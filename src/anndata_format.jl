@@ -170,16 +170,16 @@ end
 function copy_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString)::Nothing
     raw_cells_daf = anndata_as_daf(raw_cells_h5ad; obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
-    copy_axis!(; destination = destination, source = raw_cells_h5ad, axis = "cell")
-    copy_axis!(; destination = destination, source = raw_cells_h5ad, axis = "gene")
+    copy_axis!(; destination = destination, source = raw_cells_daf, axis = "cell")
+    copy_axis!(; destination = destination, source = raw_cells_daf, axis = "gene")
 
     copy_scalars_data(destination, raw_cells_daf)
 
     copy_vectors(destination, raw_cells_daf, "gene", GENE_VECTORS_DATA)
     copy_vectors(destination, raw_cells_daf, "cell", CELL_VECTORS_DATA)
 
-    copy_matrices(destination, raw_cells_h5ad, "cell", "gene", NO_MATRICES_DATA)
-    copy_matrices(destination, raw_cells_h5ad, "gene", "cell", NO_MATRICES_DATA)
+    copy_matrices(destination, raw_cells_daf, "cell", "gene", NO_MATRICES_DATA)
+    copy_matrices(destination, raw_cells_daf, "gene", "cell", NO_MATRICES_DATA)
 
     return nothing
 end
@@ -188,8 +188,8 @@ function copy_clean_cells(destination::DafWriter, clean_cells_h5ad::AbstractStri
     clean_cells_daf = anndata_as_daf(clean_cells_h5ad; obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
     if copy_axes
-        copy_axis!(; destination = destination, source = clean_cells_h5ad, axis = "cell")
-        copy_axis!(; destination = destination, source = clean_cells_h5ad, axis = "gene")
+        copy_axis!(; destination = destination, source = clean_cells_daf, axis = "cell")
+        copy_axis!(; destination = destination, source = clean_cells_daf, axis = "gene")
     end
 
     copy_scalars_data(destination, clean_cells_daf)
