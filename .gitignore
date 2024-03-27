@@ -1,0 +1,10 @@
+*.jl.*.cov
+*.jl.cov
+.*.swo
+.*.swp
+.DS_Store
+TAGS
+deps/.*
+junk*
+tags
+tracefile.info
