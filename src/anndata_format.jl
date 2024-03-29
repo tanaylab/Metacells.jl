@@ -87,7 +87,7 @@ METACELLS_SQUARE_DATA = CopyData(["obs_outgoing_weights" => ("outgoing_weights",
     function import_h5ads!(;
         destination::DafWriter,
         raw_cells_h5ad::Maybe{AbstractString} = nothing,
-        clean_cells_h5ad::AbstractString = nothing,
+        clean_cells_h5ad::AbstractString,
         metacells_h5ad::AbstractString,
         type_property::Maybe{AbstractString} = nothing,
         rename_type::Maybe{AbstractString} = "type",
@@ -162,7 +162,7 @@ changes to match the ``Daf`` capabilities and conventions:
 function import_h5ads!(;
     destination::DafWriter,
     raw_cells_h5ad::Maybe{AbstractString} = nothing,
-    clean_cells_h5ad::AbstractString = nothing,
+    clean_cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,
     type_property::Maybe{AbstractString} = nothing,
     rename_type::Maybe{AbstractString} = "type",
@@ -392,7 +392,7 @@ function copy_matrices(
         data = get(copy_data, matrix_name, (matrix_name, nothing))
         if data != nothing
             rename, empty = data
-            if !has_matrix(destination, rows_axis, columns_axis, rename; relayout = false)
+            if !has_matrix(destination, rows_axis, columns_axis, rename; relayout = true)
                 copy_matrix!(;  # NOJET
                     destination = destination,
                     source = source,
