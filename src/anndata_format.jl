@@ -1,4 +1,5 @@
 """
+: rename
 Import and export `metacells` data from/to `h5ad` files. This allows moving data between the old Python/C++ based
 `AnnData` world and the new Julia based `Daf` world.
 """
@@ -15,51 +16,72 @@ using SparseArrays
 CopyData = Dict{AbstractString, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
 
 GENE_VECTORS_DATA = CopyData([
-    "excluded_gene" => nothing,
-    "full_gene_index" => nothing,
-    "bursty_lonely_gene" => ("is_bursty_lonely", false),
-    "properly_sampled_gene" => ("is_properly_sampled", false),
-    "lateral_gene" => ("is_lateral", false),
-    "noisy_gene" => ("is_noisy", false),
-    "rare_gene" => ("is_rare", false),
-    "marker_gene" => ("is_marker", false),
-    "selected_gene" => ("is_selected", false),
-    "ignored_gene" => ("is_ignored", false),
-    "projected_noisy_gene" => ("is_projected_noisy", false),
     "atlas_gene" => ("is_atlas", false),
     "atlas_lateral_gene" => ("is_atlas_lateral", false),
-    "atlas_noisy_gene" => ("is_atlas_noisy", false),
     "atlas_marker_gene" => ("is_atlas_marker", false),
+    "atlas_noisy_gene" => ("is_atlas_noisy", false),
+    "bursty_lonely_gene" => ("is_bursty_lonely", false),
+    "correction_factor" => ("correction_factor", 0.0),
+    "excluded_gene" => nothing,
+    "full_gene_index" => nothing,
+    "fitted" => ("is_fitted", false),
+    "ignored_gene" => ("is_ignored", false),
+    "lateral_gene" => ("is_lateral", false),
+    "lateral_genes_module" => ("lateral_module", 0),
+    "marker_gene" => ("is_marker", false),
+    "noisy_gene" => ("is_noisy", false),
+    "projected_noisy_gene" => ("is_projected_noisy", false),
+    "properly_sampled_gene" => ("is_properly_sampled", false),
+    "rare_gene" => ("is_rare", false),
     "rare_gene_module" => ("rare_module", 0),
-    "lateral_gene_module" => ("lateral_module", 0),
+    "selected_gene" => ("is_selected", false),
+    "significant_inner_folds_count" => ("significant_inner_folds_count", 0),
 ])
 
 CELL_VECTORS_DATA = CopyData([
-    "full_gene_index" => nothing,
+    "cell_type" => ("projected_type", ""),
+    "cells_rare_gene_module" => ("rare_gene_module", 0),
+    "dissolve" => ("is_dissolved", false),
     "excluded_cell" => nothing,
+    "excluded_umis" => ("excluded_umis", 0),
+    "full_cell_index" => nothing,
+    "metacell" => nothing,
+    "metacell_name" => ("metacell", ""),
+    "most_similar" => nothing,
+    "most_similar_name" => ("metacell.most_similar", ""),
+    "projected_type" => ("projected_type", ""),
     "properly_sampled_cell" => ("is_properly_sampled", false),
     "rare_cell" => ("is_rare", false),
-    "dissolve" => ("is_dissolved", false),
-    "metacell" => nothing,
-    "metacell_name" => ("metacell", nothing),
-    "most_similar" => nothing,
-    "most_similar_name" => ("metacell.most_similar", nothing),
-    "cells_rare_gene_module" => ("rare_gene_module", 0),
 ])
 
 METACELL_VECTORS_DATA = CopyData([
-    "rare_metacell" => ("is_rare", nothing),
     "metacells_level" => ("level", nothing),
+    "rare_metacell" => ("is_rare", nothing),
     "similar" => ("is_similar", nothing),
 ])
 
-NO_MATRICES_DATA = CopyData()
+CELLS_MATRICES_DATA = CopyData([
+    "deviant_fold" => ("deviant_fold", 0.0),
+    "inner_fold" => ("inner_fold", 0.0),
+    "inner_stdev_log" => ("inner_stdev_log", 0.0),
+    "UMIs" => ("UMIs", 0.0),
+])
 
 METACELLS_MATRICES_DATA = CopyData([
-    "fitted" => ("is_fitted", nothing),
-    "misfit" => ("is_misfit", nothing),
-    "essential" => ("is_essential", nothing),
+    "corrected_fraction" => ("corrected_fraction", 0.0),
+    "essential" => ("is_essential", false),
+    "fitted" => ("is_fitted", false),
+    "fraction" => ("fraction", false),
+    "inner_fold" => ("inner_fold", 0.0),
+    "inner_stdev_log" => ("inner_stdev_log", 0.0),
+    "misfit" => ("is_misfit", false),
+    "projected_fold" => ("projected_fold", 0.0),
+    "projected_fraction" => ("projected_fraction", 0.0),
+    "total_umis" => ("total_umis", 0.0),
+    "zeros" => ("zeros", 0.0),
 ])
+
+METACELLS_SQUARE_DATA = CopyData(["obs_outgoing_weights" => ("outgoing_weights", nothing)])
 
 """
     function import_h5ads!(;
@@ -101,7 +123,7 @@ changes to match the ``Daf`` capabilities and conventions:
   - The `noisy_gene` mask is renamed to the per-gene `is_noisy` mask.
   - The `rare_gene` mask is renamed to the per-gene `is_rare` mask.
   - The `rare_gene_module` has 1 added to it (that is, "no module" is 0 in `Daf`) and is renamed to `rare_module`.
-  - The `lateral_gene_module` has 1 added to it (that is, "no module" is 0 in `Daf`) and is renamed to `lateral_module`.
+  - The `lateral_genes_module` has 1 added to it (that is, "no module" is 0 in `Daf`) and is renamed to `lateral_module`.
   - The `marker_gene` mask is renamed to the per-gene `is_marker` mask.
   - The `selected_gene` mask is renamed to the per-gene `is_selected` mask.
   - The `ignored_gene` mask is renamed to the per-gene `is_ignored` mask.
@@ -168,7 +190,7 @@ function import_h5ads!(;
 end
 
 function copy_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString)::Nothing
-    raw_cells_daf = anndata_as_daf(raw_cells_h5ad; obs_is = "cell", var_is = "gene", X_is = "UMIs")
+    raw_cells_daf = anndata_as_daf(raw_cells_h5ad; name = "raw_cells", obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
     copy_axis!(; destination = destination, source = raw_cells_daf, axis = "cell")
     copy_axis!(; destination = destination, source = raw_cells_daf, axis = "gene")
@@ -178,18 +200,21 @@ function copy_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString):
     copy_vectors(destination, raw_cells_daf, "gene", GENE_VECTORS_DATA)
     copy_vectors(destination, raw_cells_daf, "cell", CELL_VECTORS_DATA)
 
-    copy_matrices(destination, raw_cells_daf, "cell", "gene", NO_MATRICES_DATA)
-    copy_matrices(destination, raw_cells_daf, "gene", "cell", NO_MATRICES_DATA)
+    sparsify_umis(raw_cells_daf)
+    copy_matrices(destination, raw_cells_daf, "cell", "gene", CELLS_MATRICES_DATA)
+    copy_matrices(destination, raw_cells_daf, "gene", "cell", CELLS_MATRICES_DATA)
 
     return nothing
 end
 
 function copy_clean_cells(destination::DafWriter, clean_cells_h5ad::AbstractString; copy_axes::Bool)::Nothing
-    clean_cells_daf = anndata_as_daf(clean_cells_h5ad; obs_is = "cell", var_is = "gene", X_is = "UMIs")
+    clean_cells_daf =
+        anndata_as_daf(clean_cells_h5ad; name = "clean_cells", obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
     if copy_axes
         copy_axis!(; destination = destination, source = clean_cells_daf, axis = "cell")
         copy_axis!(; destination = destination, source = clean_cells_daf, axis = "gene")
+        sparsify_umis(clean_cells_daf)
     end
 
     copy_scalars_data(destination, clean_cells_daf)
@@ -208,8 +233,8 @@ function copy_clean_cells(destination::DafWriter, clean_cells_h5ad::AbstractStri
     copy_vectors(destination, clean_cells_daf, "gene", GENE_VECTORS_DATA)
     copy_vectors(destination, clean_cells_daf, "cell", CELL_VECTORS_DATA)
 
-    copy_matrices(destination, clean_cells_daf, "cell", "gene", NO_MATRICES_DATA)
-    copy_matrices(destination, clean_cells_daf, "gene", "cell", NO_MATRICES_DATA)
+    copy_matrices(destination, clean_cells_daf, "cell", "gene", CELLS_MATRICES_DATA)
+    copy_matrices(destination, clean_cells_daf, "gene", "cell", CELLS_MATRICES_DATA)
 
     return nothing
 end
@@ -224,7 +249,8 @@ function copy_metacells(
     type_properties::Maybe{AbstractStringSet},
     properties_defaults::Maybe{Dict},
 )::Nothing
-    metacells_daf = anndata_as_daf(metacells_h5ad; obs_is = "metacell", var_is = "gene", X_is = "fraction")
+    metacells_daf =
+        anndata_as_daf(metacells_h5ad; name = "metacells", obs_is = "metacell", var_is = "gene", X_is = "fraction")
 
     copy_axis!(; destination = destination, source = metacells_daf, axis = "metacell")
 
@@ -235,6 +261,7 @@ function copy_metacells(
 
     copy_matrices(destination, metacells_daf, "metacell", "gene", METACELLS_MATRICES_DATA)
     copy_matrices(destination, metacells_daf, "gene", "metacell", METACELLS_MATRICES_DATA)
+    copy_matrices(destination, metacells_daf, "metacell", "metacell", METACELLS_SQUARE_DATA)
 
     if type_property != nothing
         copy_metacell_types(
@@ -283,6 +310,7 @@ function copy_metacell_types(
         properties_defaults = properties_defaults,
     )
 
+    copy_axis!(; destination = metacells_daf, source = destination, axis = rename_type)
     type_names = get_axis(destination, rename_type)
     for prefix in ("ignored", "essential", "atlas_essential", "fitted")
         copy_mask_matrix(destination, metacells_daf, rename_type, type_names, prefix)
@@ -317,11 +345,11 @@ function copy_vectors(
             end
             if data != nothing
                 rename, empty = data
-                if !has_vector(destination, axis, vector_name)
-                    if empty == 0 && !(empty isa Bool)
+                if !has_vector(destination, axis, rename)
+                    if empty == 0 && endswith(vector_name, "_module")
                         vector = get_vector(source, axis, vector_name)
                         vector .+= 1
-                        set_vector!(source, axis, vector_name, SparseVector(vector); overwrite = true)
+                        set_vector!(source, axis, vector_name, sparse_vector(vector); overwrite = true)
                     end
                     copy_vector!(;  # NOJET
                         destination = destination,
@@ -338,6 +366,21 @@ function copy_vectors(
     return nothing
 end
 
+function sparsify_umis(daf::DafWriter)::Nothing
+    if has_matrix(daf, "cell", "gene", "UMIs"; relayout = false)
+        rows_axis = "cell"
+        columns_axis = "gene"
+    else
+        rows_axis = "gene"
+        columns_axis = "cell"
+    end
+    umis = get_matrix(daf, rows_axis, columns_axis, "UMIs"; relayout = false)
+    if !(umis isa SparseMatrixCSC)
+        umis = sparse_matrix_csc(umis)
+        set_matrix!(daf, rows_axis, columns_axis, "UMIs", umis; relayout = false, overwrite = true)
+    end
+end
+
 function copy_matrices(
     destination::DafWriter,
     source::DafReader,
@@ -346,10 +389,10 @@ function copy_matrices(
     copy_data::CopyData,
 )::Nothing
     for matrix_name in matrix_names(source, rows_axis, columns_axis; relayout = false)
-        if !has_matrix(destination, rows_axis, columns_axis, matrix_name; relayout = true)
-            data = get(copy_data, matrix_name, nothing)
-            if data != nothing
-                rename, empty = data
+        data = get(copy_data, matrix_name, (matrix_name, nothing))
+        if data != nothing
+            rename, empty = data
+            if !has_matrix(destination, rows_axis, columns_axis, rename; relayout = false)
                 copy_matrix!(;  # NOJET
                     destination = destination,
                     source = source,
@@ -373,10 +416,11 @@ function copy_mask_matrix(
     type_names::AbstractStringVector,
     prefix::AbstractString,
 )::Nothing
-    mask_vectors = Vector{SparseVector{Bool}}()
     any_exist = false
+
+    mask_vectors = Vector{SparseVector{Bool}}()
     for type_name in type_names
-        mask_name = "$(prefix)_gene_of_type_$(type_name)"
+        mask_name = "$(prefix)_gene_of_$(type_name)"
         if has_vector(source, "gene", mask_name)
             any_exist = true
         end
@@ -387,18 +431,21 @@ function copy_mask_matrix(
         end
         push!(mask_vectors, mask_vector)
     end
-    mask_matrix::SparseMatrixCSC{Bool} = hcat(mask_vectors...)  # NOJET
-    mask_name = "is_$(prefix)"
-    set_matrix!(source, "type", "gene", mask_name, mask_matrix)
-    return copy_matrix!(;
-        destination = destination,
-        source = source,
-        row_axis = rename_type,
-        columns_axis = "gene",
-        name = mask_name,
-        empty = false,
-        relayout = true,
-    )
+
+    if any_exist
+        mask_matrix::SparseMatrixCSC{Bool} = hcat(mask_vectors...)  # NOJET
+        mask_name = "is_$(prefix)"
+        set_matrix!(source, "gene", "type", mask_name, mask_matrix; relayout = false)
+        return copy_matrix!(;
+            destination = destination,
+            source = source,
+            rows_axis = "gene",
+            columns_axis = rename_type,
+            name = mask_name,
+            empty = false,
+            relayout = true,
+        )
+    end
 end
 
 end  # module

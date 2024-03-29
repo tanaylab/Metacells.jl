@@ -278,10 +278,8 @@ uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
 version = "4.1.1"
 
 [[deps.Daf]]
-deps = ["ConcurrentUtils", "DataFrames", "Distributed", "DocStringExtensions", "EnumX", "ExprTools", "HDF5", "JSON", "LinearAlgebra", "Mmap", "Muon", "NamedArrays", "OrderedCollections", "Random", "Reexport", "SparseArrays", "Statistics", "StringViews", "URIs"]
-git-tree-sha1 = "980772e7f614f7eee4f384dea154b88bbf5d1c34"
-repo-rev = "main"
-repo-url = "https://github.com/tanaylab/Daf.jl"
+deps = ["CategoricalArrays", "ConcurrentUtils", "DataFrames", "Distributed", "DocStringExtensions", "EnumX", "ExprTools", "HDF5", "JSON", "LinearAlgebra", "Mmap", "Muon", "NamedArrays", "OrderedCollections", "Random", "Reexport", "SparseArrays", "Statistics", "StringViews", "URIs"]
+path = "/Users/obk/projects/Daf.jl"
 uuid = "1375bf9c-a47d-45a1-aad5-626dd8629d98"
 version = "0.1.0"
 
