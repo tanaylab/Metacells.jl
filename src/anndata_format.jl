@@ -171,15 +171,18 @@ function import_h5ads!(;
     type_properties::Maybe{AbstractStringSet} = nothing,
     properties_defaults::Maybe{Dict} = nothing,
 )::Nothing
+    metacells_daf =
+        anndata_as_daf(metacells_h5ad; name = "metacells", obs_is = "metacell", var_is = "gene", X_is = "fraction")
+
     if raw_cells_h5ad != nothing
-        copy_raw_cells(destination, raw_cells_h5ad)
+        copy_raw_cells(destination, raw_cells_h5ad, metacells_daf)
     end
 
-    copy_clean_cells(destination, clean_cells_h5ad; copy_axes = raw_cells_h5ad == nothing)
+    copy_clean_cells(destination, clean_cells_h5ad, metacells_daf; copy_axes = raw_cells_h5ad == nothing)
 
     return copy_metacells(
         destination,
-        metacells_h5ad,
+        metacells_daf,
         type_property,
         rename_type,
         empty_type,
@@ -189,7 +192,7 @@ function import_h5ads!(;
     )
 end
 
-function copy_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString)::Nothing
+function copy_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString, metacells_daf::DafReader)::Nothing
     raw_cells_daf = anndata_as_daf(raw_cells_h5ad; name = "raw_cells", obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
     copy_axis!(; destination = destination, source = raw_cells_daf, axis = "cell")
@@ -197,8 +200,8 @@ function copy_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString):
 
     copy_scalars_data(destination, raw_cells_daf)
 
-    copy_vectors(destination, raw_cells_daf, "gene", GENE_VECTORS_DATA)
-    copy_vectors(destination, raw_cells_daf, "cell", CELL_VECTORS_DATA)
+    copy_vectors(destination, raw_cells_daf, "gene", GENE_VECTORS_DATA, metacells_daf)
+    copy_vectors(destination, raw_cells_daf, "cell", CELL_VECTORS_DATA, metacells_daf)
 
     sparsify_umis(raw_cells_daf)
     copy_matrices(destination, raw_cells_daf, "cell", "gene", CELLS_MATRICES_DATA)
@@ -207,7 +210,12 @@ function copy_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString):
     return nothing
 end
 
-function copy_clean_cells(destination::DafWriter, clean_cells_h5ad::AbstractString; copy_axes::Bool)::Nothing
+function copy_clean_cells(
+    destination::DafWriter,
+    clean_cells_h5ad::AbstractString,
+    metacells_daf::DafReader;
+    copy_axes::Bool,
+)::Nothing
     clean_cells_daf =
         anndata_as_daf(clean_cells_h5ad; name = "clean_cells", obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
@@ -230,8 +238,8 @@ function copy_clean_cells(destination::DafWriter, clean_cells_h5ad::AbstractStri
         )
     end
 
-    copy_vectors(destination, clean_cells_daf, "gene", GENE_VECTORS_DATA)
-    copy_vectors(destination, clean_cells_daf, "cell", CELL_VECTORS_DATA)
+    copy_vectors(destination, clean_cells_daf, "gene", GENE_VECTORS_DATA, metacells_daf)
+    copy_vectors(destination, clean_cells_daf, "cell", CELL_VECTORS_DATA, metacells_daf)
 
     copy_matrices(destination, clean_cells_daf, "cell", "gene", CELLS_MATRICES_DATA)
     copy_matrices(destination, clean_cells_daf, "gene", "cell", CELLS_MATRICES_DATA)
@@ -241,7 +249,7 @@ end
 
 function copy_metacells(
     destination::DafWriter,
-    metacells_h5ad::AbstractString,
+    metacells_daf::DafReader,
     type_property::Maybe{AbstractString},
     rename_type::Maybe{AbstractString},
     empty_type::Maybe{AbstractString},
@@ -249,15 +257,20 @@ function copy_metacells(
     type_properties::Maybe{AbstractStringSet},
     properties_defaults::Maybe{Dict},
 )::Nothing
-    metacells_daf =
-        anndata_as_daf(metacells_h5ad; name = "metacells", obs_is = "metacell", var_is = "gene", X_is = "fraction")
-
     copy_axis!(; destination = destination, source = metacells_daf, axis = "metacell")
 
     copy_scalars_data(destination, metacells_daf)
 
-    copy_vectors(destination, metacells_daf, "gene", GENE_VECTORS_DATA)
-    copy_vectors(destination, metacells_daf, "metacell", METACELL_VECTORS_DATA, type_property, rename_type)
+    copy_vectors(destination, metacells_daf, "gene", GENE_VECTORS_DATA, metacells_daf)
+    copy_vectors(
+        destination,
+        metacells_daf,
+        "metacell",
+        METACELL_VECTORS_DATA,
+        metacells_daf,
+        type_property,
+        rename_type,
+    )
 
     copy_matrices(destination, metacells_daf, "metacell", "gene", METACELLS_MATRICES_DATA)
     copy_matrices(destination, metacells_daf, "gene", "metacell", METACELLS_MATRICES_DATA)
@@ -333,6 +346,7 @@ function copy_vectors(
     source::DafWriter,
     axis::AbstractString,
     copy_data::CopyData,
+    metacells_daf::DafReader,
     type_property::Maybe{AbstractString} = nothing,
     rename_type::Maybe{AbstractString} = nothing,
 )::Nothing
@@ -351,8 +365,9 @@ function copy_vectors(
                         vector .+= 1
                         set_vector!(source, axis, vector_name, sparse_vector(vector); overwrite = true)
                     elseif vector_name == "metacell_name"
+                        valid_names = Set(get_axis(metacells_daf, "metacell"))
                         vector = get_vector(source, axis, vector_name)
-                        vector = [name == "Outliers" ? "" : name for name in vector]
+                        vector = [name in valid_names ? name : "" for name in vector]
                         set_vector!(source, axis, vector_name, vector; overwrite = true)
                     end
                     copy_vector!(;  # NOJET
