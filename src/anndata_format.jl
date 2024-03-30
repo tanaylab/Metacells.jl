@@ -350,6 +350,10 @@ function copy_vectors(
                         vector = get_vector(source, axis, vector_name)
                         vector .+= 1
                         set_vector!(source, axis, vector_name, sparse_vector(vector); overwrite = true)
+                    elseif vector_name == "metacell_name"
+                        vector = get_vector(source, axis, vector_name)
+                        vector = [name == "Outliers" ? "" : name for name in vector]
+                        set_vector!(source, axis, vector_name, vector; overwrite = true)
                     end
                     copy_vector!(;  # NOJET
                         destination = destination,
