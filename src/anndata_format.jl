@@ -1,5 +1,4 @@
 """
-: rename
 Import and export `metacells` data from/to `h5ad` files. This allows moving data between the old Python/C++ based
 `AnnData` world and the new Julia based `Daf` world.
 """
@@ -9,7 +8,8 @@ export import_h5ads!
 
 using CSV
 using Daf
-using Daf.Generic
+using Daf.GenericLogging
+using Daf.GenericTypes
 using DataFrames
 using SparseArrays
 
@@ -43,7 +43,7 @@ CELL_VECTORS_DATA = CopyData([
     "cells_rare_gene_module" => ("rare_gene_module", 0),
     "dissolve" => ("is_dissolved", false),
     "excluded_cell" => nothing,
-    "excluded_umis" => ("excluded_umis", 0),
+    "excluded_umis" => ("excluded_UMIs", 0),
     "full_cell_index" => nothing,
     "metacell" => nothing,
     "metacell_name" => ("metacell", ""),
@@ -58,6 +58,7 @@ METACELL_VECTORS_DATA = CopyData([
     "metacells_level" => ("level", nothing),
     "rare_metacell" => ("is_rare", nothing),
     "similar" => ("is_similar", nothing),
+    "total_umis" => ("total_UMIs", nothing),
 ])
 
 CELLS_MATRICES_DATA = CopyData([
@@ -77,7 +78,7 @@ METACELLS_MATRICES_DATA = CopyData([
     "misfit" => ("is_misfit", false),
     "projected_fold" => ("projected_fold", 0.0),
     "projected_fraction" => ("projected_fraction", 0.0),
-    "total_umis" => ("total_umis", 0.0),
+    "total_umis" => ("total_UMIs", 0.0),
     "zeros" => ("zeros", 0.0),
 ])
 
@@ -159,7 +160,7 @@ changes to match the ``Daf`` capabilities and conventions:
 
     It is common to call `reconstruct_axis!` on the result (e.g., if the cells were collected from a set of batches).
 """
-function import_h5ads!(;
+@logged function import_h5ads!(;
     destination::DafWriter,
     raw_cells_h5ad::Maybe{AbstractString} = nothing,
     clean_cells_h5ad::AbstractString,
@@ -171,14 +172,14 @@ function import_h5ads!(;
     type_properties::Maybe{AbstractStringSet} = nothing,
     properties_defaults::Maybe{Dict} = nothing,
 )::Nothing
-    metacells_daf =
+    metacells_daf =  # NOJET
         anndata_as_daf(metacells_h5ad; name = "metacells", obs_is = "metacell", var_is = "gene", X_is = "fraction")
 
-    if raw_cells_h5ad != nothing
+    if raw_cells_h5ad !== nothing
         copy_raw_cells(destination, raw_cells_h5ad, metacells_daf)
     end
 
-    copy_clean_cells(destination, clean_cells_h5ad, metacells_daf; copy_axes = raw_cells_h5ad == nothing)
+    copy_clean_cells(destination, clean_cells_h5ad, metacells_daf; copy_axes = raw_cells_h5ad === nothing)
 
     return copy_metacells(
         destination,
@@ -276,7 +277,7 @@ function copy_metacells(
     copy_matrices(destination, metacells_daf, "gene", "metacell", METACELLS_MATRICES_DATA)
     copy_matrices(destination, metacells_daf, "metacell", "metacell", METACELLS_SQUARE_DATA)
 
-    if type_property != nothing
+    if type_property !== nothing
         copy_metacell_types(
             destination,
             metacells_daf,
@@ -302,11 +303,11 @@ function copy_metacell_types(
     type_properties::Maybe{AbstractStringSet},
     properties_defaults::Maybe{Dict},
 )::Nothing
-    if rename_type == nothing
+    if rename_type === nothing
         rename_type = type_property
     end
 
-    if type_colors_csv != nothing
+    if type_colors_csv !== nothing
         data_frame = CSV.read(type_colors_csv, DataFrame)  # NOJET
         names = data_frame[:, type_property]
         colors = data_frame[:, "color"]
@@ -352,12 +353,12 @@ function copy_vectors(
 )::Nothing
     for vector_name in vector_names(source, axis)
         if !contains(vector_name, "_gene_of_")
-            if vector_name == type_property && rename_type != nothing
+            if vector_name == type_property && rename_type !== nothing
                 data = (rename_type, nothing)
             else
                 data = get(copy_data, vector_name, (vector_name, nothing))
             end
-            if data != nothing
+            if data !== nothing
                 rename, empty = data
                 if !has_vector(destination, axis, rename)
                     if empty == 0 && endswith(vector_name, "_module")
@@ -409,7 +410,7 @@ function copy_matrices(
 )::Nothing
     for matrix_name in matrix_names(source, rows_axis, columns_axis; relayout = false)
         data = get(copy_data, matrix_name, (matrix_name, nothing))
-        if data != nothing
+        if data !== nothing
             rename, empty = data
             if !has_matrix(destination, rows_axis, columns_axis, rename; relayout = true)
                 copy_matrix!(;  # NOJET

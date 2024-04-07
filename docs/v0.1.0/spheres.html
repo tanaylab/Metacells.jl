@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Metacells · Metacells.jl v0.1.0
+<title>Neighborhoods · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Metacells · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Metacells · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Metacells · Metacells.jl v0.1.0"/>
+<meta name="title" content="Neighborhoods · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Neighborhoods · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Neighborhoods · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -48,25 +48,25 @@
 <button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
 </button>
 <ul class="docs-menu">
-<li class="is-active">
+<li>
 <a class="tocitem" href="index.html">Metacells
 </a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="spheres.html">Neighborhoods
+</a>
 <ul class="internal">
-<li class="toplevel">
+<li>
 <a class="tocitem" href="#Index">
 <span>Index
 </span>
 </a>
 </li>
 </ul>
-</li>
-<li>
-<a class="tocitem" href="anndata_format.html">AnnData Format
-</a>
-</li>
-<li>
-<a class="tocitem" href="spheres.html">Neighborhoods
-</a>
 </li>
 </ul>
 <div class="docs-version-selector field has-addons">
@@ -89,13 +89,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="index.html">Metacells
+<a href="spheres.html">Neighborhoods
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="index.html">Metacells
+<a href="spheres.html">Neighborhoods
 </a>
 </li>
 </ul>
@@ -114,20 +114,20 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Metacells">
-<a class="docs-heading-anchor" href="#Metacells">Metacells
+<h1 id="Neighborhoods">
+<a class="docs-heading-anchor" href="#Neighborhoods">Neighborhoods
 </a>
-<a id="Metacells-1">
+<a id="Neighborhoods-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Metacells" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Neighborhoods" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Metacells" href="#Metacells.Metacells">
-<code>Metacells.Metacells
+<a class="docstring-binding" id="Metacells.Spheres" href="#Metacells.Spheres">
+<code>Metacells.Spheres
 </code>
 </a> — 
 <span class="docstring-category">Module
@@ -135,57 +135,84 @@
 </header>
 <section>
 <div>
-<p>The 
-<code>Metacells.jl
-</code> package provides computational services for the 
-<a href="https://github.com/tanaylab/metacells">metacells
-</a> package, using 
-<a href="https://github.com/tanaylab/Daf.jl">Daf
-</a> to hold the data. In the future, we&#39;ll ideally migrate all of the 
-<code>metacells
-</code>package computations to this package, converting the Python package to a thin wrapper, and provide a similar thin R wrapper to provide metacell analysis from R as well. For now,
-<code>Metacells.jl
-</code>only provides a subset of the features of the Python
-<code>metacells
-</code>package, which requires users to convert data from
-<code>AnnData
-</code>(for the old features) to
-<code>Daf
-</code> (to the new features).
+<p>Given a set of raw metacells, partition them into spheres such that all metacells in the same sphere are within some (fold factor) radius of each other. The centroids of these spheres can serve as a representation of the cell state manifold which is less sensitive to oversampling of common cell states.
 </p>
 </div>
 </section>
 </article>
-<h1 id="Index">
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Spheres.compute_spheres!" href="#Metacells.Spheres.compute_spheres!">
+<code>Metacells.Spheres.compute_spheres!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_spheres(
+    daf::DafWriter;
+    max_sphere_fold_factor::AbstractFloat = 3.0,
+    gene_fraction_regularization::AbstractFloat = 1e-5,
+    min_significant_gene_UMIs:: Unsigned = 40,
+)::Nothing
+</code>
+</pre>
+<p>Partition raw metacells into distinct spheres, using a variant of union-find:
+</p>
+<ol>
+<li>
+<p>Compute a distance between each two metacells, defined as the maximal fold factor of any of the genes. This fold factor is the absolute value of log base 2 of the fraction of the gene in both metacells, using the 
+<code>gene_fraction_regularization
+</code> (by default, 
+<code>1e-5
+</code>). If the sum of the total UMIs of the gene in both metacells is less than 
+<code>min_significant_gene_UMIs
+</code> (by default, 
+<code>40
+</code>), we ignore this fold factor as insignificant.
+</p>
+</li>
+<li>
+<p>Initially place each metacell in its own sphere.
+</p>
+</li>
+<li>
+<p>Pass on all metacell pairs, ordered by increasing distance. If the metacells belong to different spheres, merge both spheres into a single one if the maximal distance between the metacells of the combined sphere is no more than 
+<code>max_sphere_fold_factor
+</code> (by default, 
+<code>3.0
+</code>, or 8x).
+</p>
+</li>
+<li>
+<p>Compute the centroid (geomean) of each gene&#39;s fraction of each sphere, using the same 
+<code>gene_fraction_regularization
+</code> as above.
+</p>
+</li>
+</ol>
+<p>CONTRACT
+</p>
+</div>
+</section>
+</article>
+<h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
 <a id="Index-1">
 </a>
 <a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
 </a>
-</h1>
+</h2>
 <ul>
-<li>
-<a href="anndata_format.html#Metacells.AnnDataFormat">
-<code>Metacells.AnnDataFormat
-</code>
-</a>
-</li>
-<li>
-<a href="index.html#Metacells.Metacells">
-<code>Metacells.Metacells
-</code>
-</a>
-</li>
 <li>
 <a href="spheres.html#Metacells.Spheres">
 <code>Metacells.Spheres
-</code>
-</a>
-</li>
-<li>
-<a href="anndata_format.html#Metacells.AnnDataFormat.import_h5ads!">
-<code>Metacells.AnnDataFormat.import_h5ads!
 </code>
 </a>
 </li>
@@ -198,7 +225,7 @@
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-nextpage" href="anndata_format.html">AnnData Format »
+<a class="docs-footer-prevpage" href="anndata_format.html">« AnnData Format
 </a>
 <div class="flexbox-break">
 </div>

@@ -13,4 +13,7 @@ using Reexport
 include("anndata_format.jl")
 @reexport using Metacells.AnnDataFormat
 
+include("spheres.jl")
+@reexport using Metacells.Spheres
+
 end # module
