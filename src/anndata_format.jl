@@ -335,8 +335,9 @@ end
 
 function copy_scalars_data(destination::DafWriter, source::DafReader)::Nothing
     for scalar_name in scalar_names(source)
-        if !has_scalar(destination, scalar_name)
-            copy_scalar!(; destination = destination, source = source, name = scalar_name)
+        rename = scalar_name == "__name__" ? "name" : scalar_name
+        if !has_scalar(destination, rename)
+            copy_scalar!(; destination = destination, source = source, name = scalar_name, rename = rename)
         end
     end
     return nothing
