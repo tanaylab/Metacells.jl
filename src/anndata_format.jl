@@ -114,6 +114,7 @@ This will mostly just read all the specified `h5ad` files and copy the data into
 changes to match the ``Daf`` capabilities and conventions:
 
   - The `X` matrix of the cells is renamed to `UMIs`, and the `X` matrix of the metacells is renamed to `fraction`.
+  - The `__name__` scalar is not copied.
   - The `excluded_gene` and `excluded_cell` masks are not copied. Instead, if `raw_cells_h5ad` is specified, an
     `is_excluded` mask is created for both cells and genes, marking these that exist only in the `raw_cells_h5ad` and
     not in `clean_cells_h5ad` and `metacells_h5ad`.
@@ -335,9 +336,8 @@ end
 
 function copy_scalars_data(destination::DafWriter, source::DafReader)::Nothing
     for scalar_name in scalar_names(source)
-        rename = scalar_name == "__name__" ? "name" : scalar_name
-        if !has_scalar(destination, rename)
-            copy_scalar!(; destination = destination, source = source, name = scalar_name, rename = rename)
+        if scalar_name != "__name__" && !has_scalar(destination, scalar_name)
+            copy_scalar!(; destination = destination, source = source, name = scalar_name)
         end
     end
     return nothing
