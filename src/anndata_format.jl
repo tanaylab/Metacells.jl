@@ -21,13 +21,13 @@ GENE_VECTORS_DATA = CopyData([
     "atlas_marker_gene" => ("is_atlas_marker", false),
     "atlas_noisy_gene" => ("is_atlas_noisy", false),
     "bursty_lonely_gene" => ("is_bursty_lonely", false),
-    "correction_factor" => ("correction_factor", 0.0),
+    "correction_factor" => ("correction_factor", Float32(0.0)),
     "excluded_gene" => nothing,
     "full_gene_index" => nothing,
     "fitted" => ("is_fitted", false),
     "ignored_gene" => ("is_ignored", false),
     "lateral_gene" => ("is_lateral", false),
-    "lateral_genes_module" => ("lateral_module", 0),
+    "lateral_genes_module" => ("lateral_module", UInt32(0)),
     "marker_gene" => ("is_marker", false),
     "noisy_gene" => ("is_noisy", false),
     "projected_noisy_gene" => ("is_projected_noisy", false),
@@ -35,15 +35,15 @@ GENE_VECTORS_DATA = CopyData([
     "rare_gene" => ("is_rare", false),
     "rare_gene_module" => ("rare_module", 0),
     "selected_gene" => ("is_selected", false),
-    "significant_inner_folds_count" => ("significant_inner_folds_count", 0),
+    "significant_inner_folds_count" => ("significant_inner_folds_count", UInt32(0)),
 ])
 
 CELL_VECTORS_DATA = CopyData([
     "cell_type" => ("projected_type", ""),
-    "cells_rare_gene_module" => ("rare_gene_module", 0),
+    "cells_rare_gene_module" => ("rare_gene_module", UInt32(0)),
     "dissolve" => ("is_dissolved", false),
     "excluded_cell" => nothing,
-    "excluded_umis" => ("excluded_UMIs", 0),
+    "excluded_umis" => ("excluded_UMIs", UInt32(0)),
     "full_cell_index" => nothing,
     "metacell" => nothing,
     "metacell_name" => ("metacell", ""),
@@ -59,27 +59,29 @@ METACELL_VECTORS_DATA = CopyData([
     "rare_metacell" => ("is_rare", nothing),
     "similar" => ("is_similar", nothing),
     "total_umis" => ("total_UMIs", nothing),
+    "__zero" => ("total_UMIs", nothing),
+    "__zeros_downsample_umis" => ("__zeros_downsample_UMIs", nothing),
 ])
 
 CELLS_MATRICES_DATA = CopyData([
-    "deviant_fold" => ("deviant_fold", 0.0),
-    "inner_fold" => ("inner_fold", 0.0),
-    "inner_stdev_log" => ("inner_stdev_log", 0.0),
-    "UMIs" => ("UMIs", 0.0),
+    "deviant_fold" => ("deviant_fold", Float32(0.0)),
+    "inner_fold" => ("inner_fold", Float32(0.0)),
+    "inner_stdev_log" => ("inner_stdev_log", Float32(0.0)),
+    "UMIs" => ("UMIs", UInt32(0)),
 ])
 
 METACELLS_MATRICES_DATA = CopyData([
-    "corrected_fraction" => ("corrected_fraction", 0.0),
+    "corrected_fraction" => ("corrected_fraction", Float32(0.0)),
     "essential" => ("is_essential", false),
     "fitted" => ("is_fitted", false),
-    "fraction" => ("fraction", false),
-    "inner_fold" => ("inner_fold", 0.0),
-    "inner_stdev_log" => ("inner_stdev_log", 0.0),
+    "fraction" => ("fraction", Float32(0.0)),
+    "inner_fold" => ("inner_fold", Float32(0.0)),
+    "inner_stdev_log" => ("inner_stdev_log", Float32(0.0)),
     "misfit" => ("is_misfit", false),
-    "projected_fold" => ("projected_fold", 0.0),
-    "projected_fraction" => ("projected_fraction", 0.0),
-    "total_umis" => ("total_UMIs", 0.0),
-    "zeros" => ("zeros", 0.0),
+    "projected_fold" => ("projected_fold", Float32(0.0)),
+    "projected_fraction" => ("projected_fraction", Float32(0.0)),
+    "total_umis" => ("total_UMIs", UInt32(0)),
+    "zeros" => ("zeros", UInt32(0)),
 ])
 
 METACELLS_SQUARE_DATA = CopyData(["obs_outgoing_weights" => ("outgoing_weights", nothing)])
@@ -114,6 +116,7 @@ This will mostly just read all the specified `h5ad` files and copy the data into
 changes to match the ``Daf`` capabilities and conventions:
 
   - The `X` matrix of the cells is renamed to `UMIs`, and the `X` matrix of the metacells is renamed to `fraction`.
+  - Matrices and vectors of counts (UMIs, zeros) or module indices are converted to an unsigned type.
   - The `__name__` scalar is not copied.
   - The `excluded_gene` and `excluded_cell` masks are not copied. Instead, if `raw_cells_h5ad` is specified, an
     `is_excluded` mask is created for both cells and genes, marking these that exist only in the `raw_cells_h5ad` and
@@ -372,12 +375,22 @@ function copy_vectors(
                         vector = [name in valid_names ? name : "" for name in vector]
                         set_vector!(source, axis, vector_name, vector; overwrite = true)
                     end
-                    copy_vector!(;  # NOJET
+
+                    if empty !== nothing
+                        dtype = typeof(empty)
+                    elseif contains(rename, "UMIs")
+                        dtype = UInt32
+                    else
+                        dtype = nothing
+                    end
+
+                    copy_vector!(;  # NOJET # NOLINT
                         destination = destination,
                         source = source,
                         axis = axis,
                         name = vector_name,
                         rename = rename,
+                        dtype = dtype,
                         empty = empty,
                     )
                 end
@@ -414,13 +427,22 @@ function copy_matrices(
         if data !== nothing
             rename, empty = data
             if !has_matrix(destination, rows_axis, columns_axis, rename; relayout = true)
-                copy_matrix!(;  # NOJET
+                if empty !== nothing
+                    dtype = typeof(empty)
+                elseif contains(rename, "UMIs")
+                    dtype = UInt32
+                else
+                    dtype = nothing
+                end
+
+                copy_matrix!(;  # NOJET # NOLINT
                     destination = destination,
                     source = source,
                     rows_axis = rows_axis,
                     columns_axis = columns_axis,
                     name = matrix_name,
                     rename = rename,
+                    dtype = dtype,
                     empty = empty,
                     relayout = true,
                 )
@@ -457,7 +479,7 @@ function copy_mask_matrix(
         mask_matrix::SparseMatrixCSC{Bool} = hcat(mask_vectors...)  # NOJET
         mask_name = "is_$(prefix)"
         set_matrix!(source, "gene", "type", mask_name, mask_matrix; relayout = false)
-        return copy_matrix!(;
+        return copy_matrix!(;  # NOJET
             destination = destination,
             source = source,
             rows_axis = "gene",

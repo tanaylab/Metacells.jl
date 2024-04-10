@@ -1,5 +1,10 @@
 #!/bin/bash
 set -e -o pipefail
+if [ `echo */*.cov` = '*/*.cov' ]
+then
+    echo "No coverage!"
+    exit 0
+fi
 grep -H -n '.' */*.cov \
 | sed 's/\.[0-9][0-9]*\.cov:\([0-9][0-9]*\): [ ]*\([^ ]*\) /`\1`\2`/' \
 | sort -t '`' -k '1,1' -k '2n,2' \

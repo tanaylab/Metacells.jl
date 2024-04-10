@@ -33,8 +33,6 @@ Partition raw metacells into distinct spheres, using a variant of union-find:
  3. Pass on all metacell pairs, ordered by increasing distance. If the metacells belong to different spheres, merge
     both spheres into a single one if the maximal distance between the metacells of the combined sphere is no more than
     `max_sphere_fold_factor` (by default, `3.0`, or 8x).
- 4. Compute the centroid (geomean) of each gene's fraction of each sphere, using the same
-    `gene_fraction_regularization` as above.
 
 CONTRACT
 """
@@ -53,13 +51,6 @@ CONTRACT
             "The total number of UMIs used to estimate the fraction of each gene in each metacell.",
         ),
         ("metacell", "sphere") => (GuaranteedOutput, AbstractString, "The unique sphere each metacell belongs to."),
-        ("sphere", "gene", "fraction") =>
-            (GuaranteedOutput, AbstractFloat, "The centroid fraction of each gene in each sphere."),
-        ("sphere", "gene", "total_UMIs") => (
-            GuaranteedOutput,
-            AbstractFloat,
-            "The total number of UMIs used to estimate the fraction of each gene in each sphere.",
-        ),
     ],
 ) function compute_spheres!(
     daf::DafWriter;
@@ -70,8 +61,11 @@ CONTRACT
     @assert max_sphere_fold_factor > 0
     @assert gene_fraction_regularization > 0
 
-    genes_metacells_log_fraction = daf["/ gene / metacell : fraction % Log base 2 eps $(gene_fraction_regularization)"]
-    genes_metacells_total_UMIs = get_matrix(daf, "gene", "metacell", "total_UMIs")
+    @debug "read..."
+
+    genes_metacells_log_fraction =
+        daf["/ gene / metacell : fraction % Log base 2 eps $(gene_fraction_regularization)"].array
+    genes_metacells_total_UMIs = get_matrix(daf, "gene", "metacell", "total_UMIs").array
 
     check_efficient_action("compute_spheres", Columns, "genes_metacells_log_fraction", genes_metacells_log_fraction)
     check_efficient_action("compute_spheres", Columns, "genes_metacells_total_UMIs", genes_metacells_total_UMIs)
@@ -94,52 +88,59 @@ CONTRACT
 
     metacells_of_spheres = collect_group_members(spheres_of_metacells)
 
+    @debug "group..."
+
     sphere_names = group_names(daf, "metacell", metacells_of_spheres; prefix = "S")
     add_axis!(daf, "sphere", sphere_names)
     set_vector!(daf, "metacell", "sphere", sphere_names[spheres_of_metacells])
 
-    genes_spheres_fraction, genes_spheres_total_UMIs = compute_spheres_data(
-        gene_fraction_regularization,
-        metacells_of_spheres,
-        genes_metacells_log_fraction,
-        genes_metacells_total_UMIs,
-    )
-    set_matrix!(daf, "gene", "sphere", "fraction", genes_spheres_fraction)
-    set_matrix!(daf, "gene", "sphere", "total_UMIs", genes_spheres_total_UMIs)
-
     return nothing
 end
 
-function compute_sorted_distance_pairs(  # untested
+@logged function compute_sorted_distance_pairs(  # untested
     daf::DafReader,
     max_sphere_fold_factor::AbstractFloat,
     min_significant_gene_UMIs::Unsigned,
     genes_metacells_log_fraction::AbstractMatrix{<:AbstractFloat},
     genes_metacells_total_UMIs::AbstractMatrix{<:Unsigned},
 )::Vector{Tuple{Float32, UInt32, UInt32}}
-    distance_pairs = Vector{Tuple{Float32, UInt32, UInt32}}()
-
     n_metacells = axis_length(daf, "metacell")
-    for first_metacell in 1:n_metacells
-        for second_metacell in 1:(first_metacell - 1)
-            distance = compute_distance(
-                first_metacell,
-                second_metacell,
-                min_significant_gene_UMIs,
-                genes_metacells_log_fraction,
-                genes_metacells_total_UMIs,
-            )
-            if distance <= max_sphere_fold_factor
-                push!(distance_pairs, (distance, first_metacell, second_metacell))
+    n_pairs = div(n_metacells * (n_metacells - 1), 2)
+
+    distance_pairs = Vector{Tuple{Float32, UInt32, UInt32}}(undef, n_pairs)
+    next_pair_index = Atomic{Int64}(1)
+
+    @debug "collect close distance pairs..."
+    @threads for base_metacell in reverse(2:n_metacells)
+        @views genes_log_fraction_of_base_metacell = genes_metacells_log_fraction[:, base_metacell]
+        @views genes_log_fraction_of_other_metacells = genes_metacells_log_fraction[:, 1:(base_metacell - 1)]
+        @views genes_total_UMIs_of_base_metacell = genes_metacells_total_UMIs[:, base_metacell]
+        @views genes_total_UMIs_of_other_metacells = genes_metacells_total_UMIs[:, 1:(base_metacell - 1)]
+
+        fold_factors_of_other_metacells =
+            abs.(genes_log_fraction_of_other_metacells .- genes_log_fraction_of_base_metacell) .*
+            (genes_total_UMIs_of_other_metacells .+ genes_total_UMIs_of_base_metacell .>= min_significant_gene_UMIs)
+        distances_of_other_metacells = maximum(fold_factors_of_other_metacells; dims = 1)  # NOJET
+        is_close_of_other_metacells = distances_of_other_metacells .<= max_sphere_fold_factor
+        n_close = sum(is_close_of_other_metacells)
+        pair_index = atomic_add!(next_pair_index, n_close)
+        for (other_metacell, is_close) in enumerate(is_close_of_other_metacells)
+            if is_close
+                distance = distances_of_other_metacells[other_metacell]
+                distance_pairs[pair_index] = (distance, base_metacell, other_metacell)
+                pair_index += 1
             end
         end
     end
 
+    n_close = next_pair_index[] - 1
+    resize!(distance_pairs, n_close)
+    @debug "collected $(n_close) close distance pairs, sort..."
     sort!(distance_pairs)
     return distance_pairs
 end
 
-function compute_sphere_of_metacells(  # untested
+@logged function compute_sphere_of_metacells(  # untested
     sorted_distance_pairs::Vector{Tuple{Float32, UInt32, UInt32}},
     max_sphere_fold_factor::AbstractFloat,
     min_significant_gene_UMIs::Unsigned,
@@ -218,15 +219,14 @@ function compute_distance(  # untested
 )::Float32
     @views genes_log_fraction_of_first_metacell = genes_metacells_log_fraction[:, first_metacell]  # NOJET
     @views genes_log_fraction_of_second_metacell = genes_metacells_log_fraction[:, second_metacell]
-    fold_factors = abs.(genes_log_fraction_of_first_metacell .- genes_log_fraction_of_second_metacell)
-
     @views genes_total_UMIs_of_first_metacell = genes_metacells_total_UMIs[:, first_metacell]  # NOJET
     @views genes_total_UMIs_of_second_metacell = genes_metacells_total_UMIs[:, second_metacell]
-    significant_fold_factors_mask =
-        (genes_total_UMIs_of_first_metacell .+ genes_total_UMIs_of_second_metacell) .>= min_significant_gene_UMIs
 
-    @views distance = max(fold_factors[significant_fold_factors_mask])
-    return distance
+    return maximum(
+        abs.(
+            genes_log_fraction_of_first_metacell .- genes_log_fraction_of_second_metacell  #
+        )[genes_total_UMIs_of_first_metacell .+ genes_total_UMIs_of_second_metacell .>= min_significant_gene_UMIs],
+    )
 end
 
 function merge_spheres(  # untested
@@ -241,35 +241,6 @@ function merge_spheres(  # untested
     append!(low_metacells, high_metacells)
     empty!(high_metacells)
     return nothing
-end
-
-function compute_spheres_data(  # untested
-    gene_fraction_regularization::AbstractFloat,
-    metacells_of_spheres::AbstractVector{<:AbstractVector{<:Integer}},
-    genes_metacells_log_fraction::AbstractMatrix{F},
-    genes_metacells_total_UMIs::AbstractMatrix{T},
-)::Tuple{Matrix{F}, Matrix{T}} where {F <: AbstractFloat, T <: Unsigned}
-    n_genes = size(genes_metacells_log_fraction, 1)
-    n_spheres = length(metacells_of_spheres)
-
-    genes_spheres_fraction = Matrix{F}(undef, (n_genes, n_spheres))
-    genes_spheres_total_UMIs = Matrix{T}(undef, (n_genes, n_spheres))
-
-    check_efficient_action("compute_spheres_data", Columns, "genes_spheres_fraction", genes_spheres_fraction)
-    check_efficient_action("compute_spheres_data", Columns, "genes_spheres_total_UMIs", genes_spheres_total_UMIs)
-
-    @threads for (sphere, metacells_of_sphere) in enumerate(metacells_of_spheres)
-        @views genes_sphere_metacells_total_UMIs = genes_metacells_total_UMIs[:, metacells_of_sphere]
-        @views sphere_total_UMIs_of_genes = genes_spheres_total_UMIs[:, sphere]
-        sphere_total_UMIs_of_genes .= sum(genes_sphere_metacells_total_UMIs; dims = 2)
-
-        @views genes_sphere_metacells_log_fraction = genes_metacells_log_fraction[:, metacells_of_sphere]
-        @views sphere_fraction_of_genes = genes_spheres_fraction[:, sphere]
-        sphere_fraction_of_genes .=  # NOJET
-            2 .^ mean(genes_sphere_metacells_log_fraction; dims = 2) - gene_fraction_regularization
-    end
-
-    return (genes_spheres_fraction, genes_spheres_total_UMIs)
 end
 
 end  # module
