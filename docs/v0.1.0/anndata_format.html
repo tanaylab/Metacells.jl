@@ -162,8 +162,8 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function import_h5ads!(;
-    destination::DafWriter,
+<code class="language-julia hljs">function import_h5ads!(
+    destination::DafWriter;
     raw_cells_h5ad::Maybe{AbstractString} = nothing,
     clean_cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,

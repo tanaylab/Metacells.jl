@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e -o pipefail
-if [ `echo */*.cov` = '*/*.cov' ]
+if [ "`echo */*.cov`" = '*/*.cov' ]
 then
     echo "No coverage!"
     exit 0
