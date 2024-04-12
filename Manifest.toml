@@ -1,6 +1,6 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.10.2"
+julia_version = "1.10.0"
 manifest_format = "2.0"
 project_hash = "fcaafb7f3c2c1e84d828c7b23f10b06952b4eee1"
 
@@ -56,7 +56,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.1.0+0"
+version = "1.0.5+1"
 
 [[deps.CompressHashDisplace]]
 deps = ["MurmurHash3"]
@@ -91,7 +91,7 @@ version = "4.1.1"
 
 [[deps.Daf]]
 deps = ["CategoricalArrays", "ConcurrentUtils", "DataFrames", "Dates", "Distributed", "DocStringExtensions", "ExprTools", "HDF5", "JSON", "LinearAlgebra", "Logging", "Mmap", "Muon", "NamedArrays", "OrderedCollections", "Random", "Reexport", "SHA", "SparseArrays", "Statistics", "StatsBase", "StringViews", "URIs"]
-git-tree-sha1 = "5b2d7e0564d27a67799f2db50a5a740c2da1cc2c"
+git-tree-sha1 = "258003898f698da970ba94d7bb6213c3b6f0a9ec"
 repo-rev = "main"
 repo-url = "https://github.com/tanaylab/Daf.jl"
 uuid = "1375bf9c-a47d-45a1-aad5-626dd8629d98"
@@ -383,7 +383,7 @@ version = "1.2.0"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.23+4"
+version = "0.3.23+2"
 
 [[deps.OpenMPI_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "MPIPreferences", "TOML"]
