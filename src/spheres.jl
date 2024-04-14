@@ -29,11 +29,10 @@ Partition raw metacells into distinct spheres, using a variant of union-find:
     factor is the absolute value of log base 2 of the fraction of the gene in both metacells, using the
     `gene_fraction_regularization` (by default, `1e-5`). If the sum of the total UMIs of the gene in both metacells is
     less than `min_significant_gene_UMIs` (by default, `40`), we ignore this fold factor as insignificant.
-
- 2. Initially place each metacell in its own sphere.
- 3. Pass on all metacell pairs, ordered by increasing distance. If the metacells belong to different spheres, merge
-    both spheres into a single one if the maximal distance between the metacells of the combined sphere is no more than
-    `max_sphere_fold_factor` (by default, `3.0`, or 8x).
+ 2. Compute hierarchical clustering of the metacells using these distances and the `complete` linkage; that is, each
+    cluster can be seen as a sphere of some diameter where all the metacells are within that sphere.
+ 3. Use this hierarchical clustering to partition the metacells into as-small as possible spheres, where each sphere
+    diameter is at most `max_sphere_fold_factor` (by default, `3.0`, or 8x).
 
 CONTRACT
 """

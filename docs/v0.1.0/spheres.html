@@ -165,8 +165,7 @@
 <p>Partition raw metacells into distinct spheres, using a variant of union-find:
 </p>
 <ol>
-<li>
-<p>Compute a distance between each two metacells, defined as the maximal fold factor of any of the genes. This fold factor is the absolute value of log base 2 of the fraction of the gene in both metacells, using the 
+<li>Compute a distance between each two metacells, defined as the maximal fold factor of any of the genes. This fold factor is the absolute value of log base 2 of the fraction of the gene in both metacells, using the 
 <code>gene_fraction_regularization
 </code> (by default, 
 <code>1e-5
@@ -175,19 +174,16 @@
 </code> (by default, 
 <code>40
 </code>), we ignore this fold factor as insignificant.
-</p>
 </li>
-<li>
-<p>Initially place each metacell in its own sphere.
-</p>
+<li>Compute hierarchical clustering of the metacells using these distances and the 
+<code>complete
+</code> linkage; that is, each cluster can be seen as a sphere of some diameter where all the metacells are within that sphere.
 </li>
-<li>
-<p>Pass on all metacell pairs, ordered by increasing distance. If the metacells belong to different spheres, merge both spheres into a single one if the maximal distance between the metacells of the combined sphere is no more than 
+<li>Use this hierarchical clustering to partition the metacells into as-small as possible spheres, where each sphere diameter is at most 
 <code>max_sphere_fold_factor
 </code> (by default, 
 <code>3.0
 </code>, or 8x).
-</p>
 </li>
 </ol>
 <p>CONTRACT
