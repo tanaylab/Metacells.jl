@@ -156,20 +156,24 @@
 <pre>
 <code class="language-julia hljs">function compute_spheres(
     daf::DafWriter;
-    max_sphere_fold_factor::AbstractFloat = 3.0,
+    min_significant_gene_UMIs::Unsigned = Unsigned(40),
     gene_fraction_regularization::AbstractFloat = 1e-5,
-    min_significant_gene_UMIs:: Unsigned = 40,
+    confidence::AbstractFloat = 0.9,
+    max_sphere_diameter::AbstractFloat = 2.0,
+    max_neighborhood_diameter::AbstractFloat = 2.0,
 )::Nothing
 </code>
 </pre>
-<p>Partition raw metacells into distinct spheres, using a variant of union-find:
+<p>Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods.
 </p>
 <ol>
 <li>Compute a distance between each two metacells, defined as the maximal fold factor of any of the genes. This fold factor is the absolute value of log base 2 of the fraction of the gene in both metacells, using the 
 <code>gene_fraction_regularization
 </code> (by default, 
 <code>1e-5
-</code>). If the sum of the total UMIs of the gene in both metacells is less than 
+</code>). Since the fraction of the gene is a random variable, we decrease the high fraction and increase the low fraction by a factor based on the 
+<code>confidence
+</code> of the test (by default, 0.9), assuming a multinomial distribution. In addition, if the sum of the total UMIs of the gene in both metacells is less than 
 <code>min_significant_gene_UMIs
 </code> (by default, 
 <code>40
@@ -180,10 +184,18 @@
 </code> linkage; that is, each cluster can be seen as a sphere of some diameter where all the metacells are within that sphere.
 </li>
 <li>Use this hierarchical clustering to partition the metacells into as-small as possible spheres, where each sphere diameter is at most 
-<code>max_sphere_fold_factor
+<code>max_sphere_diameter
 </code> (by default, 
-<code>3.0
-</code>, or 8x).
+<code>2.0
+</code>, or 4x).
+</li>
+<li>Compute for each sphere the set of other spheres with a maximal distance of an additional 
+<code>max_neighborhood_diameter
+</code> (by default, 
+<code>2.0
+</code>, for a total neighborhood diameter of 16x). For each sphere, the main neighborhood is the one defined by that sphere; however, each sphere may belong to other neighborhoods as well.
+</li>
+<li>The distances to the other spheres in the main neighborhood of each sphere form a natural graph representation of the structure of the manifold of the distinct biological cell states captured by the metacells.
 </li>
 </ol>
 <p>CONTRACT
@@ -255,7 +267,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.3.0. Using Julia version 1.10.0.
+</a> version 1.4.0. Using Julia version 1.10.0.
 </p>
 </section>
 <footer class="modal-card-foot">
