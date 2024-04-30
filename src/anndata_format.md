@@ -3,6 +3,7 @@
 ```@docs
 Metacells.AnnDataFormat
 Metacells.AnnDataFormat.import_h5ads!
+Metacells.AnnDataFormat.CopyAnnData
 ```
 
 ## Index

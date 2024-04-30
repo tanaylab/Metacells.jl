@@ -167,6 +167,7 @@
     raw_cells_h5ad::Maybe{AbstractString} = nothing,
     clean_cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,
+    copy_clean_data::Maybe{CopyAnnData} = nothing,
     type_property::Maybe{AbstractString} = nothing,
     rename_type::Maybe{AbstractString} = &quot;type&quot;,
     type_colors_csv::Maybe{AbstractString} = nothing,
@@ -471,6 +472,16 @@
 </p>
 </div>
 </div>
+<p>Data that exists only in 
+<code>clean_cells_h5ad
+</code> poses a question when being copied into the full data set, which includes the full raw set of cells and genes. If 
+<code>copy_clean_data
+</code> is 
+<code>nothing
+</code> (the default), this is simply an error. Otherwise, data that is listed in 
+<code>copy_clean_data
+</code> is copied using the specified name and the default value is applied to the raw-only genes or cells.
+</p>
 <div class="admonition is-info">
 <header class="admonition-header">Note
 </header>
@@ -481,6 +492,32 @@
 </p>
 </div>
 </div>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnnDataFormat.CopyAnnData" href="#Metacells.AnnDataFormat.CopyAnnData">
+<code>Metacells.AnnDataFormat.CopyAnnData
+</code>
+</a> — 
+<span class="docstring-category">Type
+</span>
+</header>
+<section>
+<div>
+<p>Specify how to copy data from 
+<code>AnnData
+</code> to 
+<code>Daf
+</code>. The key is simply a vector or matrix name (ignoring axes), and the value is either 
+<code>nothing
+</code> to ignore the data, or a tuple with the name of the destination 
+<code>Daf
+</code> property and an optional value to use for missing entries (raw-only cells and/or genes).
+</p>
 </div>
 </section>
 </article>
@@ -496,6 +533,12 @@
 <li>
 <a href="anndata_format.html#Metacells.AnnDataFormat">
 <code>Metacells.AnnDataFormat
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.CopyAnnData">
+<code>Metacells.AnnDataFormat.CopyAnnData
 </code>
 </a>
 </li>

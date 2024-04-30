@@ -6,6 +6,7 @@ world.
 module AnnDataFormat
 
 export import_h5ads!
+export CopyAnnData
 
 using CSV
 using Daf
@@ -14,9 +15,14 @@ using Daf.GenericTypes
 using DataFrames
 using SparseArrays
 
-CopyData = Dict{AbstractString, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
+"""
+Specify how to copy data from `AnnData` to `Daf`. The key is simply a vector or matrix name (ignoring axes), and the
+value is either `nothing` to ignore the data, or a tuple with the name of the destination `Daf` property and an optional
+value to use for missing entries (raw-only cells and/or genes).
+"""
+CopyAnnData = Dict{AbstractString, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
 
-GENE_VECTORS_DATA = CopyData([
+GENE_VECTORS_DATA = CopyAnnData([
     "atlas_gene" => ("is_atlas", false),
     "atlas_lateral_gene" => ("is_atlas_lateral", false),
     "atlas_marker_gene" => ("is_atlas_marker", false),
@@ -39,7 +45,7 @@ GENE_VECTORS_DATA = CopyData([
     "significant_inner_folds_count" => ("significant_inner_folds_count", UInt32(0)),
 ])
 
-CELL_VECTORS_DATA = CopyData([
+CELL_VECTORS_DATA = CopyAnnData([
     "cell_type" => ("projected_type", ""),
     "cells_rare_gene_module" => ("rare_gene_module", UInt32(0)),
     "dissolve" => ("is_dissolved", false),
@@ -55,7 +61,7 @@ CELL_VECTORS_DATA = CopyData([
     "rare_cell" => ("is_rare", false),
 ])
 
-METACELL_VECTORS_DATA = CopyData([
+METACELL_VECTORS_DATA = CopyAnnData([
     "metacells_level" => ("level", nothing),
     "rare_metacell" => ("is_rare", nothing),
     "similar" => ("is_similar", nothing),
@@ -63,14 +69,14 @@ METACELL_VECTORS_DATA = CopyData([
     "__zeros_downsample_umis" => ("__zeros_downsample_UMIs", nothing),
 ])
 
-CELLS_MATRICES_DATA = CopyData([
+CELLS_MATRICES_DATA = CopyAnnData([
     "deviant_fold" => ("deviant_fold", Float32(0.0)),
     "inner_fold" => ("inner_fold", Float32(0.0)),
     "inner_stdev_log" => ("inner_stdev_log", Float32(0.0)),
     "UMIs" => ("UMIs", UInt32(0)),
 ])
 
-METACELLS_MATRICES_DATA = CopyData([
+METACELLS_MATRICES_DATA = CopyAnnData([
     "corrected_fraction" => ("corrected_fraction", Float32(0.0)),
     "essential" => ("is_essential", false),
     "fitted" => ("is_fitted", false),
@@ -84,7 +90,7 @@ METACELLS_MATRICES_DATA = CopyData([
     "zeros" => ("zeros", UInt32(0)),
 ])
 
-METACELLS_SQUARE_DATA = CopyData(["obs_outgoing_weights" => ("outgoing_weights", nothing)])
+METACELLS_SQUARE_DATA = CopyAnnData(["obs_outgoing_weights" => ("outgoing_weights", nothing)])
 
 """
     function import_h5ads!(
@@ -92,6 +98,7 @@ METACELLS_SQUARE_DATA = CopyData(["obs_outgoing_weights" => ("outgoing_weights",
         raw_cells_h5ad::Maybe{AbstractString} = nothing,
         clean_cells_h5ad::AbstractString,
         metacells_h5ad::AbstractString,
+        copy_clean_data::Maybe{CopyAnnData} = nothing,
         type_property::Maybe{AbstractString} = nothing,
         rename_type::Maybe{AbstractString} = "type",
         type_colors_csv::Maybe{AbstractString} = nothing,
@@ -160,6 +167,11 @@ changes to match the ``Daf`` capabilities and conventions:
     There is much duplication of data between the three `h5ad` files (in particular, per-gene data). Data in
     `raw_cells_h5ad` will override data in `clean_cells_h5ad`, which will override data in `metacells_h5ad`.
 
+Data that exists only in `clean_cells_h5ad` poses a question when being copied into the full data set, which includes
+the full raw set of cells and genes. If `copy_clean_data` is `nothing` (the default), this is simply an error.
+Otherwise, data that is listed in `copy_clean_data` is copied using the specified name and the default value is applied
+to the raw-only genes or cells.
+
 !!! note
 
     It is common to call `reconstruct_axis!` on the result (e.g., if the cells were collected from a set of batches).
@@ -169,6 +181,7 @@ changes to match the ``Daf`` capabilities and conventions:
     raw_cells_h5ad::Maybe{AbstractString} = nothing,
     clean_cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,
+    copy_clean_data::Maybe{CopyAnnData} = nothing,
     type_property::Maybe{AbstractString} = nothing,
     rename_type::Maybe{AbstractString} = "type",
     empty_type::Maybe{AbstractString} = nothing,
@@ -183,7 +196,13 @@ changes to match the ``Daf`` capabilities and conventions:
         import_raw_cells(destination, raw_cells_h5ad, metacells_daf)
     end
 
-    import_clean_cells(destination, clean_cells_h5ad, metacells_daf; copy_axes = raw_cells_h5ad === nothing)
+    import_clean_cells(
+        destination,
+        clean_cells_h5ad,
+        metacells_daf,
+        copy_clean_data;
+        copy_axes = raw_cells_h5ad === nothing,
+    )
 
     return import_metacells(
         destination,
@@ -205,12 +224,12 @@ function import_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString
 
     import_scalars_data(destination, raw_cells_daf)
 
-    import_vectors(destination, raw_cells_daf, "gene", GENE_VECTORS_DATA, metacells_daf)
-    import_vectors(destination, raw_cells_daf, "cell", CELL_VECTORS_DATA, metacells_daf)
+    import_vectors(destination, raw_cells_daf, "gene", nothing, GENE_VECTORS_DATA, metacells_daf)
+    import_vectors(destination, raw_cells_daf, "cell", nothing, CELL_VECTORS_DATA, metacells_daf)
 
     sparsify_umis(raw_cells_daf)
-    import_matrices(destination, raw_cells_daf, "cell", "gene", CELLS_MATRICES_DATA)
-    import_matrices(destination, raw_cells_daf, "gene", "cell", CELLS_MATRICES_DATA)
+    import_matrices(destination, raw_cells_daf, "cell", "gene", nothing, CELLS_MATRICES_DATA)
+    import_matrices(destination, raw_cells_daf, "gene", "cell", nothing, CELLS_MATRICES_DATA)
 
     return nothing
 end
@@ -218,7 +237,8 @@ end
 function import_clean_cells(
     destination::DafWriter,
     clean_cells_h5ad::AbstractString,
-    metacells_daf::DafReader;
+    metacells_daf::DafReader,
+    copy_clean_data::Maybe{CopyAnnData} = nothing;
     copy_axes::Bool,
 )::Nothing
     clean_cells_daf =
@@ -243,11 +263,11 @@ function import_clean_cells(
         )
     end
 
-    import_vectors(destination, clean_cells_daf, "gene", GENE_VECTORS_DATA, metacells_daf)
-    import_vectors(destination, clean_cells_daf, "cell", CELL_VECTORS_DATA, metacells_daf)
+    import_vectors(destination, clean_cells_daf, "gene", copy_clean_data, GENE_VECTORS_DATA, metacells_daf)
+    import_vectors(destination, clean_cells_daf, "cell", copy_clean_data, CELL_VECTORS_DATA, metacells_daf)
 
-    import_matrices(destination, clean_cells_daf, "cell", "gene", CELLS_MATRICES_DATA)
-    import_matrices(destination, clean_cells_daf, "gene", "cell", CELLS_MATRICES_DATA)
+    import_matrices(destination, clean_cells_daf, "cell", "gene", copy_clean_data, CELLS_MATRICES_DATA)
+    import_matrices(destination, clean_cells_daf, "gene", "cell", copy_clean_data, CELLS_MATRICES_DATA)
 
     return nothing
 end
@@ -266,20 +286,21 @@ function import_metacells(
 
     import_scalars_data(destination, metacells_daf)
 
-    import_vectors(destination, metacells_daf, "gene", GENE_VECTORS_DATA, metacells_daf)
+    import_vectors(destination, metacells_daf, "gene", nothing, GENE_VECTORS_DATA, metacells_daf)
     import_vectors(
         destination,
         metacells_daf,
         "metacell",
+        nothing,
         METACELL_VECTORS_DATA,
         metacells_daf,
         type_property,
         rename_type,
     )
 
-    import_matrices(destination, metacells_daf, "metacell", "gene", METACELLS_MATRICES_DATA)
-    import_matrices(destination, metacells_daf, "gene", "metacell", METACELLS_MATRICES_DATA)
-    import_matrices(destination, metacells_daf, "metacell", "metacell", METACELLS_SQUARE_DATA)
+    import_matrices(destination, metacells_daf, "metacell", "gene", nothing, METACELLS_MATRICES_DATA)
+    import_matrices(destination, metacells_daf, "gene", "metacell", nothing, METACELLS_MATRICES_DATA)
+    import_matrices(destination, metacells_daf, "metacell", "metacell", nothing, METACELLS_SQUARE_DATA)
 
     if type_property !== nothing
         import_metacell_types(
@@ -317,6 +338,8 @@ function import_metacell_types(
         colors = data_frame[:, "color"]
         add_axis!(destination, rename_type, names)
         set_vector!(destination, rename_type, "color", colors)
+        delete_vector!(destination, "metacell", "color"; must_exist = false)
+        delete_vector!(destination, "cell", "color"; must_exist = false)
     end
 
     reconstruct_axis!(
@@ -350,21 +373,35 @@ function import_vectors(
     destination::DafWriter,
     source::DafWriter,
     axis::AbstractString,
-    copy_data::CopyData,
+    copy_clean_data::Maybe{CopyAnnData},
+    copy_data::CopyAnnData,
     metacells_daf::DafReader,
     type_property::Maybe{AbstractString} = nothing,
     rename_type::Maybe{AbstractString} = nothing,
 )::Nothing
     for vector_name in vector_names(source, axis)
         if !contains(vector_name, "_gene_of_")
-            if vector_name == type_property && rename_type !== nothing
-                data = (rename_type, nothing)
+            if copy_clean_data !== nothing
+                data = get(copy_clean_data, vector_name, nothing)
             else
-                data = get(copy_data, vector_name, (vector_name, nothing))
+                data = nothing
             end
+
+            if data === nothing
+                if vector_name == type_property && rename_type !== nothing
+                    data = (rename_type, nothing)
+                else
+                    data = get(copy_data, vector_name, (vector_name, nothing))
+                end
+            end
+
             if data !== nothing
                 rename, empty = data
-                if !has_vector(destination, axis, rename)
+                if !has_vector(destination, axis, rename) && (
+                    copy_clean_data === nothing ||
+                    empty !== nothing ||
+                    axis_length(source, axis) == axis_length(destination, axis)
+                )
                     if empty == 0 && endswith(vector_name, "_module")
                         vector = get_vector(source, axis, vector_name)
                         vector .+= 1
@@ -420,13 +457,30 @@ function import_matrices(
     source::DafReader,
     rows_axis::AbstractString,
     columns_axis::AbstractString,
-    copy_data::CopyData,
+    copy_clean_data::Maybe{CopyAnnData},
+    copy_data::CopyAnnData,
 )::Nothing
     for matrix_name in matrix_names(source, rows_axis, columns_axis; relayout = false)
-        data = get(copy_data, matrix_name, (matrix_name, nothing))
+        if copy_clean_data !== nothing
+            data = get(copy_clean_data, matrix_name, nothing)
+        else
+            data = nothing
+        end
+
+        if data === nothing
+            data = get(copy_data, matrix_name, (matrix_name, nothing))
+        end
+
         if data !== nothing
             rename, empty = data
-            if !has_matrix(destination, rows_axis, columns_axis, rename; relayout = true)
+            if !has_matrix(destination, rows_axis, columns_axis, rename; relayout = true) && (
+                copy_clean_data === nothing ||
+                empty !== nothing ||
+                (
+                    axis_length(source, rows_axis) == axis_length(destination, rows_axis) &&
+                    axis_length(source, columns_axis) == axis_length(destination, columns_axis)
+                )
+            )
                 if empty !== nothing
                     dtype = typeof(empty)
                 elseif contains(rename, "UMIs")
