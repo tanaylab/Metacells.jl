@@ -24,6 +24,7 @@ using Statistics
         confidence::AbstractFloat = 0.9,
         max_sphere_diameter::AbstractFloat = 2.0,
         max_neighborhood_diameter::AbstractFloat = 2.0,
+        noisy_diameter::AbstractFloat = 1.0,
     )::Nothing
 
 Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods.
@@ -34,6 +35,7 @@ Partition raw metacells into distinct spheres, and spheres into overlapping neig
     decrease the high fraction and increase the low fraction by a factor based on the `confidence` of the test (by
     default, 0.9), assuming a multinomial distribution. In addition, if the sum of the total UMIs of the gene in both
     metacells is less than `min_significant_gene_UMIs` (by default, `40`), we ignore this fold factor as insignificant.
+    For `is_noisy` genes, we reduce the distance by `noisy_diameter` to allow for their bursty nature.
  2. Compute hierarchical clustering of the metacells using these distances and the `complete` linkage; that is, each
     cluster can be seen as a sphere of some diameter where all the metacells are within that sphere.
  3. Use this hierarchical clustering to partition the metacells into as-small as possible spheres, where each sphere
@@ -66,6 +68,8 @@ CONTRACT
             Unsigned,
             "The total number of UMIs used to estimate the fraction of each gene in each metacell.",
         ),
+        ("gene", "is_noisy") =>
+            (OptionalInput, Bool, "A mask of noisy genes to be given additional diameter when grouped."),
         ("metacell", "sphere") => (GuaranteedOutput, AbstractString, "The unique sphere each metacell belongs to."),
         ("sphere", "main_neighborhood") => (GuaranteedOutput, AbstractString, "The main neighborhood of each sphere."),
         ("sphere", "neighborhood", "is_member") =>
@@ -80,6 +84,7 @@ CONTRACT
     confidence::AbstractFloat = 0.9,
     max_sphere_diameter::AbstractFloat = 2.0,
     max_neighborhood_diameter::AbstractFloat = 2.0,
+    noisy_diameter::AbstractFloat = 1.0,
     metacell_distances::Maybe{Matrix{Float32}},
 )::Matrix{Float32}
     @assert gene_fraction_regularization > 0
@@ -88,7 +93,7 @@ CONTRACT
     @assert max_sphere_diameter > 0
     @assert max_neighborhood_diameter >= 0.0
 
-    genes_metacells_total_UMIs, genes_metacells_fraction, metacells_total_UMIs = read_metacells_data(daf)
+    genes_metacells_total_UMIs, genes_metacells_fraction, metacells_total_UMIs, genes_is_noisy = read_data(daf)
 
     genes_metacells_log_decreased_fraction, genes_metacells_log_increased_fraction =
         prepare_metacells_data(gene_fraction_regularization, confidence, genes_metacells_fraction, metacells_total_UMIs)
@@ -99,6 +104,8 @@ CONTRACT
             genes_metacells_total_UMIs,
             genes_metacells_log_decreased_fraction,
             genes_metacells_log_increased_fraction,
+            noisy_diameter,
+            genes_is_noisy,
         )
     end
 
@@ -126,13 +133,14 @@ CONTRACT
     return metacell_distances
 end
 
-@logged function read_metacells_data(  # untested
+@logged function read_data(  # untested
     daf::DafReader,
-)::Tuple{AbstractMatrix{<:Unsigned}, AbstractMatrix{<:AbstractFloat}, AbstractVector{<:Unsigned}}
+)::Tuple{AbstractMatrix{<:Unsigned}, AbstractMatrix{<:AbstractFloat}, AbstractVector{<:Unsigned}, AbstractVector{Bool}}
     genes_metacells_total_UMIs = get_matrix(daf, "gene", "metacell", "total_UMIs").array
     genes_metacells_fraction = get_matrix(daf, "gene", "metacell", "fraction").array
     metacells_total_UMIs = get_vector(daf, "metacell", "total_UMIs").array
-    return genes_metacells_total_UMIs, genes_metacells_fraction, metacells_total_UMIs
+    genes_is_noisy = get_vector(daf, "gene", "is_noisy"; default = false).array
+    return genes_metacells_total_UMIs, genes_metacells_fraction, metacells_total_UMIs, genes_is_noisy
 end
 
 @logged function prepare_metacells_data(  # untested
@@ -163,6 +171,8 @@ end
     genes_metacells_total_UMIs::AbstractMatrix{<:Unsigned},
     genes_metacells_log_decreased_fraction::AbstractMatrix{<:AbstractFloat},
     genes_metacells_log_increased_fraction::AbstractMatrix{<:AbstractFloat},
+    noisy_diameter::AbstractFloat,
+    genes_is_noisy::AbstractVector{Bool},
 )::Matrix{Float32}
     check_efficient_action("compute_spheres", Columns, "genes_metacells_total_UMIs", genes_metacells_total_UMIs)
     check_efficient_action(
@@ -202,6 +212,8 @@ end
                 genes_log_increased_fraction_of_base_metacell,
                 genes_log_decreased_fraction_of_other_metacells,
                 genes_log_increased_fraction_of_other_metacells,
+                noisy_diameter,
+                genes_is_noisy,
             )
 
         metacell_distances[1:(base_metacell - 1), base_metacell] .=
@@ -220,6 +232,8 @@ end
     gene_log_increased_fraction_of_base_metacell::AbstractFloat,
     gene_log_decreased_fraction_of_other_metacell::AbstractFloat,
     gene_log_increased_fraction_of_other_metacell::AbstractFloat,
+    noisy_diameter::AbstractFloat,
+    gene_is_noisy::Bool,
 )::AbstractFloat
     gene_total_UMIs = gene_total_UMIs_of_base_metacell + gene_total_UMIs_of_other_metacell
     is_significant = gene_total_UMIs >= min_significant_gene_UMIs
@@ -230,7 +244,7 @@ end
     gene_log_high_fraction =
         !is_base_low * gene_log_decreased_fraction_of_base_metacell +
         is_base_low * gene_log_decreased_fraction_of_other_metacell
-    return is_significant * max.(gene_log_high_fraction - gene_log_low_fraction, 0.0)
+    return is_significant * max.(gene_log_high_fraction - gene_log_low_fraction - gene_is_noisy * noisy_diameter, 0.0)
 end
 
 @logged function compute_sphere_distances(  # untested

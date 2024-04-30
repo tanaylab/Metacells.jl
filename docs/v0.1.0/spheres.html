@@ -161,6 +161,7 @@
     confidence::AbstractFloat = 0.9,
     max_sphere_diameter::AbstractFloat = 2.0,
     max_neighborhood_diameter::AbstractFloat = 2.0,
+    noisy_diameter::AbstractFloat = 1.0,
 )::Nothing
 </code>
 </pre>
@@ -177,7 +178,11 @@
 <code>min_significant_gene_UMIs
 </code> (by default, 
 <code>40
-</code>), we ignore this fold factor as insignificant.
+</code>), we ignore this fold factor as insignificant. For 
+<code>is_noisy
+</code> genes, we reduce the distance by 
+<code>noisy_diameter
+</code> to allow for their bursty nature.
 </li>
 <li>Compute hierarchical clustering of the metacells using these distances and the 
 <code>complete
