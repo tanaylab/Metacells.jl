@@ -352,7 +352,7 @@ function import_metacell_types(
     )
 
     copy_axis!(; destination = metacells_daf, source = destination, axis = rename_type)
-    type_names = get_axis(destination, rename_type)
+    type_names = axis_array(destination, rename_type)
     for prefix in ("ignored", "essential", "atlas_essential", "fitted")
         import_mask_matrix(destination, metacells_daf, rename_type, type_names, prefix)
     end
@@ -361,7 +361,7 @@ function import_metacell_types(
 end
 
 function import_scalars_data(destination::DafWriter, source::DafReader)::Nothing
-    for scalar_name in scalar_names(source)
+    for scalar_name in scalars_set(source)
         if scalar_name != "__name__" && !has_scalar(destination, scalar_name)
             copy_scalar!(; destination = destination, source = source, name = scalar_name)
         end
@@ -379,7 +379,7 @@ function import_vectors(
     type_property::Maybe{AbstractString} = nothing,
     rename_type::Maybe{AbstractString} = nothing,
 )::Nothing
-    for vector_name in vector_names(source, axis)
+    for vector_name in vectors_set(source, axis)
         if !contains(vector_name, "_gene_of_")
             if copy_clean_data !== nothing
                 data = get(copy_clean_data, vector_name, nothing)
@@ -407,7 +407,7 @@ function import_vectors(
                         vector .+= 1
                         set_vector!(source, axis, vector_name, sparse_vector(vector); overwrite = true)
                     elseif vector_name == "metacell_name"
-                        valid_names = Set(get_axis(metacells_daf, "metacell"))
+                        valid_names = Set(axis_array(metacells_daf, "metacell"))
                         vector = get_vector(source, axis, vector_name)
                         vector = [name in valid_names ? name : "" for name in vector]
                         set_vector!(source, axis, vector_name, vector; overwrite = true)
@@ -460,7 +460,7 @@ function import_matrices(
     copy_clean_data::Maybe{CopyAnnData},
     copy_data::CopyAnnData,
 )::Nothing
-    for matrix_name in matrix_names(source, rows_axis, columns_axis; relayout = false)
+    for matrix_name in matrices_set(source, rows_axis, columns_axis; relayout = false)
         if copy_clean_data !== nothing
             data = get(copy_clean_data, matrix_name, nothing)
         else

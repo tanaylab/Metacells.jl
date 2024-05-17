@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Metacells · Metacells.jl v0.1.0
+<title>Identify Genes · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Metacells · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Metacells · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Metacells · Metacells.jl v0.1.0"/>
+<meta name="title" content="Identify Genes · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Identify Genes · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Identify Genes · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -48,25 +48,25 @@
 <button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
 </button>
 <ul class="docs-menu">
-<li class="is-active">
+<li>
 <a class="tocitem" href="index.html">Metacells
 </a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="identify_genes.html">Identify Genes
+</a>
 <ul class="internal">
-<li class="toplevel">
+<li>
 <a class="tocitem" href="#Index">
 <span>Index
 </span>
 </a>
 </li>
 </ul>
-</li>
-<li>
-<a class="tocitem" href="anndata_format.html">AnnData Format
-</a>
-</li>
-<li>
-<a class="tocitem" href="identify_genes.html">Identify Genes
-</a>
 </li>
 <li>
 <a class="tocitem" href="spheres.html">Spheres
@@ -93,13 +93,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="index.html">Metacells
+<a href="identify_genes.html">Identify Genes
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="index.html">Metacells
+<a href="identify_genes.html">Identify Genes
 </a>
 </li>
 </ul>
@@ -118,20 +118,20 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Metacells">
-<a class="docs-heading-anchor" href="#Metacells">Metacells
+<h1 id="Identify-Genes">
+<a class="docs-heading-anchor" href="#Identify-Genes">Identify Genes
 </a>
-<a id="Metacells-1">
+<a id="Identify-Genes-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Metacells" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Identify-Genes" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Metacells" href="#Metacells.Metacells">
-<code>Metacells.Metacells
+<a class="docstring-binding" id="Metacells.IdentifyGenes" href="#Metacells.IdentifyGenes">
+<code>Metacells.IdentifyGenes
 </code>
 </a> — 
 <span class="docstring-category">Module
@@ -139,69 +139,132 @@
 </header>
 <section>
 <div>
-<p>The 
-<code>Metacells.jl
-</code> package provides computational services for the 
-<a href="https://github.com/tanaylab/metacells">metacells
-</a> package, using 
-<a href="https://github.com/tanaylab/Daf.jl">Daf
-</a> to hold the data. In the future, we&#39;ll ideally migrate all of the 
-<code>metacells
-</code>package computations to this package, converting the Python package to a thin wrapper, and provide a similar thin R wrapper to provide metacell analysis from R as well. For now,
-<code>Metacells.jl
-</code>only provides a subset of the features of the Python
-<code>metacells
-</code>package, which requires users to convert data from
-<code>AnnData
-</code>(for the old features) to
-<code>Daf
-</code> (to the new features).
+<p>Identify special genes.
 </p>
 </div>
 </section>
 </article>
-<h1 id="Index">
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.IdentifyGenes.identify_marker_genes!" href="#Metacells.IdentifyGenes.identify_marker_genes!">
+<code>Metacells.IdentifyGenes.identify_marker_genes!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function identify_marker_genes!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = 1e-5,
+    min_gene_range_fold::AbstractFloat = 2.0,
+    noisy_gene_fold::AbstractFloat = 1.0,
+    min_max_marker_gene_fraction::AbstractFloat = 1e-4,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Identify the genes that distinguish at least one metacell from the rest. Such genes are called &quot;marker&quot; genes as they (potentially) mark specific cell states. If 
+<code>overwrite
+</code>, will overwrite an existing 
+<code>is_marker
+</code> mask.
+</p>
+<ol>
+<li>
+<p>Compute the minimal and maximal expression level of each gene.
+</p>
+</li>
+<li>
+<p>Select the genes whose fold factor (log2 of maximal over minimal value, using the 
+<code>gene_fraction_regularization
+</code> is at least 
+<code>min_marker_gene_range_fold
+</code>. For 
+<code>is_noisy
+</code> genes, we require an additional 
+<code>noisy_gene_fold
+</code>.
+</p>
+</li>
+<li>
+<p>Identify the genes whose maximal expression is at least 
+<code>min_max_marker_gene_fraction
+</code>.
+</p>
+</li>
+</ol>
+<p>CONTRACT
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.IdentifyGenes.identify_lonely_genes!" href="#Metacells.IdentifyGenes.identify_lonely_genes!">
+<code>Metacells.IdentifyGenes.identify_lonely_genes!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function identify_lonely_genes!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = 1e-5,
+    max_lonely_gene_correlation::AbstractFloat = 0.5,
+    max_lonely_gene_correlated::Integer = 2,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Identify genes that are uncorrelated with other genes. Such &quot;lonely&quot; genes make it difficult to identify groups of genes that act together. If 
+<code>overwrite
+</code>, will overwrite an existing 
+<code>is_lonely
+</code> mask.
+</p>
+<ol>
+<li>Compute the log base 2 of the genes expression in each metacell (using the 
+<code>gene_fraction_regularization
+</code>).
+</li>
+<li>Correlate this between all the pairs of genes.
+</li>
+<li>Find the maximal correlation for each gene.
+</li>
+<li>Identify the genes which have up to 
+<code>max_lonely_gene_correlated
+</code> genes with a correlation of more than 
+<code>max_lonely_gene_correlation
+</code>.
+</li>
+</ol>
+<p>CONTRACT
+</p>
+</div>
+</section>
+</article>
+<h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
 <a id="Index-1">
 </a>
 <a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
 </a>
-</h1>
+</h2>
 <ul>
-<li>
-<a href="anndata_format.html#Metacells.AnnDataFormat">
-<code>Metacells.AnnDataFormat
-</code>
-</a>
-</li>
 <li>
 <a href="identify_genes.html#Metacells.IdentifyGenes">
 <code>Metacells.IdentifyGenes
-</code>
-</a>
-</li>
-<li>
-<a href="index.html#Metacells.Metacells">
-<code>Metacells.Metacells
-</code>
-</a>
-</li>
-<li>
-<a href="spheres.html#Metacells.Spheres">
-<code>Metacells.Spheres
-</code>
-</a>
-</li>
-<li>
-<a href="anndata_format.html#Metacells.AnnDataFormat.CopyAnnData">
-<code>Metacells.AnnDataFormat.CopyAnnData
-</code>
-</a>
-</li>
-<li>
-<a href="anndata_format.html#Metacells.AnnDataFormat.import_h5ads!">
-<code>Metacells.AnnDataFormat.import_h5ads!
 </code>
 </a>
 </li>
@@ -217,28 +280,12 @@
 </code>
 </a>
 </li>
-<li>
-<a href="spheres.html#Metacells.Spheres.compute_improved_spheres!">
-<code>Metacells.Spheres.compute_improved_spheres!
-</code>
-</a>
-</li>
-<li>
-<a href="spheres.html#Metacells.Spheres.compute_spheres!">
-<code>Metacells.Spheres.compute_spheres!
-</code>
-</a>
-</li>
-<li>
-<a href="spheres.html#Metacells.Spheres.improve_spheres!">
-<code>Metacells.Spheres.improve_spheres!
-</code>
-</a>
-</li>
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-nextpage" href="anndata_format.html">AnnData Format »
+<a class="docs-footer-prevpage" href="anndata_format.html">« AnnData Format
+</a>
+<a class="docs-footer-nextpage" href="spheres.html">Spheres »
 </a>
 <div class="flexbox-break">
 </div>

@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Neighborhoods · Metacells.jl v0.1.0
+<title>Spheres · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Neighborhoods · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Neighborhoods · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Neighborhoods · Metacells.jl v0.1.0"/>
+<meta name="title" content="Spheres · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Spheres · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Spheres · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -56,8 +56,12 @@
 <a class="tocitem" href="anndata_format.html">AnnData Format
 </a>
 </li>
+<li>
+<a class="tocitem" href="identify_genes.html">Identify Genes
+</a>
+</li>
 <li class="is-active">
-<a class="tocitem" href="spheres.html">Neighborhoods
+<a class="tocitem" href="spheres.html">Spheres
 </a>
 <ul class="internal">
 <li>
@@ -89,13 +93,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="spheres.html">Neighborhoods
+<a href="spheres.html">Spheres
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="spheres.html">Neighborhoods
+<a href="spheres.html">Spheres
 </a>
 </li>
 </ul>
@@ -114,12 +118,12 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Neighborhoods">
-<a class="docs-heading-anchor" href="#Neighborhoods">Neighborhoods
+<h1 id="Spheres">
+<a class="docs-heading-anchor" href="#Spheres">Spheres
 </a>
-<a id="Neighborhoods-1">
+<a id="Spheres-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Neighborhoods" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Spheres" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
@@ -135,7 +139,58 @@
 </header>
 <section>
 <div>
-<p>Given a set of raw metacells, partition them into spheres such that all metacells in the same sphere are within some (fold factor) radius of each other. The centroids of these spheres can serve as a representation of the cell state manifold which is less sensitive to oversampling of common cell states.
+<p>Given a set of raw metacells, partition them into spheres such that all metacells in the same sphere are within some (fold factor) radius of each other. The centroids of these spheres can serve as a representation of the cell state manifold which is less sensitive to oversampling of common cell states. Group these spheres in overlapping neighborhoods of &quot;similar&quot; spheres for further analysis.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Spheres.compute_improved_spheres!" href="#Metacells.Spheres.compute_improved_spheres!">
+<code>Metacells.Spheres.compute_improved_spheres!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_improved_spheres!(
+    daf::DafWriter;
+    min_significant_gene_UMIs::Integer = 40,
+    gene_fraction_regularization::AbstractFloat = 1e-5,
+    confidence::AbstractFloat = 0.9,
+    max_sphere_diameter::AbstractFloat = 2.0,
+    max_neighborhood_diameter::AbstractFloat = 2.0,
+    noisy_gene_fold::AbstractFloat = 1.0,
+    min_gene_correlation::AbstractFloat = 0.5,
+)::Nothing
+</code>
+</pre>
+<p>Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods, such that each sphere is homogeneous in the genes that participate in multi-gene behaviors in its main neighborhood.
+</p>
+<p>This calls 
+<a href="spheres.html#Metacells.Spheres.compute_spheres!">
+<code>compute_spheres!
+</code>
+</a> and then 
+<a href="spheres.html#Metacells.Spheres.improve_spheres!">`improve_spheres!
+</a>. In the 1st call to 
+<a href="spheres.html#Metacells.Spheres.compute_spheres!">
+<code>compute_spheres!
+</code>
+</a> call, we allow up to 
+<code>max_deviant_genes_fraction
+</code> of the genes to be deviant; in 
+<a href="spheres.html#Metacells.Spheres.improve_spheres!">
+<code>improve_spheres!
+</code>
+</a>, we forbid all genes from being deviant, as we expect to ignore all &quot;irrelevant&quot; genes as non-markers or lonely.
+</p>
+<p>CONTRACT
 </p>
 </div>
 </section>
@@ -154,21 +209,35 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function compute_spheres(
+<code class="language-julia hljs">function compute_spheres!(
     daf::DafWriter;
-    min_significant_gene_UMIs::Unsigned = Unsigned(40),
+    min_significant_gene_UMIs::Integer = 40,
     gene_fraction_regularization::AbstractFloat = 1e-5,
     confidence::AbstractFloat = 0.9,
     max_sphere_diameter::AbstractFloat = 2.0,
     max_neighborhood_diameter::AbstractFloat = 2.0,
-    noisy_diameter::AbstractFloat = 1.0,
+    noisy_gene_fold::AbstractFloat = 1.0,
+    max_deviant_genes::Integer = 0,
+    overwrite::Bool = false,
 )::Nothing
 </code>
 </pre>
 <p>Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods.
 </p>
+<div class="admonition is-info">
+<header class="admonition-header">Note
+</header>
+<div class="admonition-body">
+<p>This is a lower-level function; you probably want to call 
+<a href="spheres.html#Metacells.Spheres.compute_improved_spheres!">
+<code>compute_improved_spheres!
+</code>
+</a> instead.
+</p>
+</div>
+</div>
 <ol>
-<li>Compute a distance between each two metacells, defined as the maximal fold factor of any of the genes. This fold factor is the absolute value of log base 2 of the fraction of the gene in both metacells, using the 
+<li>Compute a distance between each two metacells, defined as the maximal fold factor of any of the genes. This fold factor is the absolute value of the difference in the log base 2 of the fraction of the gene in both metacells, using the 
 <code>gene_fraction_regularization
 </code> (by default, 
 <code>1e-5
@@ -178,29 +247,114 @@
 <code>min_significant_gene_UMIs
 </code> (by default, 
 <code>40
-</code>), we ignore this fold factor as insignificant. For 
-<code>is_noisy
+</code>), we ignore this fold factor as insignificant. We also ignore the fold factors for genes that aren&#39;t 
+<code>is_marker
+</code> in the vicinity of at least one of the metacells, or that are 
+<code>is_lonely
+</code> in the vicinity of both. For 
+<code>is_noisy_gene_fold
 </code> genes, we reduce the distance by 
-<code>noisy_diameter
+<code>noisy_gene_fold
 </code> to allow for their bursty nature.
+</li>
+<li>If 
+<code>max_deviant_genes
+</code> is not zero, we redefine the distance between metacells to be the number of genes with a maximal fold distance above the 
+<code>max_sphere_diameter
+</code> (for computing spheres) and 
+<code>max_neighborhood_diameter
+</code> (for computing neighborhoods). Otherwise, we use the raw maximal fold distance.
 </li>
 <li>Compute hierarchical clustering of the metacells using these distances and the 
 <code>complete
 </code> linkage; that is, each cluster can be seen as a sphere of some diameter where all the metacells are within that sphere.
 </li>
-<li>Use this hierarchical clustering to partition the metacells into as-small as possible spheres, where each sphere diameter is at most 
+<li>Use this hierarchical clustering to partition the metacells into as-large as possible spheres. If 
+<code>max_deviant_genes
+</code> is zero (the default), then this is 
+<code>cutree
+</code> using the 
 <code>max_sphere_diameter
 </code> (by default, 
 <code>2.0
-</code>, or 4x).
+</code>, or 4x); otherwise, it is a 
+<code>cutree
+</code> using the 
+<code>max_deviant_genes
+</code>.
 </li>
-<li>Compute for each sphere the set of other spheres with a maximal distance of an additional 
+<li>Compute for each sphere the set of other spheres in its main neighborhood. If 
+<code>max_deviant_genes
+</code> is zero, this means the maximal distance between any pair of metacells is at most an additional 
 <code>max_neighborhood_diameter
 </code> (by default, 
 <code>2.0
-</code>, for a total neighborhood diameter of 16x). For each sphere, the main neighborhood is the one defined by that sphere; however, each sphere may belong to other neighborhoods as well.
+</code>, for a total neighborhood diameter of 16x). Otherwise, it means the maximal number of genes whose distance is more than this threshold in the metacells pair is at most 
+<code>max_deviant_genes
+</code>. Neighborhoods can overlap; also, if the main neighborhoods defined by two spheres end up being identical, we unify them, so we may end up with less neighborhoods than spheres.
 </li>
 <li>The distances to the other spheres in the main neighborhood of each sphere form a natural graph representation of the structure of the manifold of the distinct biological cell states captured by the metacells.
+</li>
+</ol>
+<p>If 
+<code>overwrite
+</code> is set, the results will replace any previously computed spheres and neighborhoods.
+</p>
+<p>CONTRACT
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Spheres.improve_spheres!" href="#Metacells.Spheres.improve_spheres!">
+<code>Metacells.Spheres.improve_spheres!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function improve_spheres!(
+    daf::DafWriter;
+    min_significant_gene_UMIs::Integer = 40,
+    gene_fraction_regularization::AbstractFloat = 1e-5,
+    confidence::AbstractFloat = 0.9,
+    max_sphere_diameter::AbstractFloat = 2.0,
+    max_neighborhood_diameter::AbstractFloat = 2.0,
+    noisy_gene_fold::AbstractFloat = 1.0,
+    min_gene_correlation::AbstractFloat = 0.5,
+)::Nothing
+</code>
+</pre>
+<p>Improve the partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods. The improved partition ensures no gene is not &quot;too different&quot; between the metacells in each sphere and spheres in each neighborhood; however, this only applies to genes that have at least 
+<code>min_gene_correlation
+</code> with at least one other gene in the neighborhood.
+</p>
+<ol>
+<li>Invoke 
+<a href="identify_genes.html#Metacells.IdentifyGenes.identify_marker_genes!">
+<code>identify_marker_genes!
+</code>
+</a> and 
+<a href="identify_genes.html#Metacells.IdentifyGenes.identify_lonely_genes!">
+<code>identify_lonely_genes!
+</code>
+</a> for each neighborhood and store the results in 
+<code>is_marker
+</code> and 
+<code>is_lonely
+</code> of the genes for the metacells in sphere for which this is the main neighborhood.
+</li>
+<li>Recompute the spheres with 
+<code>max_deviant_genes = 0
+</code> and 
+<code>overwrite = true
+</code>. When computing the distance between each two metacells, this will only consider genes that are markers in either metacell and are not lonely in both. The result should be &quot;improved&quot; spheres as they will not be affected by genes that aren&#39;t part of some multi-gene behavior relevant to each sphere&#39;s neighborhood.
 </li>
 </ol>
 <p>CONTRACT
@@ -224,15 +378,27 @@
 </a>
 </li>
 <li>
+<a href="spheres.html#Metacells.Spheres.compute_improved_spheres!">
+<code>Metacells.Spheres.compute_improved_spheres!
+</code>
+</a>
+</li>
+<li>
 <a href="spheres.html#Metacells.Spheres.compute_spheres!">
 <code>Metacells.Spheres.compute_spheres!
+</code>
+</a>
+</li>
+<li>
+<a href="spheres.html#Metacells.Spheres.improve_spheres!">
+<code>Metacells.Spheres.improve_spheres!
 </code>
 </a>
 </li>
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-prevpage" href="anndata_format.html">« AnnData Format
+<a class="docs-footer-prevpage" href="identify_genes.html">« Identify Genes
 </a>
 <div class="flexbox-break">
 </div>

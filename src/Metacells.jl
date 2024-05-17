@@ -13,6 +13,9 @@ using Reexport
 include("anndata_format.jl")
 @reexport using .AnnDataFormat
 
+include("identify_genes.jl")
+@reexport using .IdentifyGenes
+
 include("spheres.jl")
 @reexport using .Spheres
 
