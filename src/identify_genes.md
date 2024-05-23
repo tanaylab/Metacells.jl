@@ -3,7 +3,7 @@
 ```@docs
 Metacells.IdentifyGenes
 Metacells.IdentifyGenes.identify_marker_genes!
-Metacells.IdentifyGenes.identify_lonely_genes!
+Metacells.IdentifyGenes.identify_correlated_genes!
 ```
 
 ## Index

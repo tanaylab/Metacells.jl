@@ -3,7 +3,7 @@ Identify special genes.
 """
 module IdentifyGenes
 
-export identify_lonely_genes!
+export identify_correlated_genes!
 export identify_marker_genes!
 
 using Daf
@@ -75,22 +75,20 @@ CONTRACT
 end
 
 """
-    function identify_lonely_genes!(
+    function identify_correlated_genes!(
         daf::DafWriter;
         gene_fraction_regularization::AbstractFloat = 1e-5,
-        max_lonely_gene_correlation::AbstractFloat = 0.5,
-        max_lonely_gene_correlated::Integer = 2,
+        min_gene_correlation::AbstractFloat = 0.5,
         overwrite::Bool = false,
     )::Nothing
 
-Identify genes that are uncorrelated with other genes. Such "lonely" genes make it difficult to identify groups of genes
-that act together. If `overwrite`, will overwrite an existing `is_lonely` mask.
+Identify genes that are correlated with other gene(s). Such genes are good candidates for looking for groups of genes
+that act together. If `overwrite`, will overwrite an existing `is_correlated` mask.
 
  1. Compute the log base 2 of the genes expression in each metacell (using the `gene_fraction_regularization`).
  2. Correlate this between all the pairs of genes.
- 3. Find the maximal correlation for each gene.
- 4. Identify the genes which have up to `max_lonely_gene_correlated` genes with a correlation of more than
-    `max_lonely_gene_correlation`.
+ 3. Find the maximal absolute correlation for each gene (that is, strong anti-correlation also counts).
+ 4. Identify the genes which have at least one gene with a correlation of at least `min_gene_correlation`.
 
 CONTRACT
 """
@@ -102,28 +100,26 @@ CONTRACT
     data = [
         ("metacell", "gene", "fraction") =>
             (RequiredInput, AbstractFloat, "The fraction of the UMIs of each gene in each metacell."),
-        ("gene", "is_lonely") => (GuaranteedOutput, Bool, "A mask of genes that are uncorrelated with other genes."),
+        ("gene", "is_correlated") =>
+            (GuaranteedOutput, Bool, "A mask of genes that are correlated with other gene(s)."),
     ],
-) function identify_lonely_genes!(  # untested
+) function identify_correlated_genes!(  # untested
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = 1e-5,
-    max_lonely_gene_correlation::AbstractFloat = 0.5,
-    max_lonely_gene_correlated::Integer = 2,
+    min_gene_correlation::AbstractFloat = 0.5,
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization > 0
-    @assert 0 <= max_lonely_gene_correlation <= 1
-    @assert 0 <= max_lonely_gene_correlated
+    @assert 0 <= min_gene_correlation <= 1
 
     log_fractions = daf["/ metacell / gene : fraction % Log base 2 eps $(gene_fraction_regularization)"].array
     genes_correlations = cor(log_fractions)
     genes_correlations .= abs.(genes_correlations)
 
     genes_correlations[diagind(genes_correlations)] .= 0  # NOJET
-    correlated_of_genes = vec(sum(abs.(genes_correlations) .> max_lonely_gene_correlation; dims = 1))
-    is_lonely_of_genes = correlated_of_genes .<= max_lonely_gene_correlated
+    is_correlated_of_genes = vec(any(abs.(genes_correlations) .>= min_gene_correlation; dims = 1))
 
-    set_vector!(daf, "gene", "is_lonely", is_lonely_of_genes; overwrite = overwrite)
+    set_vector!(daf, "gene", "is_correlated", is_correlated_of_genes; overwrite = overwrite)
     return nothing
 end
 

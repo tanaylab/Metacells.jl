@@ -6,9 +6,7 @@ of "similar" spheres for further analysis.
 """
 module Spheres
 
-export compute_improved_spheres!
 export compute_spheres!
-export improve_spheres!
 
 using ..IdentifyGenes
 
@@ -19,12 +17,61 @@ using Daf
 using Daf.GenericLogging
 using Daf.GenericTypes
 using Distributions
+using SparseArrays
 using Statistics
 
-SPHERE_CONTRACT = Contract(;
+"""
+    function compute_spheres!(
+        daf::DafWriter;
+        min_significant_gene_UMIs::Integer = 40,
+        gene_fraction_regularization::AbstractFloat = 1e-5,
+        confidence::AbstractFloat = 0.9,
+        max_sphere_diameter::AbstractFloat = 2.0,
+        max_neighborhood_diameter::AbstractFloat = 2.0,
+        noisy_gene_fold::AbstractFloat = 1.0,
+        max_deviant_genes_fraction::AbstractFloat = 0.01,
+        overwrite::Bool = false,
+    )::Nothing
+
+Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods.
+
+ 1. Initial spheres and neighborhoods are computed in a first round, and then refined in a series of followup rounds.
+ 2. In each round, we compute a distance between each two metacells. This is based on the fold factor between the
+    expression level of each (relevant) gene in the metacells. The fold factor is the absolute value of the difference in
+    the log (base 2) of the fraction of the gene in the metacells. This log is computed with the
+    `gene_fraction_regularization` (by default, `1e-5`). Since the fraction of the gene is a random variable, we decrease
+    the high fraction and increase the low fraction by a factor based on the `confidence` of the test (by default, 0.9),
+    assuming a multinomial distribution. In addition, if the sum of the total UMIs of the gene in both metacells is less
+    than `min_significant_gene_UMIs` (by default, `40`), we ignore this fold factor as insignificant. Finally, for noisy
+    genes, we reduce the fold factor by `noisy_gene_fold`. In the first round, we simply count the number of genes whose
+    fold factor is more than `max_sphere_diameter` (for computing spheres) and `max_sphere_diameter` +
+    `max_neighborhood_diameter` (for computing neighborhoods). In the followup rounds, we use the maximal gene fold, for
+    genes that are correlated in the vicinity of the metacells (see below).
+ 3. We use hierarchical clustering to partition the metacells to distinct spheres, such that the maximal distance between
+    any metacells in the sphere is bounded. In the first round, this bound is the `max_deviant_genes_fraction` out of the
+    total number of genes. In the followup rounds, this is the `max_sphere_diameter`.
+ 4. For each sphere, we compute a main neighborhood of other spheres such that the maximal distance between any metacells
+    in the neighborhood is bounded. In the first round, this bound is again the maximal number of deviant genes (this
+    time, using the increased fold distance computed above). In the followup rounds, this is the `max_sphere_diameter`
+    plus the `max_neighborhood_diameter`. These neighborhoods may overlap. The main neighborhoods of different spheres
+    may even be identical.
+ 5. For each sphere, we compute the set of genes which have at least the `min_gene_correlation` with some other gene(s)
+    in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set
+    with the set from its sphere in the previous round.
+ 6. If the new sets of correlated genes are identical to the previous round, we are done. Otherwise we repeat the round,
+    using the more restricted sets of correlated genes.
+
+If `overwrite` is set, the results will replace any previously computed spheres and neighborhoods.
+
+CONTRACT
+"""
+@logged @computation Contract(;
     axes = [
         "metacell" => (RequiredInput, "The metacells to group into neighborhoods."),
-        "gene" => (RequiredInput, "The genes to consider (typically, only marker genes)."),
+        "gene" => (
+            RequiredInput,
+            "The genes to consider (typically, only non-lateral globally marker and correlated genes).",
+        ),
         "sphere" => (GuaranteedOutput, "A partition of the metacells into distinct spheres."),
         "neighborhood" => (GuaranteedOutput, "A grouping of spheres into overlapping neighborhoods."),
     ],
@@ -41,91 +88,18 @@ SPHERE_CONTRACT = Contract(;
             Unsigned,
             "The total number of UMIs used to estimate the fraction of each gene in each metacell.",
         ),
-        ("metacell", "gene", "is_marker") =>
-            (OptionalInput, Bool, "The genes that are distinguish metacells in the vicinity of each metacell."),
-        ("metacell", "gene", "is_lonely") =>
-            (OptionalInput, Bool, "The genes that are uncorrelated in the vicinity of each metacell."),
         ("gene", "is_noisy") =>
             (OptionalInput, Bool, "A mask of noisy genes to be given additional diameter when grouped."),
         ("metacell", "sphere") => (GuaranteedOutput, AbstractString, "The unique sphere each metacell belongs to."),
-        ("sphere", "neighborhood.main") =>
-            (GuaranteedOutput, AbstractString, "The main neighborhood of each sphere."),
+        ("gene", "sphere", "is_correlated") =>
+            (GuaranteedOutput, Bool, "Which genes are correlated in the vicinity of each sphere."),
+        ("sphere", "neighborhood.main") => (GuaranteedOutput, AbstractString, "The main neighborhood of each sphere."),
         ("sphere", "neighborhood", "is_member") =>
             (GuaranteedOutput, Bool, "Membership matrix for spheres and neighborhoods."),
         ("sphere", "sphere", "distance") =>
             (GuaranteedOutput, Float32, "For each sphere, the distances of the spheres in its main neighborhood."),
     ],
-)
-
-IMPROVED_SPHERE_CONTRACT = Contract(;
-    axes = SPHERE_CONTRACT.axes,
-    data = vcat(
-        SPHERE_CONTRACT.data,
-        [
-            ("metacell", "gene", "is_marker") => (
-                GuaranteedOutput,
-                Bool,
-                "A mask of genes that distinguish between metacells in the vicinity of the metacell.",
-            ),
-            ("metacell", "gene", "is_lonely") => (
-                GuaranteedOutput,
-                Bool,
-                "A mask of genes that are uncorrelated with other genes in the vicinity of the metacell.",
-            ),
-        ],
-    ),
-)
-
-"""
-    function compute_spheres!(
-        daf::DafWriter;
-        min_significant_gene_UMIs::Integer = 40,
-        gene_fraction_regularization::AbstractFloat = 1e-5,
-        confidence::AbstractFloat = 0.9,
-        max_sphere_diameter::AbstractFloat = 2.0,
-        max_neighborhood_diameter::AbstractFloat = 2.0,
-        noisy_gene_fold::AbstractFloat = 1.0,
-        max_deviant_genes::Integer = 0,
-        overwrite::Bool = false,
-    )::Nothing
-
-Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods.
-
-!!! note
-
-    This is a lower-level function; you probably want to call [`compute_improved_spheres!`](@ref) instead.
-
- 1. Compute a distance between each two metacells, defined as the maximal fold factor of any of the genes. This fold
-    factor is the absolute value of the difference in the log base 2 of the fraction of the gene in both metacells,
-    using the `gene_fraction_regularization` (by default, `1e-5`). Since the fraction of the gene is a random variable,
-    we decrease the high fraction and increase the low fraction by a factor based on the `confidence` of the test (by
-    default, 0.9), assuming a multinomial distribution. In addition, if the sum of the total UMIs of the gene in both
-    metacells is less than `min_significant_gene_UMIs` (by default, `40`), we ignore this fold factor as insignificant.
-    We also ignore the fold factors for genes that aren't `is_marker` in the vicinity of at least one of the metacells,
-    or that are `is_lonely` in the vicinity of both. For `is_noisy_gene_fold` genes, we reduce the distance by
-    `noisy_gene_fold` to allow for their bursty nature.
- 2. If `max_deviant_genes` is not zero, we redefine the distance between metacells to be the number of genes with a maximal
-    fold distance above the `max_sphere_diameter` (for computing spheres) and `max_neighborhood_diameter` (for computing
-    neighborhoods). Otherwise, we use the raw maximal fold distance.
- 3. Compute hierarchical clustering of the metacells using these distances and the `complete` linkage; that is, each
-    cluster can be seen as a sphere of some diameter where all the metacells are within that sphere.
- 4. Use this hierarchical clustering to partition the metacells into as-large as possible spheres. If `max_deviant_genes`
-    is zero (the default), then this is `cutree` using the `max_sphere_diameter` (by default, `2.0`, or 4x); otherwise,
-    it is a `cutree` using the `max_deviant_genes`.
- 5. Compute for each sphere the set of other spheres in its main neighborhood. If `max_deviant_genes` is zero, this
-    means the maximal distance between any pair of metacells is at most an additional `max_neighborhood_diameter` (by
-    default, `2.0`, for a total neighborhood diameter of 16x). Otherwise, it means the maximal number of genes whose
-    distance is more than this threshold in the metacells pair is at most `max_deviant_genes`. Neighborhoods can
-    overlap; also, if the main neighborhoods defined by two spheres end up being identical, we unify them, so we may end
-    up with less neighborhoods than spheres.
- 6. The distances to the other spheres in the main neighborhood of each sphere form a natural graph representation of
-    the structure of the manifold of the distinct biological cell states captured by the metacells.
-
-If `overwrite` is set, the results will replace any previously computed spheres and neighborhoods.
-
-CONTRACT
-"""
-@logged @computation SPHERE_CONTRACT function compute_spheres!(  # untested
+) function compute_spheres!(  # untested
     daf::DafWriter;
     min_significant_gene_UMIs::Integer = 40,
     gene_fraction_regularization::AbstractFloat = 1e-5,
@@ -133,320 +107,389 @@ CONTRACT
     max_sphere_diameter::AbstractFloat = 2.0,
     max_neighborhood_diameter::AbstractFloat = 2.0,
     noisy_gene_fold::AbstractFloat = 1.0,
-    max_deviant_genes::Integer = 0,
+    min_gene_correlation::AbstractFloat = 0.5,
+    max_deviant_genes_fraction::AbstractFloat = 0.01,
     overwrite::Bool = false,
 )::Nothing
     @assert min_significant_gene_UMIs >= 0
     @assert gene_fraction_regularization > 0
-    @assert confidence > 0.0
-    @assert confidence < 1.0
+    @assert 0 < confidence < 1
     @assert max_sphere_diameter > 0
-    @assert max_neighborhood_diameter >= 0.0
-    @assert max_deviant_genes >= 0
+    @assert max_neighborhood_diameter >= 0
+    @assert noisy_gene_fold >= 0.0
+    @assert 0 < min_gene_correlation < 1
+    @assert 0 < max_deviant_genes_fraction < 1
 
-    genes_metacells_total_UMIs,
-    genes_metacells_fraction,
-    genes_metacells_is_marker,
-    genes_metacells_is_lonely,
-    metacells_total_UMIs,
-    genes_is_noisy = read_data(daf)
+    total_UMIs_of_genes_in_metacells, fraction_of_genes_in_metacells, total_UMIs_of_metacells, is_noisy_of_genes =
+        read_data(daf)
 
-    genes_metacells_log_decreased_fraction, genes_metacells_log_increased_fraction =
-        prepare_metacells_data(gene_fraction_regularization, confidence, genes_metacells_fraction, metacells_total_UMIs)
+    log_decreased_fraction_of_genes_in_metacells, log_increased_fraction_of_genes_in_metacells =
+        compute_confidence_log_fraction_of_genes_in_metacells(;
+            gene_fraction_regularization = gene_fraction_regularization,
+            confidence = confidence,
+            fraction_of_genes_in_metacells = fraction_of_genes_in_metacells,
+            total_UMIs_of_metacells = total_UMIs_of_metacells,
+        )
 
-    metacells_distances_for_spheres, metacells_distances_for_neighborhoods = compute_metacells_distances(  # NOJET
-        min_significant_gene_UMIs,
-        genes_metacells_total_UMIs,
-        genes_metacells_is_marker,
-        genes_metacells_is_lonely,
-        genes_metacells_log_decreased_fraction,
-        genes_metacells_log_increased_fraction,
-        max_sphere_diameter,
-        max_neighborhood_diameter,
-        noisy_gene_fold,
-        genes_is_noisy,
-        max_deviant_genes,
-    )
+    distance_for_spheres_between_metacells, distance_for_neighborhoods_between_metacells =
+        compute_initial_metacells_distances(;
+            total_UMIs_of_genes_in_metacells = total_UMIs_of_genes_in_metacells,
+            log_decreased_fraction_of_genes_in_metacells = log_decreased_fraction_of_genes_in_metacells,
+            log_increased_fraction_of_genes_in_metacells = log_increased_fraction_of_genes_in_metacells,
+            is_noisy_of_genes = is_noisy_of_genes,
+            min_significant_gene_UMIs = min_significant_gene_UMIs,
+            max_sphere_diameter = max_sphere_diameter,
+            max_neighborhood_diameter = max_neighborhood_diameter,
+            noisy_gene_fold = noisy_gene_fold,
+        )
 
-    spheres_of_metacells =
-        compute_spheres_of_metacells(metacells_distances_for_spheres, max_sphere_diameter, max_deviant_genes)
-    metacells_of_spheres = collect_group_members(spheres_of_metacells)
-    sphere_names = group_names(daf, "metacell", metacells_of_spheres; prefix = "S")
+    n_genes = axis_length(daf, "gene")
+    n_metacells = axis_length(daf, "metacell")
+    is_correlated_of_genes_in_metacells = fill(true, n_genes, n_metacells)
+    previous_n_correlated_genes_in_metacells = n_genes * n_metacells
+    max_deviant_genes = max_deviant_genes_fraction * n_genes
+    @assert max_deviant_genes > 0
+    spheres_threshold = max_deviant_genes
+    neighborhood_threshold = max_deviant_genes
 
-    spheres_distances = compute_sphere_distances(
-        metacells_of_spheres,
-        metacells_distances_for_neighborhoods,
-        max_deviant_genes == 0 ? max_sphere_diameter : nothing,
-    )
-    spheres_of_neighborhoods, main_neighborhoods_of_spheres = collect_spheres_of_neighborhoods(
-        spheres_distances,
-        max_sphere_diameter,
-        max_neighborhood_diameter,
-        max_deviant_genes,
-    )
-    neighborhood_names = group_names(daf, "metacell", spheres_of_neighborhoods; prefix = "N")
-    spheres_neighborhoods_is_member = compute_membership_matrix(spheres_of_neighborhoods, length(sphere_names))
-    @assert length(neighborhood_names) <= length(sphere_names)
+    spheres_of_metacells = nothing
+    sphere_names = nothing
+    distances_between_spheres = nothing
+    main_neighborhoods_of_spheres = nothing
+    neighborhood_names = nothing
+    spheres_of_neighborhoods = nothing
+    is_correlated_of_genes_in_spheres = nothing
+
+    round_index = 0
+    while true
+        round_index += 1
+
+        spheres_of_metacells = cluster_metacells_to_spheres(;
+            distances_between_metacells = distance_for_spheres_between_metacells,
+            threshold = spheres_threshold,
+        )
+        metacells_of_spheres = collect_group_members(spheres_of_metacells)
+        sphere_names = group_names(daf, "metacell", metacells_of_spheres; prefix = "S")
+        @debug "round: $(round_index) n_spheres: $(length(sphere_names))"
+
+        distances_between_spheres = compute_sphere_distances(;
+            distances_between_metacells = distance_for_neighborhoods_between_metacells,
+            metacells_of_spheres = metacells_of_spheres,
+        )
+
+        spheres_of_neighborhoods, main_neighborhoods_of_spheres = collect_spheres_of_neighborhoods(;
+            distances_between_spheres = distances_between_spheres,
+            threshold = neighborhood_threshold,
+        )
+
+        neighborhood_names = group_names(daf, "metacell", spheres_of_neighborhoods; prefix = "N")
+        @debug "round: $(round_index) n_neighborhoods: $(length(neighborhood_names))"
+        @assert length(neighborhood_names) <= length(sphere_names)
+
+        intermediate_daf = chain_writer([daf, MemoryDaf(; name = "intermediate")])
+        add_axis!(intermediate_daf, "sphere", sphere_names)
+        add_axis!(intermediate_daf, "neighborhood", neighborhood_names)
+        set_vector!(intermediate_daf, "metacell", "sphere", sphere_names[spheres_of_metacells]; overwrite = overwrite)
+        set_vector!(intermediate_daf, "sphere", "neighborhood.main", neighborhood_names[main_neighborhoods_of_spheres])
+
+        is_correlated_of_genes_in_spheres = identify_spheres_correlated_genes(
+            intermediate_daf;
+            gene_fraction_regularization = gene_fraction_regularization,
+            min_gene_correlation = min_gene_correlation,
+            is_correlated_of_genes_in_metacells = is_correlated_of_genes_in_metacells,
+            metacells_of_spheres = metacells_of_spheres,
+        )
+        next_n_correlated_genes_in_metacells = sum(is_correlated_of_genes_in_metacells)
+        @debug "round: $(round_index) is_correlated_genes_in_metacells: $(depict(is_correlated_of_genes_in_metacells))"
+        if next_n_correlated_genes_in_metacells == previous_n_correlated_genes_in_metacells
+            break
+        end
+        previous_n_correlated_genes_in_metacells = next_n_correlated_genes_in_metacells
+
+        distance_for_spheres_between_metacells =
+            distance_for_neighborhoods_between_metacells = compute_followup_metacells_distances(;
+                total_UMIs_of_genes_in_metacells = total_UMIs_of_genes_in_metacells,
+                log_decreased_fraction_of_genes_in_metacells = log_decreased_fraction_of_genes_in_metacells,
+                log_increased_fraction_of_genes_in_metacells = log_increased_fraction_of_genes_in_metacells,
+                metacells_of_spheres = metacells_of_spheres,
+                spheres_of_neighborhoods = spheres_of_neighborhoods,
+                main_neighborhoods_of_spheres = main_neighborhoods_of_spheres,
+                is_correlated_of_genes_in_spheres = is_correlated_of_genes_in_spheres,
+                is_noisy_of_genes = is_noisy_of_genes,
+                min_significant_gene_UMIs = min_significant_gene_UMIs,
+                noisy_gene_fold = noisy_gene_fold,
+            )
+
+        spheres_threshold = max_sphere_diameter
+        neighborhood_threshold = max_sphere_diameter + max_neighborhood_diameter
+    end
+
+    is_member_of_spheres_in_neighborhoods = compute_membership_matrix(spheres_of_neighborhoods, length(sphere_names))
 
     write_data(
-        daf,
-        sphere_names,
-        neighborhood_names,
-        spheres_of_metacells,
-        main_neighborhoods_of_spheres,
-        spheres_neighborhoods_is_member,
-        spheres_of_neighborhoods,
-        spheres_distances,
-        overwrite,
+        daf;
+        sphere_names = sphere_names,
+        neighborhood_names = neighborhood_names,
+        spheres_of_metacells = spheres_of_metacells,
+        main_neighborhoods_of_spheres = main_neighborhoods_of_spheres,
+        is_member_of_spheres_in_neighborhoods = is_member_of_spheres_in_neighborhoods,
+        is_correlated_of_genes_in_spheres = is_correlated_of_genes_in_spheres,
+        distances_between_spheres = distances_between_spheres,
+        overwrite = overwrite,
     )
-
-    if max_deviant_genes > 0
-        return nothing
-    end
 
     return nothing
 end
 
 @logged function read_data(  # untested
     daf::DafReader,
-)::Tuple{
-    AbstractMatrix{<:Unsigned},
-    AbstractMatrix{<:AbstractFloat},
-    AbstractMatrix{Bool},
-    AbstractMatrix{Bool},
-    AbstractVector{<:Unsigned},
-    AbstractVector{Bool},
-}
-    genes_metacells_total_UMIs = get_matrix(daf, "gene", "metacell", "total_UMIs").array
-    genes_metacells_fraction = get_matrix(daf, "gene", "metacell", "fraction").array
-    genes_metacells_is_marker = get_matrix(daf, "gene", "metacell", "is_marker"; default = true)
-    genes_metacells_is_lonely = get_matrix(daf, "gene", "metacell", "is_lonely"; default = false)
-    metacells_total_UMIs = get_vector(daf, "metacell", "total_UMIs").array
-    genes_is_noisy = get_vector(daf, "gene", "is_noisy"; default = false).array
-    return (
-        genes_metacells_total_UMIs,
-        genes_metacells_fraction,
-        genes_metacells_is_marker,
-        genes_metacells_is_lonely,
-        metacells_total_UMIs,
-        genes_is_noisy,
-    )
+)::Tuple{AbstractMatrix{<:Unsigned}, AbstractMatrix{<:AbstractFloat}, AbstractVector{<:Unsigned}, AbstractVector{Bool}}
+    total_UMIs_of_genes_in_metacells = get_matrix(daf, "gene", "metacell", "total_UMIs").array
+    fraction_of_genes_in_metacells = get_matrix(daf, "gene", "metacell", "fraction").array
+    total_UMIs_of_metacells = get_vector(daf, "metacell", "total_UMIs").array
+    is_noisy_of_genes = get_vector(daf, "gene", "is_noisy"; default = false).array
+
+    return total_UMIs_of_genes_in_metacells, fraction_of_genes_in_metacells, total_UMIs_of_metacells, is_noisy_of_genes
 end
 
-@logged function prepare_metacells_data(  # untested
+@logged function write_data(  # untested
+    daf::DafWriter;
+    sphere_names::AbstractStringVector,
+    neighborhood_names::AbstractStringVector,
+    spheres_of_metacells::Vector{UInt32},
+    main_neighborhoods_of_spheres::Vector{UInt32},
+    is_member_of_spheres_in_neighborhoods::AbstractMatrix{Bool},
+    is_correlated_of_genes_in_spheres::AbstractMatrix{Bool},
+    distances_between_spheres::Matrix{<:AbstractFloat},
+    overwrite::Bool,
+)::Nothing
+    check_efficient_action("compute_spheres", Columns, "distances_between_spheres", distances_between_spheres)
+
+    if overwrite
+        delete_axis!(daf, "sphere"; must_exist = false)
+        delete_axis!(daf, "neighborhood"; must_exist = false)
+    end
+    add_axis!(daf, "sphere", sphere_names)
+    add_axis!(daf, "neighborhood", neighborhood_names)
+
+    set_vector!(daf, "metacell", "sphere", sphere_names[spheres_of_metacells]; overwrite = overwrite)
+    set_vector!(daf, "sphere", "neighborhood.main", neighborhood_names[main_neighborhoods_of_spheres])
+    set_matrix!(daf, "sphere", "neighborhood", "is_member", SparseMatrixCSC(is_member_of_spheres_in_neighborhoods))
+    set_matrix!(daf, "gene", "sphere", "is_correlated", SparseMatrixCSC(is_correlated_of_genes_in_spheres))
+    set_matrix!(daf, "sphere", "sphere", "distance", distances_between_spheres)
+
+    return nothing
+end
+
+@logged function compute_confidence_log_fraction_of_genes_in_metacells(;  # untested
     gene_fraction_regularization::AbstractFloat,
     confidence::AbstractFloat,
-    genes_metacells_fraction::AbstractMatrix{<:AbstractFloat},
-    metacells_total_UMIs::AbstractVector{<:Unsigned},
+    fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
+    total_UMIs_of_metacells::AbstractVector{<:Unsigned},
 )::Tuple{Matrix{Float32}, Matrix{Float32}}
-    check_efficient_action("compute_spheres", Columns, "genes_metacells_fraction", genes_metacells_fraction)
+    check_efficient_action("compute_spheres", Columns, "fraction_of_genes_in_metacells", fraction_of_genes_in_metacells)
 
     confidence_stdevs = quantile(Normal(), confidence)
 
-    genes_metacells_confidence =
-        confidence_stdevs .* sqrt.(transpose(metacells_total_UMIs) .* genes_metacells_fraction) ./
-        transpose(metacells_total_UMIs)
+    confidence_fraction_of_genes_in_metacells =
+        confidence_stdevs .* sqrt.(transpose(total_UMIs_of_metacells) .* fraction_of_genes_in_metacells) ./
+        transpose(total_UMIs_of_metacells)
 
-    genes_metacells_log_decreased_fraction =
-        log2.(max.(genes_metacells_fraction .- genes_metacells_confidence, 0.0) .+ gene_fraction_regularization)
+    log_decreased_fraction_of_genes_in_metacells =
+        log2.(
+            max.(fraction_of_genes_in_metacells .- confidence_fraction_of_genes_in_metacells, 0.0) .+
+            gene_fraction_regularization
+        )
 
-    genes_metacells_log_increased_fraction =
-        log2.(genes_metacells_fraction .+ genes_metacells_confidence .+ gene_fraction_regularization)
+    log_increased_fraction_of_genes_in_metacells =
+        log2.(
+            fraction_of_genes_in_metacells .+ confidence_fraction_of_genes_in_metacells .+ gene_fraction_regularization
+        )
 
-    return genes_metacells_log_decreased_fraction, genes_metacells_log_increased_fraction
+    return log_decreased_fraction_of_genes_in_metacells, log_increased_fraction_of_genes_in_metacells
 end
 
-@logged function compute_metacells_distances(  # untested
+@logged function compute_initial_metacells_distances(;  # untested
+    total_UMIs_of_genes_in_metacells::AbstractMatrix{<:Unsigned},
+    log_decreased_fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
+    log_increased_fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
+    is_noisy_of_genes::AbstractVector{Bool},
     min_significant_gene_UMIs::Integer,
-    genes_metacells_total_UMIs::AbstractMatrix{<:Unsigned},
-    genes_metacells_is_marker::AbstractMatrix{Bool},
-    genes_metacells_is_lonely::AbstractMatrix{Bool},
-    genes_metacells_log_decreased_fraction::AbstractMatrix{<:AbstractFloat},
-    genes_metacells_log_increased_fraction::AbstractMatrix{<:AbstractFloat},
     max_sphere_diameter::AbstractFloat,
     max_neighborhood_diameter::AbstractFloat,
     noisy_gene_fold::AbstractFloat,
-    genes_is_noisy::AbstractVector{Bool},
-    max_deviant_genes::Integer,
 )::Tuple{Matrix{Float32}, Matrix{Float32}}
-    check_efficient_action("compute_spheres", Columns, "genes_metacells_total_UMIs", genes_metacells_total_UMIs)
     check_efficient_action(
         "compute_spheres",
         Columns,
-        "genes_metacells_log_decreased_fraction",
-        genes_metacells_log_decreased_fraction,
+        "total_UMIs_of_genes_in_metacells",
+        total_UMIs_of_genes_in_metacells,
     )
     check_efficient_action(
         "compute_spheres",
         Columns,
-        "genes_metacells_log_increased_fraction",
-        genes_metacells_log_increased_fraction,
+        "log_decreased_fraction_of_genes_in_metacells",
+        log_decreased_fraction_of_genes_in_metacells,
     )
-    @assert size(genes_metacells_log_decreased_fraction) == size(genes_metacells_total_UMIs)
-    @assert size(genes_metacells_log_increased_fraction) == size(genes_metacells_total_UMIs)
+    check_efficient_action(
+        "compute_spheres",
+        Columns,
+        "log_increased_fraction_of_genes_in_metacells",
+        log_increased_fraction_of_genes_in_metacells,
+    )
+    @assert size(log_decreased_fraction_of_genes_in_metacells) == size(total_UMIs_of_genes_in_metacells)
+    @assert size(log_increased_fraction_of_genes_in_metacells) == size(total_UMIs_of_genes_in_metacells)
 
-    n_genes = size(genes_metacells_total_UMIs, 1)
-    n_metacells = size(genes_metacells_total_UMIs, 2)
-    metacells_distances_for_spheres = zeros(Float32, n_metacells, n_metacells)
-    if max_deviant_genes > 0
-        metacells_distances_for_neighborhoods = zeros(Float32, n_metacells, n_metacells)
-    else
-        metacells_distances_for_neighborhoods = metacells_distances_for_spheres
-    end
+    n_genes = size(total_UMIs_of_genes_in_metacells, 1)
+    n_metacells = size(total_UMIs_of_genes_in_metacells, 2)
+
+    distance_for_spheres_between_metacells = zeros(Float32, n_metacells, n_metacells)
+    distance_for_neighborhoods_between_metacells = zeros(Float32, n_metacells, n_metacells)
 
     @threads for base_metacell in reverse(2:n_metacells)
-        @views genes_total_UMIs_of_base_metacell = genes_metacells_total_UMIs[:, base_metacell]
-        @views genes_total_UMIs_of_other_metacells = genes_metacells_total_UMIs[:, 1:(base_metacell - 1)]
-        @views genes_log_decreased_fraction_of_base_metacell = genes_metacells_log_decreased_fraction[:, base_metacell]
-        @views genes_log_increased_fraction_of_base_metacell = genes_metacells_log_increased_fraction[:, base_metacell]
-        @views genes_log_decreased_fraction_of_other_metacells =
-            genes_metacells_log_decreased_fraction[:, 1:(base_metacell - 1)]
-        @views genes_log_increased_fraction_of_other_metacells =
-            genes_metacells_log_increased_fraction[:, 1:(base_metacell - 1)]
+        @views total_UMIs_of_genes_in_base_metacell = total_UMIs_of_genes_in_metacells[:, base_metacell]
+        @views log_decreased_fraction_of_genes_in_base_metacell =
+            log_decreased_fraction_of_genes_in_metacells[:, base_metacell]
+        @views log_increased_fraction_of_genes_in_base_metacell =
+            log_increased_fraction_of_genes_in_metacells[:, base_metacell]
 
-        @views base_metacell_is_marker_of_genes = genes_metacells_is_marker[:, base_metacell]
-        @views base_metacell_is_lonely_of_genes = genes_metacells_is_lonely[:, base_metacell]
-        @views other_metacells_is_marker_of_genes = genes_metacells_is_marker[:, 1:(base_metacell - 1)]
-        @views other_metacells_is_lonely_of_genes = genes_metacells_is_lonely[:, 1:(base_metacell - 1)]
+        @views total_UMIs_of_genes_in_other_metacells = total_UMIs_of_genes_in_metacells[:, 1:(base_metacell - 1)]
+        @views log_decreased_fraction_of_genes_in_other_metacells =
+            log_decreased_fraction_of_genes_in_metacells[:, 1:(base_metacell - 1)]
+        @views log_increased_fraction_of_genes_in_other_metacells =
+            log_increased_fraction_of_genes_in_metacells[:, 1:(base_metacell - 1)]
 
-        significant_fold_factors_of_other_metacells =
+        significant_fold_factors_of_genes_in_other_metacells =
             gene_distance.(
                 min_significant_gene_UMIs,
-                genes_total_UMIs_of_base_metacell,
-                genes_total_UMIs_of_other_metacells,
-                base_metacell_is_marker_of_genes,
-                base_metacell_is_lonely_of_genes,
-                other_metacells_is_marker_of_genes,
-                other_metacells_is_lonely_of_genes,
-                genes_log_decreased_fraction_of_base_metacell,
-                genes_log_increased_fraction_of_base_metacell,
-                genes_log_decreased_fraction_of_other_metacells,
-                genes_log_increased_fraction_of_other_metacells,
+                total_UMIs_of_genes_in_base_metacell,
+                log_decreased_fraction_of_genes_in_base_metacell,
+                log_increased_fraction_of_genes_in_base_metacell,
+                total_UMIs_of_genes_in_other_metacells,
+                log_decreased_fraction_of_genes_in_other_metacells,
+                log_increased_fraction_of_genes_in_other_metacells,
                 noisy_gene_fold,
-                genes_is_noisy,
+                is_noisy_of_genes,
             )
-        @assert size(significant_fold_factors_of_other_metacells) == (n_genes, base_metacell - 1)
+        @assert size(significant_fold_factors_of_genes_in_other_metacells) == (n_genes, base_metacell - 1)
 
-        if max_deviant_genes > 0
-            far_sphere_genes_of_other_metacells = significant_fold_factors_of_other_metacells .> max_sphere_diameter
-            far_neighborhood_genes_of_other_metacells =
-                significant_fold_factors_of_other_metacells .> max_sphere_diameter + max_neighborhood_diameter
+        is_deviant_sphere_of_gene_in_other_metacells =
+            significant_fold_factors_of_genes_in_other_metacells .> max_sphere_diameter
+        is_deviant_neighborhood_of_genes_in_other_metacells =
+            significant_fold_factors_of_genes_in_other_metacells .> max_sphere_diameter + max_neighborhood_diameter
 
-            count_far_sphere_genes_of_other_metacells = vec(sum(far_sphere_genes_of_other_metacells; dims = 1))
-            count_far_neighborhood_genes_of_other_metacells =
-                vec(sum(far_neighborhood_genes_of_other_metacells; dims = 1))
+        n_deviant_sphere_genes_of_other_metacells = vec(sum(is_deviant_sphere_of_gene_in_other_metacells; dims = 1))
+        n_deviant_neighborhood_genes_of_other_metacells =
+            vec(sum(is_deviant_neighborhood_of_genes_in_other_metacells; dims = 1))
 
-            @assert length(count_far_sphere_genes_of_other_metacells) == base_metacell - 1
-            @assert length(count_far_neighborhood_genes_of_other_metacells) == base_metacell - 1
+        @assert length(n_deviant_sphere_genes_of_other_metacells) == base_metacell - 1
+        @assert length(n_deviant_neighborhood_genes_of_other_metacells) == base_metacell - 1
 
-            metacells_distances_for_spheres[1:(base_metacell - 1), base_metacell] .=
-                count_far_sphere_genes_of_other_metacells
-            metacells_distances_for_spheres[base_metacell, 1:(base_metacell - 1)] .=
-                count_far_sphere_genes_of_other_metacells
+        distance_for_spheres_between_metacells[1:(base_metacell - 1), base_metacell] .=
+            n_deviant_sphere_genes_of_other_metacells
+        distance_for_neighborhoods_between_metacells[base_metacell, 1:(base_metacell - 1)] .=
+            n_deviant_neighborhood_genes_of_other_metacells
 
-            metacells_distances_for_neighborhoods[1:(base_metacell - 1), base_metacell] .=
-                count_far_neighborhood_genes_of_other_metacells
-            metacells_distances_for_neighborhoods[base_metacell, 1:(base_metacell - 1)] .=
-                count_far_neighborhood_genes_of_other_metacells
-
-        else
-            maximal_fold_factors_of_other_metacells =
-                vec(maximum(significant_fold_factors_of_other_metacells; dims = 1))
-            @assert length(maximal_fold_factors_of_other_metacells) == base_metacell - 1
-            metacells_distances_for_spheres[1:(base_metacell - 1), base_metacell] .=
-                maximal_fold_factors_of_other_metacells
-            metacells_distances_for_spheres[base_metacell, 1:(base_metacell - 1)] .=
-                maximal_fold_factors_of_other_metacells
-        end
+        distance_for_spheres_between_metacells[base_metacell, 1:(base_metacell - 1)] .=
+            n_deviant_sphere_genes_of_other_metacells
+        distance_for_neighborhoods_between_metacells[base_metacell, 1:(base_metacell - 1)] .=
+            n_deviant_neighborhood_genes_of_other_metacells
     end
 
-    return metacells_distances_for_spheres, metacells_distances_for_neighborhoods
+    return distance_for_spheres_between_metacells, distance_for_neighborhoods_between_metacells
 end
 
 @inline function gene_distance(  # untested
     min_significant_gene_UMIs::Integer,
-    gene_total_UMIs_of_base_metacell::Unsigned,
-    gene_total_UMIs_of_other_metacell::Unsigned,
-    base_metacell_gene_is_marker::Bool,
-    base_metacell_gene_is_lonely::Bool,
-    other_metacells_gene_is_marker::Bool,
-    other_metacells_gene_is_lonely::Bool,
-    gene_log_decreased_fraction_of_base_metacell::AbstractFloat,
-    gene_log_increased_fraction_of_base_metacell::AbstractFloat,
-    gene_log_decreased_fraction_of_other_metacell::AbstractFloat,
-    gene_log_increased_fraction_of_other_metacell::AbstractFloat,
+    total_UMIs_of_gene_in_base_metacell::Integer,
+    log_decreased_fraction_of_gene_in_base_metacell::AbstractFloat,
+    log_increased_fraction_of_gene_in_base_metacell::AbstractFloat,
+    total_UMIs_of_genes_in_other_metacell::Integer,
+    log_decreased_fraction_of_gene_in_other_metacell::AbstractFloat,
+    log_increased_fraction_of_gene_in_other_metacell::AbstractFloat,
     noisy_gene_fold::AbstractFloat,
     gene_is_noisy::Bool,
 )::AbstractFloat
-    gene_total_UMIs = gene_total_UMIs_of_base_metacell + gene_total_UMIs_of_other_metacell
-    is_significant =
-        (gene_total_UMIs >= min_significant_gene_UMIs) &
-        (base_metacell_gene_is_marker | other_metacells_gene_is_marker) &
-        (!base_metacell_gene_is_lonely | !other_metacells_gene_is_lonely)
-    is_base_low = gene_log_increased_fraction_of_base_metacell < gene_log_increased_fraction_of_other_metacell
-    gene_log_low_fraction =
-        is_base_low * gene_log_increased_fraction_of_base_metacell +
-        !is_base_low * gene_log_increased_fraction_of_other_metacell
-    gene_log_high_fraction =
-        !is_base_low * gene_log_decreased_fraction_of_base_metacell +
-        is_base_low * gene_log_decreased_fraction_of_other_metacell
-    return is_significant * max.(gene_log_high_fraction - gene_log_low_fraction - gene_is_noisy * noisy_gene_fold, 0.0)
+    total_UMIs_of_gene = total_UMIs_of_gene_in_base_metacell + total_UMIs_of_genes_in_other_metacell
+    is_significant = total_UMIs_of_gene >= min_significant_gene_UMIs
+
+    is_base_low = log_increased_fraction_of_gene_in_base_metacell < log_increased_fraction_of_gene_in_other_metacell
+
+    log_increased_low_fraction_of_gene =
+        is_base_low * log_increased_fraction_of_gene_in_base_metacell +
+        !is_base_low * log_increased_fraction_of_gene_in_other_metacell
+
+    log_decreased_high_fraction_of_gene =
+        is_base_low * log_decreased_fraction_of_gene_in_other_metacell +
+        !is_base_low * log_decreased_fraction_of_gene_in_base_metacell
+
+    return (
+        is_significant *
+        max.(
+            log_decreased_high_fraction_of_gene - log_increased_low_fraction_of_gene - gene_is_noisy * noisy_gene_fold,
+            0.0,
+        )
+    )
 end
 
-@logged function compute_sphere_distances(  # untested
-    metacells_of_spheres::Vector{Vector{UInt32}},
-    metacells_distances::Matrix{Float32},
-    max_sphere_diameter::Maybe{AbstractFloat},
-)::Matrix{Float32}
-    check_efficient_action("compute_spheres", Columns, "metacells_distances", metacells_distances)
-
-    n_spheres = length(metacells_of_spheres)
-    spheres_distances = Matrix{eltype(metacells_distances)}(undef, n_spheres, n_spheres)
-
-    @threads for base_sphere in reverse(1:n_spheres)
-        metacells_of_base_sphere = metacells_of_spheres[base_sphere]
-        @views base_sphere_distances_matrix = metacells_distances[:, metacells_of_base_sphere]
-        base_sphere_distances_vector = maximum(base_sphere_distances_matrix; dims = 2)
-        for other_sphere in 1:base_sphere
-            metacells_of_other_sphere = metacells_of_spheres[other_sphere]
-            @views other_sphere_distances_vector = base_sphere_distances_vector[metacells_of_other_sphere]
-            distance = maximum(other_sphere_distances_vector)
-            if max_sphere_diameter !== nothing
-                if other_sphere == base_sphere
-                    @assert distance <= max_sphere_diameter
-                else
-                    @assert distance > max_sphere_diameter
-                end
-            end
-            spheres_distances[base_sphere, other_sphere] = distance
-            spheres_distances[other_sphere, base_sphere] = distance
-        end
-    end
-
-    return spheres_distances
-end
-
-@logged function compute_spheres_of_metacells(  # untested
-    metacells_distances::Matrix{Float32},
-    max_sphere_diameter::AbstractFloat,
-    max_deviant_genes::Integer,
+@logged function cluster_metacells_to_spheres(;  # untested
+    distances_between_metacells::Matrix{Float32},
+    threshold::AbstractFloat,
 )::Vector{UInt32}
-    check_efficient_action("compute_spheres", Columns, "metacells_distances", metacells_distances)
-    clusters = hclust(metacells_distances; linkage = :complete)  # NOJET
-    threshold = max_deviant_genes == 0 ? max_sphere_diameter : max_deviant_genes + 0.5
+    check_efficient_action("compute_spheres", Columns, "distances_between_metacells", distances_between_metacells)
+    clusters = hclust(distances_between_metacells; linkage = :complete)  # NOJET
     spheres_of_metacells = Vector{UInt32}(cutree(clusters; h = threshold))
     return spheres_of_metacells
 end
 
-@logged function collect_spheres_of_neighborhoods(  # untested
-    spheres_distances::Matrix{Float32},
-    max_sphere_diameter::AbstractFloat,
-    max_neighborhood_diameter::AbstractFloat,
-    max_deviant_genes::Integer,
+@logged function compute_sphere_distances(;  # untested
+    distances_between_metacells::Matrix{Float32},
+    metacells_of_spheres::Vector{Vector{UInt32}},
+)::Matrix{Float32}
+    check_efficient_action("compute_spheres", Columns, "distances_between_metacells", distances_between_metacells)
+
+    n_metacells = size(distances_between_metacells, 1)
+    @assert size(distances_between_metacells, 2) == n_metacells
+
+    n_spheres = length(metacells_of_spheres)
+    distances_between_spheres = Matrix{Float32}(undef, n_spheres, n_spheres)
+
+    @threads for base_sphere in reverse(1:n_spheres)
+        metacells_of_base_sphere = metacells_of_spheres[base_sphere]
+
+        @views distance_of_metacells_from_base_sphere_metacells =
+            distances_between_metacells[:, metacells_of_base_sphere]
+
+        distance_of_metacells_from_base_sphere = maximum(distance_of_metacells_from_base_sphere_metacells; dims = 2)
+        @assert length(distance_of_metacells_from_base_sphere) == n_metacells
+
+        for other_sphere in 1:base_sphere
+            metacells_of_other_sphere = metacells_of_spheres[other_sphere]
+
+            @views distance_of_other_sphere_metacells_from_base_sphere =
+                distance_of_metacells_from_base_sphere[metacells_of_other_sphere]
+
+            distance_between_other_and_base_spheres = maximum(distance_of_other_sphere_metacells_from_base_sphere)
+
+            distances_between_spheres[base_sphere, other_sphere] = distance_between_other_and_base_spheres
+            distances_between_spheres[other_sphere, base_sphere] = distance_between_other_and_base_spheres
+        end
+    end
+
+    return distances_between_spheres
+end
+
+@logged function collect_spheres_of_neighborhoods(;  # untested
+    distances_between_spheres::Matrix{Float32},
+    threshold::AbstractFloat,
 )::Tuple{Vector{Vector{<:Integer}}, Vector{UInt32}}
-    n_spheres = size(spheres_distances, 1)
-    threshold = max_deviant_genes == 0 ? max_sphere_diameter + max_neighborhood_diameter : max_deviant_genes
-    spheres_of_neighborhoods = [findall(spheres_distances[:, sphere] .<= threshold) for sphere in 1:n_spheres]
+    check_efficient_action("compute_spheres", Columns, "distances_between_spheres", distances_between_spheres)
+
+    n_spheres = size(distances_between_spheres, 1)
+    @assert size(distances_between_spheres, 2) == n_spheres
+
+    @views spheres_of_neighborhoods =  # NOJET
+        [findall(distances_between_spheres[:, sphere] .<= threshold) for sphere in 1:n_spheres]
     main_neighborhoods_of_spheres = Vector{UInt32}(undef, n_spheres)
 
     if n_spheres <= 1
@@ -473,262 +516,198 @@ end
     return unique_spheres_of_neighborhoods, main_neighborhoods_of_spheres
 end
 
-@logged function compute_membership_matrix(  # untested
-    spheres_of_neighborhoods::Vector{Vector{<:Integer}},
-    n_spheres::Integer,
-)::AbstractMatrix{Bool}
-    n_neighborhoods = length(spheres_of_neighborhoods)
-    spheres_neighborhoods_is_member = zeros(Bool, n_spheres, n_neighborhoods)
-    for (neighborhood, spheres_of_neighborhood) in enumerate(spheres_of_neighborhoods)
-        spheres_neighborhoods_is_member[spheres_of_neighborhood, neighborhood] .= true  # NOJET
-    end
-    return spheres_neighborhoods_is_member
-end
-
-@logged function write_data(  # untested
-    daf::DafWriter,
-    sphere_names::AbstractStringVector,
-    neighborhood_names::AbstractStringVector,
-    spheres_of_metacells::Vector{UInt32},
-    main_neighborhoods_of_spheres::Vector{UInt32},
-    spheres_neighborhoods_is_member::AbstractMatrix{Bool},
-    spheres_of_neighborhoods::Vector{Vector{<:Integer}},
-    spheres_distances::Matrix{<:AbstractFloat},
-    overwrite::Bool,
-)::Nothing
-    check_efficient_action("compute_spheres", Columns, "spheres_distances", spheres_distances)
-
-    if overwrite
-        delete_axis!(daf, "sphere"; must_exist = false)
-        delete_axis!(daf, "neighborhood"; must_exist = false)
-    end
-    add_axis!(daf, "sphere", sphere_names)
-    add_axis!(daf, "neighborhood", neighborhood_names)
-
-    set_vector!(daf, "metacell", "sphere", sphere_names[spheres_of_metacells]; overwrite = overwrite)
-    set_vector!(daf, "sphere", "neighborhood.main", neighborhood_names[main_neighborhoods_of_spheres])
-    set_matrix!(daf, "sphere", "neighborhood", "is_member", spheres_neighborhoods_is_member)
-
-    n_spheres = length(sphere_names)
-    nnz = sum([length(spheres_of_neighborhoods[main_neighborhoods_of_spheres[sphere]]) - 1 for sphere in 1:n_spheres])
-    empty_sparse_matrix!(daf, "sphere", "sphere", "distance", Float32, nnz) do colptr, rowval, nzval
-        colptr[1] = 1
-        next_value_index = 1
-        for source_sphere in 1:n_spheres
-            previous_destination_sphere = 0
-            did_see_source_sphere = false
-            for destination_sphere in spheres_of_neighborhoods[main_neighborhoods_of_spheres[source_sphere]]
-                @assert destination_sphere > previous_destination_sphere
-                previous_destination_sphere = destination_sphere
-                if destination_sphere != source_sphere
-                    rowval[next_value_index] = destination_sphere
-                    nzval[next_value_index] = spheres_distances[destination_sphere, source_sphere]
-                    next_value_index += 1
-                else
-                    did_see_source_sphere = true
-                end
-            end
-            @assert did_see_source_sphere
-            colptr[source_sphere + 1] = next_value_index
-        end
-        @assert next_value_index == nnz + 1
-        return nothing
-    end
-
-    return nothing
-end
-
-"""
-    function improve_spheres!(
-        daf::DafWriter;
-        min_significant_gene_UMIs::Integer = 40,
-        gene_fraction_regularization::AbstractFloat = 1e-5,
-        confidence::AbstractFloat = 0.9,
-        max_sphere_diameter::AbstractFloat = 2.0,
-        max_neighborhood_diameter::AbstractFloat = 2.0,
-        noisy_gene_fold::AbstractFloat = 1.0,
-        min_gene_correlation::AbstractFloat = 0.5,
-    )::Nothing
-
-Improve the partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods. The improved
-partition ensures no gene is not "too different" between the metacells in each sphere and spheres in each neighborhood;
-however, this only applies to genes that have at least `min_gene_correlation` with at least one other gene in the
-neighborhood.
-
- 1. Invoke [`identify_marker_genes!`](@ref) and [`identify_lonely_genes!`](@ref) for each neighborhood and store the
-    results in `is_marker` and `is_lonely` of the genes for the metacells in sphere for which this is the main
-    neighborhood.
- 2. Recompute the spheres with `max_deviant_genes = 0` and `overwrite = true`. When computing the distance between each
-    two metacells, this will only consider genes that are markers in either metacell and are not lonely in both. The
-    result should be "improved" spheres as they will not be affected by genes that aren't part of some multi-gene
-    behavior relevant to each sphere's neighborhood.
-
-CONTRACT
-"""
-@logged @computation IMPROVED_SPHERE_CONTRACT function improve_spheres!(  # untested
-    daf::DafWriter;
-    min_significant_gene_UMIs::Integer = 40,
-    gene_fraction_regularization::AbstractFloat = 1e-5,
-    confidence::AbstractFloat = 0.9,
-    max_sphere_diameter::AbstractFloat = 2.0,
-    max_neighborhood_diameter::AbstractFloat = 2.0,
-    noisy_gene_fold::AbstractFloat = 1.0,
-    min_marker_gene_range_fold::AbstractFloat = 2.0,
-    min_max_marker_gene_fraction::AbstractFloat = 1e-4,
-    max_lonely_gene_correlation::AbstractFloat = 0.5,
-    max_lonely_gene_correlated::Integer = 0,
-)::Nothing
-    identify_neighborhoods_genes!(
-        daf;
-        gene_fraction_regularization = gene_fraction_regularization,
-        noisy_gene_fold = noisy_gene_fold,
-        min_marker_gene_range_fold = min_marker_gene_range_fold,
-        min_max_marker_gene_fraction = min_max_marker_gene_fraction,
-        max_lonely_gene_correlation = max_lonely_gene_correlation,
-        max_lonely_gene_correlated = max_lonely_gene_correlated,
-    )
-
-    compute_spheres!(
-        daf;
-        min_significant_gene_UMIs = min_significant_gene_UMIs,
-        gene_fraction_regularization = gene_fraction_regularization,
-        confidence = confidence,
-        max_sphere_diameter = max_sphere_diameter,
-        max_neighborhood_diameter = max_neighborhood_diameter,
-        noisy_gene_fold = noisy_gene_fold,
-        max_deviant_genes = 0,
-        overwrite = true,
-    )
-    return nothing
-end
-
-@logged function identify_neighborhoods_genes!(  # untested
+@logged function identify_spheres_correlated_genes(  # untested
     daf::DafReader;
     gene_fraction_regularization::AbstractFloat,
-    noisy_gene_fold::AbstractFloat,
-    min_marker_gene_range_fold::AbstractFloat,
-    min_max_marker_gene_fraction::AbstractFloat,
-    max_lonely_gene_correlation::AbstractFloat,
-    max_lonely_gene_correlated::Integer,
-)::Nothing
+    min_gene_correlation::AbstractFloat,
+    is_correlated_of_genes_in_metacells::Matrix{Bool},
+    metacells_of_spheres::Vector{Vector{UInt32}},
+)::Matrix{Bool}
+    check_efficient_action(
+        "compute_spheres",
+        Columns,
+        "is_correlated_of_genes_in_metacells",
+        is_correlated_of_genes_in_metacells,
+    )
     n_genes = axis_length(daf, "gene")
-    n_neighborhoods = axis_length(daf, "neighborhood")
-    n_metacells = axis_length(daf, "metacell")
-    genes_metacells_is_marker = zeros(Bool, n_genes, n_metacells)
-    genes_metacells_is_lonely = zeros(Bool, n_genes, n_metacells)
-    metacell_index_of_names = daf["/ metacell : name"].dicts[1]
+    n_spheres = axis_length(daf, "sphere")
+    sphere_names = axis_array(daf, "sphere")
 
-    neighborhood_names = axis_array(daf, "neighborhood")
-    @threads for neighborhood_index in 1:n_neighborhoods
-        neighborhood_name = neighborhood_names[neighborhood_index]
+    is_correlated_of_genes_in_spheres = zeros(Bool, n_genes, n_spheres)
+    main_neighborhoods_of_spheres = get_vector(daf, "sphere", "neighborhood.main")
+
+    @threads for sphere_index in 1:n_spheres
+        sphere_name = sphere_names[sphere_index]
+        neighborhood_name = main_neighborhoods_of_spheres[sphere_index]
         neighborhood_daf = chain_writer(
             [
                 viewer(
                     daf;
-                    name = "view.$(neighborhood_name)",
+                    name = "intermediate.$(sphere_name)",
                     axes = [
                         "metacell" => "/ metacell & sphere => neighborhood.main = $(neighborhood_name)",
                         "gene" => "=",
                     ],
                     data = [("metacell", "gene", "fraction") => "="],
                 ),
-                MemoryDaf(; name = "identified.$(neighborhood_name)"),
+                MemoryDaf(; name = "intermediate.$(sphere_name).identified"),
             ];
-            name = "chain.$(neighborhood_name)",
+            name = "intermediate..$(neighborhood_name).chain",
         )
 
-        identify_marker_genes!(
-            neighborhood_daf;
-            gene_fraction_regularization = gene_fraction_regularization,
-            min_marker_gene_range_fold = min_marker_gene_range_fold,
-            noisy_gene_fold = noisy_gene_fold,
-            min_max_marker_gene_fraction = min_max_marker_gene_fraction,
-        )
-        identify_lonely_genes!(
-            neighborhood_daf;
-            gene_fraction_regularization = gene_fraction_regularization,
-            max_lonely_gene_correlation = max_lonely_gene_correlation,
-            max_lonely_gene_correlated = max_lonely_gene_correlated,
-        )
+        metacell_indices_of_sphere = metacells_of_spheres[sphere_index]
+        @views is_correlated_of_genes_in_metacells_of_sphere =
+            is_correlated_of_genes_in_metacells[:, metacell_indices_of_sphere]
+        is_correlated_of_genes_in_sphere = vec(maximum(is_correlated_of_genes_in_metacells_of_sphere; dims = 2))
+        @assert length(is_correlated_of_genes_in_sphere) == n_genes
 
-        is_marker_of_neighborhood_genes = neighborhood_daf["/ gene : is_marker"]
-        is_lonely_of_neighborhood_genes = neighborhood_daf["/ gene : is_lonely"]
+        n_metacells_of_neighborhood = axis_length(neighborhood_daf, "metacell")
+        if n_metacells_of_neighborhood > 1
+            identify_correlated_genes!(
+                neighborhood_daf;
+                gene_fraction_regularization = gene_fraction_regularization,
+                min_gene_correlation = min_gene_correlation,
+            )
+            is_correlated_of_genes_in_neighborhood = neighborhood_daf["/ gene : is_correlated || true"].array
+            is_correlated_of_genes_in_sphere .&= is_correlated_of_genes_in_neighborhood
+        end
 
-        metacell_names_of_neighborhood = axis_array(neighborhood_daf, "metacell")
-        metacell_indices_of_neighborhood =
-            [metacell_index_of_names[metacell_name] for metacell_name in metacell_names_of_neighborhood]
-
-        genes_metacells_is_marker[:, metacell_indices_of_neighborhood] .= is_marker_of_neighborhood_genes
-        genes_metacells_is_lonely[:, metacell_indices_of_neighborhood] .= is_lonely_of_neighborhood_genes
+        is_correlated_of_genes_in_spheres[:, sphere_index] .= is_correlated_of_genes_in_sphere
+        is_correlated_of_genes_in_metacells[:, metacell_indices_of_sphere] .= is_correlated_of_genes_in_sphere
     end
 
-    set_matrix!(daf, "gene", "metacell", "is_marker", genes_metacells_is_marker; overwrite = true)
-    set_matrix!(daf, "gene", "metacell", "is_lonely", genes_metacells_is_lonely; overwrite = true)
-
-    return nothing
+    return is_correlated_of_genes_in_spheres
 end
 
-"""
-    function compute_improved_spheres!(
-        daf::DafWriter;
-        min_significant_gene_UMIs::Integer = 40,
-        gene_fraction_regularization::AbstractFloat = 1e-5,
-        confidence::AbstractFloat = 0.9,
-        max_sphere_diameter::AbstractFloat = 2.0,
-        max_neighborhood_diameter::AbstractFloat = 2.0,
-        noisy_gene_fold::AbstractFloat = 1.0,
-        min_gene_correlation::AbstractFloat = 0.5,
-    )::Nothing
-
-Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods, such that each sphere is
-homogeneous in the genes that participate in multi-gene behaviors in its main neighborhood.
-
-This calls [`compute_spheres!`](@ref) and then [`improve_spheres!](@ref). In the 1st call to [`compute_spheres!`](@ref) call, we allow up to `max_deviant_genes_fraction` of the genes to be deviant; in [`improve_spheres!`](@ref), we forbid
-all genes from being deviant, as we expect to ignore all "irrelevant" genes as non-markers or lonely.
-
-CONTRACT
-"""
-@logged @computation IMPROVED_SPHERE_CONTRACT function compute_improved_spheres!(  # untested
-    daf::DafWriter;
-    min_significant_gene_UMIs::Integer = 40,
-    gene_fraction_regularization::AbstractFloat = 1e-5,
-    confidence::AbstractFloat = 0.9,
-    max_sphere_diameter::AbstractFloat = 2.0,
-    max_neighborhood_diameter::AbstractFloat = 2.0,
-    noisy_gene_fold::AbstractFloat = 1.0,
-    min_marker_gene_range_fold::AbstractFloat = 2.0,
-    min_max_marker_gene_fraction::AbstractFloat = 1e-4,
-    max_lonely_gene_correlation::AbstractFloat = 0.5,
-    max_lonely_gene_correlated::Integer = 0,
-    max_deviant_genes_fraction::AbstractFloat = 0.01,
-)::Nothing
-    @assert 0.0 <= max_deviant_genes_fraction <= 1.0
-
-    compute_spheres!(
-        daf;
-        min_significant_gene_UMIs = min_significant_gene_UMIs,
-        gene_fraction_regularization = gene_fraction_regularization,
-        confidence = confidence,
-        max_sphere_diameter = max_sphere_diameter,
-        max_neighborhood_diameter = max_neighborhood_diameter,
-        noisy_gene_fold = noisy_gene_fold,
-        max_deviant_genes = Int(round(axis_length(daf, "gene") * max_deviant_genes_fraction)),
-        overwrite = false,
+@logged function compute_followup_metacells_distances(;  # untested
+    total_UMIs_of_genes_in_metacells::AbstractMatrix{<:Unsigned},
+    log_decreased_fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
+    log_increased_fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
+    metacells_of_spheres::Vector{Vector{UInt32}},
+    spheres_of_neighborhoods::Vector{Vector{<:Integer}},
+    main_neighborhoods_of_spheres::Vector{UInt32},
+    is_correlated_of_genes_in_spheres::Matrix{Bool},
+    is_noisy_of_genes::AbstractVector{Bool},
+    min_significant_gene_UMIs::Integer,
+    noisy_gene_fold::AbstractFloat,
+)::Matrix{Float32}
+    check_efficient_action(
+        "compute_spheres",
+        Columns,
+        "total_UMIs_of_genes_in_metacells",
+        total_UMIs_of_genes_in_metacells,
     )
-    improve_spheres!(
-        daf;
-        min_significant_gene_UMIs = min_significant_gene_UMIs,
-        gene_fraction_regularization = gene_fraction_regularization,
-        confidence = confidence,
-        max_sphere_diameter = max_sphere_diameter,
-        max_neighborhood_diameter = max_neighborhood_diameter,
-        noisy_gene_fold = noisy_gene_fold,
-        min_marker_gene_range_fold = min_marker_gene_range_fold,
-        min_max_marker_gene_fraction = min_max_marker_gene_fraction,
-        max_lonely_gene_correlation = max_lonely_gene_correlation,
-        max_lonely_gene_correlated = max_lonely_gene_correlated,
+    check_efficient_action(
+        "compute_spheres",
+        Columns,
+        "log_decreased_fraction_of_genes_in_metacells",
+        log_decreased_fraction_of_genes_in_metacells,
     )
-    return nothing
+    check_efficient_action(
+        "compute_spheres",
+        Columns,
+        "log_increased_fraction_of_genes_in_metacells",
+        log_increased_fraction_of_genes_in_metacells,
+    )
+    @assert size(log_decreased_fraction_of_genes_in_metacells) == size(total_UMIs_of_genes_in_metacells)
+    @assert size(log_increased_fraction_of_genes_in_metacells) == size(total_UMIs_of_genes_in_metacells)
+
+    n_metacells = size(total_UMIs_of_genes_in_metacells, 2)
+    distances_between_metacells = fill(Inf32, n_metacells, n_metacells)
+
+    n_spheres = length(metacells_of_spheres)
+    did_compute_distance_between_spheres = zeros(Bool, n_spheres, n_spheres)
+
+    @threads for base_sphere_index in 1:n_spheres
+        metacell_indices_of_base_sphere = metacells_of_spheres[base_sphere_index]
+
+        @views is_correlated_of_genes_in_base_sphere = is_correlated_of_genes_in_spheres[:, base_sphere_index]
+
+        base_neighborhood_index = main_neighborhoods_of_spheres[base_sphere_index]
+        other_sphere_indices = spheres_of_neighborhoods[base_neighborhood_index]
+        for other_sphere_index in other_sphere_indices
+            if did_compute_distance_between_spheres[base_sphere_index, other_sphere_index]
+                continue
+            end
+            did_compute_distance_between_spheres[base_sphere_index, other_sphere_index] = true
+            did_compute_distance_between_spheres[other_sphere_index, base_sphere_index] = true
+
+            metacell_indices_of_other_sphere = metacells_of_spheres[other_sphere_index]
+            n_metacells_of_other_sphere = length(metacell_indices_of_other_sphere)
+
+            @views is_correlated_of_genes_in_other_sphere = is_correlated_of_genes_in_spheres[:, other_sphere_index]
+            is_correlated_of_genes_for_distance =
+                is_correlated_of_genes_in_base_sphere .| is_correlated_of_genes_in_other_sphere
+            if !any(is_correlated_of_genes_for_distance)
+                distances_between_metacells[metacell_indices_of_base_sphere, metacell_indices_of_other_sphere] .= 0
+                distances_between_metacells[metacell_indices_of_other_sphere, metacell_indices_of_base_sphere] .= 0
+                continue
+            end
+            is_noisy_of_genes_for_distance = is_noisy_of_genes[is_correlated_of_genes_for_distance]
+
+            for base_metacell_index in metacell_indices_of_base_sphere
+                total_UMIs_of_genes_in_base_metacell =
+                    total_UMIs_of_genes_in_metacells[is_correlated_of_genes_for_distance, base_metacell_index]
+                log_decreased_fraction_of_genes_in_base_metacell = log_decreased_fraction_of_genes_in_metacells[
+                    is_correlated_of_genes_for_distance,
+                    base_metacell_index,
+                ]
+                log_increased_fraction_of_genes_in_base_metacell = log_increased_fraction_of_genes_in_metacells[
+                    is_correlated_of_genes_for_distance,
+                    base_metacell_index,
+                ]
+
+                total_UMIs_of_genes_in_other_metacells = total_UMIs_of_genes_in_metacells[
+                    is_correlated_of_genes_for_distance,
+                    metacell_indices_of_other_sphere,
+                ]
+                log_decreased_fraction_of_genes_in_other_metacells = log_decreased_fraction_of_genes_in_metacells[
+                    is_correlated_of_genes_for_distance,
+                    metacell_indices_of_other_sphere,
+                ]
+                log_increased_fraction_of_genes_in_other_metacells = log_increased_fraction_of_genes_in_metacells[
+                    is_correlated_of_genes_for_distance,
+                    metacell_indices_of_other_sphere,
+                ]
+
+                significant_fold_factors_of_genes_in_other_metacells =
+                    gene_distance.(
+                        min_significant_gene_UMIs,
+                        total_UMIs_of_genes_in_base_metacell,
+                        log_decreased_fraction_of_genes_in_base_metacell,
+                        log_increased_fraction_of_genes_in_base_metacell,
+                        total_UMIs_of_genes_in_other_metacells,
+                        log_decreased_fraction_of_genes_in_other_metacells,
+                        log_increased_fraction_of_genes_in_other_metacells,
+                        noisy_gene_fold,
+                        is_noisy_of_genes_for_distance,
+                    )
+                @assert size(significant_fold_factors_of_genes_in_other_metacells, 2) == n_metacells_of_other_sphere
+
+                maximal_fold_factors_of_genes_in_other_metacells =
+                    vec(maximum(significant_fold_factors_of_genes_in_other_metacells; dims = 1))
+                @assert length(maximal_fold_factors_of_genes_in_other_metacells) == n_metacells_of_other_sphere
+
+                distances_between_metacells[base_metacell_index, metacell_indices_of_other_sphere] .=
+                    maximal_fold_factors_of_genes_in_other_metacells
+                distances_between_metacells[metacell_indices_of_other_sphere, base_metacell_index] .=
+                    maximal_fold_factors_of_genes_in_other_metacells
+            end
+        end
+    end
+    return distances_between_metacells
+end
+
+@logged function compute_membership_matrix(  # untested
+    spheres_of_neighborhoods::Vector{Vector{<:Integer}},
+    n_spheres::Integer,
+)::AbstractMatrix{Bool}
+    n_neighborhoods = length(spheres_of_neighborhoods)
+    is_member_of_spheres_in_neighborhoods = zeros(Bool, n_spheres, n_neighborhoods)
+    for (neighborhood, spheres_of_neighborhood) in enumerate(spheres_of_neighborhoods)
+        is_member_of_spheres_in_neighborhoods[spheres_of_neighborhood, neighborhood] .= true  # NOJET
+    end
+    return is_member_of_spheres_in_neighborhoods
 end
 
 end  # module
