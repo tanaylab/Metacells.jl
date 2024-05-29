@@ -102,7 +102,7 @@ METACELLS_SQUARE_DATA = CopyAnnData(["obs_outgoing_weights" => ("outgoing_weight
         type_property::Maybe{AbstractString} = nothing,
         rename_type::Maybe{AbstractString} = "type",
         type_colors_csv::Maybe{AbstractString} = nothing,
-        type_properties::Maybe{AbstractStringSet} = nothing,
+        type_properties::Maybe{AbstractSet{<:AbstractString}} = nothing,
         properties_defaults::Maybe{Dict} = nothing,
     )::Nothing
 
@@ -186,7 +186,7 @@ to the raw-only genes or cells.
     rename_type::Maybe{AbstractString} = "type",
     empty_type::Maybe{AbstractString} = nothing,
     type_colors_csv::Maybe{AbstractString} = nothing,
-    type_properties::Maybe{AbstractStringSet} = nothing,
+    type_properties::Maybe{AbstractSet{<:AbstractString}} = nothing,
     properties_defaults::Maybe{Dict} = nothing,
 )::Nothing
     metacells_daf =  # NOJET
@@ -279,7 +279,7 @@ function import_metacells(
     rename_type::Maybe{AbstractString},
     empty_type::Maybe{AbstractString},
     type_colors_csv::Maybe{AbstractString},
-    type_properties::Maybe{AbstractStringSet},
+    type_properties::Maybe{AbstractSet{<:AbstractString}},
     properties_defaults::Maybe{Dict},
 )::Nothing
     copy_axis!(; destination = destination, source = metacells_daf, axis = "metacell")
@@ -325,7 +325,7 @@ function import_metacell_types(
     rename_type::Maybe{AbstractString},
     empty_type::Maybe{AbstractString},
     type_colors_csv::Maybe{AbstractString},
-    type_properties::Maybe{AbstractStringSet},
+    type_properties::Maybe{AbstractSet{<:AbstractString}},
     properties_defaults::Maybe{Dict},
 )::Nothing
     if rename_type === nothing
@@ -510,7 +510,7 @@ function import_mask_matrix(
     destination::DafWriter,
     source::DafReader,
     rename_type::AbstractString,
-    type_names::AbstractStringVector,
+    type_names::AbstractVector{<:AbstractString},
     prefix::AbstractString,
 )::Nothing
     any_exist = false

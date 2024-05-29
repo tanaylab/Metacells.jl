@@ -29,6 +29,7 @@ using Statistics
         max_sphere_diameter::AbstractFloat = 2.0,
         max_neighborhood_diameter::AbstractFloat = 2.0,
         noisy_gene_fold::AbstractFloat = 1.0,
+        min_gene_correlation::AbstractFloat = 0.5,
         max_deviant_genes_fraction::AbstractFloat = 0.01,
         overwrite::Bool = false,
     )::Nothing
@@ -254,8 +255,8 @@ end
 
 @logged function write_data(  # untested
     daf::DafWriter;
-    sphere_names::AbstractStringVector,
-    neighborhood_names::AbstractStringVector,
+    sphere_names::AbstractVector{<:AbstractString},
+    neighborhood_names::AbstractVector{<:AbstractString},
     spheres_of_metacells::Vector{UInt32},
     main_neighborhoods_of_spheres::Vector{UInt32},
     is_member_of_spheres_in_neighborhoods::AbstractMatrix{Bool},
