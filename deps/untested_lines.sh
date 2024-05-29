@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e -o pipefail
-grep -H -n '.' */*.cov \
+shopt -s nullglob
+set -- */*.cov
+if [ "$#" -eq 0 ]
+then
+    exit 0
+fi
+grep -H -n '.' "$@" \
 | sed 's/\.[0-9][0-9]*\.cov:\([0-9][0-9]*\): [ ]*\([^ ]*\) /`\1`\2`/' \
 | sort -t '`' -k '1,1' -k '2n,2' \
 | awk -F '`' '
