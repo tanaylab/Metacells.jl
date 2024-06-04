@@ -553,7 +553,7 @@ end
                 ),
                 MemoryDaf(; name = "intermediate.$(sphere_name).identified"),
             ];
-            name = "intermediate..$(neighborhood_name).chain",
+            name = "intermediate.$(neighborhood_name).chain",
         )
 
         metacell_indices_of_sphere = metacells_of_spheres[sphere_index]
