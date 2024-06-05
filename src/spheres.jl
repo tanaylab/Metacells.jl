@@ -47,7 +47,8 @@ Partition raw metacells into distinct spheres, and spheres into overlapping neig
     genes, we reduce the fold factor by `noisy_gene_fold`. In the first round, we simply count the number of genes whose
     fold factor is more than `max_sphere_diameter` (for computing spheres) and `max_sphere_diameter` +
     `max_neighborhood_diameter` (for computing neighborhoods). In the followup rounds, we use the maximal gene fold, for
-    genes that are correlated in the vicinity of the metacells (see below).
+    genes that are correlated in the vicinity of the metacells (see below). Finally, in the followup rounds, we only compare
+    a base metacell with other metacells which were in the same neighborhood in the previous round.
  3. We use hierarchical clustering to partition the metacells to distinct spheres, such that the maximal distance between
     any metacells in the sphere is bounded. In the first round, this bound is the `max_deviant_genes_fraction` out of the
     total number of genes. In the followup rounds, this is the `max_sphere_diameter`.
@@ -59,8 +60,11 @@ Partition raw metacells into distinct spheres, and spheres into overlapping neig
  5. For each sphere, we compute the set of genes which have at least the `min_gene_correlation` with some other gene(s)
     in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set
     with the set from its sphere in the previous round.
- 6. If the new sets of correlated genes are identical to the previous round, we are done. Otherwise we repeat the round,
+ 6. If the new sets of correlated genes are identical to the previous round, we are (almost) done. Otherwise we repeat the round,
     using the more restricted sets of correlated genes.
+ 7. If we are (almost) done, we recompute the distances between metacells as in (2), but this time we compare all
+    metacell pairs, even if they weren't in the same neighborhood, and we recompute the spheres and neighborhoods using
+    these more dense distances. This gives us bigger spheres and neighborhoods as the final result.
 
 If `overwrite` is set, the results will replace any previously computed spheres and neighborhoods.
 
@@ -162,6 +166,8 @@ CONTRACT
     is_correlated_of_genes_in_spheres = nothing
 
     round_index = 0
+    is_final = false
+    metacells_of_spheres = nothing
     while true
         round_index += 1
 
@@ -171,7 +177,7 @@ CONTRACT
         )
         metacells_of_spheres = collect_group_members(spheres_of_metacells)
         sphere_names = group_names(daf, "metacell", metacells_of_spheres; prefix = "S")
-        @debug "round: $(round_index) n_spheres: $(length(sphere_names))"
+        @debug "round: $(round_index) is_final: $(is_final) n_spheres: $(length(sphere_names))"
 
         distances_between_spheres = compute_sphere_distances(;
             distances_between_metacells = distance_for_neighborhoods_between_metacells,
@@ -184,7 +190,7 @@ CONTRACT
         )
 
         neighborhood_names = group_names(daf, "metacell", spheres_of_neighborhoods; prefix = "N")
-        @debug "round: $(round_index) n_neighborhoods: $(length(neighborhood_names))"
+        @debug "round: $(round_index) is_final: $(is_final) n_neighborhoods: $(length(neighborhood_names))"
         @assert length(neighborhood_names) <= length(sphere_names)
 
         intermediate_daf = chain_writer([daf, MemoryDaf(; name = "intermediate")])
@@ -199,12 +205,16 @@ CONTRACT
             min_gene_correlation = min_gene_correlation,
             is_correlated_of_genes_in_metacells = is_correlated_of_genes_in_metacells,
             metacells_of_spheres = metacells_of_spheres,
+            is_final = is_final,
         )
         next_n_correlated_genes_in_metacells = sum(is_correlated_of_genes_in_metacells)
-        @debug "round: $(round_index) is_correlated_genes_in_metacells: $(depict(is_correlated_of_genes_in_metacells))"
-        if next_n_correlated_genes_in_metacells == previous_n_correlated_genes_in_metacells
+        @debug "round: $(round_index) is_final: $(is_final) is_correlated_genes_in_metacells: $(depict(is_correlated_of_genes_in_metacells))"
+
+        if is_final
             break
         end
+
+        is_final = next_n_correlated_genes_in_metacells == previous_n_correlated_genes_in_metacells
         previous_n_correlated_genes_in_metacells = next_n_correlated_genes_in_metacells
 
         distance_for_spheres_between_metacells =
@@ -219,6 +229,7 @@ CONTRACT
                 is_noisy_of_genes = is_noisy_of_genes,
                 min_significant_gene_UMIs = min_significant_gene_UMIs,
                 noisy_gene_fold = noisy_gene_fold,
+                is_final = is_final,
             )
 
         spheres_threshold = max_sphere_diameter
@@ -523,6 +534,7 @@ end
     min_gene_correlation::AbstractFloat,
     is_correlated_of_genes_in_metacells::Matrix{Bool},
     metacells_of_spheres::Vector{Vector{UInt32}},
+    is_final::Bool,
 )::Matrix{Bool}
     check_efficient_action(
         "compute_spheres",
@@ -540,37 +552,39 @@ end
     @threads for sphere_index in 1:n_spheres
         sphere_name = sphere_names[sphere_index]
         neighborhood_name = main_neighborhoods_of_spheres[sphere_index]
-        neighborhood_daf = chain_writer(
-            [
-                viewer(
-                    daf;
-                    name = "intermediate.$(sphere_name)",
-                    axes = [
-                        "metacell" => "/ metacell & sphere => neighborhood.main = $(neighborhood_name)",
-                        "gene" => "=",
-                    ],
-                    data = [("metacell", "gene", "fraction") => "="],
-                ),
-                MemoryDaf(; name = "intermediate.$(sphere_name).identified"),
-            ];
-            name = "intermediate.$(neighborhood_name).chain",
-        )
-
         metacell_indices_of_sphere = metacells_of_spheres[sphere_index]
         @views is_correlated_of_genes_in_metacells_of_sphere =
             is_correlated_of_genes_in_metacells[:, metacell_indices_of_sphere]
         is_correlated_of_genes_in_sphere = vec(maximum(is_correlated_of_genes_in_metacells_of_sphere; dims = 2))
         @assert length(is_correlated_of_genes_in_sphere) == n_genes
 
-        n_metacells_of_neighborhood = axis_length(neighborhood_daf, "metacell")
-        if n_metacells_of_neighborhood > 1
-            identify_correlated_genes!(
-                neighborhood_daf;
-                gene_fraction_regularization = gene_fraction_regularization,
-                min_gene_correlation = min_gene_correlation,
+        if !is_final
+            neighborhood_daf = chain_writer(
+                [
+                    viewer(
+                        daf;
+                        name = "intermediate.$(sphere_name)",
+                        axes = [
+                            "metacell" => "/ metacell & sphere => neighborhood.main = $(neighborhood_name)",
+                            "gene" => "=",
+                        ],
+                        data = [("metacell", "gene", "fraction") => "="],
+                    ),
+                    MemoryDaf(; name = "intermediate.$(sphere_name).identified"),
+                ];
+                name = "intermediate.$(neighborhood_name).chain",
             )
-            is_correlated_of_genes_in_neighborhood = neighborhood_daf["/ gene : is_correlated || true"].array
-            is_correlated_of_genes_in_sphere .&= is_correlated_of_genes_in_neighborhood
+
+            n_metacells_of_neighborhood = axis_length(neighborhood_daf, "metacell")
+            if n_metacells_of_neighborhood > 1
+                identify_correlated_genes!(
+                    neighborhood_daf;
+                    gene_fraction_regularization = gene_fraction_regularization,
+                    min_gene_correlation = min_gene_correlation,
+                )
+                is_correlated_of_genes_in_neighborhood = neighborhood_daf["/ gene : is_correlated || true"].array
+                is_correlated_of_genes_in_sphere .&= is_correlated_of_genes_in_neighborhood
+            end
         end
 
         is_correlated_of_genes_in_spheres[:, sphere_index] .= is_correlated_of_genes_in_sphere
@@ -591,6 +605,7 @@ end
     is_noisy_of_genes::AbstractVector{Bool},
     min_significant_gene_UMIs::Integer,
     noisy_gene_fold::AbstractFloat,
+    is_final::Bool,
 )::Matrix{Float32}
     check_efficient_action(
         "compute_spheres",
@@ -621,11 +636,15 @@ end
 
     @threads for base_sphere_index in 1:n_spheres
         metacell_indices_of_base_sphere = metacells_of_spheres[base_sphere_index]
-
         @views is_correlated_of_genes_in_base_sphere = is_correlated_of_genes_in_spheres[:, base_sphere_index]
 
-        base_neighborhood_index = main_neighborhoods_of_spheres[base_sphere_index]
-        other_sphere_indices = spheres_of_neighborhoods[base_neighborhood_index]
+        if is_final
+            other_sphere_indices = 1:base_sphere_index
+        else
+            base_neighborhood_index = main_neighborhoods_of_spheres[base_sphere_index]
+            other_sphere_indices = spheres_of_neighborhoods[base_neighborhood_index]
+        end
+
         for other_sphere_index in other_sphere_indices
             if did_compute_distance_between_spheres[base_sphere_index, other_sphere_index]
                 continue
@@ -640,8 +659,8 @@ end
             is_correlated_of_genes_for_distance =
                 is_correlated_of_genes_in_base_sphere .| is_correlated_of_genes_in_other_sphere
             if !any(is_correlated_of_genes_for_distance)
-                distances_between_metacells[metacell_indices_of_base_sphere, metacell_indices_of_other_sphere] .= 0
-                distances_between_metacells[metacell_indices_of_other_sphere, metacell_indices_of_base_sphere] .= 0
+                distances_between_metacells[metacell_indices_of_base_sphere, metacell_indices_of_other_sphere] .= Inf
+                distances_between_metacells[metacell_indices_of_other_sphere, metacell_indices_of_base_sphere] .= Inf
                 continue
             end
             is_noisy_of_genes_for_distance = is_noisy_of_genes[is_correlated_of_genes_for_distance]

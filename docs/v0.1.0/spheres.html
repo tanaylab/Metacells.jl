@@ -195,7 +195,7 @@
 <code>max_sphere_diameter
 </code> + 
 <code>max_neighborhood_diameter
-</code> (for computing neighborhoods). In the followup rounds, we use the maximal gene fold, for genes that are correlated in the vicinity of the metacells (see below).
+</code> (for computing neighborhoods). In the followup rounds, we use the maximal gene fold, for genes that are correlated in the vicinity of the metacells (see below). Finally, in the followup rounds, we only compare a base metacell with other metacells which were in the same neighborhood in the previous round.
 </li>
 <li>We use hierarchical clustering to partition the metacells to distinct spheres, such that the maximal distance between any metacells in the sphere is bounded. In the first round, this bound is the 
 <code>max_deviant_genes_fraction
@@ -213,7 +213,9 @@
 <code>min_gene_correlation
 </code> with some other gene(s) in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set with the set from its sphere in the previous round.
 </li>
-<li>If the new sets of correlated genes are identical to the previous round, we are done. Otherwise we repeat the round, using the more restricted sets of correlated genes.
+<li>If the new sets of correlated genes are identical to the previous round, we are (almost) done. Otherwise we repeat the round, using the more restricted sets of correlated genes.
+</li>
+<li>If we are (almost) done, we recompute the distances between metacells as in (2), but this time we compare all metacell pairs, even if they weren&#39;t in the same neighborhood, and we recompute the spheres and neighborhoods using these more dense distances. This gives us bigger spheres and neighborhoods as the final result.
 </li>
 </ol>
 <p>If 
