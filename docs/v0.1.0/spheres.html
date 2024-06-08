@@ -165,7 +165,6 @@
     confidence::AbstractFloat = 0.9,
     max_sphere_diameter::AbstractFloat = 2.0,
     max_neighborhood_diameter::AbstractFloat = 2.0,
-    noisy_gene_fold::AbstractFloat = 1.0,
     min_gene_correlation::AbstractFloat = 0.5,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
     overwrite::Bool = false,
@@ -187,9 +186,7 @@
 <code>min_significant_gene_UMIs
 </code> (by default, 
 <code>40
-</code>), we ignore this fold factor as insignificant. Finally, for noisy genes, we reduce the fold factor by 
-<code>noisy_gene_fold
-</code>. In the first round, we simply count the number of genes whose fold factor is more than 
+</code>), we ignore this fold factor as insignificant. Finally, genes, we reduce the fold factor using the gene&#39;s divergence factor. In the first round, we simply count the number of genes whose fold factor is more than 
 <code>max_sphere_diameter
 </code> (for computing spheres) and 
 <code>max_sphere_diameter
@@ -213,9 +210,7 @@
 <code>min_gene_correlation
 </code> with some other gene(s) in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set with the set from its sphere in the previous round.
 </li>
-<li>If the new sets of correlated genes are identical to the previous round, we are (almost) done. Otherwise we repeat the round, using the more restricted sets of correlated genes.
-</li>
-<li>If we are (almost) done, we recompute the distances between metacells as in (2), but this time we compare all metacell pairs, even if they weren&#39;t in the same neighborhood, and we recompute the spheres and neighborhoods using these more dense distances. This gives us bigger spheres and neighborhoods as the final result.
+<li>If the new sets of correlated genes are identical to the previous round, we are done.
 </li>
 </ol>
 <p>If 

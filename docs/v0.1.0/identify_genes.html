@@ -148,6 +148,59 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
+<a class="docstring-binding" id="Metacells.IdentifyGenes.compute_genes_divergence!" href="#Metacells.IdentifyGenes.compute_genes_divergence!">
+<code>Metacells.IdentifyGenes.compute_genes_divergence!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_genes_divergence!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = 1e-5,
+    min_divergent_gene_range_fold::AbstractFloat = 6.0,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Compute a divergence factor for all genes. This factor is typically 0.0 for most genes (and is always below 1.0). Genes that have a wide range of expression are given a higher divergence factor. When looking for significant differences in gene expressions, the divergence factor is used to scale down the difference, to compensate for the gene&#39;s inherent wider expression range. Specifically, we take the raw fold factor and multiply it by (1.0 - divergence).
+</p>
+<p>This works as follows:
+</p>
+<ol>
+<li>Compute the minimal and maximal expression level of each gene.
+</li>
+<li>Compute the fold factor (log2 of maximal over minimal value, using the 
+<code>gene_fraction_regularization
+</code>.
+</li>
+<li>The raw factor of the gene is the ratio between the fold factor and the 
+<code>min_divergent_gene_range_fold
+</code>. If this is higher than 1, we set the divergence factor accordingly.
+</li>
+</ol>
+<div class="admonition is-info">
+<header class="admonition-header">Note
+</header>
+<div class="admonition-body">
+<p>Ideally, all code that uses the manual 
+<code>is_noisy
+</code> mask should be modified to use the divergence factor instead.
+</p>
+</div>
+</div>
+<p>CONTRACT
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
 <a class="docstring-binding" id="Metacells.IdentifyGenes.identify_marker_genes!" href="#Metacells.IdentifyGenes.identify_marker_genes!">
 <code>Metacells.IdentifyGenes.identify_marker_genes!
 </code>
@@ -162,7 +215,6 @@
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = 1e-5,
     min_gene_range_fold::AbstractFloat = 2.0,
-    noisy_gene_fold::AbstractFloat = 1.0,
     min_max_marker_gene_fraction::AbstractFloat = 1e-4,
     overwrite::Bool = false,
 )::Nothing
@@ -175,27 +227,21 @@
 </code> mask.
 </p>
 <ol>
-<li>
-<p>Compute the minimal and maximal expression level of each gene.
-</p>
+<li>Compute the minimal and maximal expression level of each gene.
 </li>
-<li>
-<p>Select the genes whose fold factor (log2 of maximal over minimal value, using the 
+<li>Compute the fold factor (log2 of maximal over minimal value, using the 
 <code>gene_fraction_regularization
-</code> is at least 
-<code>min_marker_gene_range_fold
-</code>. For 
-<code>is_noisy
-</code> genes, we require an additional 
-<code>noisy_gene_fold
 </code>.
-</p>
 </li>
-<li>
-<p>Identify the genes whose maximal expression is at least 
+<li>Reduce this fold factor using the 
+<code>divergence
+</code> factor of the genes.
+</li>
+<li>Identify as markers genes whose adjusted fold factor is at least 
+<code>min_marker_gene_range_fold
+</code>, and whose maximal expression is at least 
 <code>min_max_marker_gene_fraction
 </code>.
-</p>
 </li>
 </ol>
 <p>CONTRACT
@@ -262,6 +308,12 @@
 <li>
 <a href="identify_genes.html#Metacells.IdentifyGenes">
 <code>Metacells.IdentifyGenes
+</code>
+</a>
+</li>
+<li>
+<a href="identify_genes.html#Metacells.IdentifyGenes.compute_genes_divergence!">
+<code>Metacells.IdentifyGenes.compute_genes_divergence!
 </code>
 </a>
 </li>
