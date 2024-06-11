@@ -532,7 +532,7 @@ function import_mask_matrix(
     if any_exist
         mask_matrix::SparseMatrixCSC{Bool} = hcat(mask_vectors...)  # NOJET
         mask_name = "is_$(prefix)"
-        set_matrix!(source, "gene", "type", mask_name, mask_matrix; relayout = false)
+        set_matrix!(source, "gene", rename_type, mask_name, mask_matrix; relayout = false)
         return copy_matrix!(;  # NOJET
             destination = destination,
             source = source,

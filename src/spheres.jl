@@ -218,8 +218,6 @@ CONTRACT
         next_n_correlated_genes_in_metacells = sum(is_correlated_of_genes_in_metacells)
         @debug "round: $(round_index) is_correlated_genes_in_metacells: $(depict(is_correlated_of_genes_in_metacells))"
 
-        # TODOX
-        #       if next_n_correlated_genes_in_metacells == previous_n_correlated_genes_in_metacells
         if next_n_correlated_genes_in_metacells > previous_n_correlated_genes_in_metacells * 0.999 &&
            next_n_correlated_genes_in_metacells < previous_n_correlated_genes_in_metacells * 1.001
             break
