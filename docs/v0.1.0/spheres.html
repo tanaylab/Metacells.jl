@@ -210,7 +210,9 @@
 <code>min_gene_correlation
 </code> with some other gene(s) in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set with the set from its sphere in the previous round.
 </li>
-<li>If the new sets of correlated genes are identical to the previous round, we are done.
+<li>If the new sets of correlated genes only differ up to 
+<code>max_convergence_fraction
+</code>, consider this to have converged. Otherwise, repeat from step 2.
 </li>
 </ol>
 <p>If 

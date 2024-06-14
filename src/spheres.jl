@@ -60,7 +60,8 @@ Partition raw metacells into distinct spheres, and spheres into overlapping neig
  5. For each sphere, we compute the set of genes which have at least the `min_gene_correlation` with some other gene(s)
     in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set
     with the set from its sphere in the previous round.
- 6. If the new sets of correlated genes are identical to the previous round, we are done.
+ 6. If the new sets of correlated genes only differ up to `max_convergence_fraction`, consider this to have converged.
+    Otherwise, repeat from step 2.
 
 If `overwrite` is set, the results will replace any previously computed spheres and neighborhoods.
 
@@ -111,6 +112,7 @@ CONTRACT
     target_spheres_in_neighborhood::Integer = 20,
     min_gene_correlation::AbstractFloat = 0.5,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
+    max_convergence_fraction::AbstractFloat = 0.0015,
     overwrite::Bool = false,
 )::Nothing
     @assert min_significant_gene_UMIs >= 0
@@ -216,10 +218,12 @@ CONTRACT
             is_correlated_of_genes_in_metacells = is_correlated_of_genes_in_metacells,
         )
         next_n_correlated_genes_in_metacells = sum(is_correlated_of_genes_in_metacells)
-        @debug "round: $(round_index) is_correlated_genes_in_metacells: $(depict(is_correlated_of_genes_in_metacells))"
+        delta =
+            (next_n_correlated_genes_in_metacells - previous_n_correlated_genes_in_metacells) /
+            previous_n_correlated_genes_in_metacells
 
-        if next_n_correlated_genes_in_metacells > previous_n_correlated_genes_in_metacells * 0.999 &&
-           next_n_correlated_genes_in_metacells < previous_n_correlated_genes_in_metacells * 1.001
+        @debug "round: $(round_index) is_correlated_genes_in_metacells: $(depict(is_correlated_of_genes_in_metacells)) (delta: $(delta))"
+        if abs(delta) <= max_convergence_fraction
             break
         end
         previous_n_correlated_genes_in_metacells = next_n_correlated_genes_in_metacells
