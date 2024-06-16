@@ -173,7 +173,7 @@ CONTRACT
             threshold = boxes_threshold,
         )
         metacells_of_boxes = collect_group_members(boxes_of_metacells)
-        names_of_boxes = group_names(daf, "metacell", metacells_of_boxes; prefix = "S")
+        names_of_boxes = group_names(daf, "metacell", metacells_of_boxes; prefix = "B")
         @debug "round: $(round_index) n_boxes: $(length(names_of_boxes))"
 
         distances_between_boxes = compute_box_distances(;
