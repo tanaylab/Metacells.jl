@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Spheres · Metacells.jl v0.1.0
+<title>Boxes · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Spheres · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Spheres · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Spheres · Metacells.jl v0.1.0"/>
+<meta name="title" content="Boxes · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Boxes · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Boxes · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -61,7 +61,7 @@
 </a>
 </li>
 <li class="is-active">
-<a class="tocitem" href="spheres.html">Spheres
+<a class="tocitem" href="boxes.html">Boxes
 </a>
 <ul class="internal">
 <li>
@@ -93,13 +93,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="spheres.html">Spheres
+<a href="boxes.html">Boxes
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="spheres.html">Spheres
+<a href="boxes.html">Boxes
 </a>
 </li>
 </ul>
@@ -118,20 +118,20 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Spheres">
-<a class="docs-heading-anchor" href="#Spheres">Spheres
+<h1 id="Boxes">
+<a class="docs-heading-anchor" href="#Boxes">Boxes
 </a>
-<a id="Spheres-1">
+<a id="Boxes-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Spheres" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Boxes" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Spheres" href="#Metacells.Spheres">
-<code>Metacells.Spheres
+<a class="docstring-binding" id="Metacells.Boxes" href="#Metacells.Boxes">
+<code>Metacells.Boxes
 </code>
 </a> — 
 <span class="docstring-category">Module
@@ -139,7 +139,7 @@
 </header>
 <section>
 <div>
-<p>Given a set of raw metacells, partition them into spheres such that all metacells in the same sphere are within some (fold factor) radius of each other. The centroids of these spheres can serve as a representation of the cell state manifold which is less sensitive to oversampling of common cell states. Group these spheres in overlapping neighborhoods of &quot;similar&quot; spheres for further analysis.
+<p>Given a set of raw metacells, partition them into boxes such that all metacells in the same box are within some (fold factor) radius of each other. The centroids of these boxes can serve as a representation of the cell state manifold which is less sensitive to oversampling of common cell states. Group these boxes in overlapping neighborhoods of &quot;similar&quot; boxes for further analysis.
 </p>
 </div>
 </section>
@@ -148,8 +148,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Spheres.compute_spheres!" href="#Metacells.Spheres.compute_spheres!">
-<code>Metacells.Spheres.compute_spheres!
+<a class="docstring-binding" id="Metacells.Boxes.compute_boxes!" href="#Metacells.Boxes.compute_boxes!">
+<code>Metacells.Boxes.compute_boxes!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -158,23 +158,23 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function compute_spheres!(
+<code class="language-julia hljs">function compute_boxes!(
     daf::DafWriter;
     min_significant_gene_UMIs::Integer = 40,
     gene_fraction_regularization::AbstractFloat = 1e-5,
     confidence::AbstractFloat = 0.9,
-    max_sphere_diameter::AbstractFloat = 2.0,
-    max_neighborhood_diameter::AbstractFloat = 2.0,
+    max_box_span::AbstractFloat = 2.0,
+    max_neighborhood_span::AbstractFloat = 2.0,
     min_gene_correlation::AbstractFloat = 0.5,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
     overwrite::Bool = false,
 )::Nothing
 </code>
 </pre>
-<p>Partition raw metacells into distinct spheres, and spheres into overlapping neighborhoods.
+<p>Partition raw metacells into distinct boxes, and boxes into overlapping neighborhoods.
 </p>
 <ol>
-<li>Initial spheres and neighborhoods are computed in a first round, and then refined in a series of followup rounds.
+<li>Initial boxes and neighborhoods are computed in a first round, and then refined in a series of followup rounds.
 </li>
 <li>In each round, we compute a distance between each two metacells. This is based on the fold factor between the expression level of each (relevant) gene in the metacells. The fold factor is the absolute value of the difference in the log (base 2) of the fraction of the gene in the metacells. This log is computed with the 
 <code>gene_fraction_regularization
@@ -187,28 +187,28 @@
 </code> (by default, 
 <code>40
 </code>), we ignore this fold factor as insignificant. Finally, genes, we reduce the fold factor using the gene&#39;s divergence factor. In the first round, we simply count the number of genes whose fold factor is more than 
-<code>max_sphere_diameter
-</code> (for computing spheres) and 
-<code>max_sphere_diameter
+<code>max_box_span
+</code> (for computing boxes) and 
+<code>max_box_span
 </code> + 
-<code>max_neighborhood_diameter
+<code>max_neighborhood_span
 </code> (for computing neighborhoods). In the followup rounds, we use the maximal gene fold, for genes that are correlated in the vicinity of the metacells (see below). Finally, in the followup rounds, we only compare a base metacell with other metacells which were in the same neighborhood in the previous round.
 </li>
-<li>We use hierarchical clustering to partition the metacells to distinct spheres, such that the maximal distance between any metacells in the sphere is bounded. In the first round, this bound is the 
+<li>We use hierarchical clustering to partition the metacells to distinct boxes, such that the maximal distance between any metacells in the box is bounded. In the first round, this bound is the 
 <code>max_deviant_genes_fraction
 </code> out of the total number of genes. In the followup rounds, this is the 
-<code>max_sphere_diameter
+<code>max_box_span
 </code>.
 </li>
-<li>For each sphere, we compute a main neighborhood of other spheres such that the maximal distance between any metacells in the neighborhood is bounded. In the first round, this bound is again the maximal number of deviant genes (this time, using the increased fold distance computed above). In the followup rounds, this is the 
-<code>max_sphere_diameter
+<li>For each box, we compute a main neighborhood of other boxes such that the maximal distance between any metacells in the neighborhood is bounded. In the first round, this bound is again the maximal number of deviant genes (this time, using the increased fold distance computed above). In the followup rounds, this is the 
+<code>max_box_span
 </code> plus the 
-<code>max_neighborhood_diameter
-</code>. These neighborhoods may overlap. The main neighborhoods of different spheres may even be identical.
+<code>max_neighborhood_span
+</code>. These neighborhoods may overlap. The main neighborhoods of different boxes may even be identical.
 </li>
-<li>For each sphere, we compute the set of genes which have at least the 
+<li>For each box, we compute the set of genes which have at least the 
 <code>min_gene_correlation
-</code> with some other gene(s) in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set with the set from its sphere in the previous round.
+</code> with some other gene(s) in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set with the set from its box in the previous round.
 </li>
 <li>If the new sets of correlated genes only differ up to 
 <code>max_convergence_fraction
@@ -217,7 +217,7 @@
 </ol>
 <p>If 
 <code>overwrite
-</code> is set, the results will replace any previously computed spheres and neighborhoods.
+</code> is set, the results will replace any previously computed boxes and neighborhoods.
 </p>
 <p>CONTRACT
 </p>
@@ -234,14 +234,14 @@
 </h2>
 <ul>
 <li>
-<a href="spheres.html#Metacells.Spheres">
-<code>Metacells.Spheres
+<a href="boxes.html#Metacells.Boxes">
+<code>Metacells.Boxes
 </code>
 </a>
 </li>
 <li>
-<a href="spheres.html#Metacells.Spheres.compute_spheres!">
-<code>Metacells.Spheres.compute_spheres!
+<a href="boxes.html#Metacells.Boxes.compute_boxes!">
+<code>Metacells.Boxes.compute_boxes!
 </code>
 </a>
 </li>

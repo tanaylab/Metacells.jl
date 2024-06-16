@@ -16,7 +16,7 @@ include("anndata_format.jl")
 include("identify_genes.jl")
 @reexport using .IdentifyGenes
 
-include("spheres.jl")
-@reexport using .Spheres
+include("boxes.jl")
+@reexport using .Boxes
 
 end # module
