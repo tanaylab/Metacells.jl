@@ -266,7 +266,7 @@
 <code class="language-julia hljs">function identify_correlated_genes!(
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = 1e-5,
-    min_gene_correlation::AbstractFloat = 0.5,
+    correlation_confidence::AbstractFloat = 0.9,
     overwrite::Bool = false,
 )::Nothing
 </code>
@@ -284,11 +284,15 @@
 </li>
 <li>Correlate this between all the pairs of genes.
 </li>
-<li>Find the maximal absolute correlation for each gene (that is, strong anti-correlation also counts).
+<li>For each gene, shuffle its values along all metacells, and again correlate this between all the pairs of genes.
 </li>
-<li>Identify the genes which have at least one gene with a correlation of at least 
-<code>min_gene_correlation
-</code>.
+<li>Find the maximal absolute correlation for each gene in both cases (that is, strong anti-correlation also counts).
+</li>
+<li>Find the 
+<code>correlation_confidence
+</code> quantile correlation of the shuffled data.
+</li>
+<li>Identify the genes that have at least that level of correlations in the unshuffled data.
 </li>
 </ol>
 <p>CONTRACT

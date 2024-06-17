@@ -17,6 +17,7 @@ using Daf
 using Daf.GenericLogging
 using Daf.GenericTypes
 using Distributions
+using Random
 using SparseArrays
 using Statistics
 
@@ -25,10 +26,10 @@ using Statistics
         daf::DafWriter;
         min_significant_gene_UMIs::Integer = 40,
         gene_fraction_regularization::AbstractFloat = 1e-5,
-        confidence::AbstractFloat = 0.9,
+        fold_confidence::AbstractFloat = 0.9,
         max_box_span::AbstractFloat = 2.0,
         max_neighborhood_span::AbstractFloat = 2.0,
-        min_gene_correlation::AbstractFloat = 0.5,
+        correlation_confidence::AbstractFloat = 0.99,
         max_deviant_genes_fraction::AbstractFloat = 0.01,
         overwrite::Bool = false,
     )::Nothing
@@ -40,15 +41,14 @@ Partition raw metacells into distinct boxes, and boxes into overlapping neighbor
     expression level of each (relevant) gene in the metacells. The fold factor is the absolute value of the difference
     in the log (base 2) of the fraction of the gene in the metacells. This log is computed with the
     `gene_fraction_regularization` (by default, `1e-5`). Since the fraction of the gene is a random variable, we
-    decrease the high fraction and increase the low fraction by a factor based on the `confidence` of the test (by
+    decrease the high fraction and increase the low fraction by a factor based on the `fold_confidence` of the test (by
     default, 0.9), assuming a multinomial distribution. In addition, if the sum of the total UMIs of the gene in both
     metacells is less than `min_significant_gene_UMIs` (by default, `40`), we ignore this fold factor as insignificant.
-    Finally, genes, we reduce the fold factor using the gene's divergence factor. In the first round, we simply count the
-    number of genes whose fold factor is more than `max_box_span` (for computing boxes) and
-    `max_box_span` + `max_neighborhood_span` (for computing neighborhoods). In the followup rounds, we use
-    the maximal gene fold, for genes that are correlated in the vicinity of the metacells (see below). Finally, in the
-    followup rounds, we only compare a base metacell with other metacells which were in the same neighborhood in the
-    previous round.
+    Finally, genes, we reduce the fold factor using the gene's divergence factor. In the first round, we simply count
+    the number of genes whose fold factor is more than `max_box_span` (for computing boxes) and `max_box_span` +
+    `max_neighborhood_span` (for computing neighborhoods). In the followup rounds, we use the maximal gene fold, for
+    genes that are correlated in the vicinity of the metacells (see below). Finally, in the followup rounds, we only
+    compare a base metacell with other metacells which were in the same neighborhood in the previous round.
  3. We use hierarchical clustering to partition the metacells to distinct boxes, such that the maximal distance between
     any metacells in the box is bounded. In the first round, this bound is the `max_deviant_genes_fraction` out of the
     total number of genes. In the followup rounds, this is the `max_box_span`.
@@ -57,9 +57,8 @@ Partition raw metacells into distinct boxes, and boxes into overlapping neighbor
     time, using the increased fold distance computed above). In the followup rounds, this is the `max_box_span`
     plus the `max_neighborhood_span`. These neighborhoods may overlap. The main neighborhoods of different boxes
     may even be identical.
- 5. For each box, we compute the set of genes which have at least the `min_gene_correlation` with some other gene(s)
-    in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set
-    with the set from its box in the previous round.
+ 5. For each box, we compute the set of genes which are correlated (using the `correlation_confidence`) with some other
+    gene(s) in its main neighborhood.
  6. If the new sets of correlated genes only differ up to `max_convergence_fraction`, consider this to have converged.
     Otherwise, repeat from step 2.
 
@@ -105,23 +104,24 @@ CONTRACT
     daf::DafWriter;
     min_significant_gene_UMIs::Integer = 40,
     gene_fraction_regularization::AbstractFloat = 1e-5,
-    confidence::AbstractFloat = 0.9,
+    fold_confidence::AbstractFloat = 0.9,
     max_box_span::AbstractFloat = 2.0,
     max_neighborhood_span::AbstractFloat = 2.0,
     target_boxes_in_neighborhood::Integer = 20,
-    min_gene_correlation::AbstractFloat = 0.5,
+    correlation_confidence::AbstractFloat = 0.9,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
     max_convergence_fraction::AbstractFloat = 0.0015,
     overwrite::Bool = false,
+    rng::Maybe{AbstractRNG} = nothing,
 )::Nothing
     @assert min_significant_gene_UMIs >= 0
-    @assert gene_fraction_regularization > 0
-    @assert 0 < confidence < 1
+    @assert gene_fraction_regularization >= 0
+    @assert 0 <= fold_confidence <= 1
     @assert max_box_span > 0
     @assert max_neighborhood_span >= 0
     @assert target_boxes_in_neighborhood > 0
-    @assert 0 < min_gene_correlation < 1
-    @assert 0 < max_deviant_genes_fraction < 1
+    @assert 0 <= correlation_confidence <= 1
+    @assert 0 <= max_deviant_genes_fraction <= 1
 
     total_UMIs_of_genes_in_metacells, fraction_of_genes_in_metacells, total_UMIs_of_metacells, divergence_of_genes =
         read_data(daf)
@@ -129,7 +129,7 @@ CONTRACT
     log_decreased_fraction_of_genes_in_metacells, log_increased_fraction_of_genes_in_metacells =
         compute_confidence_log_fraction_of_genes_in_metacells(;
             gene_fraction_regularization = gene_fraction_regularization,
-            confidence = confidence,
+            fold_confidence = fold_confidence,
             fraction_of_genes_in_metacells = fraction_of_genes_in_metacells,
             total_UMIs_of_metacells = total_UMIs_of_metacells,
         )
@@ -201,8 +201,9 @@ CONTRACT
         is_correlated_of_genes_in_neighborhoods = identify_neighborhoods_correlated_genes(
             intermediate_daf;
             gene_fraction_regularization = gene_fraction_regularization,
-            min_gene_correlation = min_gene_correlation,
+            correlation_confidence = correlation_confidence,
             is_correlated_of_genes_in_metacells = is_correlated_of_genes_in_metacells,
+            rng = rng,
         )
         next_n_correlated_genes_in_metacells = sum(is_correlated_of_genes_in_metacells)
         delta =
@@ -301,13 +302,13 @@ end
 
 @logged function compute_confidence_log_fraction_of_genes_in_metacells(;  # untested
     gene_fraction_regularization::AbstractFloat,
-    confidence::AbstractFloat,
+    fold_confidence::AbstractFloat,
     fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
     total_UMIs_of_metacells::AbstractVector{<:Unsigned},
 )::Tuple{Matrix{Float32}, Matrix{Float32}}
     check_efficient_action("compute_boxes", Columns, "fraction_of_genes_in_metacells", fraction_of_genes_in_metacells)
 
-    confidence_stdevs = quantile(Normal(), confidence)
+    confidence_stdevs = quantile(Normal(), fold_confidence)
 
     confidence_fraction_of_genes_in_metacells =
         confidence_stdevs .* sqrt.(transpose(total_UMIs_of_metacells) .* fraction_of_genes_in_metacells) ./
@@ -550,8 +551,9 @@ end
 @logged function identify_neighborhoods_correlated_genes(  # untested
     daf::DafReader;
     gene_fraction_regularization::AbstractFloat,
-    min_gene_correlation::AbstractFloat,
+    correlation_confidence::AbstractFloat,
     is_correlated_of_genes_in_metacells::Matrix{Bool},
+    rng::Maybe{AbstractRNG},
 )::Matrix{Bool}
     check_efficient_action(
         "compute_boxes",
@@ -592,7 +594,8 @@ end
             identify_correlated_genes!(
                 neighborhood_daf;
                 gene_fraction_regularization = gene_fraction_regularization,
-                min_gene_correlation = min_gene_correlation,
+                correlation_confidence = correlation_confidence,
+                rng = rng,
             )
             is_correlated_of_genes_in_neighborhood = neighborhood_daf["/ gene : is_correlated"].array
         else

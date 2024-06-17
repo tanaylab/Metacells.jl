@@ -162,10 +162,10 @@
     daf::DafWriter;
     min_significant_gene_UMIs::Integer = 40,
     gene_fraction_regularization::AbstractFloat = 1e-5,
-    confidence::AbstractFloat = 0.9,
+    fold_confidence::AbstractFloat = 0.9,
     max_box_span::AbstractFloat = 2.0,
     max_neighborhood_span::AbstractFloat = 2.0,
-    min_gene_correlation::AbstractFloat = 0.5,
+    correlation_confidence::AbstractFloat = 0.99,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
     overwrite::Bool = false,
 )::Nothing
@@ -181,7 +181,7 @@
 </code> (by default, 
 <code>1e-5
 </code>). Since the fraction of the gene is a random variable, we decrease the high fraction and increase the low fraction by a factor based on the 
-<code>confidence
+<code>fold_confidence
 </code> of the test (by default, 0.9), assuming a multinomial distribution. In addition, if the sum of the total UMIs of the gene in both metacells is less than 
 <code>min_significant_gene_UMIs
 </code> (by default, 
@@ -206,9 +206,9 @@
 <code>max_neighborhood_span
 </code>. These neighborhoods may overlap. The main neighborhoods of different boxes may even be identical.
 </li>
-<li>For each box, we compute the set of genes which have at least the 
-<code>min_gene_correlation
-</code> with some other gene(s) in its main neighborhood. We restrict the correlated set of genes of each metacell to be the intersection of this set with the set from its box in the previous round.
+<li>For each box, we compute the set of genes which are correlated (using the 
+<code>correlation_confidence
+</code>) with some other gene(s) in its main neighborhood.
 </li>
 <li>If the new sets of correlated genes only differ up to 
 <code>max_convergence_fraction

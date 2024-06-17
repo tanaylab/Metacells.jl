@@ -9,7 +9,9 @@ export identify_marker_genes!
 
 using Daf
 using Daf.GenericLogging
+using Daf.GenericTypes
 using LinearAlgebra
+using Random
 using Statistics
 
 """
@@ -54,8 +56,8 @@ CONTRACT
     min_divergent_gene_range_fold::AbstractFloat = 6.0,
     overwrite::Bool = false,
 )::Nothing
-    @assert gene_fraction_regularization > 0
-    @assert min_divergent_gene_range_fold > 0
+    @assert gene_fraction_regularization >= 0
+    @assert min_divergent_gene_range_fold >= 0
 
     log_minimal_fraction_of_genes =
         daf["/ metacell / gene : fraction %> Min % Log base 2 eps $(gene_fraction_regularization)"].array
@@ -110,8 +112,8 @@ CONTRACT
     min_max_marker_gene_fraction::AbstractFloat = 1e-4,
     overwrite::Bool = false,
 )::Nothing
-    @assert gene_fraction_regularization > 0
-    @assert min_marker_gene_range_fold > 0
+    @assert gene_fraction_regularization >= 0
+    @assert min_marker_gene_range_fold >= 0
     @assert min_max_marker_gene_fraction >= 0
 
     log_minimal_fraction_of_genes =
@@ -135,7 +137,7 @@ end
     function identify_correlated_genes!(
         daf::DafWriter;
         gene_fraction_regularization::AbstractFloat = 1e-5,
-        min_gene_correlation::AbstractFloat = 0.5,
+        correlation_confidence::AbstractFloat = 0.9,
         overwrite::Bool = false,
     )::Nothing
 
@@ -144,8 +146,10 @@ that act together. If `overwrite`, will overwrite an existing `is_correlated` ma
 
  1. Compute the log base 2 of the genes expression in each metacell (using the `gene_fraction_regularization`).
  2. Correlate this between all the pairs of genes.
- 3. Find the maximal absolute correlation for each gene (that is, strong anti-correlation also counts).
- 4. Identify the genes which have at least one gene with a correlation of at least `min_gene_correlation`.
+ 3. For each gene, shuffle its values along all metacells, and again correlate this between all the pairs of genes.
+ 4. Find the maximal absolute correlation for each gene in both cases (that is, strong anti-correlation also counts).
+ 5. Find the `correlation_confidence` quantile correlation of the shuffled data.
+ 6. Identify the genes that have at least that level of correlations in the unshuffled data.
 
 CONTRACT
 """
@@ -163,18 +167,45 @@ CONTRACT
 ) function identify_correlated_genes!(  # untested
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = 1e-5,
-    min_gene_correlation::AbstractFloat = 0.5,
+    correlation_confidence::AbstractFloat = 0.99,
     overwrite::Bool = false,
+    rng::Maybe{AbstractRNG} = nothing,
 )::Nothing
-    @assert gene_fraction_regularization > 0
-    @assert 0 <= min_gene_correlation <= 1
+    @assert gene_fraction_regularization >= 0
+    @assert 0 <= correlation_confidence <= 1
 
-    log_fractions = daf["/ metacell / gene : fraction % Log base 2 eps $(gene_fraction_regularization)"].array
-    genes_correlations = cor(log_fractions)
-    genes_correlations .= abs.(genes_correlations)
+    n_genes = axis_length(daf, "gene")
+    log_fractions_of_genes_in_metacells =
+        daf["/ metacell / gene : fraction % Log base 2 eps $(gene_fraction_regularization)"].array
 
-    genes_correlations[diagind(genes_correlations)] .= 0  # NOJET
-    is_correlated_of_genes = vec(any(abs.(genes_correlations) .>= min_gene_correlation; dims = 1))
+    correlations_between_genes = cor(log_fractions_of_genes_in_metacells)
+    correlations_between_genes .= abs.(correlations_between_genes)
+    correlations_between_genes[diagind(correlations_between_genes)] .= 0  # NOJET
+    correlations_between_genes[isnan.(correlations_between_genes)] .= 0
+    max_correlations_of_genes = vec(maximum(correlations_between_genes; dims = 1))
+    @assert length(max_correlations_of_genes) == n_genes
+
+    shuffled_log_fractions_of_genes_in_metacells = copy_array(log_fractions_of_genes_in_metacells)
+    if rng === nothing
+        rng = Random.default_rng()
+    end
+    for gene_index in 1:n_genes
+        @views shuffled_log_fractions_of_metacells_of_gene = shuffled_log_fractions_of_genes_in_metacells[:, gene_index]
+        shuffle!(rng, shuffled_log_fractions_of_metacells_of_gene)
+    end
+
+    shuffled_correlations_between_genes = cor(shuffled_log_fractions_of_genes_in_metacells)
+    shuffled_correlations_between_genes .= abs.(shuffled_correlations_between_genes)
+    shuffled_correlations_between_genes[diagind(shuffled_correlations_between_genes)] .= 0  # NOJET
+    shuffled_correlations_between_genes[isnan.(shuffled_correlations_between_genes)] .= 0
+    max_shuffled_correlations_of_genes = vec(maximum(shuffled_correlations_between_genes; dims = 1))
+
+    @debug "mean: $(mean(max_shuffled_correlations_of_genes))"
+    @debug "stdev: $(std(max_shuffled_correlations_of_genes))"
+    threshold = quantile(max_shuffled_correlations_of_genes, correlation_confidence)
+    @debug "threshold: $(threshold)"
+
+    is_correlated_of_genes = max_correlations_of_genes .>= threshold
 
     set_vector!(daf, "gene", "is_correlated", is_correlated_of_genes; overwrite = overwrite)
     return nothing
