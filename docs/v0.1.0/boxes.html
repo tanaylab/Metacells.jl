@@ -53,7 +53,7 @@
 </a>
 </li>
 <li>
-<a class="tocitem" href="anndata_format.html">AnnData Format
+<a class="tocitem" href="contracts.html">Contracts
 </a>
 </li>
 <li>
@@ -71,6 +71,10 @@
 </a>
 </li>
 </ul>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
 </li>
 </ul>
 <div class="docs-version-selector field has-addons">
@@ -161,11 +165,11 @@
 <code class="language-julia hljs">function compute_boxes!(
     daf::DafWriter;
     min_significant_gene_UMIs::Integer = 40,
-    gene_fraction_regularization::AbstractFloat = 1e-5,
+    gene_fraction_regularization::AbstractFloat = 1.0e-5,
     fold_confidence::AbstractFloat = 0.9,
     max_box_span::AbstractFloat = 2.0,
-    max_neighborhood_span::AbstractFloat = 2.0,
-    correlation_confidence::AbstractFloat = 0.99,
+    max_neighborhood_span::AbstractFloat = 0.01,
+    correlation_confidence::AbstractFloat = 0.9,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
     overwrite::Bool = false,
 )::Nothing
@@ -219,7 +223,93 @@
 <code>overwrite
 </code> is set, the results will replace any previously computed boxes and neighborhoods.
 </p>
-<p>CONTRACT
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::AbstractFloat (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::AbstractFloat (required): The total number of UMIs used to estimate the fraction of all the genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ fraction
+</strong>::AbstractFloat (required): The estimated fraction of the UMIs of each gene in each metacell.
+</p>
+<p>
+<strong>gene, metacell @ total_UMIs
+</strong>::AbstractFloat (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>box
+</strong> (guaranteed): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>neighborhood
+</strong> (guaranteed): Overlapping groups of boxes with &quot;close&quot; estimated cell states.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ box
+</strong>::AbstractFloat (guaranteed): The unique box each metacell belongs to.
+</p>
+<p>
+<strong>box @ neighborhood.main
+</strong>::AbstractFloat (guaranteed): The unique main neighborhood of each box.
+</p>
+<p>
+<strong>neighborhood @ span
+</strong>::AbstractFloat (guaranteed): The span (fold factor) used to compute the neighborhood.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, neighborhood @ is_correlated
+</strong>::AbstractFloat (guaranteed): Which genes are correlated in each neighborhood.
+</p>
+<p>
+<strong>box, box @ distance
+</strong>::AbstractFloat (guaranteed): The distance (fold factor) between the most different metacell genes between the boxes.
+</p>
+<p>
+<strong>box, neighborhood @ is_member
+</strong>::AbstractFloat (guaranteed): A mask of the member boxes of each neighborhood.
 </p>
 </div>
 </section>
@@ -249,6 +339,8 @@
 </article>
 <nav class="docs-footer">
 <a class="docs-footer-prevpage" href="identify_genes.html">« Identify Genes
+</a>
+<a class="docs-footer-nextpage" href="anndata_format.html">AnnData Format »
 </a>
 <div class="flexbox-break">
 </div>

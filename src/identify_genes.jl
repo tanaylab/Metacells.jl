@@ -14,12 +14,14 @@ using LinearAlgebra
 using Random
 using Statistics
 
+using ..Contracts
+
 """
     function compute_genes_divergence!(
         daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = 1e-5,
-        min_divergent_gene_range_fold::AbstractFloat = 6.0,
-        overwrite::Bool = false,
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        min_divergent_gene_range_fold::AbstractFloat = $(DEFAULT.min_divergent_gene_range_fold),
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Compute a divergence factor for all genes. This factor is typically 0.0 for most genes (and is always below 1.0). Genes
@@ -38,18 +40,11 @@ This works as follows:
 
     Ideally, all code that uses the manual `is_noisy` mask should be modified to use the divergence factor instead.
 
-CONTRACT
+$(CONTRACT)
 """
 @logged @computation Contract(
-    axes = [
-        "metacell" => (RequiredInput, "The metacells to group into neighborhoods."),
-        "gene" => (RequiredInput, "The genes to consider."),
-    ],
-    data = [
-        ("metacell", "gene", "fraction") =>
-            (RequiredInput, AbstractFloat, "The fraction of the UMIs of each gene in each metacell."),
-        ("gene", "divergence") => (GuaranteedOutput, AbstractFloat, "How to scale fold factors for this gene."),
-    ],
+    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
+    data = [gene_metacell_fraction_matrix(RequiredInput), gene_divergence_vector(GuaranteedOutput)],
 ) function compute_genes_divergence!(  # untested
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = 1e-5,
@@ -77,10 +72,10 @@ end
 """
     function identify_marker_genes!(
         daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = 1e-5,
-        min_gene_range_fold::AbstractFloat = 2.0,
-        min_max_marker_gene_fraction::AbstractFloat = 1e-4,
-        overwrite::Bool = false,
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        min_marker_gene_range_fold::AbstractFloat = $(DEFAULT.min_marker_gene_range_fold),
+        min_max_marker_gene_fraction::AbstractFloat = $(DEFAULT.min_max_marker_gene_fraction),
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Identify the genes that distinguish at least one metacell from the rest. Such genes are called "marker" genes as they
@@ -92,18 +87,14 @@ Identify the genes that distinguish at least one metacell from the rest. Such ge
  4. Identify as markers genes whose adjusted fold factor is at least `min_marker_gene_range_fold`, and whose maximal
     expression is at least `min_max_marker_gene_fraction`.
 
-CONTRACT
+$(CONTRACT)
 """
 @logged @computation Contract(
-    axes = [
-        "metacell" => (RequiredInput, "The metacells to group into neighborhoods."),
-        "gene" => (RequiredInput, "The genes to consider."),
-    ],
+    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
-        ("metacell", "gene", "fraction") =>
-            (RequiredInput, AbstractFloat, "The fraction of the UMIs of each gene in each metacell."),
-        ("gene", "divergence") => (RequiredInput, AbstractFloat, "How to scale fold factors for this gene."),
-        ("gene", "is_marker") => (GuaranteedOutput, Bool, "A mask of genes that distinguish between metacells."),
+        gene_metacell_fraction_matrix(RequiredInput),
+        gene_divergence_vector(RequiredInput),
+        gene_is_marker_vector(GuaranteedOutput),
     ],
 ) function identify_marker_genes!(  # untested
     daf::DafWriter;
@@ -136,9 +127,9 @@ end
 """
     function identify_correlated_genes!(
         daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = 1e-5,
-        correlation_confidence::AbstractFloat = 0.9,
-        overwrite::Bool = false,
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        correlation_confidence::AbstractFloat = $(DEFAULT.correlation_confidence),
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Identify genes that are correlated with other gene(s). Such genes are good candidates for looking for groups of genes
@@ -151,19 +142,11 @@ that act together. If `overwrite`, will overwrite an existing `is_correlated` ma
  5. Find the `correlation_confidence` quantile correlation of the shuffled data.
  6. Identify the genes that have at least that level of correlations in the unshuffled data.
 
-CONTRACT
+$(CONTRACT)
 """
 @logged @computation Contract(
-    axes = [
-        "metacell" => (RequiredInput, "The metacells to group into neighborhoods."),
-        "gene" => (RequiredInput, "The genes to consider (typically, only marker genes)."),
-    ],
-    data = [
-        ("metacell", "gene", "fraction") =>
-            (RequiredInput, AbstractFloat, "The fraction of the UMIs of each gene in each metacell."),
-        ("gene", "is_correlated") =>
-            (GuaranteedOutput, Bool, "A mask of genes that are correlated with other gene(s)."),
-    ],
+    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
+    data = [gene_metacell_fraction_matrix(RequiredInput), gene_is_correlated_vector(GuaranteedOutput)],
 ) function identify_correlated_genes!(  # untested
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = 1e-5,

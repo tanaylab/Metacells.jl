@@ -8,6 +8,7 @@ module Boxes
 
 export compute_boxes!
 
+using ..Contracts
 using ..IdentifyGenes
 
 using Base.Iterators
@@ -24,14 +25,14 @@ using Statistics
 """
     function compute_boxes!(
         daf::DafWriter;
-        min_significant_gene_UMIs::Integer = 40,
-        gene_fraction_regularization::AbstractFloat = 1e-5,
-        fold_confidence::AbstractFloat = 0.9,
-        max_box_span::AbstractFloat = 2.0,
-        max_neighborhood_span::AbstractFloat = 2.0,
-        correlation_confidence::AbstractFloat = 0.99,
-        max_deviant_genes_fraction::AbstractFloat = 0.01,
-        overwrite::Bool = false,
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        fold_confidence::AbstractFloat = $(DEFAULT.fold_confidence),
+        max_box_span::AbstractFloat = $(DEFAULT.max_box_span),
+        max_neighborhood_span::AbstractFloat = $(DEFAULT.max_deviant_genes_fraction),
+        correlation_confidence::AbstractFloat = $(DEFAULT.correlation_confidence),
+        max_deviant_genes_fraction::AbstractFloat = $(DEFAULT.max_deviant_genes_fraction),
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Partition raw metacells into distinct boxes, and boxes into overlapping neighborhoods.
@@ -64,41 +65,26 @@ Partition raw metacells into distinct boxes, and boxes into overlapping neighbor
 
 If `overwrite` is set, the results will replace any previously computed boxes and neighborhoods.
 
-CONTRACT
+$(CONTRACT)
 """
 @logged @computation Contract(;
     axes = [
-        "metacell" => (RequiredInput, "The metacells to group into neighborhoods."),
-        "gene" => (
-            RequiredInput,
-            "The genes to consider (typically, only non-lateral globally marker and correlated genes).",
-        ),
-        "box" => (GuaranteedOutput, "A partition of the metacells into distinct boxes."),
-        "neighborhood" => (GuaranteedOutput, "A grouping of boxes into overlapping neighborhoods."),
+        gene_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        box_axis(GuaranteedOutput),
+        neighborhood_axis(GuaranteedOutput),
     ],
     data = [
-        ("metacell", "gene", "fraction") =>
-            (RequiredInput, AbstractFloat, "The fraction of the UMIs of each gene in each metacell."),
-        ("metacell", "total_UMIs") => (
-            RequiredInput,
-            Unsigned,
-            "The total number of UMIs used to estimate the fraction of all the genes in each metacell.",
-        ),
-        ("metacell", "gene", "total_UMIs") => (
-            RequiredInput,
-            Unsigned,
-            "The total number of UMIs used to estimate the fraction of each gene in each metacell.",
-        ),
-        ("gene", "divergence") => (OptionalInput, AbstractFloat, "How to scale fold factors for this gene."),
-        ("metacell", "box") => (GuaranteedOutput, AbstractString, "The unique box each metacell belongs to."),
-        ("gene", "neighborhood", "is_correlated") =>
-            (GuaranteedOutput, Bool, "Which genes are correlated in each neighborhood."),
-        ("box", "neighborhood.main") => (GuaranteedOutput, AbstractString, "The main neighborhood of each box."),
-        ("neighborhood", "span") => (GuaranteedOutput, AbstractFloat, "The span used to compute the neighborhood."),
-        ("box", "neighborhood", "is_member") =>
-            (GuaranteedOutput, Bool, "Membership matrix for boxes and neighborhoods."),
-        ("box", "box", "distance") =>
-            (GuaranteedOutput, Float32, "For each box, the distances of the boxes in its main neighborhood."),
+        gene_divergence_vector(RequiredInput),
+        metacell_box_vector(GuaranteedOutput),
+        metacell_total_UMIs_vector(RequiredInput),
+        gene_metacell_fraction_matrix(RequiredInput),
+        gene_metacell_total_UMIs_matrix(RequiredInput),
+        gene_neighborhood_is_correlated_matrix(GuaranteedOutput),
+        box_main_neighborhood_vector(GuaranteedOutput),
+        neighborhood_span_vector(GuaranteedOutput),
+        box_box_distance(GuaranteedOutput),
+        box_neighborhood_is_member_matrix(GuaranteedOutput),
     ],
 ) function compute_boxes!(  # untested
     daf::DafWriter;
