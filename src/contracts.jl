@@ -115,11 +115,8 @@ is used when considering the distance between gene expressions. Therefore genes 
 a higher fold factor
 """
 function gene_divergence_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("gene", "divergence") => (
-        expectation,
-        AbstractFloat,
-        "Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.",
-    )
+    return ("gene", "divergence") =>
+        (expectation, StorageFloat, "Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.")
 end
 
 """
@@ -190,7 +187,7 @@ the robustness of the estimates.
 function metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("metacell", "total_UMIs") => (
         expectation,
-        Unsigned,
+        StorageUnsigned,
         "The total number of UMIs used to estimate the fraction of all the genes in each metacell.",
     )
 end
@@ -234,8 +231,11 @@ boxes may share the same main neighborhood. If the samples are sufficiently spar
 only just the single box (which itself may include just a single metacell).
 """
 function box_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
-    return ("box", "neighborhood.main") =>
-        (expectation, Unsigned, "The total number of UMIs used to estimate the fraction of all the genes in each box.")
+    return ("box", "neighborhood.main") => (
+        expectation,
+        StorageUnsigned,
+        "The total number of UMIs used to estimate the fraction of all the genes in each box.",
+    )
 end
 
 """
@@ -265,7 +265,7 @@ simple fixed span will not do, due to the curse of multi-dimensionality).
 """
 function neighborhood_span_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("neighborhood", "span") =>
-        (expectation, AbstractFloat, "The span (fold factor) used to compute the neighborhood.")
+        (expectation, StorageFloat, "The span (fold factor) used to compute the neighborhood.")
 end
 
 """
@@ -277,7 +277,7 @@ batch effects, purging doublets, and compensating for any other technical artifa
 """
 function gene_metacell_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "fraction") =>
-        (expectation, AbstractFloat, "The estimated fraction of the UMIs of each gene in each metacell.")
+        (expectation, StorageFloat, "The estimated fraction of the UMIs of each gene in each metacell.")
 end
 
 """
@@ -289,8 +289,11 @@ estimates) to be some minimum, and possibly adjust the fold factor according to 
 multinomial sampling distribution).
 """
 function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "metacell", "total_UMIs") =>
-        (expectation, Unsigned, "The total number of UMIs used to estimate the fraction of each gene in each metacell.")
+    return ("gene", "metacell", "total_UMIs") => (
+        expectation,
+        StorageUnsigned,
+        "The total number of UMIs used to estimate the fraction of each gene in each metacell.",
+    )
 end
 
 """
@@ -299,9 +302,9 @@ end
 The estimated fraction of the UMIs of each gene in each box. Each box is a sample of the manifold, representing a real
 biological state, which is different from the state of any other box.
 """
-function gene_box_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+function gene_box_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "box", "fraction") =>
-        (expectation, AbstractFloat, "The estimated fraction of the UMIs of each gene in each box.")
+        (expectation, StorageFloat, "The estimated fraction of the UMIs of each gene in each box.")
 end
 
 """
@@ -312,9 +315,12 @@ robustness of the estimate. When computing fold factors, we require the total nu
 estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a
 multinomial sampling distribution).
 """
-function gene_box_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
-    return ("gene", "box", "total_UMIs") =>
-        (expectation, Unsigned, "The total number of UMIs used to estimate the fraction of each gene in each box.")
+function gene_box_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "box", "total_UMIs") => (
+        expectation,
+        StorageUnsigned,
+        "The total number of UMIs used to estimate the fraction of each gene in each box.",
+    )
 end
 
 """
@@ -342,7 +348,7 @@ genes that are also correlated in the main neighborhood of either of the boxes).
 function box_box_distance(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("box", "box", "distance") => (
         expectation,
-        AbstractFloat,
+        StorageFloat,
         "The distance (fold factor) between the most different metacell genes between the boxes.",
     )
 end

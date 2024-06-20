@@ -7,6 +7,7 @@ of "similar" boxes for further analysis.
 module Boxes
 
 export compute_boxes!
+export compute_boxes_data!
 
 using ..Contracts
 using ..IdentifyGenes
@@ -723,6 +724,30 @@ end
         is_member_of_boxes_in_neighborhoods[boxes_of_neighborhood, neighborhood] .= true  # NOJET
     end
     return is_member_of_boxes_in_neighborhoods
+end
+
+"""
+    function compute_boxes_data!(daf::DafWriter)::Nothing
+
+Compute aggregated per-box data based on per-metacell data. This is separated from [`compute_boxes!`](@ref) to allow
+computing this data for all genes (instead of just for the subset of genes fed to [`compute_boxes!`](@ref)).
+
+$(CONTRACT)
+"""
+@computation Contract(
+    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), box_axis(RequiredInput)],
+    data = [
+        gene_metacell_fraction_matrix(RequiredInput),
+        gene_metacell_total_UMIs_matrix(RequiredInput),
+        gene_box_fraction_matrix(GuaranteedOutput),
+        gene_box_total_UMIs_matrix(GuaranteedOutput),
+    ],
+) function compute_boxes_data!(daf::DafWriter)::Nothing  # untested
+    fraction_of_genes_in_boxes = daf["/ metacell / gene : fraction @ box ! %> GeoMean eps 1e-5"]
+    set_matrix!(daf, "box", "gene", "fraction", fraction_of_genes_in_boxes; overwrite = true)
+    total_UMIs_of_genes_in_boxes = daf["/ metacell / gene : total_UMIs @ box ! %> Sum"]
+    set_matrix!(daf, "box", "gene", "total_UMIs", total_UMIs_of_genes_in_boxes; overwrite = true)
+    return nothing
 end
 
 end  # module

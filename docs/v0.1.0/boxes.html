@@ -245,11 +245,11 @@
 </p>
 <p>
 <strong>gene @ divergence
-</strong>::AbstractFloat (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
 </p>
 <p>
 <strong>metacell @ total_UMIs
-</strong>::Unsigned (required): The total number of UMIs used to estimate the fraction of all the genes in each metacell.
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of all the genes in each metacell.
 </p>
 <p>
 <strong>Matrices
@@ -257,11 +257,11 @@
 </p>
 <p>
 <strong>gene, metacell @ fraction
-</strong>::AbstractFloat (required): The estimated fraction of the UMIs of each gene in each metacell.
+</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
 <strong>gene, metacell @ total_UMIs
-</strong>::Unsigned (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -293,7 +293,7 @@
 </p>
 <p>
 <strong>neighborhood @ span
-</strong>::AbstractFloat (guaranteed): The span (fold factor) used to compute the neighborhood.
+</strong>::Union{Float32, Float64} (guaranteed): The span (fold factor) used to compute the neighborhood.
 </p>
 <p>
 <strong>Matrices
@@ -305,11 +305,89 @@
 </p>
 <p>
 <strong>box, box @ distance
-</strong>::AbstractFloat (guaranteed): The distance (fold factor) between the most different metacell genes between the boxes.
+</strong>::Union{Float32, Float64} (guaranteed): The distance (fold factor) between the most different metacell genes between the boxes.
 </p>
 <p>
 <strong>box, neighborhood @ is_member
 </strong>::Bool (guaranteed): A mask of the member boxes of each neighborhood.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Boxes.compute_boxes_data!" href="#Metacells.Boxes.compute_boxes_data!">
+<code>Metacells.Boxes.compute_boxes_data!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_boxes_data!(daf::DafWriter)::Nothing
+</code>
+</pre>
+<p>Compute aggregated per-box data based on per-metacell data. This is separated from 
+<a href="boxes.html#Metacells.Boxes.compute_boxes!">
+<code>compute_boxes!
+</code>
+</a> to allow computing this data for all genes (instead of just for the subset of genes fed to 
+<a href="boxes.html#Metacells.Boxes.compute_boxes!">
+<code>compute_boxes!
+</code>
+</a>).
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>box
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ fraction
+</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
+</p>
+<p>
+<strong>gene, metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, box @ fraction
+</strong>::Union{Float32, Float64} (guaranteed): The estimated fraction of the UMIs of each gene in each box.
+</p>
+<p>
+<strong>gene, box @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total number of UMIs used to estimate the fraction of each gene in each box.
 </p>
 </div>
 </section>
@@ -332,6 +410,12 @@
 <li>
 <a href="boxes.html#Metacells.Boxes.compute_boxes!">
 <code>Metacells.Boxes.compute_boxes!
+</code>
+</a>
+</li>
+<li>
+<a href="boxes.html#Metacells.Boxes.compute_boxes_data!">
+<code>Metacells.Boxes.compute_boxes_data!
 </code>
 </a>
 </li>

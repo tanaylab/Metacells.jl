@@ -218,7 +218,7 @@
 </p>
 <p>
 <strong>gene, metacell @ fraction
-</strong>::AbstractFloat (required): The estimated fraction of the UMIs of each gene in each metacell.
+</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -230,7 +230,7 @@
 </p>
 <p>
 <strong>gene @ divergence
-</strong>::AbstractFloat (guaranteed): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</strong>::Union{Float32, Float64} (guaranteed): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
 </p>
 </div>
 </section>
@@ -304,7 +304,7 @@
 </p>
 <p>
 <strong>gene @ divergence
-</strong>::AbstractFloat (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
 </p>
 <p>
 <strong>Matrices
@@ -312,7 +312,7 @@
 </p>
 <p>
 <strong>gene, metacell @ fraction
-</strong>::AbstractFloat (required): The estimated fraction of the UMIs of each gene in each metacell.
+</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -397,7 +397,7 @@
 </p>
 <p>
 <strong>gene, metacell @ fraction
-</strong>::AbstractFloat (required): The estimated fraction of the UMIs of each gene in each metacell.
+</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs

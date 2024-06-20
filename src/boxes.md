@@ -3,6 +3,7 @@
 ```@docs
 Metacells.Boxes
 Metacells.Boxes.compute_boxes!
+Metacells.Boxes.compute_boxes_data!
 ```
 
 ## Index
