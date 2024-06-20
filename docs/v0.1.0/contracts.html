@@ -514,6 +514,28 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_type_vector" href="#Metacells.Contracts.metacell_type_vector">
+<code>Metacells.Contracts.metacell_type_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each metacell belongs to.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
 <a class="docstring-binding" id="Metacells.Contracts.box_main_neighborhood_vector" href="#Metacells.Contracts.box_main_neighborhood_vector">
 <code>Metacells.Contracts.box_main_neighborhood_vector
 </code>
@@ -536,6 +558,50 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
+<a class="docstring-binding" id="Metacells.Contracts.box_total_UMIs_vector" href="#Metacells.Contracts.box_total_UMIs_vector">
+<code>Metacells.Contracts.box_total_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function box_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The unique main neighborhood of each box. Ideally, each box is the center of its own main neighborhood, and also belongs to overlapping neighborhood of some other nearby boxes. However, where the manifold is sparsely sampled, a few nearby boxes may share the same main neighborhood. If the samples are sufficiently sparse, the main neighborhood may include only just the single box (which itself may include just a single metacell).
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.box_type_vector" href="#Metacells.Contracts.box_type_vector">
+<code>Metacells.Contracts.box_type_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function box_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each box belongs to.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
 <a class="docstring-binding" id="Metacells.Contracts.neighborhood_span_vector" href="#Metacells.Contracts.neighborhood_span_vector">
 <code>Metacells.Contracts.neighborhood_span_vector
 </code>
@@ -550,6 +616,28 @@
 </code>
 </pre>
 <p>The span (fold factor) used to compute the neighborhood. This is different for each neighborhood (but is never too big), to ensure that the sizes of the neighborhoods are not too large even for densely sampled regions of the manifold (a simple fixed span will not do, due to the curse of multi-dimensionality).
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.type_color_vector" href="#Metacells.Contracts.type_color_vector">
+<code>Metacells.Contracts.type_color_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function type_color_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A unique color for each type for graphs.
 </p>
 </div>
 </section>
@@ -654,6 +742,50 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_box_fraction_matrix" href="#Metacells.Contracts.gene_box_fraction_matrix">
+<code>Metacells.Contracts.gene_box_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_box_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated fraction of the UMIs of each gene in each box. Each box is a sample of the manifold, representing a real biological state, which is different from the state of any other box.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_box_total_UMIs_matrix" href="#Metacells.Contracts.gene_box_total_UMIs_matrix">
+<code>Metacells.Contracts.gene_box_total_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_box_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of each gene in each box. This is used to estimate the robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a multinomial sampling distribution).
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
 <a class="docstring-binding" id="Metacells.Contracts.box_neighborhood_is_member_matrix" href="#Metacells.Contracts.box_neighborhood_is_member_matrix">
 <code>Metacells.Contracts.box_neighborhood_is_member_matrix
 </code>
@@ -712,6 +844,18 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.box_total_UMIs_vector">
+<code>Metacells.Contracts.box_total_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.box_type_vector">
+<code>Metacells.Contracts.box_type_vector
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.cell_axis">
 <code>Metacells.Contracts.cell_axis
 </code>
@@ -726,6 +870,18 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.gene_axis">
 <code>Metacells.Contracts.gene_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_box_fraction_matrix">
+<code>Metacells.Contracts.gene_box_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_box_total_UMIs_matrix">
+<code>Metacells.Contracts.gene_box_total_UMIs_matrix
 </code>
 </a>
 </li>
@@ -796,6 +952,12 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.metacell_type_vector">
+<code>Metacells.Contracts.metacell_type_vector
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.neighborhood_axis">
 <code>Metacells.Contracts.neighborhood_axis
 </code>
@@ -810,6 +972,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.type_axis">
 <code>Metacells.Contracts.type_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.type_color_vector">
+<code>Metacells.Contracts.type_color_vector
 </code>
 </a>
 </li>

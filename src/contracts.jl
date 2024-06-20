@@ -29,6 +29,14 @@ export neighborhood_axis
 export neighborhood_span_vector
 export type_axis
 
+export box_total_UMIs_vector
+export box_type_vector
+export gene_box_fraction_matrix
+export gene_box_total_UMIs_matrix
+export gene_is_lateral_vector
+export metacell_type_vector
+export type_color_vector
+
 using Daf
 
 """
@@ -182,9 +190,18 @@ the robustness of the estimates.
 function metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("metacell", "total_UMIs") => (
         expectation,
-        AbstractFloat,
+        Unsigned,
         "The total number of UMIs used to estimate the fraction of all the genes in each metacell.",
     )
+end
+
+"""
+    function metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The type each metacell belongs to.
+"""
+function metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("metacell", "type") => (expectation, AbstractString, "The type each metacell belongs to.")
 end
 
 """
@@ -193,7 +210,7 @@ end
 The unique box each metacell belongs to.
 """
 function metacell_box_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("metacell", "box") => (expectation, AbstractFloat, "The unique box each metacell belongs to.")
+    return ("metacell", "box") => (expectation, AbstractString, "The unique box each metacell belongs to.")
 end
 
 """
@@ -205,7 +222,38 @@ boxes may share the same main neighborhood. If the samples are sufficiently spar
 only just the single box (which itself may include just a single metacell).
 """
 function box_main_neighborhood_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("box", "neighborhood.main") => (expectation, AbstractFloat, "The unique main neighborhood of each box.")
+    return ("box", "neighborhood.main") => (expectation, AbstractString, "The unique main neighborhood of each box.")
+end
+
+"""
+    function box_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The unique main neighborhood of each box. Ideally, each box is the center of its own main neighborhood, and also belongs
+to overlapping neighborhood of some other nearby boxes. However, where the manifold is sparsely sampled, a few nearby
+boxes may share the same main neighborhood. If the samples are sufficiently sparse, the main neighborhood may include
+only just the single box (which itself may include just a single metacell).
+"""
+function box_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("box", "neighborhood.main") =>
+        (expectation, Unsigned, "The total number of UMIs used to estimate the fraction of all the genes in each box.")
+end
+
+"""
+    function box_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The type each box belongs to.
+"""
+function box_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("box", "type") => (expectation, AbstractString, "The type each box belongs to.")
+end
+
+"""
+    function type_color_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+A unique color for each type for graphs.
+"""
+function type_color_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("type", "color") => (expectation, AbstractString, "A unique color for each type for graphs.")
 end
 
 """
@@ -241,11 +289,32 @@ estimates) to be some minimum, and possibly adjust the fold factor according to 
 multinomial sampling distribution).
 """
 function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "metacell", "total_UMIs") => (
-        expectation,
-        AbstractFloat,
-        "The total number of UMIs used to estimate the fraction of each gene in each metacell.",
-    )
+    return ("gene", "metacell", "total_UMIs") =>
+        (expectation, Unsigned, "The total number of UMIs used to estimate the fraction of each gene in each metacell.")
+end
+
+"""
+    function gene_box_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The estimated fraction of the UMIs of each gene in each box. Each box is a sample of the manifold, representing a real
+biological state, which is different from the state of any other box.
+"""
+function gene_box_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("gene", "box", "fraction") =>
+        (expectation, AbstractFloat, "The estimated fraction of the UMIs of each gene in each box.")
+end
+
+"""
+    function gene_box_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The total number of UMIs used to estimate the fraction of each gene in each box. This is used to estimate the
+robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared
+estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a
+multinomial sampling distribution).
+"""
+function gene_box_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("gene", "box", "total_UMIs") =>
+        (expectation, Unsigned, "The total number of UMIs used to estimate the fraction of each gene in each box.")
 end
 
 """
@@ -260,7 +329,7 @@ of the manifold.
 """
 function gene_neighborhood_is_correlated_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "neighborhood", "is_correlated") =>
-        (expectation, AbstractFloat, "Which genes are correlated in each neighborhood.")
+        (expectation, Bool, "Which genes are correlated in each neighborhood.")
 end
 
 """
@@ -286,7 +355,7 @@ each neighborhood contains multiple boxes.
 """
 function box_neighborhood_is_member_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("box", "neighborhood", "is_member") =>
-        (expectation, AbstractFloat, "A mask of the member boxes of each neighborhood.")
+        (expectation, Bool, "A mask of the member boxes of each neighborhood.")
 end
 
 end  # module

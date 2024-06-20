@@ -249,7 +249,7 @@
 </p>
 <p>
 <strong>metacell @ total_UMIs
-</strong>::AbstractFloat (required): The total number of UMIs used to estimate the fraction of all the genes in each metacell.
+</strong>::Unsigned (required): The total number of UMIs used to estimate the fraction of all the genes in each metacell.
 </p>
 <p>
 <strong>Matrices
@@ -261,7 +261,7 @@
 </p>
 <p>
 <strong>gene, metacell @ total_UMIs
-</strong>::AbstractFloat (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</strong>::Unsigned (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -285,11 +285,11 @@
 </p>
 <p>
 <strong>metacell @ box
-</strong>::AbstractFloat (guaranteed): The unique box each metacell belongs to.
+</strong>::AbstractString (guaranteed): The unique box each metacell belongs to.
 </p>
 <p>
 <strong>box @ neighborhood.main
-</strong>::AbstractFloat (guaranteed): The unique main neighborhood of each box.
+</strong>::AbstractString (guaranteed): The unique main neighborhood of each box.
 </p>
 <p>
 <strong>neighborhood @ span
@@ -301,7 +301,7 @@
 </p>
 <p>
 <strong>gene, neighborhood @ is_correlated
-</strong>::AbstractFloat (guaranteed): Which genes are correlated in each neighborhood.
+</strong>::Bool (guaranteed): Which genes are correlated in each neighborhood.
 </p>
 <p>
 <strong>box, box @ distance
@@ -309,7 +309,7 @@
 </p>
 <p>
 <strong>box, neighborhood @ is_member
-</strong>::AbstractFloat (guaranteed): A mask of the member boxes of each neighborhood.
+</strong>::Bool (guaranteed): A mask of the member boxes of each neighborhood.
 </p>
 </div>
 </section>

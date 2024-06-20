@@ -26,8 +26,12 @@ Metacells.Contracts.gene_divergence_vector
 Metacells.Contracts.cell_is_excluded_vector
 Metacells.Contracts.metacell_total_UMIs_vector
 Metacells.Contracts.metacell_box_vector
+Metacells.Contracts.metacell_type_vector
 Metacells.Contracts.box_main_neighborhood_vector
+Metacells.Contracts.box_total_UMIs_vector
+Metacells.Contracts.box_type_vector
 Metacells.Contracts.neighborhood_span_vector
+Metacells.Contracts.type_color_vector
 ```
 
 ## Matrices
@@ -37,6 +41,8 @@ Metacells.Contracts.gene_metacell_fraction_matrix
 Metacells.Contracts.gene_metacell_total_UMIs_matrix
 Metacells.Contracts.gene_neighborhood_is_correlated_matrix
 Metacells.Contracts.box_box_distance
+Metacells.Contracts.gene_box_fraction_matrix
+Metacells.Contracts.gene_box_total_UMIs_matrix
 Metacells.Contracts.box_neighborhood_is_member_matrix
 ```
 
