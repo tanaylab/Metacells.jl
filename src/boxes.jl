@@ -10,6 +10,7 @@ export compute_boxes!
 export compute_boxes_data!
 
 using ..Contracts
+using ..Defaults
 using ..IdentifyGenes
 
 using Base.Iterators
@@ -89,11 +90,11 @@ $(CONTRACT)
     ],
 ) function compute_boxes!(  # untested
     daf::DafWriter;
-    min_significant_gene_UMIs::Integer = 40,
-    gene_fraction_regularization::AbstractFloat = 1e-5,
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
     fold_confidence::AbstractFloat = 0.9,
-    max_box_span::AbstractFloat = 2.0,
-    max_neighborhood_span::AbstractFloat = 2.0,
+    max_box_span::AbstractFloat = function_default(identify_marker_genes!, :min_marker_gene_range_fold),
+    max_neighborhood_span::AbstractFloat = function_default(identify_marker_genes!, :min_marker_gene_range_fold),
     target_boxes_in_neighborhood::Integer = 20,
     correlation_confidence::AbstractFloat = 0.9,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
@@ -737,16 +738,26 @@ $(CONTRACT)
 @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), box_axis(RequiredInput)],
     data = [
+        metacell_box_vector(RequiredInput),
+        metacell_type_vector(OptionalInput),
         gene_metacell_fraction_matrix(RequiredInput),
         gene_metacell_total_UMIs_matrix(RequiredInput),
+        box_type_vector(OptionalOutput),
         gene_box_fraction_matrix(GuaranteedOutput),
         gene_box_total_UMIs_matrix(GuaranteedOutput),
     ],
-) function compute_boxes_data!(daf::DafWriter)::Nothing  # untested
+) function compute_boxes_data!(daf::DafWriter; overwrite::Bool = false)::Nothing  # untested
     fraction_of_genes_in_boxes = daf["/ metacell / gene : fraction @ box ! %> GeoMean eps 1e-5"]
-    set_matrix!(daf, "box", "gene", "fraction", fraction_of_genes_in_boxes; overwrite = true)
+    set_matrix!(daf, "box", "gene", "fraction", fraction_of_genes_in_boxes; overwrite = overwrite)
+
     total_UMIs_of_genes_in_boxes = daf["/ metacell / gene : total_UMIs @ box ! %> Sum"]
-    set_matrix!(daf, "box", "gene", "total_UMIs", total_UMIs_of_genes_in_boxes; overwrite = true)
+    set_matrix!(daf, "box", "gene", "total_UMIs", total_UMIs_of_genes_in_boxes; overwrite = overwrite)
+
+    if has_vector(daf, "metacell", "type")
+        types_of_boxes = daf["/ metacell : type @ box ! %> Mode"]
+        set_vector!(daf, "box", "type", types_of_boxes; overwrite = overwrite)
+    end
+
     return nothing
 end
 

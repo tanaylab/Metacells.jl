@@ -10,6 +10,9 @@ module Metacells
 
 using Reexport
 
+include("defaults.jl")
+@reexport using .Defaults
+
 include("anndata_format.jl")
 @reexport using .AnnDataFormat
 

@@ -76,6 +76,10 @@
 <a class="tocitem" href="anndata_format.html">AnnData Format
 </a>
 </li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
 </ul>
 <div class="docs-version-selector field has-addons">
 <div class="control">
@@ -362,6 +366,18 @@
 </strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
 </p>
 <p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ box
+</strong>::AbstractString (required): The unique box each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ type
+</strong>::AbstractString (optional): The type each metacell belongs to.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -376,6 +392,14 @@
 <p>
 <strong>Outputs
 </strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>box @ type
+</strong>::AbstractString (optional): The type each box belongs to.
 </p>
 <p>
 <strong>Matrices

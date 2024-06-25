@@ -197,7 +197,7 @@ end
 
 The type each metacell belongs to.
 """
-function metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+function metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("metacell", "type") => (expectation, AbstractString, "The type each metacell belongs to.")
 end
 
@@ -243,7 +243,7 @@ end
 
 The type each box belongs to.
 """
-function box_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+function box_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("box", "type") => (expectation, AbstractString, "The type each box belongs to.")
 end
 
