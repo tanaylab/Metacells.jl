@@ -735,7 +735,7 @@ computing this data for all genes (instead of just for the subset of genes fed t
 
 $(CONTRACT)
 """
-@computation Contract(
+@logged @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), box_axis(RequiredInput)],
     data = [
         metacell_box_vector(RequiredInput),
