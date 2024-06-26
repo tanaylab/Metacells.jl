@@ -24,6 +24,8 @@ using Random
 using SparseArrays
 using Statistics
 
+import Random.default_rng
+
 """
     function compute_boxes!(
         daf::DafWriter;
@@ -100,7 +102,7 @@ $(CONTRACT)
     max_deviant_genes_fraction::AbstractFloat = 0.01,
     max_convergence_fraction::AbstractFloat = 0.0015,
     overwrite::Bool = false,
-    rng::Maybe{AbstractRNG} = nothing,
+    rng::AbstractRNG = default_rng(),
 )::Nothing
     @assert min_significant_gene_UMIs >= 0
     @assert gene_fraction_regularization >= 0
@@ -541,7 +543,7 @@ end
     gene_fraction_regularization::AbstractFloat,
     correlation_confidence::AbstractFloat,
     is_correlated_of_genes_in_metacells::Matrix{Bool},
-    rng::Maybe{AbstractRNG},
+    rng::AbstractRNG,
 )::Matrix{Bool}
     check_efficient_action(
         "compute_boxes",

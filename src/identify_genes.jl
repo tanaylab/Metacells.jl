@@ -17,6 +17,8 @@ using Statistics
 using ..Contracts
 using ..Defaults
 
+import Random.default_rng
+
 """
     function identify_marker_genes!(
         daf::DafWriter;
@@ -153,7 +155,7 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
     correlation_confidence::AbstractFloat = 0.99,
     overwrite::Bool = false,
-    rng::Maybe{AbstractRNG} = nothing,
+    rng::AbstractRNG = default_rng(),
 )::Nothing
     @assert gene_fraction_regularization >= 0
     @assert 0 <= correlation_confidence <= 1
@@ -170,9 +172,6 @@ $(CONTRACT)
     @assert length(max_correlations_of_genes) == n_genes
 
     shuffled_log_fractions_of_genes_in_metacells = copy_array(log_fractions_of_genes_in_metacells)
-    if rng === nothing
-        rng = Random.default_rng()
-    end
     for gene_index in 1:n_genes
         @views shuffled_log_fractions_of_metacells_of_gene = shuffled_log_fractions_of_genes_in_metacells[:, gene_index]
         shuffle!(rng, shuffled_log_fractions_of_metacells_of_gene)
