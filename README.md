@@ -37,7 +37,7 @@ at some point of your processing pipeline, in order to use the new features, and
 ## Installation
 
 Just `Pkg.add("Metacells")`, like installing any other Julia package. However, until this package is complete, there's
-little point in directly installing it. You should probably install the Python package instead (which will automaticaly
+little point in directly installing it. You should probably install the Python package instead (which will automatically
 install the Julia package as a dependency).
 
 To install the Python `metacells` [package](https://github.com/tanaylab/metacells), just `pip install metacells`, like
