@@ -13,6 +13,9 @@ using Reexport
 include("defaults.jl")
 @reexport using .Defaults
 
+include("gmara.jl")
+@reexport using .Gmara
+
 include("anndata_format.jl")
 @reexport using .AnnDataFormat
 

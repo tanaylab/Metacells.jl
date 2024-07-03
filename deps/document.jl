@@ -46,7 +46,15 @@ makedocs(;
         prettyurls = false,
         size_threshold_warn = 200 * 2^10,
     ),
-    pages = ["index.md", "contracts.md", "identify_genes.md", "boxes.md", "anndata_format.md", "defaults.md"],
+    pages = [
+        "index.md",
+        "gmara.md",
+        "contracts.md",
+        "identify_genes.md",
+        "boxes.md",
+        "anndata_format.md",
+        "defaults.md",
+    ],
 )
 
 if seen_problems

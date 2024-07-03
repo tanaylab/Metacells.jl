@@ -72,7 +72,7 @@ for line in fileinput.input():
         context_changed = True
         depth = len(line.split(' ')[0])
 
-        while len(context_lines) >= depth:
+        while len(context_lines) >= max(depth, 1):
             context_lines.pop()
             context_disabled.pop()
 
