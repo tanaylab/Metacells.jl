@@ -288,8 +288,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Gmara.gmara_namespace" href="#Metacells.Gmara.gmara_namespace">
-<code>Metacells.Gmara.gmara_namespace
+<a class="docstring-binding" id="Metacells.Gmara.gmara_genes" href="#Metacells.Gmara.gmara_genes">
+<code>Metacells.Gmara.gmara_genes
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -298,14 +298,31 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">gmara_namespace(;
+<code class="language-julia hljs">gmara_genes(;
     species::AbstractString,
     namespace::AbstractString,
+    [list::Maybe{AbstractString} = nothing,
     version::AbstractString = &quot;main&quot;
+    cache_dir = CACHE_DIR,
+    timeout::Real = TIMEOUT],
 )::AbstractSet{&lt;:AbstractString}
 </code>
 </pre>
-<p>Return the set of names in a namespace of genes of some species. As usual in Gmara, this includes everything that may be used as name, e.g. for Ensembl it includes genes, transcripts and proteins; for Symbol it includes genes and clones; etc.
+<p>Return the set of names of a 
+<code>version
+</code> of a 
+<code>list
+</code> in a 
+<code>namespace
+</code> of genes of some 
+<code>species
+</code>. This returns all the names that are (probably) in the list; it a name isn&#39;t in the result, it is almost certain it does not belong in the list. As usual in Gmara, this includes everything that may be used as name, e.g. for Ensembl it includes genes, transcripts and proteins; for Symbol it includes approved and alises; etc. If the 
+<code>list
+</code> is 
+<code>nothing
+</code>, this just returns the set of known gene names in the 
+<code>namespace
+</code>.
 </p>
 </div>
 </section>
@@ -314,8 +331,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Gmara.gmara_list" href="#Metacells.Gmara.gmara_list">
-<code>Metacells.Gmara.gmara_list
+<a class="docstring-binding" id="Metacells.Gmara.set_gmara_genes_mask!" href="#Metacells.Gmara.set_gmara_genes_mask!">
+<code>Metacells.Gmara.set_gmara_genes_mask!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -324,15 +341,44 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">gmara_list(;
+<code class="language-julia hljs">set_gmara_genes_mask!(
+    daf::DafWriter;
     species::AbstractString,
     namespace::AbstractString,
-    list::AbstractString,
-    version::AbstractString = &quot;main&quot;
-)::AbstractSet{&lt;:AbstractString}
+    [list::Maybe{AbstractString} = nothing,
+    gene_names::AbstractString = &quot;name&quot;,
+    property::Maybe{AbstractString} = nothing,
+    overwrite::Bool = false,
+    cache_dir = CACHE_DIR,
+    timeout::Real = TIMEOUT],
+)::Nothing
 </code>
 </pre>
-<p>Return the set of names in list in a namespace of genes of some species. This returns all the names that are (probably) in the list; it a name isn&#39;t in the result, it is almost certain it does not belong in the list. As usual in Gmara, this includes everything that may be used as name, e.g. for Ensembl it includes genes, transcripts and proteins; for Symbol it includes genes and clones; etc.
+<p>Set a gene property mask in 
+<code>daf
+</code> based on some 
+<code>version
+</code> of a Gmara 
+<code>list
+</code> of some 
+<code>namespace
+</code> for some 
+<code>species
+</code>. We match the 
+<code>gene_names
+</code> (by default, just the unique names in the gene axis) with the list names and set the result mask as a per-gene 
+<code>property
+</code> (by default, 
+<span>$is_$
+</span>
+<em>list
+</em>). If 
+<code>list
+</code> is 
+<code>nothing
+</code>, this just marks the gene names that exist in the namespace. If 
+<code>overwrite
+</code>, this will overwrite an existing property of the.array same name.
 </p>
 </div>
 </section>
@@ -393,20 +439,20 @@
 </a>
 </li>
 <li>
-<a href="gmara.html#Metacells.Gmara.gmara_list">
-<code>Metacells.Gmara.gmara_list
-</code>
-</a>
-</li>
-<li>
-<a href="gmara.html#Metacells.Gmara.gmara_namespace">
-<code>Metacells.Gmara.gmara_namespace
+<a href="gmara.html#Metacells.Gmara.gmara_genes">
+<code>Metacells.Gmara.gmara_genes
 </code>
 </a>
 </li>
 <li>
 <a href="gmara.html#Metacells.Gmara.normalize_gene_name">
 <code>Metacells.Gmara.normalize_gene_name
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.set_gmara_genes_mask!">
+<code>Metacells.Gmara.set_gmara_genes_mask!
 </code>
 </a>
 </li>

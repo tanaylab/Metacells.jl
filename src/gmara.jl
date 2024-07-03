@@ -9,12 +9,13 @@ Access gene names lists from [Gmara](https://github.com/tanaylab/Gmara).
 """
 module Gmara
 
-export gmara_list
-export gmara_namespace
+export gmara_genes
 export empty_gmara_cache!
 export normalize_gene_name
+export set_gmara_genes_mask!
 
 using ConcurrentUtils
+using Daf
 using Daf.GenericTypes
 using GZip
 using HTTP
@@ -83,58 +84,35 @@ function empty_gmara_cache!()::Nothing
 end
 
 """
-    gmara_namespace(;
+    gmara_genes(;
         species::AbstractString,
         namespace::AbstractString,
+        [list::Maybe{AbstractString} = nothing,
         version::AbstractString = "main"
+        cache_dir = CACHE_DIR,
+        timeout::Real = TIMEOUT],
     )::AbstractSet{<:AbstractString}
 
-Return the set of names in a namespace of genes of some species. As usual in Gmara, this includes everything that may be
-used as name, e.g. for Ensembl it includes genes, transcripts and proteins; for Symbol it includes genes and clones;
-etc.
+Return the set of names of a `version` of a `list` in a `namespace` of genes of some `species`. This returns all the
+names that are (probably) in the list; it a name isn't in the result, it is almost certain it does not belong in the
+list. As usual in Gmara, this includes everything that may be used as name, e.g. for Ensembl it includes genes,
+transcripts and proteins; for Symbol it includes approved and alises; etc. If the `list` is `nothing`, this just returns
+the set of known gene names in the `namespace`.
 """
-function gmara_namespace(;
+function gmara_genes(;
     species::AbstractString,
     namespace::AbstractString,
+    list::Maybe{AbstractString} = nothing,
     version::AbstractString = "main",
     cache_dir = CACHE_DIR,
     timeout::Real = TIMEOUT,
 )::AbstractSet{<:AbstractString}
-    return get_set_file(
-        "genes/$(species)/namespaces/names/$(namespace).tsv";
-        version = version,
-        cache_dir = cache_dir,
-        timeout = timeout,
-    )
-end
-
-"""
-    gmara_list(;
-        species::AbstractString,
-        namespace::AbstractString,
-        list::AbstractString,
-        version::AbstractString = "main"
-    )::AbstractSet{<:AbstractString}
-
-Return the set of names in list in a namespace of genes of some species. This returns all the names that are (probably)
-in the list; it a name isn't in the result, it is almost certain it does not belong in the list. As usual in Gmara, this
-includes everything that may be used as name, e.g. for Ensembl it includes genes, transcripts and proteins; for Symbol
-it includes genes and clones; etc.
-"""
-function gmara_list(;
-    species::AbstractString,
-    namespace::AbstractString,
-    list::AbstractString,
-    version::AbstractString = "main",
-    cache_dir = CACHE_DIR,
-    timeout::Real = TIMEOUT,
-)::AbstractSet{<:AbstractString}
-    return get_set_file(
-        "genes/$(species)/lists/$(list)/names/$(namespace).tsv";
-        version = version,
-        cache_dir = cache_dir,
-        timeout = timeout,
-    )
+    if list === nothing
+        path = "genes/$(species)/namespaces/names/$(namespace).tsv"
+    else
+        path = "genes/$(species)/lists/$(list)/names/$(namespace).tsv"
+    end
+    return get_set_file(path; version = version, cache_dir = cache_dir, timeout = timeout)
 end
 
 function get_set_file(
@@ -304,6 +282,53 @@ end
 function unlock_file(file::Base.Filesystem.File, path::AbstractString)::Nothing
     close(file)
     return rm(path * ".lock")
+end
+
+"""
+    set_gmara_genes_mask!(
+        daf::DafWriter;
+        species::AbstractString,
+        namespace::AbstractString,
+        [list::Maybe{AbstractString} = nothing,
+        gene_names::AbstractString = "name",
+        property::Maybe{AbstractString} = nothing,
+        overwrite::Bool = false,
+        cache_dir = CACHE_DIR,
+        timeout::Real = TIMEOUT],
+    )::Nothing
+
+Set a gene property mask in `daf` based on some `version` of a Gmara `list` of some `namespace` for some `species`. We
+match the `gene_names` (by default, just the unique names in the gene axis) with the list names and set the result mask
+as a per-gene `property` (by default, ``is_``_list_). If `list` is `nothing`, this just marks the gene names that exist
+in the namespace. If `overwrite`, this will overwrite an existing property of the.array same name.
+"""
+function set_gmara_genes_mask!(
+    daf::DafWriter;
+    species::AbstractString,
+    namespace::AbstractString,
+    list::Maybe{AbstractString} = nothing,
+    version::AbstractString = "main",
+    gene_names::AbstractString = "name",
+    property::Maybe{AbstractString} = nothing,
+    overwrite::Bool = false,
+    cache_dir = CACHE_DIR,
+    timeout::Real = TIMEOUT,
+)::Nothing
+    if property === nothing
+        property = "is_$(list)"
+    end
+    gene_names = get_vector(daf, "gene", gene_names).array
+    gmara_names = gmara_genes(;
+        species = species,
+        namespace = namespace,
+        list = list,
+        version = version,
+        cache_dir = cache_dir,
+        timeout = timeout,
+    )
+    gene_mask = [normalize_gene_name(gene_name; namespace = namespace) in gmara_names for gene_name in gene_names]
+    set_vector!(daf, "gene", property, gene_mask; overwrite = overwrite)
+    return nothing
 end
 
 end  # module

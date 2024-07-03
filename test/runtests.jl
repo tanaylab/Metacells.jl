@@ -1,5 +1,6 @@
 using Test
 
+using Daf
 using Metacells
 using NestedTests
 

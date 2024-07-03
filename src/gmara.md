@@ -15,8 +15,8 @@ Metacells.Gmara.TIMEOUT
 
 ```@docs
 Metacells.Gmara.normalize_gene_name
-Metacells.Gmara.gmara_namespace
-Metacells.Gmara.gmara_list
+Metacells.Gmara.gmara_genes
+Metacells.Gmara.set_gmara_genes_mask!
 Metacells.Gmara.empty_gmara_cache!
 ```
 
