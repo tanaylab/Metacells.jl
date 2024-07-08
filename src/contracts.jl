@@ -19,6 +19,7 @@ export gene_axis
 export gene_divergence_vector
 export gene_is_correlated_vector
 export gene_is_marker_vector
+export gene_is_transcription_factor_vector
 export gene_metacell_fraction_matrix
 export gene_metacell_total_UMIs_matrix
 export gene_neighborhood_is_correlated_matrix
@@ -165,6 +166,16 @@ total UMIs of each cell.
 """
 function gene_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_lateral") => (expectation, Bool, "A mask of genes that are totally excluded from the analysis.")
+end
+
+"""
+    function gene_is_transcription_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+A mask of genes that bind to the DNA. That is, these genes are good candidates for controlling the expression of other
+genes.
+"""
+function gene_is_transcription_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("gene", "is_transcription_factor") => (expectation, Bool, "A mask of genes that bind to the DNA.")
 end
 
 """

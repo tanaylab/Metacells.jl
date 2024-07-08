@@ -31,13 +31,13 @@ seems to be an inherent part of the identifier.
 """
 function normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
     if namespace == "UCSC"
-        return lowercase(name)
+        return name
     end
     parts = split(name, ".")
     if length(parts) == 2
         name = parts[1]
     end
-    return uppercase(name)
+    return name
 end
 
 """
@@ -191,13 +191,15 @@ function ensure_is_downloaded(
 
     response_headers = Dict(response.headers)
     cache_data_path = cache_dir * "/" * version * "/" * path * ".gz"
+    # TODO: Seems that LFS files are never served zipped.
+    # Strange, you would think it would be a priotity for them.
     if get(response_headers, "Content-Encoding", nothing) == "gzip"
-        open(cache_data_path, "w") do file
-            return write(file, response.body)
+        open(cache_data_path, "w") do file  # untested
+            return write(file, response.body)  # untested
         end
     else
-        GZip.open(cache_data_path, "w") do file  # untested
-            return write(file, response.body)  # untested
+        GZip.open(cache_data_path, "w") do file
+            return write(file, response.body)
         end
     end
 
@@ -216,7 +218,8 @@ function ensure_is_downloaded(
 end
 
 function github_url(path::AbstractString; version::AbstractString = "main")::AbstractString
-    return "https://raw.githubusercontent.com/tanaylab/Gmara/$(version)/$(path)"
+    # PRE-LFS: return "https://raw.githubusercontent.com/tanaylab/Gmara/$(version)/$(path)"
+    return "https://media.githubusercontent.com/media/tanaylab/Gmara/$(version)/$(path)"
 end
 
 function write_set_to_file(
