@@ -28,4 +28,7 @@ include("identify_genes.jl")
 include("boxes.jl")
 @reexport using .Boxes
 
+include("programs.jl")
+@reexport using .Programs
+
 end # module

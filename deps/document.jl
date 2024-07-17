@@ -51,6 +51,7 @@ makedocs(;
         "gmara.md",
         "contracts.md",
         "identify_genes.md",
+        "programs.md",
         "boxes.md",
         "anndata_format.md",
         "defaults.md",

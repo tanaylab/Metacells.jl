@@ -119,7 +119,7 @@ $(CONTRACT)
 
     range_fold_of_genes = log_maximal_fraction_of_genes .- log_minimal_fraction_of_genes
     range_fold_of_genes[range_fold_of_genes .< min_divergent_gene_range_fold] .= min_divergent_gene_range_fold
-    divergence_of_genes = Vector{Float32}(1.0 .- min.(1.0, min_divergent_gene_range_fold ./ range_fold_of_genes))
+    divergence_of_genes = Vector{Float32}(1.0 .- min.(1.0, min_divergent_gene_range_fold ./ range_fold_of_genes))  # NOJET
     @assert all(divergence_of_genes .>= 0)
     @assert all(divergence_of_genes .< 1.0)
 

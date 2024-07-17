@@ -195,7 +195,7 @@ function ensure_is_downloaded(
     # Strange, you would think it would be a priotity for them.
     if get(response_headers, "Content-Encoding", nothing) == "gzip"
         open(cache_data_path, "w") do file  # untested
-            return write(file, response.body)  # untested
+            return write(file, response.body)
         end
     else
         GZip.open(cache_data_path, "w") do file

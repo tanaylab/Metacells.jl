@@ -97,10 +97,10 @@ $(CONTRACT)
     fold_confidence::AbstractFloat = 0.9,
     max_box_span::AbstractFloat = function_default(identify_marker_genes!, :min_marker_gene_range_fold),
     max_neighborhood_span::AbstractFloat = function_default(identify_marker_genes!, :min_marker_gene_range_fold),
-    target_boxes_in_neighborhood::Integer = 20,
+    target_boxes_in_neighborhood::Maybe{Integer} = nothing,
     correlation_confidence::AbstractFloat = 0.9,
     max_deviant_genes_fraction::AbstractFloat = 0.01,
-    max_convergence_fraction::AbstractFloat = 0.0015,
+    max_convergence_fraction::AbstractFloat = 0.01,
     overwrite::Bool = false,
     rng::AbstractRNG = default_rng(),
 )::Nothing
@@ -109,7 +109,7 @@ $(CONTRACT)
     @assert 0 <= fold_confidence <= 1
     @assert max_box_span > 0
     @assert max_neighborhood_span >= 0
-    @assert target_boxes_in_neighborhood > 0
+    @assert target_boxes_in_neighborhood === nothing || target_boxes_in_neighborhood > 0
     @assert 0 <= correlation_confidence <= 1
     @assert 0 <= max_deviant_genes_fraction <= 1
 
@@ -165,6 +165,21 @@ $(CONTRACT)
         metacells_of_boxes = collect_group_members(boxes_of_metacells)
         names_of_boxes = group_names(daf, "metacell", metacells_of_boxes; prefix = "B")
         @debug "round: $(round_index) n_boxes: $(length(names_of_boxes))"
+
+        if round_index > 1 && true
+            @debug "TODOX ROUND $(round_index)"
+            todox_verify_45_53_distinct_boxes(
+                axis_array(daf, "gene"),
+                min_significant_gene_UMIs,
+                metacells_of_boxes,
+                is_correlated_of_genes_in_metacells,
+                total_UMIs_of_genes_in_metacells,
+                log_decreased_fraction_of_genes_in_metacells,
+                log_increased_fraction_of_genes_in_metacells,
+                divergence_of_genes,
+                max_box_span,
+            )
+        end
 
         distances_between_boxes = compute_box_distances(;
             distances_between_metacells = distance_for_neighborhoods_between_metacells,
@@ -223,6 +238,21 @@ $(CONTRACT)
     end
 
     is_member_of_boxes_in_neighborhoods = compute_membership_matrix(boxes_of_neighborhoods, length(names_of_boxes))
+
+    if true
+        @debug "TODOX DONE"
+        todox_verify_45_53_distinct_boxes(
+            axis_array(daf, "gene"),
+            min_significant_gene_UMIs,
+            metacells_of_boxes,
+            is_correlated_of_genes_in_metacells,
+            total_UMIs_of_genes_in_metacells,
+            log_decreased_fraction_of_genes_in_metacells,
+            log_increased_fraction_of_genes_in_metacells,
+            divergence_of_genes,
+            max_box_span,
+        )
+    end
 
     write_data(
         daf;
@@ -300,7 +330,7 @@ end
 
     confidence_stdevs = quantile(Normal(), fold_confidence)
 
-    confidence_fraction_of_genes_in_metacells =
+    confidence_fraction_of_genes_in_metacells =  # NOJET
         confidence_stdevs .* sqrt.(transpose(total_UMIs_of_metacells) .* fraction_of_genes_in_metacells) ./
         transpose(total_UMIs_of_metacells)
 
@@ -483,7 +513,7 @@ end
 @logged function collect_boxes_of_neighborhoods(;  # untested
     distances_between_boxes::Matrix{Float32},
     threshold::AbstractFloat,
-    target_boxes_in_neighborhood::Integer,
+    target_boxes_in_neighborhood::Maybe{Integer},
     is_first::Bool,
 )::Tuple{Vector{Float32}, Vector{Vector{UInt32}}, Vector{UInt32}}
     check_efficient_action("compute_boxes", Columns, "distances_between_boxes", distances_between_boxes)
@@ -494,16 +524,22 @@ end
     neighborhood_spans_of_boxes = Vector{Float32}(undef, n_boxes)
     boxes_of_neighborhoods = Vector{Vector{UInt32}}(undef, n_boxes)
 
-    boxes_quantile = min(target_boxes_in_neighborhood / n_boxes, 1.0)
-    box_threshold = threshold
     for box_index in 1:n_boxes
         @views distances_from_box = distances_between_boxes[:, box_index]
-        if !is_first
-            target_threshold = quantile(distances_from_box, boxes_quantile)
-            box_threshold = min(target_threshold, threshold)
+        boxes_order = sortperm(distances_from_box)
+        boxes_of_neighborhood = [box_index]
+        for next_box_index in boxes_order
+            if next_box_index != box_index
+                distances_to_prev_boxes = vec(distances_between_boxes[boxes_of_neighborhood, next_box_index])
+                maximal_distance_to_prev_boxes = maximum(distances_to_prev_boxes)
+                if maximal_distance_to_prev_boxes <= threshold
+                    push!(boxes_of_neighborhood, next_box_index)
+                end
+            end
         end
-        boxes_of_neighborhoods[box_index] = findall(distances_from_box .<= box_threshold)
-        neighborhood_spans_of_boxes[box_index] = box_threshold
+        sort!(boxes_of_neighborhood)
+        boxes_of_neighborhoods[box_index] = boxes_of_neighborhood
+        neighborhood_spans_of_boxes[box_index] = threshold
     end
 
     main_neighborhoods_of_boxes = Vector{UInt32}(undef, n_boxes)
@@ -761,6 +797,69 @@ $(CONTRACT)
     end
 
     return nothing
+end
+
+function todox_verify_45_53_distinct_boxes(
+    names_of_genes::AbstractVector{<:AbstractString},
+    min_significant_gene_UMIs::Integer,
+    metacells_of_boxes::Vector{Vector{UInt32}},
+    is_correlated_of_genes_in_metacells::Matrix{Bool},
+    total_UMIs_of_genes_in_metacells::AbstractMatrix{<:Unsigned},
+    log_decreased_fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
+    log_increased_fraction_of_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
+    divergence_of_genes::AbstractVector{<:AbstractFloat},
+    max_box_span::AbstractFloat,
+)::Bool
+    @debug "TODOX verify_45_53_distinct_boxes:"
+    did_find = false
+    for metacell_of_45 in metacells_of_boxes[45]
+        is_correlated_of_genes_in_metacell_of_45 = vec(is_correlated_of_genes_in_metacells[:, metacell_of_45])
+        for metacell_of_53 in metacells_of_boxes[53]
+            is_correlated_of_genes_in_metacell_of_53 = vec(is_correlated_of_genes_in_metacells[:, metacell_of_53])
+            is_correlated_of_genes_for_distance =
+                is_correlated_of_genes_in_metacell_of_45 .| is_correlated_of_genes_in_metacell_of_53
+
+            for gene_index in findall(is_correlated_of_genes_for_distance)
+                total_UMIs_of_gene_in_45_metacell = total_UMIs_of_genes_in_metacells[gene_index, metacell_of_45]
+                log_decreased_fraction_of_gene_in_45_metacell = log_decreased_fraction_of_genes_in_metacells[gene_index, metacell_of_45]
+                log_increased_fraction_of_gene_in_45_metacell = log_increased_fraction_of_genes_in_metacells[gene_index, metacell_of_45]
+
+                total_UMIs_of_gene_in_53_metacell = total_UMIs_of_genes_in_metacells[gene_index, metacell_of_53]
+                log_decreased_fraction_of_gene_in_53_metacell = log_decreased_fraction_of_genes_in_metacells[gene_index, metacell_of_53]
+                log_increased_fraction_of_gene_in_53_metacell = log_increased_fraction_of_genes_in_metacells[gene_index, metacell_of_53]
+
+                divergence_of_gene_for_distance = divergence_of_genes[gene_index]
+
+                distance = gene_distance(
+                    min_significant_gene_UMIs,
+                    total_UMIs_of_gene_in_45_metacell,
+                    log_decreased_fraction_of_gene_in_45_metacell,
+                    log_increased_fraction_of_gene_in_45_metacell,
+                    total_UMIs_of_gene_in_53_metacell,
+                    log_decreased_fraction_of_gene_in_53_metacell,
+                    log_increased_fraction_of_gene_in_53_metacell,
+                    divergence_of_gene_for_distance,
+                )
+
+                if distance > max_box_span * 2
+                    @debug "TODOX - metacell_of_45: $(metacell_of_45)"
+                    @debug "TODOX   metacell_of_53: $(metacell_of_53)"
+                    @debug "TODOX   gene: $(names_of_genes[gene_index])"
+                    @debug "TODOX   distance: $(distance)"
+                    @debug "TODOX   min_significant_gene_UMIs $(min_significant_gene_UMIs)"
+                    @debug "TODOX   total_UMIs_of_gene_in_45_metacell $(total_UMIs_of_gene_in_45_metacell)"
+                    @debug "TODOX   log_decreased_fraction_of_gene_in_45_metacell $(log_decreased_fraction_of_gene_in_45_metacell)"
+                    @debug "TODOX   log_increased_fraction_of_gene_in_45_metacell $(log_increased_fraction_of_gene_in_45_metacell)"
+                    @debug "TODOX   total_UMIs_of_gene_in_53_metacell $(total_UMIs_of_gene_in_53_metacell)"
+                    @debug "TODOX   log_decreased_fraction_of_gene_in_53_metacell $(log_decreased_fraction_of_gene_in_53_metacell)"
+                    @debug "TODOX   log_increased_fraction_of_gene_in_53_metacell $(log_increased_fraction_of_gene_in_53_metacell)"
+                    @debug "TODOX   divergence_of_gene_for_distance $(divergence_of_gene_for_distance)"
+                    did_find = true
+                end
+            end
+        end
+    end
+    return did_find
 end
 
 end  # module
