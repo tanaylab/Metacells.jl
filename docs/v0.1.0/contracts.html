@@ -1,0 +1,806 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Contracts · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="Contracts · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Contracts · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Contracts · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li>
+<a class="tocitem" href="index.html">Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Axes">
+<span>Axes
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Vectors">
+<span>Vectors
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Matrices">
+<span>Matrices
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="identify_genes.html">Identify Genes
+</a>
+</li>
+<li>
+<a class="tocitem" href="programs.html">Programs
+</a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="contracts.html">Contracts
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="contracts.html">Contracts
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="Contracts">
+<a class="docs-heading-anchor" href="#Contracts">Contracts
+</a>
+<a id="Contracts-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Contracts" title="Permalink">
+</a>
+</h1>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts" href="#Metacells.Contracts">
+<code>Metacells.Contracts
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+</header>
+<section>
+<div>
+<p>Functions for defining a 
+<code>Contract
+</code> for a metacells 
+<code>Daf
+</code> data set 
+<code>@computation
+</code>. This also serves as a quick vocabulary of the contents of a metacells 
+<code>Daf
+</code> data set.
+</p>
+<p>In the descriptions below, &quot;fold factor&quot; refers to the log base 2 of the ratio between expression levels. For gene RNA expression levels, we typically use a regularization factor of 1e-5; fold factors of 1 (2x) is typically considered to be irrelevant, fold factors of 2 (4x) are considered to be potentially significant, fold factor of 3 (8x) are considered to point to a definite significant difference, etc. When used as thresholds, fold factors are adjusted using confidence levels (based on the number of UMIs used for the estimates) and the 
+<a href="contracts.html#Metacells.Contracts.gene_divergence_vector">
+<code>gene_divergence_vector
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Axes">
+<a class="docs-heading-anchor" href="#Axes">Axes
+</a>
+<a id="Axes-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Axes" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_axis" href="#Metacells.Contracts.gene_axis">
+<code>Metacells.Contracts.gene_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of sequenced genes. By convention we use TODO as the namespace of the genes, but this may be different depending on the data set.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.cell_axis" href="#Metacells.Contracts.cell_axis">
+<code>Metacells.Contracts.cell_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function cell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of sequenced single cells. There&#39;s no convention for cell names, as long as they are unique. Typically some sort of barcode is used, possibly combined with a batch and/or plate and/or experiment identification. In the latter case it is recommended that 
+<code>batch
+</code> and/or 
+<code>plate
+</code> and/or 
+<code>experiment
+</code> would also be created as explicit axes, to allow associating metadata with them instead of repeating it for each cell.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_axis" href="#Metacells.Contracts.metacell_axis">
+<code>Metacells.Contracts.metacell_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function metacell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of metacells, which are minimal-sized groups of cells for robust point estimates. That is, each metacell is considered to be a robustly estimated point in the multi-dimensional manifold of cell states. Metacells may be very similar or very different from each other depending on the data set and the manifold region.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_axis" href="#Metacells.Contracts.block_axis">
+<code>Metacells.Contracts.block_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of blocks, which are distinct groups of metacells with &quot;very close&quot; estimated cell state. That is, for some chosen set of genes, the metacells in each block all have very close estimates of gene expressions (maximal fold factor up to some maximal span). This maximal span is small and identical for all the blocks.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.type_axis" href="#Metacells.Contracts.type_axis">
+<code>Metacells.Contracts.type_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function type_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of types, which are distinct named biological cell states. That is, types are convenient labels manually assigned to large groups of cells, metacells, blocks, neighborhoods, etc. The resolution of the type labels depends on the data set and the type of analysis. In particular, types are not typically associated with a specific biological cell state, but rather with a set of related biological cell states (possibly along a gradient of such states).
+</p>
+</div>
+</section>
+</article>
+<h2 id="Vectors">
+<a class="docs-heading-anchor" href="#Vectors">Vectors
+</a>
+<a id="Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Vectors" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_is_excluded_vector" href="#Metacells.Contracts.gene_is_excluded_vector">
+<code>Metacells.Contracts.gene_is_excluded_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are excluded from consideration. These genes are completely unrelated to the biological behaviors of interest. Not only that, they have strong and variable expression levels; enough to have an global impact on the expression level of the rest of the genes - for example, mitochondrial genes. Such genes make it difficult to estimate the relative expression level of genes between different cell states. Therefore, such genes aren&#39;t even counted in the total UMIs of each cell.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_is_lateral_vector" href="#Metacells.Contracts.gene_is_lateral_vector">
+<code>Metacells.Contracts.gene_is_lateral_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_is_lateral_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are lateral to the biological behaviors of interest. That is, these genes may satisfy all criteria for being in a group of cooperating genes, but the biological behavior they participate in isn&#39;t relevant to the behaviors of interest - for example, genes related to cell cycle or stress. Such genes make it harder to focus on the biological behaviors of interest. They are therefore masked out during the analysis.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_is_marker_vector" href="#Metacells.Contracts.gene_is_marker_vector">
+<code>Metacells.Contracts.gene_is_marker_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_is_marker_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states. That is, these genes have a significant expression level at some cell state, as well as a significant range of expression across all cell states, so can be used to distinguish between cell states. Non-marker genes are by definition not useful for such analysis, but marker genes aren&#39;t necessarily useful due to other considerations.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_is_transcription_factor_vector" href="#Metacells.Contracts.gene_is_transcription_factor_vector">
+<code>Metacells.Contracts.gene_is_transcription_factor_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_is_transcription_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that bind to the DNA. That is, these genes are good candidates for controlling the expression of other genes.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_divergence_vector" href="#Metacells.Contracts.gene_divergence_vector">
+<code>Metacells.Contracts.gene_divergence_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_divergence_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>For each gene, we scale fold factors of each gene by multiplying with (1 - divergence) of the gene. In particular this is used when considering the distance between gene expressions. Therefore genes with a non-zero divergence will require a higher fold factor
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.cell_is_excluded_vector" href="#Metacells.Contracts.cell_is_excluded_vector">
+<code>Metacells.Contracts.cell_is_excluded_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function cell_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of cells that are excluded from consideration. This can be due to any number of reasons - doublets, too low a number of UMIs, to high a percentage of excluded gene UMIs, etc.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_total_UMIs_vector" href="#Metacells.Contracts.metacell_total_UMIs_vector">
+<code>Metacells.Contracts.metacell_total_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of all the genes in each metacell. This is used to estimate the robustness of the estimates.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_block_vector" href="#Metacells.Contracts.metacell_block_vector">
+<code>Metacells.Contracts.metacell_block_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function metacell_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The unique block each metacell belongs to.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_type_vector" href="#Metacells.Contracts.metacell_type_vector">
+<code>Metacells.Contracts.metacell_type_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each metacell belongs to.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.type_color_vector" href="#Metacells.Contracts.type_color_vector">
+<code>Metacells.Contracts.type_color_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function type_color_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A unique color for each type for graphs.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Matrices">
+<a class="docs-heading-anchor" href="#Matrices">Matrices
+</a>
+<a id="Matrices-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Matrices" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_metacell_fraction_matrix" href="#Metacells.Contracts.gene_metacell_fraction_matrix">
+<code>Metacells.Contracts.gene_metacell_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_metacell_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated fraction of the UMIs of each gene in each metacell. We assume that each metacell is a sample of the manifold, representing a real biological state, regardless to its distance to other metacells (subject to cleaning up batch effects, purging doublets, and compensating for any other technical artifacts).
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_metacell_total_UMIs_matrix" href="#Metacells.Contracts.gene_metacell_total_UMIs_matrix">
+<code>Metacells.Contracts.gene_metacell_total_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of each gene in each metacell. This is used to estimate the robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a multinomial sampling distribution).
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_block_distance" href="#Metacells.Contracts.block_block_distance">
+<code>Metacells.Contracts.block_block_distance
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function block_block_distance(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The distance (fold factor) between the most different metacell genes between the blocks. This is the fold factor between the most different gene expression in a pair of metacells, one in each block. This considers only the global predictive genes.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h2>
+<ul>
+<li>
+<a href="contracts.html#Metacells.Contracts">
+<code>Metacells.Contracts
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>Metacells.Contracts.block_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_block_distance">
+<code>Metacells.Contracts.block_block_distance
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_axis">
+<code>Metacells.Contracts.cell_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_is_excluded_vector">
+<code>Metacells.Contracts.cell_is_excluded_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_axis">
+<code>Metacells.Contracts.gene_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_divergence_vector">
+<code>Metacells.Contracts.gene_divergence_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_is_excluded_vector">
+<code>Metacells.Contracts.gene_is_excluded_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_is_lateral_vector">
+<code>Metacells.Contracts.gene_is_lateral_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_is_marker_vector">
+<code>Metacells.Contracts.gene_is_marker_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_is_transcription_factor_vector">
+<code>Metacells.Contracts.gene_is_transcription_factor_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_metacell_fraction_matrix">
+<code>Metacells.Contracts.gene_metacell_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_metacell_total_UMIs_matrix">
+<code>Metacells.Contracts.gene_metacell_total_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_axis">
+<code>Metacells.Contracts.metacell_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_block_vector">
+<code>Metacells.Contracts.metacell_block_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_total_UMIs_vector">
+<code>Metacells.Contracts.metacell_total_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_type_vector">
+<code>Metacells.Contracts.metacell_type_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.type_axis">
+<code>Metacells.Contracts.type_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.type_color_vector">
+<code>Metacells.Contracts.type_color_vector
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-prevpage" href="gmara.html">« Gmara
+</a>
+<a class="docs-footer-nextpage" href="identify_genes.html">Identify Genes »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.5.0. Using Julia version 1.10.4.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

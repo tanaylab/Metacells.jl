@@ -16,8 +16,8 @@ global_logger(detect_problems)
 
 push!(LOAD_PATH, ".")
 
-using JET
 using Metacells
+using JET
 
 println(report_package("Metacells"))
 
