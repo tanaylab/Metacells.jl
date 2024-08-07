@@ -11,10 +11,11 @@ levels (based on the number of UMIs used for the estimates) and the [`gene_diver
 module Contracts
 
 export block_axis
-export block_block_distance
+export block_block_distance_matrix
 export cell_axis
 export gene_axis
 export gene_divergence_vector
+export gene_is_global_predictive_factor_vector
 export gene_is_lateral_vector
 export gene_is_marker_vector
 export gene_is_transcription_factor_vector
@@ -146,6 +147,17 @@ function gene_is_transcription_factor_vector(expectation::ContractExpectation)::
 end
 
 """
+    function gene_is_global_predictive_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+A mask of globally predictive transcription factors. That is, knowing the values of all these genes allows us to predict the
+values of the rest of the genes (but not as well as when using the locally predictive transcription factors).
+"""
+function gene_is_global_predictive_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("gene", "is_global_predictive_factor") =>
+        (expectation, Bool, "A mask of globally predictive transcription factors.")
+end
+
+"""
     function cell_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 
 A mask of cells that are excluded from consideration. This can be due to any number of reasons - doublets, too
@@ -226,13 +238,13 @@ function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair
 end
 
 """
-    function block_block_distance(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The distance (fold factor) between the most different metacell genes between the blocks. This is the fold factor between
 the most different gene expression in a pair of metacells, one in each block. This considers only the global predictive
 genes.
 """
-function block_block_distance(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("block", "block", "distance") => (
         expectation,
         StorageFloat,

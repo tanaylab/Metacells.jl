@@ -21,6 +21,7 @@ Metacells.Contracts.gene_is_excluded_vector
 Metacells.Contracts.gene_is_lateral_vector
 Metacells.Contracts.gene_is_marker_vector
 Metacells.Contracts.gene_is_transcription_factor_vector
+Metacells.Contracts.gene_is_global_predictive_factor_vector
 Metacells.Contracts.gene_divergence_vector
 Metacells.Contracts.cell_is_excluded_vector
 Metacells.Contracts.metacell_total_UMIs_vector
