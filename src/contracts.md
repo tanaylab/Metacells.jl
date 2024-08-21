@@ -21,6 +21,8 @@ Metacells.Contracts.gene_is_excluded_vector
 Metacells.Contracts.gene_is_lateral_vector
 Metacells.Contracts.gene_is_marker_vector
 Metacells.Contracts.gene_is_transcription_factor_vector
+Metacells.Contracts.gene_factor_priority_vector
+Metacells.Contracts.gene_is_forbidden_factor_vector
 Metacells.Contracts.gene_is_global_predictive_factor_vector
 Metacells.Contracts.gene_divergence_vector
 Metacells.Contracts.cell_is_excluded_vector
@@ -35,7 +37,10 @@ Metacells.Contracts.type_color_vector
 ```@docs
 Metacells.Contracts.gene_metacell_fraction_matrix
 Metacells.Contracts.gene_metacell_total_UMIs_matrix
-Metacells.Contracts.block_block_distance
+Metacells.Contracts.block_block_distance_matrix
+Metacells.Contracts.block_block_is_in_neighborhood_matrix
+Metacells.Contracts.block_block_is_in_environment_matrix
+Metacells.Contracts.gene_block_is_local_predictive_factor_matrix
 ```
 
 ## Index

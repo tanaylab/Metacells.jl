@@ -29,7 +29,7 @@ import Metacells.Contracts.metacell_axis
     function identify_marker_genes!(
         daf::DafWriter;
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
-        min_marker_gene_range_fold::AbstractFloat = $(DEFAULT.min_marker_gene_range_fold),
+        min_marker_gene_range_fold::Real = $(DEFAULT.min_marker_gene_range_fold),
         min_marker_gene_max_fraction::AbstractFloat = $(DEFAULT.min_marker_gene_max_fraction),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
@@ -55,7 +55,7 @@ $(CONTRACT)
 ) function identify_marker_genes!(  # untested
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-    min_marker_gene_range_fold::AbstractFloat = 2.0,
+    min_marker_gene_range_fold::Real = 2,
     min_marker_gene_max_fraction::AbstractFloat = 1e-4,
     overwrite::Bool = false,
 )::Nothing
@@ -84,7 +84,7 @@ end
     function compute_genes_divergence!(
         daf::DafWriter;
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
-        min_divergent_gene_range_fold::AbstractFloat = $(DEFAULT.min_divergent_gene_range_fold),
+        min_divergent_gene_range_fold::Real = $(DEFAULT.min_divergent_gene_range_fold),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
@@ -112,7 +112,7 @@ $(CONTRACT)
 ) function compute_genes_divergence!(  # untested
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-    min_divergent_gene_range_fold::AbstractFloat = 6.0,
+    min_divergent_gene_range_fold::Real = 6,
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization >= 0

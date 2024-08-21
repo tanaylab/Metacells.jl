@@ -12,9 +12,14 @@ module Contracts
 
 export block_axis
 export block_block_distance_matrix
+export block_block_is_in_environment_matrix
+export block_block_is_in_neighborhood_matrix
 export cell_axis
 export gene_axis
+export gene_block_is_local_predictive_factor_matrix
 export gene_divergence_vector
+export gene_factor_priority_vector
+export gene_is_forbidden_factor_vector
 export gene_is_global_predictive_factor_vector
 export gene_is_lateral_vector
 export gene_is_marker_vector
@@ -70,7 +75,7 @@ The axis of blocks, which are distinct groups of metacells with "very close" est
 chosen set of genes, the metacells in each block all have very close estimates of gene expressions (maximal fold
 factor up to some maximal span). This maximal span is small and identical for all the blocks.
 """
-function block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
+function block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
     return "block" => (expectation, "Distinct groups of metacells with \"very close\" estimated cell state.")
 end
 
@@ -142,8 +147,31 @@ end
 A mask of genes that bind to the DNA. That is, these genes are good candidates for controlling the expression of other
 genes.
 """
-function gene_is_transcription_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+function gene_is_transcription_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("gene", "is_transcription_factor") => (expectation, Bool, "A mask of genes that bind to the DNA.")
+end
+
+"""
+    function gene_is_forbidden_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+A mask of genes that are forbidden from being used as predictive factors. That is, when searching for a set of
+transcription factors that predict the expression of the rest of the genes, we do not consider the forbidden genes.
+"""
+function gene_is_forbidden_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("gene", "is_forbidden_factor") =>
+        (expectation, Bool, "A mask of genes that are forbidden from being used as predictive factors.")
+end
+
+"""
+    function gene_factor_priority_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+For each gene, a priority value for using it as a predictor for the rest of the genes; the higher the priority, the more
+likely it is this gene will be useful as a predictor. Zero priority is for genes not even considered (not transcription
+factors, or factors that don't have sufficient predictive value).
+"""
+function gene_factor_priority_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("gene", "factor_priority") =>
+        (expectation, StorageUnsigned, "Priority for using the gene as a predictor for the rest of the genes.")
 end
 
 """
@@ -152,7 +180,7 @@ end
 A mask of globally predictive transcription factors. That is, knowing the values of all these genes allows us to predict the
 values of the rest of the genes (but not as well as when using the locally predictive transcription factors).
 """
-function gene_is_global_predictive_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+function gene_is_global_predictive_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("gene", "is_global_predictive_factor") =>
         (expectation, Bool, "A mask of globally predictive transcription factors.")
 end
@@ -174,7 +202,7 @@ end
 The total number of UMIs used to estimate the fraction of all the genes in each metacell. This is used to estimate
 the robustness of the estimates.
 """
-function metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+function metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("metacell", "total_UMIs") => (
         expectation,
         StorageUnsigned,
@@ -196,7 +224,7 @@ end
 
 The unique block each metacell belongs to.
 """
-function metacell_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+function metacell_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("metacell", "block") => (expectation, AbstractString, "The unique block each metacell belongs to.")
 end
 
@@ -229,7 +257,7 @@ robustness of the estimate. When computing fold factors, we require the total nu
 estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a
 multinomial sampling distribution).
 """
-function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "total_UMIs") => (
         expectation,
         StorageUnsigned,
@@ -240,16 +268,52 @@ end
 """
     function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
-The distance (fold factor) between the most different metacell genes between the blocks. This is the fold factor between
-the most different gene expression in a pair of metacells, one in each block. This considers only the global predictive
-genes.
+The mean distance (maximal fold factor of any gene) between the metacells of the blocks. This is the mean fold factor
+between the most different gene expression in all pairs of metacells, one in each block. This considers only the global
+predictive genes.
 """
-function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("block", "block", "distance") => (
         expectation,
         StorageFloat,
-        "The distance (fold factor) between the most different metacell genes between the blocks.",
+        "The mean distance (maximal fold factor of any gene) between the metacells of the blocks.",
     )
+end
+
+"""
+    function block_block_is_in_environment_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+For each block, the mask of nearby blocks in its linear environment. That is, we expect the genes in the metacells in
+the blocks of the environment to reasonably fit a linear model (of the log of the expression).
+"""
+function block_block_is_in_environment_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    return ("block", "block", "is_in_environment") =>
+        (expectation, Bool, "For each block, the mask of nearby blocks in its linear environment.")
+end
+
+"""
+    function block_block_is_in_neighborhood_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+For each block, the mask of nearby blocks in its immediate neighborhood. The neighborhood consists of a small number of
+very close blocks, which we use as the basis for evaluating linear approximations (of the log of the expression of the
+genes).
+"""
+function block_block_is_in_neighborhood_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    return ("block", "block", "is_in_neighborhood") =>
+        (expectation, Bool, "For each block, the mask of nearby blocks in its immediate neighborhood.")
+end
+
+"""
+    function gene_block_is_local_predictive_factor_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+A mask of the predictive factors in each block. That is, for each gene in each block, whether the gene is a
+transcription factor that can be used to predict the values of the rest of the genes in the metacells of the block.
+"""
+function gene_block_is_local_predictive_factor_matrix(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "block", "is_local_predictive_factor") =>
+        (expectation, Bool, "A mask of the predictive factors in each block.")
 end
 
 end  # module
