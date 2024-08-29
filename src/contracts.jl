@@ -14,9 +14,12 @@ export block_axis
 export block_block_distance_matrix
 export block_block_is_in_environment_matrix
 export block_block_is_in_neighborhood_matrix
+export block_total_UMIs_vector
 export cell_axis
 export gene_axis
+export gene_block_fraction_matrix
 export gene_block_is_local_predictive_factor_matrix
+export gene_block_total_UMIs_matrix
 export gene_divergence_vector
 export gene_factor_priority_vector
 export gene_is_forbidden_factor_vector
@@ -211,6 +214,20 @@ function metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{Vect
 end
 
 """
+    function block_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The total number of UMIs used to estimate the fraction of all the genes in each block. This is used to estimate
+the robustness of the estimates.
+"""
+function block_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("block", "total_UMIs") => (
+        expectation,
+        StorageUnsigned,
+        "The total number of UMIs used to estimate the fraction of all the genes in each block.",
+    )
+end
+
+"""
     function metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 
 The type each metacell belongs to.
@@ -266,6 +283,22 @@ function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair
 end
 
 """
+    function gene_block_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The total number of UMIs used to estimate the fraction of each gene in each block. This is used to estimate the
+robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared
+estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a
+multinomial sampling distribution).
+"""
+function gene_block_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "block", "total_UMIs") => (
+        expectation,
+        StorageUnsigned,
+        "The total number of UMIs used to estimate the fraction of each gene in each block.",
+    )
+end
+
+"""
     function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The mean distance (maximal fold factor of any gene) between the metacells of the blocks. This is the mean fold factor
@@ -314,6 +347,18 @@ function gene_block_is_local_predictive_factor_matrix(
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "block", "is_local_predictive_factor") =>
         (expectation, Bool, "A mask of the predictive factors in each block.")
+end
+
+"""
+    function gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The estimated fraction of the UMIs of each gene in each block. This assumes the metacells in each block are samples of
+the "same" biological state, based on the fact that all these metacells have very similar expression levels for all
+the global predictive transcription factors.
+"""
+function gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "block", "fraction") =>
+        (expectation, StorageFloat, "The estimated fraction of the UMIs of each gene in each block.")
 end
 
 end  # module
