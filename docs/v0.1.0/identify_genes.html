@@ -152,6 +152,8 @@
 </a> — 
 <span class="docstring-category">Module
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -169,6 +171,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -257,6 +261,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -341,6 +347,93 @@
 </div>
 </section>
 </article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.IdentifyGenes.identify_correlated_genes!" href="#Metacells.IdentifyGenes.identify_correlated_genes!">
+<code>Metacells.IdentifyGenes.identify_correlated_genes!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function identify_correlated_genes!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = 1.0e-5,
+    correlation_confidence::AbstractFloat = 0.99,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Identify genes that are correlated with other gene(s). Such genes are good candidates for looking for groups of genes that act together. If 
+<code>overwrite
+</code>, will overwrite an existing 
+<code>is_correlated
+</code> mask.
+</p>
+<ol>
+<li>Compute the log base 2 of the genes expression in each metacell (using the 
+<code>gene_fraction_regularization
+</code>).
+</li>
+<li>Correlate this between all the pairs of genes.
+</li>
+<li>For each gene, shuffle its values along all metacells, and again correlate this between all the pairs of genes.
+</li>
+<li>Find the maximal absolute correlation for each gene in both cases (that is, strong anti-correlation also counts).
+</li>
+<li>Find the 
+<code>correlation_confidence
+</code> quantile correlation of the shuffled data.
+</li>
+<li>Identify the genes that have at least that level of correlations in the unshuffled data.
+</li>
+</ol>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ fraction
+</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_correlated
+</strong>::Bool (guaranteed): A mask of genes that are correlated with other gene(s).
+</p>
+</div>
+</section>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -359,6 +452,12 @@
 <li>
 <a href="identify_genes.html#Metacells.IdentifyGenes.compute_genes_divergence!">
 <code>Metacells.IdentifyGenes.compute_genes_divergence!
+</code>
+</a>
+</li>
+<li>
+<a href="identify_genes.html#Metacells.IdentifyGenes.identify_correlated_genes!">
+<code>Metacells.IdentifyGenes.identify_correlated_genes!
 </code>
 </a>
 </li>
@@ -421,7 +520,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.5.0. Using Julia version 1.10.4.
+</a> version 1.7.0. Using Julia version 1.10.5.
 </p>
 </section>
 <footer class="modal-card-foot">

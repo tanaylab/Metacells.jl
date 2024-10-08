@@ -1,7 +1,7 @@
 """
 Import and export `metacells` data from/to `h5ad` files. This allows moving data between the old Python/C++ based
-[AnnData](https://github.com/scverse/anndata) world and the new Julia based [Daf](https://github.com/tanaylab/Daf.jl)
-world.
+[AnnData](https://github.com/scverse/anndata) world and the new Julia based
+[Daf](https://github.com/tanaylab/DataAxesFormats.jl) world.
 """
 module AnnDataFormat
 
@@ -9,9 +9,9 @@ export import_h5ads!
 export CopyAnnData
 
 using CSV
-using Daf
-using Daf.GenericLogging
-using Daf.GenericTypes
+using DataAxesFormats
+using DataAxesFormats.GenericLogging
+using DataAxesFormats.GenericTypes
 using DataFrames
 using SparseArrays
 

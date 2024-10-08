@@ -170,6 +170,8 @@
 </a> — 
 <span class="docstring-category">Module
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -210,6 +212,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -231,6 +235,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -260,6 +266,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -282,6 +290,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -303,6 +313,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -334,6 +346,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -355,6 +369,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -378,6 +394,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -394,11 +412,37 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_is_correlated_vector" href="#Metacells.Contracts.gene_is_correlated_vector">
+<code>Metacells.Contracts.gene_is_correlated_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_is_correlated_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are correlated with other gene(s). We typically search for groups of genes that act together. Genes that have no correlation with other genes aren&#39;t useful for this sort of analysis, even if they are marker genes.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
 <a class="docstring-binding" id="Metacells.Contracts.gene_is_transcription_factor_vector" href="#Metacells.Contracts.gene_is_transcription_factor_vector">
 <code>Metacells.Contracts.gene_is_transcription_factor_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -416,33 +460,13 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.gene_factor_priority_vector" href="#Metacells.Contracts.gene_factor_priority_vector">
-<code>Metacells.Contracts.gene_factor_priority_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">function gene_factor_priority_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>For each gene, a priority value for using it as a predictor for the rest of the genes; the higher the priority, the more likely it is this gene will be useful as a predictor. Zero priority is for genes not even considered (not transcription factors, or factors that don&#39;t have sufficient predictive value).
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
 <a class="docstring-binding" id="Metacells.Contracts.gene_is_forbidden_factor_vector" href="#Metacells.Contracts.gene_is_forbidden_factor_vector">
 <code>Metacells.Contracts.gene_is_forbidden_factor_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -460,33 +484,13 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.gene_is_global_predictive_factor_vector" href="#Metacells.Contracts.gene_is_global_predictive_factor_vector">
-<code>Metacells.Contracts.gene_is_global_predictive_factor_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">function gene_is_global_predictive_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>A mask of globally predictive transcription factors. That is, knowing the values of all these genes allows us to predict the values of the rest of the genes (but not as well as when using the locally predictive transcription factors).
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
 <a class="docstring-binding" id="Metacells.Contracts.gene_divergence_vector" href="#Metacells.Contracts.gene_divergence_vector">
 <code>Metacells.Contracts.gene_divergence_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -510,6 +514,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -531,6 +537,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -554,6 +562,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -575,6 +585,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -598,6 +610,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -606,6 +620,54 @@
 </code>
 </pre>
 <p>A unique color for each type for graphs.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_total_UMIs_vector" href="#Metacells.Contracts.block_total_UMIs_vector">
+<code>Metacells.Contracts.block_total_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function block_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of all the genes in each block. This is used to estimate the robustness of the estimates.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_metacells_vector" href="#Metacells.Contracts.block_metacells_vector">
+<code>Metacells.Contracts.block_metacells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function block_metacells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of metacells included in each block.
 </p>
 </div>
 </section>
@@ -627,6 +689,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -650,6 +714,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -666,20 +732,46 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.block_block_distance_matrix" href="#Metacells.Contracts.block_block_distance_matrix">
-<code>Metacells.Contracts.block_block_distance_matrix
+<a class="docstring-binding" id="Metacells.Contracts.gene_block_fraction_matrix" href="#Metacells.Contracts.gene_block_fraction_matrix">
+<code>Metacells.Contracts.gene_block_fraction_matrix
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+<code class="language-julia hljs">function gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The mean distance (maximal fold factor of any gene) between the metacells of the blocks. This is the mean fold factor between the most different gene expression in all pairs of metacells, one in each block. This considers only the global predictive genes.
+<p>The estimated fraction of the UMIs of each gene in each block. This assumes the metacells in each block are samples of the &quot;same&quot; biological state, based on the fact that all these metacells have very similar expression levels for all the global predictive transcription factors.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_block_total_UMIs_matrix" href="#Metacells.Contracts.gene_block_total_UMIs_matrix">
+<code>Metacells.Contracts.gene_block_total_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function gene_block_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of each gene in each block. This is used to estimate the robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a multinomial sampling distribution).
 </p>
 </div>
 </section>
@@ -693,6 +785,8 @@
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
@@ -716,6 +810,8 @@
 </a> — 
 <span class="docstring-category">Function
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -724,28 +820,6 @@
 </code>
 </pre>
 <p>For each block, the mask of nearby blocks in its linear environment. That is, we expect the genes in the metacells in the blocks of the environment to reasonably fit a linear model (of the log of the expression).
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.gene_block_is_local_predictive_factor_matrix" href="#Metacells.Contracts.gene_block_is_local_predictive_factor_matrix">
-<code>Metacells.Contracts.gene_block_is_local_predictive_factor_matrix
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">function gene_block_is_local_predictive_factor_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>A mask of the predictive factors in each block. That is, for each gene in each block, whether the gene is a transcription factor that can be used to predict the values of the rest of the genes in the metacells of the block.
 </p>
 </div>
 </section>
@@ -772,12 +846,6 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.block_block_distance_matrix">
-<code>Metacells.Contracts.block_block_distance_matrix
-</code>
-</a>
-</li>
-<li>
 <a href="contracts.html#Metacells.Contracts.block_block_is_in_environment_matrix">
 <code>Metacells.Contracts.block_block_is_in_environment_matrix
 </code>
@@ -786,6 +854,18 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.block_block_is_in_neighborhood_matrix">
 <code>Metacells.Contracts.block_block_is_in_neighborhood_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_metacells_vector">
+<code>Metacells.Contracts.block_metacells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_total_UMIs_vector">
+<code>Metacells.Contracts.block_total_UMIs_vector
 </code>
 </a>
 </li>
@@ -808,8 +888,14 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.gene_block_is_local_predictive_factor_matrix">
-<code>Metacells.Contracts.gene_block_is_local_predictive_factor_matrix
+<a href="contracts.html#Metacells.Contracts.gene_block_fraction_matrix">
+<code>Metacells.Contracts.gene_block_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_block_total_UMIs_matrix">
+<code>Metacells.Contracts.gene_block_total_UMIs_matrix
 </code>
 </a>
 </li>
@@ -820,8 +906,8 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.gene_factor_priority_vector">
-<code>Metacells.Contracts.gene_factor_priority_vector
+<a href="contracts.html#Metacells.Contracts.gene_is_correlated_vector">
+<code>Metacells.Contracts.gene_is_correlated_vector
 </code>
 </a>
 </li>
@@ -834,12 +920,6 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.gene_is_forbidden_factor_vector">
 <code>Metacells.Contracts.gene_is_forbidden_factor_vector
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.gene_is_global_predictive_factor_vector">
-<code>Metacells.Contracts.gene_is_global_predictive_factor_vector
 </code>
 </a>
 </li>
@@ -962,7 +1042,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.5.0. Using Julia version 1.10.4.
+</a> version 1.7.0. Using Julia version 1.10.5.
 </p>
 </section>
 <footer class="modal-card-foot">

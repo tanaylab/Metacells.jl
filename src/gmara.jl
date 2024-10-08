@@ -15,8 +15,8 @@ export normalize_gene_name
 export set_gmara_genes_mask!
 
 using ConcurrentUtils
-using Daf
-using Daf.GenericTypes
+using DataAxesFormats
+using DataAxesFormats.GenericTypes
 using GZip
 using HTTP
 using Serialization
@@ -180,7 +180,7 @@ function ensure_is_downloaded(
     end
 
     response =
-        HTTP.request("GET", url, headers; canonicalize_headers = true, status_exception = false, decompress = false)
+        HTTP.request("GET", url, headers; canonicalize_headers = true, status_exception = false, decompress = false)  # NOLINT
 
     if response.status == 304
         return false

@@ -7,9 +7,9 @@ export compute_genes_divergence!
 export identify_correlated_genes!
 export identify_marker_genes!
 
-using Daf
-using Daf.GenericLogging
-using Daf.GenericTypes
+using DataAxesFormats
+using DataAxesFormats.GenericLogging
+using DataAxesFormats.GenericTypes
 using LinearAlgebra
 using Random
 using Statistics
@@ -22,6 +22,7 @@ import Random.default_rng
 # Needed because of JET:
 import Metacells.Contracts.gene_axis
 import Metacells.Contracts.gene_divergence_vector
+import Metacells.Contracts.gene_is_correlated_vector
 import Metacells.Contracts.gene_is_marker_vector
 import Metacells.Contracts.gene_metacell_fraction_matrix
 import Metacells.Contracts.metacell_axis

@@ -152,6 +152,8 @@
 </a> — 
 <span class="docstring-category">Module
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -164,31 +166,68 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Programs.compute_factor_priority_of_genes!" href="#Metacells.Programs.compute_factor_priority_of_genes!">
-<code>Metacells.Programs.compute_factor_priority_of_genes!
+<a class="docstring-binding" id="Metacells.Programs.compute_blocks!" href="#Metacells.Programs.compute_blocks!">
+<code>Metacells.Programs.compute_blocks!
 </code>
 </a> — 
 <span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function compute_factor_priority_of_genes!(
+<code class="language-julia hljs">function compute_blocks!(
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = 2.0e-5,
-    max_principal_components::Integer = 40,
-    factors_per_principal_component::Real = 2,
+    min_significant_gene_UMIs::Integer = 40,
+    fold_confidence::AbstractFloat = 0.9,
+    max_block_span::Real = 1,
+    max_principal_components = 40,
+    min_blocks_in_neighborhood::Integer = 4,
+    min_metacells_in_neighborhood::Integer = 50,
+    min_blocks_in_approximate_environment::Integer = 20,
+    min_metacells_in_approximate_environment::Integer = 500,
+    cross_validation_parts::Integer = 5,
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = false,
 )::Nothing
 </code>
 </pre>
-<p>Given the transcription factors in the data, identify an ordered subset of these to use as candidates for predicting the rest of the genes. To achieve this, we run PCA analysis with up to 
-<code>max_principal_components
-</code> on the log (base 2) of the gene expressions (using the 
+<p>Group the metacells into blocks where the metacells in each one are &quot;similar&quot; in all the transcription factors. That is, each block is an approximation of a single cell state, assuming the transcription factors control the expression of the rest of the genes. Then, group these blocks into overlapping small tight neighborhoods, and larger environments, such that each block&#39;s environment can be reasonably approximated using a linear model (which is not computed), evaluated using cross-validation on the RMSE in the neighborhood at its core.
+</p>
+<p>First, we compute metacell-metacell distances based on the maximal fold factor between 
+<code>is_transcription_factor
+</code> genes, which aren&#39;t 
+<code>is_forbidden_factor
+</code>. The fold factor is log (base 2) of the gene expression using the 
 <code>gene_fraction_regularization
-</code>). We then rank each gene in each principal component (based on the absolute coefficient value) and compute the minimal rank of each gene (giving lower weight to genes in later components). We prioritize the transcription factors according to this minimal rank, choosing the top 
-<code>factors_per_principal_component
-</code> times the number of principal components.
+</code>. For computing this fold factor, we ignore genes whose total UMIs in the compared metacells isn&#39;t at least 
+<code>min_significant_gene_UMIs
+</code>. We also we reduce the distance using the 
+<code>fold_confidence
+</code> based on the number of UMIs used to estimate the expression in the metacells, and the 
+<code>divergence
+</code> of the gene. Two metacells can only belong to the same block if the final fold factor is at most 
+<code>max_block_span
+</code> in all the genes.
+</p>
+<p>We then compute block-block distance which is the mean distance between the metacells of the blocks. Using this distances, we define a tight neighborhood of each block containing at least 
+<code>min_blocks_in_neighborhood
+</code> and 
+<code>min_metacells_in_neighborhood
+</code>. We also compute an approximate environment of at least 
+<code>min_blocks_in_approximate_environment
+</code> and 
+<code>min_metacells_in_approximate_environment
+</code>. Using this approximate environment, we compute 
+<code>max_principal_components
+</code> for the transcription factor genes, and figure out how many of them are useful to predict the value of the rest of the genes using 
+<code>cross_validation_parts
+</code> minimizing the RMSE in the neighborhood.
+</p>
+<p>Having determined the dimensionality of the environment of the block, we search for the optimal environment such that the RMSE of the cross validation of a linear model with this humber of principal components (computed on the transcription factor genes) for predicting the value of the rest of the genes.
 </p>
 <p>
 <strong>Inputs
@@ -209,6 +248,10 @@
 <p>
 <strong>Vectors
 </strong>
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of all the genes in each metacell.
 </p>
 <p>
 <strong>gene @ divergence
@@ -235,189 +278,10 @@
 </strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
-<strong>Outputs
-</strong>
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>gene @ factor_priority
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): Priority for using the gene as a predictor for the rest of the genes.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Programs.compute_global_predictive_factors!" href="#Metacells.Programs.compute_global_predictive_factors!">
-<code>Metacells.Programs.compute_global_predictive_factors!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">function compute_global_predictive_factors!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = 2.0e-5,
-    cross_validation::Integer = 5,
-    rng::AbstractRNG = default_rng(),
-)::Nothing
-</code>
-</pre>
-<p>Given a prioritized subset of the factor genes likely to be predictive, identify a subset of these genes which best predict the values of the rest of the genes, using non-negative least-squares approximation using the log (base 2) of the genes expression (using the 
-<code>gene_fraction_regularization
-</code>). To avoid over-fitting, we use 
-<code>cross_validation
-</code>.
-</p>
-<p>We require each additional used factor to improve (reduce) the RMS of the cross validation error by at least 
-<code>min_rms_improvement
-</code> (on average). Factors with higher prioriry are allowed a lower improvement and factors with a lower priority require higher improvement; the range of this is 
-<code>rms_priority_improvement
-</code> times the 
-<code>min_rms_improvement
-</code>. That is, if this range is 1, then the highest priority factor requires 0.5 times the minimal improvement, and the lowest priority factor requires 1.5 times the minimal improvement.
-</p>
-<p>Since this prediction is global for the whole data set, we do not expect it to be useful as of itself. We therefore intentionally do not store the coefficients. Instead we only store the mask of chosen predictive factors.
-</p>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>gene
-</strong> (required): Sequenced genes.
-</p>
-<p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>gene @ divergence
-</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
-</p>
-<p>
-<strong>gene @ factor_priority
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): Priority for using the gene as a predictor for the rest of the genes.
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
-<strong>gene, metacell @ fraction
-</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
-</p>
-<p>
-<strong>Outputs
-</strong>
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>gene @ is
-<em>global
-</em>predictive_factor
-</strong>::Bool (guaranteed): A mask of globally predictive transcription factors.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Programs.compute_blocks!" href="#Metacells.Programs.compute_blocks!">
-<code>Metacells.Programs.compute_blocks!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">function compute_blocks!(
-    daf::DafWriter;
-    min_significant_gene_UMIs::Integer = 40,
-    gene_fraction_regularization::AbstractFloat = 2.0e-5,
-    fold_confidence::AbstractFloat = 0.9,
-    max_block_span::Real = 2,
-)::Nothing
-</code>
-</pre>
-<p>Given a set of transcription factors that can be used to predict the rest of the genes across the whole manifold, group the metacells into distinct blocks, such that within each block, the expression level of all these factors differ by a fold factor of more than 
-<code>max_block_span
-</code> between any of the metacells of the block. When evaluating the difference in expression between the genes, we reduce the distance using the 
-<code>fold_confidence
-</code> based on the number of UMIs used to estimate the expression in the metacells; we also ignore any difference between the expression level of genes whose total UMIs (in both compared metacells) is less thabn 
-<code>min_significant_gene_UMIs
-</code>.
-</p>
-<p>We expect all the metacells within each block to be &quot;essentially identical&quot;, so blocks serve as a useful way to group metacells together for the purpose of type annotations. We also assume that the same local linear program applies for all metacells of each block. The distance matrix between the blocks expresses the overall structure of the manifold.
-</p>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>gene
-</strong> (required): Sequenced genes.
-</p>
-<p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>gene @ divergence
-</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
-</p>
-<p>
-<strong>gene @ is
-<em>global
-</em>predictive_factor
-</strong>::Bool (required): A mask of globally predictive transcription factors.
-</p>
-<p>
-<strong>metacell @ total_UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of all the genes in each metacell.
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
-<strong>gene, metacell @ fraction
-</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
-</p>
-<p>
 <strong>gene, metacell @ total_UMIs
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>Additional inputs may be used depending on the parameter(s).
 </p>
 <p>
 <strong>Outputs
@@ -444,108 +308,6 @@
 </strong>
 </p>
 <p>
-<strong>block, block @ distance
-</strong>::Union{Float32, Float64} (guaranteed): The mean distance (maximal fold factor of any gene) between the metacells of the blocks.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Programs.compute_blocks_vicinities!" href="#Metacells.Programs.compute_blocks_vicinities!">
-<code>Metacells.Programs.compute_blocks_vicinities!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">function compute_blocks_vicinities!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = 2.0e-5,
-    min_rms_improvement::AbstractFloat = 0.02,
-    rms_priority_improvement::Real = 1,
-    block_rms_bonus::AbstractFloat = 0.0005,
-    cross_validation::Integer = 5,
-    min_blocks_in_neighborhood::Integer = 4,
-    min_metacells_in_neighborhood::Integer = 100,
-    rng::AbstractRNG = default_rng(),
-)::Nothing
-</code>
-</pre>
-<p>Given a partition of the metacells into distinct blocks, compute for each block its immediate neighborhood (of at least 
-<code>min_blocks_in_neighborhood
-</code> blocks and at least 
-<code>min_metacells_in_neighborhood
-</code> metacells). Then expact this to an environment such that computing a linear model for the environment (based on the precomputed set of global predictive genes) minimizes the RMS of the error in the neighborhood.
-</p>
-<p>The motivation is that the small neighborhood is large enough to evaluate the linear model, but is too small by itself for detecting the linear model. Expanding the neighborhood to a larger environment allows us to detect weak linear programs that exist in the neighborhood, therefore reducing the RMS. Since the manifold is not linear, expanding the environment beyond a certain point starts to increase the RMS again. We give a slight bonus of 
-<code>block_rms_bonus
-</code> for per each block added to the environment to reduce the chances of stopping in a local minimum.
-</p>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>gene
-</strong> (required): Sequenced genes.
-</p>
-<p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
-</p>
-<p>
-<strong>block
-</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>gene @ divergence
-</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
-</p>
-<p>
-<strong>gene @ is
-<em>global
-</em>predictive_factor
-</strong>::Bool (required): A mask of globally predictive transcription factors.
-</p>
-<p>
-<strong>metacell @ block
-</strong>::AbstractString (required): The unique block each metacell belongs to.
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
-<strong>gene, metacell @ fraction
-</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
-</p>
-<p>
-<strong>block, block @ distance
-</strong>::Union{Float32, Float64} (required): The mean distance (maximal fold factor of any gene) between the metacells of the blocks.
-</p>
-<p>
-<strong>Outputs
-</strong>
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
 <strong>block, block @ is
 <em>in
 </em>neighborhood
@@ -557,46 +319,7 @@
 </em>environment
 </strong>::Bool (guaranteed): For each block, the mask of nearby blocks in its linear environment.
 </p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Programs.compute_local_predictive_factors!" href="#Metacells.Programs.compute_local_predictive_factors!">
-<code>Metacells.Programs.compute_local_predictive_factors!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">function compute_local_predictive_factors!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = 2.0e-5,
-    min_rms_improvement::AbstractFloat = 0.02,
-    rms_priority_improvement::Real = 1,
-    cross_validation::Integer = 5,
-    min_marker_gene_range_fold::Real = 1,
-    min_marker_gene_max_fraction::AbstractFloat = 0.0001,
-    rng::AbstractRNG = default_rng(),
-)::Nothing
-</code>
-</pre>
-<p>Having computed the neighborhoods and environments, then for each block, figure out the set of transcription factors for best approximating the gene expression of the metacells in each neighborhood based on the environment. This set of local predictive factors will be different from the set of global predictive factors (and will be different for each block).
-</p>
-<p>When computing this set, we only consider the genes that are marker genes within the environment (as per 
-<a href="identify_genes.html#Metacells.IdentifyGenes.identify_marker_genes!">
-<code>identify_marker_genes!
-</code>
-</a>, using 
-<code>min_marker_gene_max_fraction
-</code> and a tighter 
-<code>min_marker_gene_range_fold
-</code>.
+<p>Additional outputs may be created depending on the parameter(s).
 </p>
 </div>
 </section>
@@ -619,30 +342,6 @@
 <li>
 <a href="programs.html#Metacells.Programs.compute_blocks!">
 <code>Metacells.Programs.compute_blocks!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_blocks_vicinities!">
-<code>Metacells.Programs.compute_blocks_vicinities!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_factor_priority_of_genes!">
-<code>Metacells.Programs.compute_factor_priority_of_genes!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_global_predictive_factors!">
-<code>Metacells.Programs.compute_global_predictive_factors!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_local_predictive_factors!">
-<code>Metacells.Programs.compute_local_predictive_factors!
 </code>
 </a>
 </li>
@@ -699,7 +398,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.5.0. Using Julia version 1.10.4.
+</a> version 1.7.0. Using Julia version 1.10.5.
 </p>
 </section>
 <footer class="modal-card-foot">

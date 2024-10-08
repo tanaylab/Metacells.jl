@@ -152,6 +152,8 @@
 </a> — 
 <span class="docstring-category">Module
 </span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
 </header>
 <section>
 <div>
@@ -160,7 +162,7 @@
 </code> package provides computational services for the 
 <a href="https://github.com/tanaylab/metacells">metacells
 </a> package, using 
-<a href="https://github.com/tanaylab/Daf.jl">Daf
+<a href="https://github.com/tanaylab/DataAxesFormats.jl">Daf
 </a> to hold the data. In the future, we&#39;ll ideally migrate all of the 
 <code>metacells
 </code>package computations to this package, converting the Python package to a thin wrapper, and provide a similar thin R wrapper to provide metacell analysis from R as well. For now,
@@ -169,7 +171,7 @@
 <code>metacells
 </code>package, which requires users to convert data from
 <code>AnnData
-</code>(for the old features) to
+</code>(for the old features) to 
 <code>Daf
 </code> (to the new features).
 </p>
@@ -270,12 +272,6 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.block_block_distance_matrix">
-<code>Metacells.Contracts.block_block_distance_matrix
-</code>
-</a>
-</li>
-<li>
 <a href="contracts.html#Metacells.Contracts.block_block_is_in_environment_matrix">
 <code>Metacells.Contracts.block_block_is_in_environment_matrix
 </code>
@@ -284,6 +280,18 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.block_block_is_in_neighborhood_matrix">
 <code>Metacells.Contracts.block_block_is_in_neighborhood_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_metacells_vector">
+<code>Metacells.Contracts.block_metacells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_total_UMIs_vector">
+<code>Metacells.Contracts.block_total_UMIs_vector
 </code>
 </a>
 </li>
@@ -306,8 +314,14 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.gene_block_is_local_predictive_factor_matrix">
-<code>Metacells.Contracts.gene_block_is_local_predictive_factor_matrix
+<a href="contracts.html#Metacells.Contracts.gene_block_fraction_matrix">
+<code>Metacells.Contracts.gene_block_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_block_total_UMIs_matrix">
+<code>Metacells.Contracts.gene_block_total_UMIs_matrix
 </code>
 </a>
 </li>
@@ -318,8 +332,8 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.gene_factor_priority_vector">
-<code>Metacells.Contracts.gene_factor_priority_vector
+<a href="contracts.html#Metacells.Contracts.gene_is_correlated_vector">
+<code>Metacells.Contracts.gene_is_correlated_vector
 </code>
 </a>
 </li>
@@ -332,12 +346,6 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.gene_is_forbidden_factor_vector">
 <code>Metacells.Contracts.gene_is_forbidden_factor_vector
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.gene_is_global_predictive_factor_vector">
-<code>Metacells.Contracts.gene_is_global_predictive_factor_vector
 </code>
 </a>
 </li>
@@ -438,6 +446,12 @@
 </a>
 </li>
 <li>
+<a href="identify_genes.html#Metacells.IdentifyGenes.identify_correlated_genes!">
+<code>Metacells.IdentifyGenes.identify_correlated_genes!
+</code>
+</a>
+</li>
+<li>
 <a href="identify_genes.html#Metacells.IdentifyGenes.identify_marker_genes!">
 <code>Metacells.IdentifyGenes.identify_marker_genes!
 </code>
@@ -446,30 +460,6 @@
 <li>
 <a href="programs.html#Metacells.Programs.compute_blocks!">
 <code>Metacells.Programs.compute_blocks!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_blocks_vicinities!">
-<code>Metacells.Programs.compute_blocks_vicinities!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_factor_priority_of_genes!">
-<code>Metacells.Programs.compute_factor_priority_of_genes!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_global_predictive_factors!">
-<code>Metacells.Programs.compute_global_predictive_factors!
-</code>
-</a>
-</li>
-<li>
-<a href="programs.html#Metacells.Programs.compute_local_predictive_factors!">
-<code>Metacells.Programs.compute_local_predictive_factors!
 </code>
 </a>
 </li>
@@ -524,7 +514,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.5.0. Using Julia version 1.10.4.
+</a> version 1.7.0. Using Julia version 1.10.5.
 </p>
 </section>
 <footer class="modal-card-foot">

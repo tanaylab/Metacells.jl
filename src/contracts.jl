@@ -11,26 +11,17 @@ levels (based on the number of UMIs used for the estimates) and the [`gene_diver
 module Contracts
 
 export block_axis
-export block_block_distance_matrix
 export block_block_is_in_environment_matrix
 export block_block_is_in_neighborhood_matrix
+export block_metacells_vector
 export block_total_UMIs_vector
 export cell_axis
 export gene_axis
 export gene_block_fraction_matrix
-export gene_block_is_local_marker_matrix
-export gene_block_is_local_predictive_factor_matrix
-export gene_block_local_r2_matrix
-export gene_block_local_rms_matrix
-export gene_block_program_mean_log_fraction_matrix
 export gene_block_total_UMIs_matrix
 export gene_divergence_vector
-export gene_factor_priority_vector
-export gene_global_r2_vector
-export gene_global_rms_vector
 export gene_is_correlated_vector
 export gene_is_forbidden_factor_vector
-export gene_is_global_predictive_factor_vector
 export gene_is_lateral_vector
 export gene_is_marker_vector
 export gene_is_transcription_factor_vector
@@ -40,11 +31,10 @@ export metacell_axis
 export metacell_block_vector
 export metacell_total_UMIs_vector
 export metacell_type_vector
-export program_gene_fraction_regularization_scalar
 export type_axis
 export type_color_vector
 
-using Daf
+using DataAxesFormats
 
 """
     function gene_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
@@ -184,53 +174,6 @@ function gene_is_correlated_vector(expectation::ContractExpectation)::Pair{Vecto
 end
 
 """
-    function gene_factor_priority_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-
-For each gene, a priority value for using it as a predictor for the rest of the genes; the higher the priority, the more
-likely it is this gene will be useful as a predictor. Zero priority is for genes not even considered (not transcription
-factors, or factors that don't have sufficient predictive value).
-"""
-function gene_factor_priority_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("gene", "factor_priority") =>
-        (expectation, StorageUnsigned, "Priority for using the gene as a predictor for the rest of the genes.")
-end
-
-"""
-    function gene_is_global_predictive_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-
-A mask of globally predictive transcription factors. That is, knowing the values of all these genes allows us to predict the
-values of the rest of the genes (but not as well as when using the locally predictive transcription factors).
-"""
-function gene_is_global_predictive_factor_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("gene", "is_global_predictive_factor") =>
-        (expectation, Bool, "A mask of globally predictive transcription factors.")
-end
-
-"""
-    function gene_global_rms_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-
-The cross-validation RMS of the global linear approximation for this gene. That is, when using the global predictive
-transcription factors, this is the residual mean square error (reduced by the gene's divergence) of the approximation of
-the (log base 2) of the gene expression across the metacells. Genes which aren't approximated are given an RMS of 0.
-"""
-function gene_global_rms_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("gene", "global_rms") =>
-        (expectation, StorageFloat, "The cross-validation RMS of the global linear approximation for this gene.")
-end
-
-"""
-    function gene_global_r2_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-
-The cross-validation R^2 of the global linear approximation for this gene. That is, when using the global predictive
-transcription factors, this is the coefficient of determination of the approximation of the (log base 2) of the gene
-expression across the metacells. Genes which aren't approximated are given an R^2 of 0.
-"""
-function gene_global_r2_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("gene", "global_r2") =>
-        (expectation, StorageFloat, "The cross-validation R^2 of the global linear approximation for this gene.")
-end
-
-"""
     function cell_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 
 A mask of cells that are excluded from consideration. This can be due to any number of reasons - doublets, too
@@ -261,12 +204,21 @@ end
 The total number of UMIs used to estimate the fraction of all the genes in each block. This is used to estimate
 the robustness of the estimates.
 """
-function block_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function block_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "total_UMIs") => (
         expectation,
         StorageUnsigned,
         "The total number of UMIs used to estimate the fraction of all the genes in each block.",
     )
+end
+
+"""
+    function block_metacells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The number of metacells included in each block.
+"""
+function block_metacells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("block", "metacells") => (expectation, StorageUnsigned, "The number of metacells included in each block.")
 end
 
 """
@@ -332,26 +284,11 @@ robustness of the estimate. When computing fold factors, we require the total nu
 estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a
 multinomial sampling distribution).
 """
-function gene_block_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function gene_block_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "block", "total_UMIs") => (
         expectation,
         StorageUnsigned,
         "The total number of UMIs used to estimate the fraction of each gene in each block.",
-    )
-end
-
-"""
-    function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-
-The mean distance (maximal fold factor of any gene) between the metacells of the blocks. This is the mean fold factor
-between the most different gene expression in all pairs of metacells, one in each block. This considers only the global
-predictive genes.
-"""
-function block_block_distance_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-    return ("block", "block", "distance") => (
-        expectation,
-        StorageFloat,
-        "The mean distance (maximal fold factor of any gene) between the metacells of the blocks.",
     )
 end
 
@@ -379,95 +316,15 @@ function block_block_is_in_neighborhood_matrix(expectation::ContractExpectation)
 end
 
 """
-    function gene_block_is_local_predictive_factor_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-
-A mask of the predictive factors in each block. That is, for each gene in each block, whether the gene is a
-transcription factor that can be used to predict the values of the rest of the genes in the metacells of the block.
-"""
-function gene_block_is_local_predictive_factor_matrix(
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "block", "is_local_predictive_factor") =>
-        (expectation, Bool, "A mask of the predictive factors in each block.")
-end
-
-"""
-    function gene_block_is_local_marker_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-
-A mask of the marker genes in the environment of each block. That is, for each block, we look at the genes in the
-environment of the block that have both a significant maximal expression and a wide range of expressions. This is a
-subset of the overall marker genes.
-"""
-function gene_block_is_local_marker_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "block", "is_local_marker") =>
-        (expectation, Bool, "A mask of the marker genes in the environment of each block.")
-end
-
-"""
-    function gene_block_program_mean_log_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-
-The mean log of the expression level in the environment of the block. When predicting the expression level of genes, we
-actually predict the difference from this mean based on the difference from this mean of the predictive transcription
-factors.
-"""
-function gene_block_program_mean_log_fraction_matrix(
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "block", "program_mean_log_fraction") =>
-        (expectation, StorageFloat, "The mean log of the expression level in the environment of the block.")
-end
-
-"""
-    function program_gene_fraction_regularization_scalar(expectation::ContractExpectation)::Pair{ScalarKey, DataSpecification}
-
-The regularization used to compute the log base 2 of the gene fractions for the predictive programs.
-"""
-function program_gene_fraction_regularization_scalar(
-    expectation::ContractExpectation,
-)::Pair{ScalarKey, DataSpecification}
-    return "program_gene_fraction_regularization" => (
-        expectation,
-        StorageFloat,
-        "The regularization used to compute the log base 2 of the gene fractions for the predictive programs.",
-    )
-end
-
-"""
     function gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The estimated fraction of the UMIs of each gene in each block. This assumes the metacells in each block are samples of
 the "same" biological state, based on the fact that all these metacells have very similar expression levels for all
 the global predictive transcription factors.
 """
-function gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "block", "fraction") =>
         (expectation, StorageFloat, "The estimated fraction of the UMIs of each gene in each block.")
-end
-
-"""
-    function gene_block_local_rms_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-
-The cross-validation RMS of the linear approximation for this gene in each block. That is, when using the local predictive
-transcription factors of the block, this is the residual mean square error (reduced by the gene's divergence) of the
-approximation of the (log base 2) of the gene expression across the metacells in the neighborhood of the block. Genes
-which aren't approximated are given an RMS of 0.
-"""
-function gene_block_local_rms_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "block", "local_rms") =>
-        (expectation, StorageFloat, "The cross-validation RMS of the linear approximation for this gene in each block.")
-end
-
-"""
-    function gene_block_local_r2_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-
-The cross-validation R^2 of the linear approximation for this gene in each block. That is, when using the local
-predictive transcription factors of the block, this is the coefficient of determination of the approximation of the (log
-base 2) of the gene expression across the metacells in the neighborhood of the block. Genes which aren't approximated
-are given an R^2 of 0.
-"""
-function gene_block_local_r2_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "block", "local_r2") =>
-        (expectation, StorageFloat, "The cross-validation R^2 of the linear approximation for this gene in each block.")
 end
 
 end  # module
