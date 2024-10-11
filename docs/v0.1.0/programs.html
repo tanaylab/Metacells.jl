@@ -180,18 +180,18 @@
 <pre>
 <code class="language-julia hljs">function compute_blocks!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = 2.0e-5,
-    min_significant_gene_UMIs::Integer = 40,
-    fold_confidence::AbstractFloat = 0.9,
-    max_block_span::Real = 1,
-    max_principal_components = 40,
-    min_blocks_in_neighborhood::Integer = 4,
-    min_metacells_in_neighborhood::Integer = 50,
-    min_blocks_in_approximate_environment::Integer = 20,
-    min_metacells_in_approximate_environment::Integer = 500,
-    cross_validation_parts::Integer = 5,
+    gene_fraction_regularization::AbstractFloat = ```2.0e-5```,
+    min_significant_gene_UMIs::Integer = ```40```,
+    fold_confidence::AbstractFloat = ```0.9```,
+    max_block_span::Real = ```1```,
+    max_principal_components = ```40```,
+    min_blocks_in_neighborhood::Integer = ```4```,
+    min_metacells_in_neighborhood::Integer = ```50```,
+    min_blocks_in_approximate_environment::Integer = ```20```,
+    min_metacells_in_approximate_environment::Integer = ```500```,
+    cross_validation_parts::Integer = ```5```,
     rng::AbstractRNG = default_rng(),
-    overwrite::Bool = false,
+    overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>

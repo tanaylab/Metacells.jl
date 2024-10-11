@@ -499,11 +499,14 @@ function compute_pcs_vicinity_of_block!(;  # untested
         n_parts = n_parts,
         rng = rng,
     )
+    coeffs = loadings(pca)
+    n_factor_genes = size(scaled_log_fractions_of_factor_genes_in_metacells, 1)
+    @assert_matrix(coeffs, n_factor_genes, outdim(pca), Columns)
 
-    n_blocks_in_environment, rmse = quad_minimize_cost(;
+    n_blocks_in_environment, rmse = fast_minimize_cost(;
         minimal_value = n_blocks_in_neighborhood,
         maximal_value = blocks.n_blocks,
-        max_uncertainty = 1,
+        linear_init = false,
     ) do m_blocks_in_environment
         environment_metacells_mask = region_metacells_mask(blocks, ordered_block_indices[1:m_blocks_in_environment])
         scaled_log_fractions_of_factor_genes_in_environment_metacells =
@@ -521,7 +524,7 @@ function compute_pcs_vicinity_of_block!(;  # untested
             n_parts = n_parts,
             rng = rng,
         )
-        # @debug "  Environment blocks: $(m_blocks_in_environment) RMSE: $(rmse)"
+        #@debug "  Environment blocks: $(m_blocks_in_environment) RMSE: $(rmse)"
         return rmse
     end
 
@@ -592,10 +595,10 @@ function compute_environment_principal_components(;  # untested
     scaled_log_fractions_of_environment_metacells_of_measured_genes =
         transposer(scaled_log_fractions_of_measured_genes_in_metacells[:, environment_metacells_mask])
 
-    n_principal_components, rmse = quad_minimize_cost(;
+    n_principal_components, rmse = fast_minimize_cost(;
         minimal_value = 1,
         maximal_value = m_principal_components,
-        max_uncertainty = 1,
+        linear_init = false,
     ) do m_principal_components
         rmse = compute_cross_validation_rmse_of_pca(;
             values_of_included_profiles_of_measured_genes = scaled_log_fractions_of_environment_metacells_of_measured_genes,
@@ -605,7 +608,7 @@ function compute_environment_principal_components(;  # untested
             n_parts = n_parts,
             rng = rng,
         )
-        # @debug "  Used principal components: $(m_principal_components) RMSE: $(rmse)"
+        #@debug "  Used principal components: $(m_principal_components) RMSE: $(rmse)"
         return rmse
     end
 
@@ -690,136 +693,288 @@ function region_metacells_mask(blocks::Blocks, block_indices::Indices)::Mask  # 
     return metacells_mask
 end
 
-function quad_minimize_cost(  # untested
+function fast_minimize_cost(  # untested
     compute_cost::Function;
     minimal_value::Integer,
     maximal_value::Integer,
-    max_uncertainty::Integer,
+    linear_init::Bool,
 )::Tuple{Integer, AbstractFloat}
+    min_significant_rmse = 1e-3
+
+    @assert min_significant_rmse > 0
     @assert 0 < minimal_value < maximal_value
 
-    max_not_u_shaped_samples = 10
-    sample_radius_fraction = 0.1
-    min_estimate_samples = 10
+    if linear_init
+        linear_init_steps = 5
+        @assert linear_init_steps > 1
 
-    @assert 0 < sample_radius_fraction < 1
-
-    sample_values = [minimal_value]
-    sample_costs = [compute_cost(minimal_value)]
-
-    is_u_shaped = false
-
-    estimated_value = nothing
-    estimated_cost = nothing
-
-    offset = 1
-    while !is_u_shaped
-        sample_value = minimal_value + offset
-        if sample_value <= maximal_value
-            offset *= 2
-        else
-            sample_value = rand(minimal_value:maximal_value)
-        end
-        sample_cost = compute_cost(sample_value)
-
-        push!(sample_values, sample_value)
-        push!(sample_costs, sample_cost)
-
-        if length(sample_values) >= 5
-            estimated_value, estimated_cost, is_u_shaped = estimate_peak(sample_values, sample_costs)
-            if is_u_shaped
-                break
+        step_size = (maximal_value - minimal_value) / linear_init_steps
+        sampled_values = [minimal_value]
+        for step_index in 1:linear_init_steps
+            sample_value = Int(round(minimal_value + step_size * step_index))
+            if sample_value !== sampled_values[end]
+                @assert sample_value > sampled_values[end]
+                push!(sampled_values, sample_value)
             end
-            if length(sample_values) > max_not_u_shaped_samples
-                error("minimized function is not U-shaped")
+        end
+        @assert sampled_values[end] == maximal_value
+
+        sampled_costs = compute_cost.(sampled_values)  # NOJET
+    else
+        sampled_values = [minimal_value]
+        sampled_costs = [compute_cost(minimal_value)]
+
+        offset = 1
+        while sampled_values[end] != maximal_value
+            sample_value = min(minimal_value + offset, maximal_value)
+            offset *= 2
+            sample_cost = compute_cost(sample_value)
+            push!(sampled_values, sample_value)
+            push!(sampled_costs, sample_cost)
+
+            if sample_value == maximal_value ||
+               (length(sampled_values) > 4 && sampled_costs[end] - minimum(sampled_costs) > min_significant_rmse * 2)
+                break
             end
         end
     end
 
-    estimated_value = min(estimated_value, maximal_value)
-    estimated_value = max(estimated_value, minimal_value)
-
-    sample_radius = max(max_uncertainty, Int(round((maximal_value - minimal_value + 1) * sample_radius_fraction)))
-
-    index = 0
     while true
-        previous_estimated_value = estimated_value
-        weights = 1.0 ./ (1.0 .+ abs.(sample_values .- previous_estimated_value))
-        estimated_value, estimated_cost, is_u_shaped = estimate_peak(sample_values, sample_costs, weights)
-
-        if !is_u_shaped
-            index += 1
-            if index > max_not_u_shaped_samples
-                error("minimized function is not U-shaped")
-            end
-            sample_value = rand(minimal_value:maximal_value)
-            sample_cost = compute_cost(sample_value)
-            push!(sample_values, sample_value)
-            push!(sample_costs, sample_cost)
-            continue
-        end
-
-        estimated_value = min(estimated_value, maximal_value)
-        estimated_value = max(estimated_value, minimal_value)
-
-        if abs.(estimated_value - previous_estimated_value) <= max_uncertainty
-            n_high_samples = sum(sample_values .>= estimated_value)
-            n_low_samples = sum(sample_values .<= estimated_value)
-            if n_high_samples >= min_estimate_samples / 2 && n_low_samples >= min_estimate_samples / 2
-                return (estimated_value, estimated_cost)
+        best_index = 1
+        best_cost = sampled_costs[1]
+        n_sampled = length(sampled_costs)
+        for index in 2:n_sampled
+            cost = sampled_costs[index]
+            if cost + min_significant_rmse < best_cost
+                best_index = index
+                best_cost = cost
             end
         end
 
-        min_sample_value = max(estimated_value - sample_radius, minimal_value)
-        max_sample_value = min(estimated_value + sample_radius, maximal_value)
-        sample_value = rand(min_sample_value:max_sample_value)
-        sample_cost = compute_cost(sample_value)
+        best_value = sampled_values[best_index]
+        sample_value = nothing
+        if best_index == 1
+            next_value = sampled_values[2]
+            if next_value > best_value + 1
+                sample_value = div(best_value + next_value, 2)
+            end
+        elseif best_index == length(sampled_costs)
+            prev_value = sampled_values[end - 1]
+            if prev_value < best_value - 1
+                sample_value = div(best_value + prev_value, 2)
+            end
+        else
+            next_value = sampled_values[best_index + 1]
+            prev_value = sampled_values[best_index - 1]
+            next_gap = next_value - best_value
+            prev_gap = best_value - prev_value
+            if prev_gap > 1 && prev_gap >= next_gap
+                sample_value = div(best_value + prev_value, 2)
+            elseif next_gap > 1
+                sample_value = div(best_value + next_value, 2)
+            end
+        end
 
-        push!(sample_values, sample_value)
-        push!(sample_costs, sample_cost)
+        if sample_value === nothing
+            return (best_value, sampled_costs[best_index])
+        end
+
+        sample_index = searchsortedfirst(sampled_values, sample_value)
+        insert!(sampled_values, sample_index, sample_value)
+        insert!(sampled_costs, sample_index, compute_cost(sample_value))
     end
 end
 
-function estimate_peak(  # untested
-    xs::AbstractVector{<:Real},
-    ys::AbstractVector{<:Real},
-    ws::Maybe{AbstractVector{<:Real}} = nothing,
-)::Tuple{Integer, AbstractFloat, Bool}
-    if ws === nothing
-        sum_x = sum(xs)
-        sum_y = sum(ys)
-        sum_x2 = sum(xs .* xs)
-        sum_xy = sum(xs .* ys)  # NOJET
-        sum_x3 = sum(xs .* xs .* xs)  # NOJET
-        sum_x2y = sum(xs .* xs .* ys)
-        sum_x4 = sum(xs .* xs .* xs .* xs)
-        n = length(xs)
+function slow_minimize_cost(  # untested
+    compute_cost::Function;
+    minimal_value::Integer,
+    maximal_value::Integer,
+    linear_init::Bool,
+)::Tuple{Integer, AbstractFloat}
+    @assert 0 < minimal_value < maximal_value
+
+    if linear_init
+        linear_init_steps = 5
+        @assert linear_init_steps > 1
+
+        step_size = (maximal_value - minimal_value) / linear_init_steps
+        sampled_values = [minimal_value]
+        for step_index in 1:linear_init_steps
+            sample_value = Int(round(minimal_value + step_size * step_index))
+            if sample_value !== sampled_values[end]
+                @assert sample_value > sampled_values[end]
+                push!(sampled_values, sample_value)
+            end
+        end
+        @assert sampled_values[end] == maximal_value
+
+        sampled_costs = compute_cost.(sampled_values)
     else
-        sum_x = sum(xs .* ws)
-        sum_y = sum(ys .* ws)
-        sum_x2 = sum(xs .* xs .* ws)
-        sum_xy = sum(xs .* ys .* ws)
-        sum_x3 = sum(xs .* xs .* xs .* ws)
-        sum_x2y = sum(xs .* xs .* ys .* ws)
-        sum_x4 = sum(xs .* xs .* xs .* xs .* ws)
-        n = sum(ws)
+        min_rise_fraction = 0.5
+
+        @assert 0 < min_rise_fraction
+
+        sampled_values = [minimal_value]
+        sampled_costs = [compute_cost(minimal_value)]
+
+        offset = 1
+        while sampled_values[end] != maximal_value
+            sample_value = min(minimal_value + offset, maximal_value)
+            offset *= 2
+            sample_cost = compute_cost(sample_value)
+            push!(sampled_values, sample_value)
+            push!(sampled_costs, sample_cost)
+
+            if sample_value == maximal_value || (
+                length(sampled_values) > 4 &&
+                sampled_costs[end] - min_rise_fraction * sampled_costs[1] >
+                (1 - min_rise_fraction) * minimum(sampled_costs)
+            )
+                break
+            end
+        end
     end
 
-    sxx = sum_x2 - sum_x^2 / n
-    sxy = sum_xy - sum_x * sum_y / n
-    sxx2 = sum_x3 - sum_x2 * sum_x / n
-    sx2y = sum_x2y - sum_x2 * sum_y / n
-    sx2x2 = sum_x4 - sum_x2^2 / n
+    n_samples = length(sampled_values)
+    sampled_repeats = fill(1, n_samples)
 
-    d = sxx * sx2x2 - sxx2^2
-    b = (sxy * sx2x2 - sx2y * sxx2) / d
-    a = (sx2y * sxx - sxy * sxx2) / d
-    c = sum_y / n - b * sum_x / n - a * sum_x2 / n
+    while true
+        local_minimum_indices = find_local_minimums(sampled_costs)
 
-    estimate = -b / (2 * a)
-    cost = a * estimate * estimate + b * estimate + c
+        if ensure_sampled_minimums(;
+            compute_cost = compute_cost,
+            local_minimum_indices = local_minimum_indices,
+            sampled_values = sampled_values,
+            sampled_repeats = sampled_repeats,
+            sampled_costs = sampled_costs,
+        )
+            continue
+        end
 
-    return (Int(round(estimate)), cost, a > 0)
+        if refine_sampled_minimums(;
+            compute_cost = compute_cost,
+            local_minimum_indices = local_minimum_indices,
+            sampled_values = sampled_values,
+            sampled_repeats = sampled_repeats,
+            sampled_costs = sampled_costs,
+        )
+            continue
+        end
+
+        minimum_index = argmin(sampled_costs)
+        return (sampled_values[minimum_index], sampled_costs[minimum_index])
+    end
+end
+
+function find_local_minimums(sampled_costs::AbstractVector{<:AbstractFloat})::AbstractVector{<:Integer}  # untested
+    n_samples = length(sampled_costs)
+    local_minimum_indices = Int32[]
+
+    @assert length(sampled_costs) > 1
+
+    if sampled_costs[1] < sampled_costs[2]
+        push!(local_minimum_indices, 1)
+    end
+
+    for index in 2:(n_samples - 1)
+        if sampled_costs[index] < sampled_costs[index - 1] && sampled_costs[index] < sampled_costs[index + 1]
+            push!(local_minimum_indices, index)
+        end
+    end
+
+    if sampled_costs[n_samples] < sampled_costs[n_samples - 1]
+        push!(local_minimum_indices, length(sampled_costs))
+    end
+
+    @assert length(local_minimum_indices) > 0
+    return local_minimum_indices
+end
+
+function ensure_sampled_minimums(;  # untested
+    compute_cost::Function,
+    local_minimum_indices::AbstractVector{<:Integer},
+    sampled_values::AbstractVector{<:Integer},
+    sampled_repeats::AbstractVector{<:Integer},
+    sampled_costs::AbstractVector{<:AbstractFloat},
+)::Bool
+    n_local_minimums = length(local_minimum_indices)
+    @assert n_local_minimums > 0
+
+    if n_local_minimums == 1
+        return false
+    end
+
+    min_repeats = 3
+
+    n_samples = length(sampled_values)
+    @assert_vector(sampled_repeats, n_samples)
+    @assert_vector(sampled_costs, n_samples)
+
+    did_sample = false
+
+    for local_minimum_index in local_minimum_indices
+        low_index = max(local_minimum_index - 1, 1)
+        high_index = min(local_minimum_index + 1, n_samples)
+        for index in low_index:high_index
+            repeats = sampled_repeats[index]
+            while repeats < min_repeats
+                repeats += 1
+                new_weight = 1.0 / repeats
+                old_weight = 1.0 - new_weight
+                sampled_repeats[index] = repeats
+                sampled_costs[index] =
+                    old_weight * sampled_costs[index] + new_weight * compute_cost(sampled_values[index])
+                did_sample = true
+            end
+        end
+    end
+
+    return did_sample
+end
+
+function refine_sampled_minimums(;  # untested
+    compute_cost::Function,
+    local_minimum_indices::AbstractVector{<:Integer},
+    sampled_values::AbstractVector{<:Integer},
+    sampled_repeats::AbstractVector{<:Integer},
+    sampled_costs::AbstractVector{<:AbstractFloat},
+)::Bool
+    n_local_minimums = length(local_minimum_indices)
+    @assert n_local_minimums > 0
+
+    n_samples = length(sampled_values)
+    @assert_vector(sampled_repeats, n_samples)
+    @assert_vector(sampled_costs, n_samples)
+
+    for local_minimum_index in local_minimum_indices
+        minimum_value = sampled_values[local_minimum_index]
+
+        low_index = max(local_minimum_index - 1, 1)
+        high_index = min(local_minimum_index + 1, n_samples)
+
+        low_value = sampled_values[low_index]
+        high_value = sampled_values[high_index]
+
+        low_gap = minimum_value - low_value
+        high_gap = high_value - minimum_value
+
+        mid_value = nothing
+        if low_gap > 1 && low_gap >= high_gap
+            mid_value = div(low_value + minimum_value, 2)
+        elseif high_gap > 1
+            mid_value = div(high_value + minimum_value, 2)
+        end
+
+        if mid_value !== nothing
+            mid_index = searchsortedfirst(sampled_values, mid_value)
+            insert!(sampled_values, mid_index, mid_value)
+            insert!(sampled_repeats, mid_index, 1)
+            insert!(sampled_costs, mid_index, compute_cost(mid_value))
+            return true
+        end
+    end
+
+    return false
 end
 
 end  # module

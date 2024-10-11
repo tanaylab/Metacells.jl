@@ -179,8 +179,8 @@ function ensure_is_downloaded(
         push!(headers, "If-None-Match" => etag)
     end
 
-    response =
-        HTTP.request("GET", url, headers; canonicalize_headers = true, status_exception = false, decompress = false)  # NOLINT
+    response =  # NOJET
+        HTTP.request("GET", url, headers; canonicalize_headers = true, status_exception = false, decompress = false)
 
     if response.status == 304
         return false

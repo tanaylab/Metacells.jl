@@ -180,9 +180,9 @@
 <pre>
 <code class="language-julia hljs">function compute_genes_divergence!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = 1.0e-5,
-    min_divergent_gene_range_fold::Real = 6,
-    overwrite::Bool = false,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    min_divergent_gene_range_fold::Real = ```6```,
+    overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
@@ -269,10 +269,10 @@
 <pre>
 <code class="language-julia hljs">function identify_marker_genes!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = 1.0e-5,
-    min_marker_gene_range_fold::Real = 2,
-    min_marker_gene_max_fraction::AbstractFloat = 0.0001,
-    overwrite::Bool = false,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    min_marker_gene_range_fold::Real = ```2```,
+    min_marker_gene_max_fraction::AbstractFloat = ```0.0001```,
+    overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
@@ -365,9 +365,9 @@
 <pre>
 <code class="language-julia hljs">function identify_correlated_genes!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = 1.0e-5,
-    correlation_confidence::AbstractFloat = 0.99,
-    overwrite::Bool = false,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    correlation_confidence::AbstractFloat = ```0.99```,
+    overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
