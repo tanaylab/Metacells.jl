@@ -112,7 +112,7 @@ function gmara_genes(;
     else
         path = "genes/$(species)/lists/$(list)/names/$(namespace).tsv"
     end
-    return get_set_file(path; version = version, cache_dir = cache_dir, timeout = timeout)
+    return get_set_file(path; version, cache_dir, timeout)
 end
 
 function get_set_file(
@@ -129,7 +129,7 @@ function get_set_file(
         set = lock(CACHE_LOCK) do
             set = get(CACHE_IN_MEMORY, cache_key, nothing)
             if set === nothing
-                set = load_set_file(path; version = version, cache_dir = cache_dir, timeout = timeout)
+                set = load_set_file(path; version, cache_dir, timeout)
                 CACHE_IN_MEMORY[cache_key] = set
             end
             return set
@@ -145,7 +145,7 @@ function load_set_file(
     timeout::Real = TIMEOUT,
 )::AbstractSet{<:AbstractString}
     cache_version_path = cache_dir * "/" * version * "/" * path
-    with_lock_file(cache_version_path; timeout = timeout) do
+    with_lock_file(cache_version_path; timeout) do
         etag_path = cache_version_path * ".etag"
         if ispath(etag_path)
             etag = read(etag_path, String)
@@ -153,13 +153,10 @@ function load_set_file(
             etag = nothing
         end
 
-        if (
-            ensure_is_downloaded(path; version = version, etag = etag, cache_dir = cache_dir) ||
-            !ispath(cache_version_path * ".jl_set.gz")
-        )
-            set = write_set_to_file(path; version = version, cache_dir = cache_dir)
+        if ensure_is_downloaded(path; version, etag, cache_dir) || !ispath(cache_version_path * ".jl_set.gz")
+            set = write_set_to_file(path; version, cache_dir)
         else
-            set = read_set_from_file(path; version = version, cache_dir = cache_dir)
+            set = read_set_from_file(path; version, cache_dir)
         end
 
         return set
@@ -172,7 +169,7 @@ function ensure_is_downloaded(
     etag::Maybe{AbstractString},
     cache_dir::AbstractString = CACHE_DIR,
 )::Bool
-    url = github_url(path; version = version)
+    url = github_url(path; version)
 
     headers = ["Accept-Encoding" => "gzip"]
     if etag !== nothing
@@ -253,7 +250,7 @@ function read_set_from_file(
 end
 
 function with_lock_file(action::Function, path::AbstractString; timeout::Real = TIMEOUT)::Any
-    file = lock_file(path; timeout = timeout)
+    file = lock_file(path; timeout)
     try
         return action()
     finally
@@ -321,16 +318,9 @@ function set_gmara_genes_mask!(
         property = "is_$(list)"
     end
     gene_names = get_vector(daf, "gene", gene_names).array
-    gmara_names = gmara_genes(;
-        species = species,
-        namespace = namespace,
-        list = list,
-        version = version,
-        cache_dir = cache_dir,
-        timeout = timeout,
-    )
-    gene_mask = [normalize_gene_name(gene_name; namespace = namespace) in gmara_names for gene_name in gene_names]
-    set_vector!(daf, "gene", property, gene_mask; overwrite = overwrite)
+    gmara_names = gmara_genes(; species, namespace, list, version, cache_dir, timeout)
+    gene_mask = [normalize_gene_name(gene_name; namespace) in gmara_names for gene_name in gene_names]
+    set_vector!(daf, "gene", property, gene_mask; overwrite)
     return nothing
 end
 

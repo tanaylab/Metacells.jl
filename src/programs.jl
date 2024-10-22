@@ -4,6 +4,7 @@ Approximate the manifold of actual cell states (captured by metacells) using lin
 module Programs
 
 export compute_blocks!
+export compute_block_programs
 
 using ..Contracts
 using ..Defaults
@@ -17,6 +18,7 @@ using DataAxesFormats.GenericLogging
 using DataAxesFormats.GenericTypes
 using Distributions
 using MultivariateStats
+using NMF
 using NonNegLeastSquares
 using Printf
 using Random
@@ -25,13 +27,9 @@ using Statistics
 
 import Random.default_rng
 
-Indices = AbstractVector{<:Integer}
-Mask = Union{AbstractVector{Bool}, BitVector}
-Subset = Union{Indices, Mask}
-
 @kwdef struct Blocks
-    blocks_of_metacells::Indices
-    metacells_of_blocks::AbstractVector{<:Indices}
+    blocks_of_metacells::AbstractVector{<:Integer}
+    metacells_of_blocks::AbstractVector{<:AbstractVector{<:Integer}}
     n_blocks::Integer
     distances_between_blocks::AbstractMatrix{<:AbstractFloat}
 end
@@ -162,8 +160,8 @@ $(CONTRACT)
             total_UMIs_of_genes_in_metacells = total_UMIs_of_factor_genes_in_metacells,
             total_UMIs_of_metacells = total_UMIs_of_metacells,
             scale_of_genes = scale_of_genes[factor_genes_indices],
-            gene_fraction_regularization = gene_fraction_regularization,
-            fold_confidence = fold_confidence,
+            gene_fraction_regularization,
+            fold_confidence,
         )
 
     blocks = compute_blocks_by_confidence(;
@@ -171,13 +169,13 @@ $(CONTRACT)
         log_increased_fractions_of_genes_in_metacells = log_increased_fractions_of_factor_genes_in_metacells,
         total_UMIs_of_genes_in_metacells = total_UMIs_of_factor_genes_in_metacells,
         min_significant_gene_UMIs = min_significant_gene_UMIs,
-        max_block_span = max_block_span,
+        max_block_span,
     )
     @debug "Blocks: $(blocks.n_blocks)"
     block_names = group_names(daf, "metacell", blocks.metacells_of_blocks; prefix = "B")
 
     add_axis!(daf, "block", block_names)
-    set_vector!(daf, "metacell", "block", block_names[blocks.blocks_of_metacells]; overwrite = overwrite)
+    set_vector!(daf, "metacell", "block", block_names[blocks.blocks_of_metacells]; overwrite)
 
     scaled_log_fractions_of_genes_in_metacells = log_fractions_of_genes_in_metacells .* scale_of_genes
     @assert_matrix(scaled_log_fractions_of_genes_in_metacells, n_genes, n_metacells)
@@ -212,20 +210,21 @@ $(CONTRACT)
         @views is_in_environment_of_block = is_in_environment_of_block_of_block[:, block_index]
         expansion_dimensions_of_blocks[block_index], expansion_rmse_of_blocks[block_index] =
             compute_pcs_vicinity_of_block!(;
-                scaled_log_fractions_of_factor_genes_in_metacells = scaled_log_fractions_of_factor_genes_in_metacells,
-                scaled_log_fractions_of_measured_genes_in_metacells = scaled_log_fractions_of_measured_genes_in_metacells,
+                scaled_log_fractions_of_factor_genes_in_metacells,
+                scaled_log_fractions_of_measured_genes_in_metacells,
                 distances_between_blocks = blocks.distances_between_blocks,
-                min_blocks_in_neighborhood = min_blocks_in_neighborhood,
-                min_metacells_in_neighborhood = min_metacells_in_neighborhood,
-                min_blocks_in_approximate_environment = min_blocks_in_approximate_environment,
-                min_metacells_in_approximate_environment = min_metacells_in_approximate_environment,
-                max_principal_components = max_principal_components,
-                n_parts = cross_validation_parts,
-                rng = rng,
-                blocks = blocks,
-                block_index = block_index,
-                is_in_neighborhood_of_block = is_in_neighborhood_of_block,
-                is_in_environment_of_block = is_in_environment_of_block,
+                min_blocks_in_neighborhood,
+                min_metacells_in_neighborhood,
+                min_blocks_in_approximate_environment,
+                min_metacells_in_approximate_environment,
+                max_principal_components,
+                cross_validation_parts,
+                rng,
+                blocks,
+                block_index,
+                is_in_neighborhood_of_block,
+                is_in_environment_of_block,
+                factor_genes_indices,
             )
     end
 
@@ -238,7 +237,7 @@ $(CONTRACT)
         "block",
         "is_in_neighborhood",
         SparseMatrixCSC(is_in_neighborhood_of_block_of_block);
-        overwrite = overwrite,
+        overwrite,
     )
     set_matrix!(
         daf,
@@ -246,7 +245,7 @@ $(CONTRACT)
         "block",
         "is_in_environment",
         SparseMatrixCSC(is_in_environment_of_block_of_block);
-        overwrite = overwrite,
+        overwrite,
     )
 
     return nothing
@@ -298,10 +297,10 @@ function compute_blocks_by_confidence(;  # untested
     max_block_span::Real,
 )::Blocks
     distances_between_metacells = compute_distances_between_metacells(;
-        log_decreased_fractions_of_genes_in_metacells = log_decreased_fractions_of_genes_in_metacells,
-        log_increased_fractions_of_genes_in_metacells = log_increased_fractions_of_genes_in_metacells,
-        total_UMIs_of_genes_in_metacells = total_UMIs_of_genes_in_metacells,
-        min_significant_gene_UMIs = min_significant_gene_UMIs,
+        log_decreased_fractions_of_genes_in_metacells,
+        log_increased_fractions_of_genes_in_metacells,
+        total_UMIs_of_genes_in_metacells,
+        min_significant_gene_UMIs,
     )
 
     clusters = hclust(distances_between_metacells; linkage = :complete)  # NOJET
@@ -309,17 +308,9 @@ function compute_blocks_by_confidence(;  # untested
     metacells_of_blocks = collect_group_members(blocks_of_metacells)
     n_blocks = length(metacells_of_blocks)
 
-    distances_between_blocks = compute_distances_between_blocks(;
-        distances_between_metacells = distances_between_metacells,
-        metacells_of_blocks = metacells_of_blocks,
-    )
+    distances_between_blocks = compute_distances_between_blocks(; distances_between_metacells, metacells_of_blocks)
 
-    return Blocks(;
-        blocks_of_metacells = blocks_of_metacells,
-        metacells_of_blocks = metacells_of_blocks,
-        n_blocks = n_blocks,
-        distances_between_blocks = distances_between_blocks,
-    )
+    return Blocks(; blocks_of_metacells, metacells_of_blocks, n_blocks, distances_between_blocks)
 end
 
 function compute_distances_between_metacells(;  # untested
@@ -402,7 +393,7 @@ end
 
 function compute_distances_between_blocks(;  # untested
     distances_between_metacells::Matrix{Float32},
-    metacells_of_blocks::AbstractVector{<:Indices},
+    metacells_of_blocks::AbstractVector{<:AbstractVector{<:Integer}},
 )::AbstractMatrix{<:AbstractFloat}
     n_metacells = size(distances_between_metacells, 1)
     @assert_matrix(distances_between_metacells, n_metacells, n_metacells, Columns)
@@ -457,78 +448,157 @@ function compute_pcs_vicinity_of_block!(;  # untested
     min_blocks_in_approximate_environment::Integer,
     min_metacells_in_approximate_environment::Integer,
     max_principal_components::Integer,
-    n_parts::Integer,
+    cross_validation_parts::Integer,
     rng::AbstractRNG,
     blocks::Blocks,
     block_index::Integer,
     is_in_neighborhood_of_block::AbstractVector{Bool},
     is_in_environment_of_block::AbstractVector{Bool},
+    factor_genes_indices::Any,
 )::Tuple{Integer, AbstractFloat}
+    n_metacells = size(scaled_log_fractions_of_factor_genes_in_metacells, 2)
+    n_factor_genes = length(factor_genes_indices)
+    n_measured_genes = size(scaled_log_fractions_of_measured_genes_in_metacells, 1)
+
+    @assert_matrix(scaled_log_fractions_of_factor_genes_in_metacells, n_factor_genes, n_metacells, Columns)
+    @assert_matrix(scaled_log_fractions_of_measured_genes_in_metacells, n_measured_genes, n_metacells, Columns)
+
     distances_between_others_and_block = distances_between_blocks[:, block_index]
     @assert_vector(distances_between_others_and_block, blocks.n_blocks)
 
     ordered_block_indices = sortperm(distances_between_others_and_block)
     @assert ordered_block_indices[1] == block_index
 
-    @debug "Block: $(block_index) metacells: $(sum(region_metacells_mask(blocks, ordered_block_indices[1:1])))"
+    @debug "Block: $(block_index) metacells: $(sum(collect_metacells_region_mask(blocks, ordered_block_indices[1:1])))"
 
     n_blocks_in_neighborhood = compute_vicinity_of_block(;
-        blocks = blocks,
+        blocks,
         min_blocks_in_vicinity = min_blocks_in_neighborhood,
         min_metacells_in_vicinity = min_metacells_in_neighborhood,
-        ordered_block_indices = ordered_block_indices,
+        ordered_block_indices,
     )
-    neighborhood_metacells_mask = region_metacells_mask(blocks, ordered_block_indices[1:n_blocks_in_neighborhood])
-    @debug "- Approximate neighborhood blocks: $(n_blocks_in_neighborhood) metacells: $(sum(neighborhood_metacells_mask))"
+    neighborhood_metacells_mask =
+        collect_metacells_region_mask(blocks, ordered_block_indices[1:n_blocks_in_neighborhood])
+    @debug "- Neighborhood blocks: $(n_blocks_in_neighborhood) metacells: $(sum(neighborhood_metacells_mask))"
 
-    n_blocks_in_environment = compute_vicinity_of_block(;
-        blocks = blocks,
+    n_blocks_in_approximate_environment = compute_vicinity_of_block(;
+        blocks,
         min_blocks_in_vicinity = min_blocks_in_approximate_environment,
         min_metacells_in_vicinity = min_metacells_in_approximate_environment,
-        ordered_block_indices = ordered_block_indices,
+        ordered_block_indices,
     )
-    environment_metacells_mask = region_metacells_mask(blocks, ordered_block_indices[1:n_blocks_in_environment])
-    @debug "- Approximate environment blocks: $(n_blocks_in_environment) metacells: $(sum(environment_metacells_mask))"
+    approximate_environment_metacells_mask =
+        collect_metacells_region_mask(blocks, ordered_block_indices[1:n_blocks_in_approximate_environment])
+    scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells =
+        scaled_log_fractions_of_factor_genes_in_metacells[:, approximate_environment_metacells_mask]
+    n_approximate_environment_metacells =
+        size(scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells, 2)
+    @debug "- Approximate environment blocks: $(n_blocks_in_approximate_environment) metacells: $(n_approximate_environment_metacells)"
 
-    pca, n_principal_components = compute_environment_principal_components(;
-        scaled_log_fractions_of_factor_genes_in_metacells = scaled_log_fractions_of_factor_genes_in_metacells,
-        scaled_log_fractions_of_measured_genes_in_metacells = scaled_log_fractions_of_measured_genes_in_metacells,
-        neighborhood_metacells_mask = neighborhood_metacells_mask,
-        environment_metacells_mask = environment_metacells_mask,
-        max_principal_components = max_principal_components,
-        n_parts = n_parts,
-        rng = rng,
+    pca = fit(
+        PCA,
+        scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells;
+        maxoutdim = max_principal_components,
     )
-    coeffs = loadings(pca)
-    n_factor_genes = size(scaled_log_fractions_of_factor_genes_in_metacells, 1)
-    @assert_matrix(coeffs, n_factor_genes, outdim(pca), Columns)
+    @assert indim(pca) == n_factor_genes
+    @assert outdim(pca) <= max_principal_components
+    max_n_principal_components = outdim(pca)
+    @debug "- Max principal components: $(max_n_principal_components)"
 
-    n_blocks_in_environment, rmse = fast_minimize_cost(;
+    coefficients_of_factor_genes_in_principal_components = loadings(pca)  # NOJET
+    @assert_matrix(
+        coefficients_of_factor_genes_in_principal_components,
+        n_factor_genes,
+        max_n_principal_components,
+        Columns
+    )
+    mean_scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells =
+        vec(mean(scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells; dims = 2))
+    @assert_vector(mean_scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells, n_factor_genes)
+    scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells .-=
+        mean_scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells
+
+    values_of_principal_components_of_approximate_environment_metacells =
+        transpose(coefficients_of_factor_genes_in_principal_components) *
+        scaled_log_fractions_of_factor_genes_in_approximate_environment_metacells
+    @assert_matrix(
+        values_of_principal_components_of_approximate_environment_metacells,
+        max_n_principal_components,
+        n_approximate_environment_metacells
+    )
+
+    scaled_log_fractions_of_measured_genes_of_approximate_environment_metacells =
+        scaled_log_fractions_of_measured_genes_in_metacells[:, approximate_environment_metacells_mask]
+
+    neighborhood_metacells_mask_in_approximate_environment =
+        neighborhood_metacells_mask[approximate_environment_metacells_mask]
+    neighborhood_metacells_indices_in_approximate_environment =
+        findall(neighborhood_metacells_mask_in_approximate_environment)
+
+    n_principal_components, rmse, _ = fast_minimize_cost(;
+        minimal_value = 1,
+        maximal_value = max_n_principal_components,
+        linear_init = false,
+    ) do m_principal_components
+        rmse = compute_cross_validation_of_prediction(
+            solve_least_squares;
+            predictors_in_profiles = values_of_principal_components_of_approximate_environment_metacells[
+                1:m_principal_components,
+                :,
+            ],
+            measured_in_profiles = scaled_log_fractions_of_measured_genes_of_approximate_environment_metacells,
+            core_profiles_indices = neighborhood_metacells_indices_in_approximate_environment,
+            cross_validation_parts,
+            rng,
+        )
+
+        @debug "  Used principal components: $(m_principal_components) RMSE: $(rmse)"
+        return (rmse, nothing)
+    end
+    @debug "- Predictive principal components: $(n_principal_components) RMSE: $(rmse)"
+
+    coefficients_of_factor_genes_in_principal_components =
+        coefficients_of_factor_genes_in_principal_components[:, 1:n_principal_components]
+
+    n_blocks_in_environment, rmse, _ = fast_minimize_cost(;
         minimal_value = n_blocks_in_neighborhood,
         maximal_value = blocks.n_blocks,
         linear_init = false,
     ) do m_blocks_in_environment
-        environment_metacells_mask = region_metacells_mask(blocks, ordered_block_indices[1:m_blocks_in_environment])
+        environment_metacells_mask =
+            collect_metacells_region_mask(blocks, ordered_block_indices[1:m_blocks_in_environment])
         scaled_log_fractions_of_factor_genes_in_environment_metacells =
             scaled_log_fractions_of_factor_genes_in_metacells[:, environment_metacells_mask]
-        values_of_principal_components_of_environment_metacells =
-            predict(pca, scaled_log_fractions_of_factor_genes_in_environment_metacells)
+        n_environment_metacells = size(scaled_log_fractions_of_factor_genes_in_environment_metacells, 2)
 
-        rmse = compute_cross_validation_rmse_of_pca(;
-            values_of_included_profiles_of_measured_genes = transposer(
-                scaled_log_fractions_of_measured_genes_in_metacells[:, environment_metacells_mask],
-            ),
-            values_of_principal_components_of_included_profiles = values_of_principal_components_of_environment_metacells,
-            core_profiles_mask = neighborhood_metacells_mask[environment_metacells_mask],
-            n_principal_components = n_principal_components,
-            n_parts = n_parts,
-            rng = rng,
+        values_of_principal_components_of_environment_metacells =
+            transpose(coefficients_of_factor_genes_in_principal_components) *
+            scaled_log_fractions_of_factor_genes_in_environment_metacells
+        @assert_matrix(
+            values_of_principal_components_of_environment_metacells,
+            n_principal_components,
+            n_environment_metacells
+        )
+
+        scaled_log_fractions_of_measured_genes_in_environment_metacells =
+            scaled_log_fractions_of_measured_genes_in_metacells[:, environment_metacells_mask]
+
+        neighborhood_metacells_mask_in_environment = neighborhood_metacells_mask[environment_metacells_mask]
+        neighborhood_metacells_indices_in_environment = findall(neighborhood_metacells_mask_in_environment)
+
+        rmse = compute_cross_validation_of_prediction(
+            solve_least_squares;
+            predictors_in_profiles = values_of_principal_components_of_environment_metacells,
+            measured_in_profiles = scaled_log_fractions_of_measured_genes_in_environment_metacells,
+            core_profiles_indices = neighborhood_metacells_indices_in_environment,
+            cross_validation_parts,
+            rng,
         )
         #@debug "  Environment blocks: $(m_blocks_in_environment) RMSE: $(rmse)"
-        return rmse
+        return (rmse, nothing)
     end
 
-    environment_metacells_mask = region_metacells_mask(blocks, ordered_block_indices[1:n_blocks_in_environment])
+    environment_metacells_mask = collect_metacells_region_mask(blocks, ordered_block_indices[1:n_blocks_in_environment])
     @debug "- Refined environment blocks: $(n_blocks_in_environment) metacells: $(sum(environment_metacells_mask)) RMSE: $(rmse)"
 
     is_in_neighborhood_of_block[ordered_block_indices[1:n_blocks_in_neighborhood]] .= true
@@ -541,7 +611,7 @@ function compute_vicinity_of_block(;  # untested
     blocks::Blocks,
     min_blocks_in_vicinity::Real,
     min_metacells_in_vicinity::Real,
-    ordered_block_indices::Indices,
+    ordered_block_indices::AbstractVector{<:Integer},
 )::Integer
     n_metacells_in_vicinity = 0
     n_blocks_in_vicinity = 0
@@ -549,7 +619,7 @@ function compute_vicinity_of_block(;  # untested
 
     while n_blocks_in_vicinity < min_blocks_in_vicinity || n_metacells_in_vicinity < min_metacells_in_vicinity
         n_blocks_in_vicinity += 1
-        vicinity_metacells_mask = region_metacells_mask(blocks, ordered_block_indices[1:n_blocks_in_vicinity])
+        vicinity_metacells_mask = collect_metacells_region_mask(blocks, ordered_block_indices[1:n_blocks_in_vicinity])
         @assert vicinity_metacells_mask !== nothing
         n_metacells_in_vicinity = sum(vicinity_metacells_mask)
     end
@@ -557,148 +627,23 @@ function compute_vicinity_of_block(;  # untested
     return n_blocks_in_vicinity
 end
 
-function compute_environment_principal_components(;  # untested
-    scaled_log_fractions_of_factor_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
-    scaled_log_fractions_of_measured_genes_in_metacells::AbstractMatrix{<:AbstractFloat},
-    neighborhood_metacells_mask::Union{AbstractVector{Bool}, BitVector},
-    environment_metacells_mask::Union{AbstractVector{Bool}, BitVector},
-    max_principal_components::Integer,
-    n_parts::Integer,
-    rng::AbstractRNG,
-)::Tuple{PCA, Integer}
-    n_metacells = length(neighborhood_metacells_mask)
-    n_factor_genes = size(scaled_log_fractions_of_factor_genes_in_metacells, 1)
-    n_measured_genes = size(scaled_log_fractions_of_measured_genes_in_metacells, 1)
-
-    @assert_matrix(scaled_log_fractions_of_factor_genes_in_metacells, n_factor_genes, n_metacells, Columns)
-    @assert_matrix(scaled_log_fractions_of_measured_genes_in_metacells, n_measured_genes, n_metacells, Columns)
-
-    scaled_log_fractions_of_factor_genes_in_environment_metacells =
-        scaled_log_fractions_of_factor_genes_in_metacells[:, environment_metacells_mask]
-    n_environment_metacells = size(scaled_log_fractions_of_factor_genes_in_environment_metacells, 2)
-
-    pca = fit(PCA, scaled_log_fractions_of_factor_genes_in_environment_metacells; maxoutdim = max_principal_components)
-    @assert indim(pca) == n_factor_genes
-    @assert outdim(pca) <= max_principal_components
-    m_principal_components = outdim(pca)
-
-    @debug "- Max principal components: $(m_principal_components)"
-
-    values_of_principal_components_of_environment_metacells =
-        predict(pca, scaled_log_fractions_of_factor_genes_in_environment_metacells)
-    @assert_matrix(
-        values_of_principal_components_of_environment_metacells,
-        m_principal_components,
-        n_environment_metacells
-    )
-
-    scaled_log_fractions_of_environment_metacells_of_measured_genes =
-        transposer(scaled_log_fractions_of_measured_genes_in_metacells[:, environment_metacells_mask])
-
-    n_principal_components, rmse = fast_minimize_cost(;
-        minimal_value = 1,
-        maximal_value = m_principal_components,
-        linear_init = false,
-    ) do m_principal_components
-        rmse = compute_cross_validation_rmse_of_pca(;
-            values_of_included_profiles_of_measured_genes = scaled_log_fractions_of_environment_metacells_of_measured_genes,
-            values_of_principal_components_of_included_profiles = values_of_principal_components_of_environment_metacells,
-            core_profiles_mask = neighborhood_metacells_mask[environment_metacells_mask],
-            n_principal_components = m_principal_components,
-            n_parts = n_parts,
-            rng = rng,
-        )
-        #@debug "  Used principal components: $(m_principal_components) RMSE: $(rmse)"
-        return rmse
-    end
-
-    @debug "- Best principal components: $(n_principal_components) RMSE: $(rmse)"
-    return pca, n_principal_components
-end
-
-function compute_cross_validation_rmse_of_pca(;  # untested
-    values_of_included_profiles_of_measured_genes::AbstractMatrix{<:AbstractFloat},
-    values_of_principal_components_of_included_profiles::AbstractMatrix{<:AbstractFloat},
-    core_profiles_mask::Union{AbstractVector{Bool}, BitVector},
-    n_principal_components::Integer,
-    n_parts::Integer,
-    rng::AbstractRNG,
-)::AbstractFloat
-    n_included_profiles, n_measured_genes = size(values_of_included_profiles_of_measured_genes)
-    shuffled_core_profiles_indices = shuffle!(rng, findall(core_profiles_mask))
-    n_core_profiles = length(shuffled_core_profiles_indices)
-    parts_size = n_core_profiles / n_parts
-
-    rmse_of_parts = Vector{Float32}(undef, n_parts)
-
-    @threads for part_index in 1:n_parts
-        first_left_out_position = Int(round((part_index - 1) * parts_size)) + 1
-        last_left_out_position = Int(round(part_index * parts_size))
-        left_out_positions = first_left_out_position:last_left_out_position
-
-        test_profiles_indices = shuffled_core_profiles_indices[left_out_positions]
-        n_test_profiles = length(test_profiles_indices)
-        train_profiles_mask = fill(true, n_included_profiles)
-        train_profiles_mask[test_profiles_indices] .= false
-
-        values_of_principal_components_of_train_profiles =
-            values_of_principal_components_of_included_profiles[1:n_principal_components, train_profiles_mask]
-
-        values_of_train_profiles_of_measured_genes =
-            values_of_included_profiles_of_measured_genes[train_profiles_mask, :]
-
-        mean_values_of_principal_components_of_train_profiles =
-            vec(mean(values_of_principal_components_of_train_profiles; dims = 2))
-        @assert_vector(mean_values_of_principal_components_of_train_profiles, n_principal_components)
-
-        mean_values_in_train_profiles_of_measured_genes =
-            vec(mean(values_of_included_profiles_of_measured_genes; dims = 1))
-        @assert_vector(mean_values_in_train_profiles_of_measured_genes, n_measured_genes)
-
-        values_of_principal_components_of_train_profiles .-= mean_values_of_principal_components_of_train_profiles
-        values_of_train_profiles_of_measured_genes .-= transpose(mean_values_in_train_profiles_of_measured_genes)
-
-        coefficients_of_principal_components_of_measured_genes =
-            transpose(values_of_principal_components_of_train_profiles) \ values_of_train_profiles_of_measured_genes
-        @assert_matrix(coefficients_of_principal_components_of_measured_genes, n_principal_components, n_measured_genes)
-
-        values_of_principal_components_of_test_profiles =
-            values_of_principal_components_of_included_profiles[1:n_principal_components, test_profiles_indices]
-
-        values_of_measured_genes_in_test_profiles =
-            transposer(values_of_included_profiles_of_measured_genes[test_profiles_indices, :])
-
-        predicted_values_of_measured_genes_in_test_profiles =
-            transpose(coefficients_of_principal_components_of_measured_genes) *
-            values_of_principal_components_of_test_profiles
-        @assert_matrix(predicted_values_of_measured_genes_in_test_profiles, n_measured_genes, n_test_profiles, Columns)
-
-        predicted_values_of_measured_genes_in_test_profiles .+= mean_values_in_train_profiles_of_measured_genes
-        predicted_values_of_measured_genes_in_test_profiles .-= values_of_measured_genes_in_test_profiles
-        predicted_values_of_measured_genes_in_test_profiles .*= predicted_values_of_measured_genes_in_test_profiles
-
-        rmse_of_measured_genes = sqrt.(vec(mean(predicted_values_of_measured_genes_in_test_profiles; dims = 2)))
-        @assert_vector(rmse_of_measured_genes, n_measured_genes)
-        rmse_of_parts[part_index] = mean(rmse_of_measured_genes)
-    end
-
-    return mean(rmse_of_parts)
-end
-
-function region_metacells_mask(blocks::Blocks, block_indices::Indices)::Mask  # untested
-    metacells_mask = zeros(Bool, length(blocks.blocks_of_metacells))
+function collect_metacells_region_mask(
+    blocks::Blocks,
+    block_indices::AbstractVector{<:Integer},
+)::Union{AbstractVector{Bool}, BitVector}  # untested
+    region_metacells_mask = zeros(Bool, length(blocks.blocks_of_metacells))
     for block_index in block_indices
-        metacells_mask[blocks.metacells_of_blocks[block_index]] .= true
+        region_metacells_mask[blocks.metacells_of_blocks[block_index]] .= true
     end
-    return metacells_mask
+    return region_metacells_mask
 end
 
 function fast_minimize_cost(  # untested
-    compute_cost::Function;
+    compute_cost_result::Function;
     minimal_value::Integer,
     maximal_value::Integer,
     linear_init::Bool,
-)::Tuple{Integer, AbstractFloat}
+)::Tuple{Integer, AbstractFloat, Any}
     min_significant_rmse = 1e-3
 
     @assert min_significant_rmse > 0
@@ -719,18 +664,23 @@ function fast_minimize_cost(  # untested
         end
         @assert sampled_values[end] == maximal_value
 
-        sampled_costs = compute_cost.(sampled_values)  # NOJET
+        sampled_computed = compute_cost_result.(sampled_values)  # NOJET
+        sampled_costs = [sample_cost for (sample_cost, _) in sampled_computed]
+        sampled_results = [sample_result for (_, sample_result) in sampled_computed]
     else
+        sample_cost, sample_result = compute_cost_result(minimal_value)
         sampled_values = [minimal_value]
-        sampled_costs = [compute_cost(minimal_value)]
+        sampled_costs = [sample_cost]
+        sampled_results = [sample_result]
 
         offset = 1
         while sampled_values[end] != maximal_value
             sample_value = min(minimal_value + offset, maximal_value)
             offset *= 2
-            sample_cost = compute_cost(sample_value)
+            sample_cost, sample_result = compute_cost_result(sample_value)
             push!(sampled_values, sample_value)
             push!(sampled_costs, sample_cost)
+            push!(sampled_results, sample_result)
 
             if sample_value == maximal_value ||
                (length(sampled_values) > 4 && sampled_costs[end] - minimum(sampled_costs) > min_significant_rmse * 2)
@@ -776,205 +726,857 @@ function fast_minimize_cost(  # untested
         end
 
         if sample_value === nothing
-            return (best_value, sampled_costs[best_index])
+            return (best_value, sampled_costs[best_index], sampled_results[best_index])
         end
 
+        sample_cost, sample_result = compute_cost_result(sample_value)
         sample_index = searchsortedfirst(sampled_values, sample_value)
         insert!(sampled_values, sample_index, sample_value)
-        insert!(sampled_costs, sample_index, compute_cost(sample_value))
+        insert!(sampled_costs, sample_index, sample_cost)
+        insert!(sampled_results, sample_index, sample_result)
     end
 end
 
-function slow_minimize_cost(  # untested
-    compute_cost::Function;
-    minimal_value::Integer,
-    maximal_value::Integer,
-    linear_init::Bool,
-)::Tuple{Integer, AbstractFloat}
-    @assert 0 < minimal_value < maximal_value
+@kwdef mutable struct BlockContext
+    block_index::Integer
+    n_factor_genes::Integer
+    n_measured_genes::Integer
+    n_environment_metacells::Integer
+    n_neighborhood_metacells::Integer
+    scaled_log_fractions_of_factor_genes_in_environment_metacells::AbstractMatrix{<:AbstractFloat}
+    central_scaled_log_fractions_of_factor_genes_in_environment_metacells::AbstractMatrix{<:AbstractFloat}
+    mean_scaled_log_fractions_of_factor_genes_in_environment_metacells::AbstractVector{<:AbstractFloat}
+    scaled_log_fractions_of_measured_genes_in_environment_metacells::AbstractMatrix{<:AbstractFloat}
+    central_scaled_log_fractions_of_measured_genes_in_environment_metacells::AbstractMatrix{<:AbstractFloat}
+    mean_scaled_log_fractions_of_measured_genes_in_environment_metacells::AbstractVector{<:AbstractFloat}
+    neighborhood_metacells_mask_in_environment::Union{AbstractVector{Bool}, BitVector}
+    neighborhood_metacells_indices_in_environment::AbstractVector{<:Integer}
+    environment_metacells_indices::AbstractVector{<:Integer}
+    neighborhood_metacells_indices::AbstractVector{<:Integer}
+    factor_genes_indices::AbstractVector{<:Integer}
+    measured_genes_indices::AbstractVector{<:Integer}
+    names_of_genes::AbstractVector{<:AbstractString}
+    cross_validation_parts::Integer
+    rng::AbstractRNG
+end
 
-    if linear_init
-        linear_init_steps = 5
-        @assert linear_init_steps > 1
+@kwdef mutable struct BlockModel
+    context::BlockContext
+    method::AbstractString
+    parameters::AbstractString
+    filter::Maybe{AbstractFloat}
+    modules::Bool
+    names_of_programs::Maybe{AbstractVector{<:AbstractString}} = nothing
+    n_programs::Maybe{Integer} = nothing
+    n_positive_programs::Maybe{Integer} = nothing
+    n_used_factors::Maybe{Integer} = nothing
+    n_used_coefficients::Maybe{Integer} = nothing
+    coefficients_of_factor_genes_in_programs::Maybe{AbstractMatrix{<:AbstractFloat}} = nothing
+    values_of_programs_in_environment_metacells::Maybe{AbstractMatrix{<:AbstractFloat}} = nothing
+    central_values_of_programs_in_environment_metacells::Maybe{AbstractMatrix{<:AbstractFloat}} = nothing
+    mean_values_of_programs_in_environment_metacells::Maybe{AbstractVector{<:AbstractFloat}} = nothing
+    coefficients_of_programs_of_measured_genes::Maybe{AbstractMatrix{<:AbstractFloat}} = nothing
+    predicted_measured_genes_in_neighborhood_metacells::Maybe{AbstractMatrix{<:AbstractFloat}} = nothing
+    g_rmse_of_measured_genes::Maybe{AbstractVector{<:AbstractFloat}} = nothing
+    g_rmse::Maybe{AbstractFloat} = nothing
+    x_rmse::Maybe{AbstractFloat} = nothing
+end
 
-        step_size = (maximal_value - minimal_value) / linear_init_steps
-        sampled_values = [minimal_value]
-        for step_index in 1:linear_init_steps
-            sample_value = Int(round(minimal_value + step_size * step_index))
-            if sample_value !== sampled_values[end]
-                @assert sample_value > sampled_values[end]
-                push!(sampled_values, sample_value)
+@logged function compute_block_programs(  # untested
+    daf::DafReader;
+    block_index::Integer,
+    gene_fraction_regularization::AbstractFloat = 2 * GENE_FRACTION_REGULARIZATION,
+    max_principal_components::Integer = 40,
+    min_marker_gene_range_fold::Real = max(
+        function_default(identify_marker_genes!, :min_marker_gene_range_fold) - 1,
+        1,
+    ),
+    min_marker_gene_max_fraction::AbstractFloat = function_default(
+        identify_marker_genes!,
+        :min_marker_gene_max_fraction,
+    ),
+    cross_validation_parts::Integer = 5,
+    rng::AbstractRNG = default_rng(),
+)::Nothing
+    @assert gene_fraction_regularization >= 0
+    @assert max_principal_components > 0
+    @assert cross_validation_parts > 1
+    @assert 0 < block_index <= axis_length(daf, "block")
+
+    mkdir("csvs/block.$(block_index)")
+
+    n_genes = axis_length(daf, "gene")
+    n_metacells = axis_length(daf, "metacell")
+
+    divergence_of_genes = get_vector(daf, "gene", "divergence").array
+    names_of_genes = axis_array(daf, "gene")
+
+    fractions_of_genes_in_metacells = get_matrix(daf, "gene", "metacell", "fraction").array
+    @assert_matrix(fractions_of_genes_in_metacells, n_genes, n_metacells, Columns)
+
+    names_of_blocks = axis_array(daf, "block")
+    block_name = names_of_blocks[block_index]
+
+    neighborhood_metacells_indices = daf["/ metacell & block => is_in_neighborhood ;= $(block_name) : index"]
+    environment_metacells_indices = daf["/ metacell & block => is_in_environment ;= $(block_name) : index"]
+    n_neighborhood_metacells = length(neighborhood_metacells_indices)
+    n_environment_metacells = length(environment_metacells_indices)
+
+    neighborhood_metacells_mask = zeros(Bool, n_metacells)
+    environment_metacells_mask = zeros(Bool, n_metacells)
+
+    neighborhood_metacells_mask[neighborhood_metacells_indices] .= true
+    environment_metacells_mask[environment_metacells_indices] .= true
+    @debug "Metacells in neighborhood: $(n_neighborhood_metacells)"
+    @debug "Metacells in environment: $(n_environment_metacells)"
+
+    environment_marker_genes_mask = marker_genes_of_environment(;
+        daf,
+        gene_fraction_regularization,
+        min_marker_gene_range_fold,
+        min_marker_gene_max_fraction,
+        environment_metacells_mask,
+    )
+    @debug "Marker genes in environment: $(sum(environment_marker_genes_mask))"
+
+    factor_genes_mask =
+        get_vector(daf, "gene", "is_transcription_factor") .&
+        .!get_vector(daf, "gene", "is_forbidden_factor"; default = false) .&
+        environment_marker_genes_mask
+    factor_genes_indices = findall(factor_genes_mask)
+    n_factor_genes = length(factor_genes_indices)
+    @debug "Factors $(length(factor_genes_indices)): [ $(join(sort(names_of_genes[factor_genes_indices]), ", ")) ]"
+    @assert 0 < n_factor_genes < n_genes
+
+    measured_genes_mask = .!factor_genes_mask .& environment_marker_genes_mask
+    n_measured_genes = sum(measured_genes_mask)
+    measured_genes_indices = findall(measured_genes_mask)
+    n_measured_genes = length(measured_genes_indices)
+    @debug "Measured genes in environment: $(n_measured_genes)"
+    @assert n_measured_genes > 0
+
+    log_fractions_of_genes_in_metacells = log2.(fractions_of_genes_in_metacells .+ gene_fraction_regularization)
+    @assert_matrix(log_fractions_of_genes_in_metacells, n_genes, n_metacells, Columns)
+
+    scale_of_genes = 1.0 .- divergence_of_genes
+    scaled_log_fractions_of_genes_in_metacells = log_fractions_of_genes_in_metacells .* scale_of_genes
+    @assert_matrix(scaled_log_fractions_of_genes_in_metacells, n_genes, n_metacells)
+
+    open("csvs/block.$(block_index)/scale_of_genes.csv", "w") do file
+        println(file, "gene,scale")
+        for (name_of_gene, scale_of_gene) in zip(names_of_genes, scale_of_genes)
+            println(file, "$(name_of_gene),$(scale_of_gene)")
+        end
+    end
+
+    open("csvs/block.$(block_index)/measured_in_neighborhood.csv", "w") do file
+        println(file, "metacell,measured_gene,value")
+        for metacell_index in neighborhood_metacells_indices
+            for gene_index in measured_genes_indices
+                println(
+                    file,
+                    "$(metacell_index),$(names_of_genes[gene_index]),$(scaled_log_fractions_of_genes_in_metacells[gene_index, metacell_index])",
+                )
             end
         end
-        @assert sampled_values[end] == maximal_value
+    end
 
-        sampled_costs = compute_cost.(sampled_values)
-    else
-        min_rise_fraction = 0.5
+    open("csvs/block.$(block_index)/factors_in_neighborhood.csv", "w") do file
+        println(file, "metacell,factor_gene,value")
+        for metacell_index in neighborhood_metacells_indices
+            for gene_index in factor_genes_indices
+                println(
+                    file,
+                    "$(metacell_index),$(names_of_genes[gene_index]),$(scaled_log_fractions_of_genes_in_metacells[gene_index, metacell_index])",
+                )
+            end
+        end
+    end
 
-        @assert 0 < min_rise_fraction
+    scaled_log_fractions_of_factor_genes_in_environment_metacells =
+        scaled_log_fractions_of_genes_in_metacells[factor_genes_indices, environment_metacells_mask]
+    @assert_matrix(
+        scaled_log_fractions_of_factor_genes_in_environment_metacells,
+        n_factor_genes,
+        n_environment_metacells
+    )
 
-        sampled_values = [minimal_value]
-        sampled_costs = [compute_cost(minimal_value)]
+    central_scaled_log_fractions_of_factor_genes_in_environment_metacells,
+    mean_scaled_log_fractions_of_factor_genes_in_environment_metacells =
+        centralize(scaled_log_fractions_of_factor_genes_in_environment_metacells)
 
-        offset = 1
-        while sampled_values[end] != maximal_value
-            sample_value = min(minimal_value + offset, maximal_value)
-            offset *= 2
-            sample_cost = compute_cost(sample_value)
-            push!(sampled_values, sample_value)
-            push!(sampled_costs, sample_cost)
+    scaled_log_fractions_of_measured_genes_in_environment_metacells =
+        scaled_log_fractions_of_genes_in_metacells[measured_genes_mask, environment_metacells_mask]
+    @assert_matrix(
+        scaled_log_fractions_of_measured_genes_in_environment_metacells,
+        n_measured_genes,
+        n_environment_metacells
+    )
 
-            if sample_value == maximal_value || (
-                length(sampled_values) > 4 &&
-                sampled_costs[end] - min_rise_fraction * sampled_costs[1] >
-                (1 - min_rise_fraction) * minimum(sampled_costs)
+    central_scaled_log_fractions_of_measured_genes_in_environment_metacells,
+    mean_scaled_log_fractions_of_measured_genes_in_environment_metacells =
+        centralize(scaled_log_fractions_of_measured_genes_in_environment_metacells)
+
+    neighborhood_metacells_mask_in_environment = neighborhood_metacells_mask[environment_metacells_mask]
+    neighborhood_metacells_indices_in_environment = findall(neighborhood_metacells_mask_in_environment)
+
+    context = BlockContext(;
+        block_index,
+        n_factor_genes,
+        n_measured_genes,
+        n_environment_metacells,
+        n_neighborhood_metacells,
+        scaled_log_fractions_of_factor_genes_in_environment_metacells,
+        central_scaled_log_fractions_of_factor_genes_in_environment_metacells,
+        mean_scaled_log_fractions_of_factor_genes_in_environment_metacells,
+        scaled_log_fractions_of_measured_genes_in_environment_metacells,
+        central_scaled_log_fractions_of_measured_genes_in_environment_metacells,
+        mean_scaled_log_fractions_of_measured_genes_in_environment_metacells,
+        neighborhood_metacells_mask_in_environment,
+        neighborhood_metacells_indices_in_environment,
+        environment_metacells_indices,
+        neighborhood_metacells_indices,
+        factor_genes_indices,
+        measured_genes_indices,
+        names_of_genes,
+        cross_validation_parts,
+        rng,
+    )
+    store_block_context(context)
+
+    # PCA
+
+    pca = fit(PCA, scaled_log_fractions_of_factor_genes_in_environment_metacells; maxoutdim = max_principal_components)
+    @assert indim(pca) == n_factor_genes
+    n_pca_principal_components = outdim(pca)
+    @assert n_pca_principal_components <= max_principal_components
+
+    pca_coefficients_of_factor_genes_in_principal_components = loadings(pca)
+    @assert_matrix(pca_coefficients_of_factor_genes_in_principal_components, n_factor_genes, n_pca_principal_components)
+
+    pca_model = BlockModel(;
+        context,
+        method = "pca",
+        parameters = "all",
+        filter = nothing,
+        modules = false,
+        coefficients_of_factor_genes_in_programs = pca_coefficients_of_factor_genes_in_principal_components,
+        n_programs = n_pca_principal_components,
+    )
+    evaluate_block_model!(pca_model)
+
+    store_block_model(pca_model)
+    modules_model(pca_model)
+    filter_model(pca_model)
+
+    _, _, subset_pca_model = fast_minimize_cost(;
+        minimal_value = 1,
+        maximal_value = n_pca_principal_components,
+        linear_init = true,
+    ) do m_used_principal_components
+        subset_pca_model = BlockModel(;
+            context,
+            method = "pca",
+            parameters = "top=$(m_used_principal_components)",
+            filter = nothing,
+            modules = false,
+            coefficients_of_factor_genes_in_programs = pca_coefficients_of_factor_genes_in_principal_components[
+                :,
+                1:m_used_principal_components,
+            ],
+            n_programs = m_used_principal_components,
+        )
+        evaluate_block_model!(subset_pca_model)
+        return (subset_pca_model.x_rmse, subset_pca_model)
+    end
+
+    store_block_model(subset_pca_model)
+    modules_model(subset_pca_model)
+    filter_model(subset_pca_model)
+
+    # POLARITY
+
+    polarity_coefficients_of_factor_genes_in_principal_components = hcat(
+        max.(pca_coefficients_of_factor_genes_in_principal_components, 0),
+        .-min.(pca_coefficients_of_factor_genes_in_principal_components, 0),
+    )
+    @assert_matrix(
+        polarity_coefficients_of_factor_genes_in_principal_components,
+        n_factor_genes,
+        2 * n_pca_principal_components
+    )
+
+    polarity_model = BlockModel(;
+        context,
+        method = "polarity",
+        parameters = "all",
+        filter = nothing,
+        modules = false,
+        coefficients_of_factor_genes_in_programs = polarity_coefficients_of_factor_genes_in_principal_components,
+        n_programs = 2 * n_pca_principal_components,
+        n_positive_programs = n_pca_principal_components,
+    )
+    evaluate_block_model!(polarity_model)
+
+    store_block_model(polarity_model)
+    modules_model(polarity_model)
+    filter_model(polarity_model)
+
+    _, _, subset_polarity_model = fast_minimize_cost(;
+        minimal_value = 1,
+        maximal_value = n_pca_principal_components,
+        linear_init = true,
+    ) do n_positive_principal_components
+        _, _, subset_polarity_model = fast_minimize_cost(;
+            minimal_value = 1,
+            maximal_value = n_pca_principal_components,
+            linear_init = true,
+        ) do n_negative_principal_components
+            subset_polarity_model = BlockModel(;
+                context,
+                method = "polarity",
+                parameters = "pos=$(n_positive_principal_components).neg=$(n_negative_principal_components)",
+                filter = nothing,
+                modules = false,
+                coefficients_of_factor_genes_in_programs = polarity_coefficients_of_factor_genes_in_principal_components[
+                    :,
+                    vcat(
+                        collect(1:n_positive_principal_components),
+                        collect(
+                            (n_pca_principal_components + 1):(n_pca_principal_components + n_negative_principal_components),
+                        ),
+                    ),
+                ],
+                n_programs = n_positive_principal_components + n_negative_principal_components,
             )
-                break
+            evaluate_block_model!(subset_polarity_model)
+            return (subset_polarity_model.x_rmse, subset_polarity_model)
+        end
+        return (subset_polarity_model.x_rmse, subset_polarity_model)
+    end
+
+    store_block_model(subset_polarity_model)
+    modules_model(subset_polarity_model)
+    filter_model(subset_polarity_model)
+
+    # NMF
+
+    rebased_scaled_log_fractions_of_factor_genes_in_environment_metacells =
+        scaled_log_fractions_of_factor_genes_in_environment_metacells .- log2(gene_fraction_regularization)
+
+    max_nmf_programs = min(max_principal_components, context.n_factor_genes)
+    result = nnmf(rebased_scaled_log_fractions_of_factor_genes_in_environment_metacells, max_nmf_programs)
+    nmf_coefficients_of_factor_genes_in_programs = result.W
+    @assert_matrix(nmf_coefficients_of_factor_genes_in_programs, n_factor_genes, max_nmf_programs, Columns)
+
+    nmf_model = BlockModel(;
+        context,
+        method = "nmf",
+        parameters = "all",
+        filter = nothing,
+        modules = false,
+        coefficients_of_factor_genes_in_programs = nmf_coefficients_of_factor_genes_in_programs,
+        n_programs = max_nmf_programs,
+    )
+    evaluate_block_model!(nmf_model)
+
+    store_block_model(nmf_model)
+    modules_model(nmf_model)
+    filter_model(nmf_model)
+
+    _, _, nmf_model =
+        fast_minimize_cost(; minimal_value = 1, maximal_value = max_nmf_programs, linear_init = false) do n_nmf_programs
+            result = nnmf(rebased_scaled_log_fractions_of_factor_genes_in_environment_metacells, n_nmf_programs)  # NOJET
+            nmf_coefficients_of_factor_genes_in_programs = result.W
+            @assert_matrix(nmf_coefficients_of_factor_genes_in_programs, n_factor_genes, n_nmf_programs, Columns)
+
+            nmf_model = BlockModel(;
+                context,
+                method = "nmf",
+                parameters = "few=$(n_nmf_programs)",
+                filter = nothing,
+                modules = false,
+                coefficients_of_factor_genes_in_programs = nmf_coefficients_of_factor_genes_in_programs,
+                n_programs = n_nmf_programs,
+            )
+            evaluate_block_model!(nmf_model)
+            return (nmf_model.x_rmse, nmf_model)
+        end
+
+    store_block_model(nmf_model)
+    modules_model(nmf_model)
+    filter_model(nmf_model)
+
+    return nothing
+end
+
+function filter_model(base_model::BlockModel)::Nothing
+    @assert base_model.filter === nothing
+    @assert !base_model.modules
+
+    BAD_RMSE = 10.0
+
+    _, _, filtered_model =
+        fast_minimize_cost(; minimal_value = 1, maximal_value = 1000, linear_init = true) do threshold_k
+            threshold = threshold_k / 1000
+            filtered_coefficients_of_factor_genes_in_programs =
+                copy_array(base_model.coefficients_of_factor_genes_in_programs)
+            filtered_coefficients_of_factor_genes_in_programs[abs.(
+                filtered_coefficients_of_factor_genes_in_programs
+            ) .< threshold] .= 0
+
+            maximal_coefficients_in_programs =
+                vec(maximum(abs.(filtered_coefficients_of_factor_genes_in_programs); dims = 1))
+            @assert_vector(maximal_coefficients_in_programs, base_model.n_programs)
+            nonzero_programs_mask = maximal_coefficients_in_programs .> 0
+            filtered_coefficients_of_factor_genes_in_programs =
+                filtered_coefficients_of_factor_genes_in_programs[:, nonzero_programs_mask]
+            n_programs = size(filtered_coefficients_of_factor_genes_in_programs, 2)
+            if n_programs == 0
+                return (BAD_RMSE, nothing)
+            end
+            if base_model.n_positive_programs === nothing
+                n_positive_programs = nothing
+            else
+                n_positive_programs = sum(nonzero_programs_mask[1:(base_model.n_positive_programs)])  # NOJET
+            end
+
+            filtered_model = BlockModel(;
+                context = base_model.context,
+                method = base_model.method,
+                parameters = base_model.parameters,
+                filter = threshold,
+                modules = false,
+                coefficients_of_factor_genes_in_programs = filtered_coefficients_of_factor_genes_in_programs,
+                n_programs,
+                n_positive_programs,
+            )
+
+            evaluate_block_model!(filtered_model)
+            return (filtered_model.x_rmse, filtered_model)
+        end
+
+    store_block_model(filtered_model)
+    return modules_model(filtered_model)
+end
+
+function modules_model(base_model::BlockModel)::Nothing
+    @assert !base_model.modules
+
+    modules_coefficients_of_factor_genes_in_programs = copy_array(base_model.coefficients_of_factor_genes_in_programs)
+    zero_programs_mask = fill(true, base_model.n_programs)  # NOJET
+    for factor_gene_position in 1:(base_model.context.n_factor_genes)
+        program_index = argmax(vec(abs.(modules_coefficients_of_factor_genes_in_programs[factor_gene_position, :])))
+        zero_programs_mask[program_index] = false
+        modules_coefficients_of_factor_genes_in_programs[factor_gene_position, zero_programs_mask] .= 0
+        zero_programs_mask[program_index] = true
+    end
+
+    maximal_coefficients_in_programs = vec(maximum(abs.(modules_coefficients_of_factor_genes_in_programs); dims = 1))
+    @assert_vector(maximal_coefficients_in_programs, base_model.n_programs)
+    nonzero_programs_mask = maximal_coefficients_in_programs .> 0
+    modules_coefficients_of_factor_genes_in_programs =
+        modules_coefficients_of_factor_genes_in_programs[:, nonzero_programs_mask]
+    n_programs = size(modules_coefficients_of_factor_genes_in_programs, 2)
+
+    if n_programs > 0
+        if base_model.n_positive_programs === nothing
+            n_positive_programs = nothing
+        else
+            n_positive_programs = sum(nonzero_programs_mask[1:(base_model.n_positive_programs)])  # NOJET
+        end
+        modules_model = BlockModel(;
+            context = base_model.context,
+            method = base_model.method,
+            parameters = base_model.parameters,
+            filter = base_model.filter,
+            modules = true,
+            coefficients_of_factor_genes_in_programs = modules_coefficients_of_factor_genes_in_programs,
+            n_programs,
+            n_positive_programs,
+        )
+        evaluate_block_model!(modules_model)
+        store_block_model(modules_model)
+    end
+
+    return nothing
+end
+
+function evaluate_block_model!(model::BlockModel)::Nothing
+    @assert_matrix(model.coefficients_of_factor_genes_in_programs, model.context.n_factor_genes, model.n_programs)
+
+    if model.n_used_factors === nothing
+        factors_coefficients_mask = vec(maximum(abs.(model.coefficients_of_factor_genes_in_programs); dims = 2) .> 0)
+        @assert_vector(factors_coefficients_mask, model.context.n_factor_genes)
+        model.n_used_factors = sum(factors_coefficients_mask)
+    end
+
+    if model.n_used_coefficients === nothing
+        model.n_used_coefficients = sum(model.coefficients_of_factor_genes_in_programs .!= 0)
+    end
+
+    if model.values_of_programs_in_environment_metacells === nothing
+        model.values_of_programs_in_environment_metacells =
+            transpose(model.coefficients_of_factor_genes_in_programs) *
+            model.context.scaled_log_fractions_of_factor_genes_in_environment_metacells
+    end
+    @assert_matrix(
+        model.values_of_programs_in_environment_metacells,
+        model.n_programs,
+        model.context.n_environment_metacells
+    )
+
+    if model.central_values_of_programs_in_environment_metacells === nothing ||  # NOJET
+       model.mean_values_of_programs_in_environment_metacells
+        model.central_values_of_programs_in_environment_metacells,  # NOJET
+        model.mean_values_of_programs_in_environment_metacells =
+            centralize(model.values_of_programs_in_environment_metacells)
+    end
+    @assert_matrix(
+        model.central_values_of_programs_in_environment_metacells,
+        model.n_programs,
+        model.context.n_environment_metacells
+    )
+
+    if model.coefficients_of_programs_of_measured_genes === nothing
+        model.coefficients_of_programs_of_measured_genes =
+            transpose(model.central_values_of_programs_in_environment_metacells) \
+            transpose(model.context.central_scaled_log_fractions_of_measured_genes_in_environment_metacells)
+    end
+    @assert_matrix(model.coefficients_of_programs_of_measured_genes, model.n_programs, model.context.n_measured_genes)
+
+    if model.predicted_measured_genes_in_neighborhood_metacells === nothing
+        model.predicted_measured_genes_in_neighborhood_metacells =
+            transpose(model.coefficients_of_programs_of_measured_genes) *
+            model.central_values_of_programs_in_environment_metacells[
+                :,
+                model.context.neighborhood_metacells_indices_in_environment,
+            ]
+        model.predicted_measured_genes_in_neighborhood_metacells .+=  # NOJET
+            model.context.mean_scaled_log_fractions_of_measured_genes_in_environment_metacells
+    end
+    @assert_matrix(
+        model.predicted_measured_genes_in_neighborhood_metacells,
+        model.context.n_measured_genes,
+        model.context.n_neighborhood_metacells,
+    )
+
+    if model.g_rmse_of_measured_genes === nothing
+        error_of_measured_genes_in_neighborhood_metacells =
+            model.predicted_measured_genes_in_neighborhood_metacells .-
+            model.context.scaled_log_fractions_of_measured_genes_in_environment_metacells[
+                :,
+                model.context.neighborhood_metacells_indices_in_environment,
+            ]
+        error_of_measured_genes_in_neighborhood_metacells .*= error_of_measured_genes_in_neighborhood_metacells
+        model.g_rmse_of_measured_genes = sqrt.(vec(mean(error_of_measured_genes_in_neighborhood_metacells; dims = 2)))
+    end
+    @assert_vector(model.g_rmse_of_measured_genes, model.context.n_measured_genes)
+
+    if model.g_rmse === nothing
+        model.g_rmse = mean(model.g_rmse_of_measured_genes)
+    end
+
+    if model.x_rmse === nothing
+        model.x_rmse = compute_cross_validation_of_prediction(
+            solve_least_squares;
+            predictors_in_profiles = model.values_of_programs_in_environment_metacells,
+            measured_in_profiles = model.context.scaled_log_fractions_of_measured_genes_in_environment_metacells,
+            core_profiles_indices = model.context.neighborhood_metacells_indices_in_environment,
+            cross_validation_parts = model.context.cross_validation_parts,
+            rng = model.context.rng,
+        )
+    end
+
+    return nothing
+end
+
+function store_block_context(context::BlockContext)::Nothing
+    csv_path_prefix = "csvs/block.$(context.block_index)/"
+
+    open(csv_path_prefix * "factors_in_environment.csv", "w") do file
+        println(file, "metacell,factor_gene,value")
+        for (metacell_position, metacell_index) in enumerate(context.environment_metacells_indices)
+            for (gene_position, gene_index) in enumerate(context.factor_genes_indices)
+                gene_name = context.names_of_genes[gene_index]
+                value = context.scaled_log_fractions_of_factor_genes_in_environment_metacells[
+                    gene_position,
+                    metacell_position,
+                ]
+                println(file, "$(metacell_index),$(gene_name),$(value)")
             end
         end
     end
 
-    n_samples = length(sampled_values)
-    sampled_repeats = fill(1, n_samples)
-
-    while true
-        local_minimum_indices = find_local_minimums(sampled_costs)
-
-        if ensure_sampled_minimums(;
-            compute_cost = compute_cost,
-            local_minimum_indices = local_minimum_indices,
-            sampled_values = sampled_values,
-            sampled_repeats = sampled_repeats,
-            sampled_costs = sampled_costs,
-        )
-            continue
-        end
-
-        if refine_sampled_minimums(;
-            compute_cost = compute_cost,
-            local_minimum_indices = local_minimum_indices,
-            sampled_values = sampled_values,
-            sampled_repeats = sampled_repeats,
-            sampled_costs = sampled_costs,
-        )
-            continue
-        end
-
-        minimum_index = argmin(sampled_costs)
-        return (sampled_values[minimum_index], sampled_costs[minimum_index])
-    end
-end
-
-function find_local_minimums(sampled_costs::AbstractVector{<:AbstractFloat})::AbstractVector{<:Integer}  # untested
-    n_samples = length(sampled_costs)
-    local_minimum_indices = Int32[]
-
-    @assert length(sampled_costs) > 1
-
-    if sampled_costs[1] < sampled_costs[2]
-        push!(local_minimum_indices, 1)
-    end
-
-    for index in 2:(n_samples - 1)
-        if sampled_costs[index] < sampled_costs[index - 1] && sampled_costs[index] < sampled_costs[index + 1]
-            push!(local_minimum_indices, index)
-        end
-    end
-
-    if sampled_costs[n_samples] < sampled_costs[n_samples - 1]
-        push!(local_minimum_indices, length(sampled_costs))
-    end
-
-    @assert length(local_minimum_indices) > 0
-    return local_minimum_indices
-end
-
-function ensure_sampled_minimums(;  # untested
-    compute_cost::Function,
-    local_minimum_indices::AbstractVector{<:Integer},
-    sampled_values::AbstractVector{<:Integer},
-    sampled_repeats::AbstractVector{<:Integer},
-    sampled_costs::AbstractVector{<:AbstractFloat},
-)::Bool
-    n_local_minimums = length(local_minimum_indices)
-    @assert n_local_minimums > 0
-
-    if n_local_minimums == 1
-        return false
-    end
-
-    min_repeats = 3
-
-    n_samples = length(sampled_values)
-    @assert_vector(sampled_repeats, n_samples)
-    @assert_vector(sampled_costs, n_samples)
-
-    did_sample = false
-
-    for local_minimum_index in local_minimum_indices
-        low_index = max(local_minimum_index - 1, 1)
-        high_index = min(local_minimum_index + 1, n_samples)
-        for index in low_index:high_index
-            repeats = sampled_repeats[index]
-            while repeats < min_repeats
-                repeats += 1
-                new_weight = 1.0 / repeats
-                old_weight = 1.0 - new_weight
-                sampled_repeats[index] = repeats
-                sampled_costs[index] =
-                    old_weight * sampled_costs[index] + new_weight * compute_cost(sampled_values[index])
-                did_sample = true
+    open(csv_path_prefix * "measured_in_environment.csv", "w") do file
+        println(file, "metacell,measured_gene,value")
+        for (metacell_position, metacell_index) in enumerate(context.environment_metacells_indices)
+            for (gene_position, gene_index) in enumerate(context.measured_genes_indices)
+                gene_name = context.names_of_genes[gene_index]
+                value = context.scaled_log_fractions_of_measured_genes_in_environment_metacells[
+                    gene_position,
+                    metacell_position,
+                ]
+                println(file, "$(metacell_index),$(gene_name),$(value)")
             end
         end
     end
 
-    return did_sample
+    return nothing
 end
 
-function refine_sampled_minimums(;  # untested
-    compute_cost::Function,
-    local_minimum_indices::AbstractVector{<:Integer},
-    sampled_values::AbstractVector{<:Integer},
-    sampled_repeats::AbstractVector{<:Integer},
-    sampled_costs::AbstractVector{<:AbstractFloat},
-)::Bool
-    n_local_minimums = length(local_minimum_indices)
-    @assert n_local_minimums > 0
-
-    n_samples = length(sampled_values)
-    @assert_vector(sampled_repeats, n_samples)
-    @assert_vector(sampled_costs, n_samples)
-
-    for local_minimum_index in local_minimum_indices
-        minimum_value = sampled_values[local_minimum_index]
-
-        low_index = max(local_minimum_index - 1, 1)
-        high_index = min(local_minimum_index + 1, n_samples)
-
-        low_value = sampled_values[low_index]
-        high_value = sampled_values[high_index]
-
-        low_gap = minimum_value - low_value
-        high_gap = high_value - minimum_value
-
-        mid_value = nothing
-        if low_gap > 1 && low_gap >= high_gap
-            mid_value = div(low_value + minimum_value, 2)
-        elseif high_gap > 1
-            mid_value = div(high_value + minimum_value, 2)
-        end
-
-        if mid_value !== nothing
-            mid_index = searchsortedfirst(sampled_values, mid_value)
-            insert!(sampled_values, mid_index, mid_value)
-            insert!(sampled_repeats, mid_index, 1)
-            insert!(sampled_costs, mid_index, compute_cost(mid_value))
-            return true
+function store_block_model(model::BlockModel)::Nothing
+    if !isfile("csvs/methods.csv")
+        open("csvs/methods.csv", "a") do file
+            return println(
+                file,
+                "block" *
+                ",method" *
+                ",params" *
+                ",filter" *
+                ",unique" *
+                ",programs" *
+                ",used_factors" *
+                ",used_coeffs" *
+                ",g_rmse" *
+                ",x_rmse",
+            )
         end
     end
 
-    return false
+    open("csvs/methods.csv", "a") do file
+        return println(
+            file,
+            "$(model.context.block_index)" *
+            ",$(model.method)" *
+            ",$(model.parameters)" *
+            ",$(model.filter === nothing ? "1.0" : model.filter)" *
+            ",$(model.modules ? "modules" : "programs")" *
+            ",$(model.n_programs)" *
+            ",$(model.n_used_factors)" *
+            ",$(model.n_used_coefficients)" *
+            ",$(model.g_rmse)" *
+            ",$(model.x_rmse)",
+        )
+    end
+
+    prefix = "$(model.method).$(model.parameters)"
+    if model.filter !== nothing
+        prefix *= ".filter=$(model.filter)"
+    end
+    if model.modules
+        prefix *= ".modules"
+    end
+
+    @debug "$(prefix) X-RMSE: $(model.x_rmse) programs: $(model.n_programs) factors: $(model.n_used_factors) coeffs: $(model.n_used_coefficients)"
+
+    csv_path_prefix = "csvs/block.$(model.context.block_index)/$(prefix)"
+    open(csv_path_prefix * ".factor_programs.csv", "w") do file
+        println(file, "block,program,factor_gene,coefficient")
+        for program_index in 1:(model.n_programs)  # NOJET
+            if model.names_of_programs === nothing
+                program_name = "$(program_index)"
+            else
+                program_name = model.names_of_programs[program_index]
+            end
+            for gene_position in 1:(model.context.n_factor_genes)
+                gene_name = model.context.names_of_genes[model.context.factor_genes_indices[gene_position]]
+                value = model.coefficients_of_programs_of_measured_genes[program_index, gene_position]
+                println(file, "$(model.context.block_index),$(program_name),$(gene_name),$(value)")
+            end
+        end
+    end
+
+    open(csv_path_prefix * ".measured_programs.csv", "w") do file
+        println(file, "block,program,measured_gene,coefficient")
+        for program_index in 1:(model.n_programs)  # NOJET
+            if model.names_of_programs === nothing
+                program_name = "$(program_index)"
+            else
+                program_name = model.names_of_programs[program_index]
+            end
+            for gene_position in 1:(model.context.n_measured_genes)
+                gene_name = model.context.names_of_genes[model.context.measured_genes_indices[gene_position]]
+                value = model.coefficients_of_programs_of_measured_genes[program_index, gene_position]
+                println(file, "$(model.context.block_index),$(program_name),$(gene_name),$(value)")
+            end
+        end
+    end
+
+    open(csv_path_prefix * ".g_rmse_of_measured.csv", "w") do file
+        println(file, "block,gene,g_rmse")
+        for gene_position in 1:(model.context.n_measured_genes)
+            gene_name = model.context.names_of_genes[model.context.measured_genes_indices[gene_position]]
+            value = model.g_rmse_of_measured_genes[gene_position]
+            println(file, "$(model.context.block_index),$(gene_name),$(value)")
+        end
+    end
+
+    open(csv_path_prefix * ".programs_in_environment.csv", "w") do file
+        println(file, "block,metacell,program,value")
+        for (metacell_position, metacell_index) in enumerate(model.context.environment_metacells_indices)
+            for program_index in 1:(model.n_programs)  # NOJET
+                if model.names_of_programs === nothing
+                    program_name = "$(program_index)"
+                else
+                    program_name = model.names_of_programs[program_index]
+                end
+                value = model.values_of_programs_in_environment_metacells[program_index, metacell_position]
+                println(file, "$(model.context.block_index),$(metacell_index),$(program_name),$(value)")
+            end
+        end
+    end
+
+    open(csv_path_prefix * ".programs_in_neighborhood.csv", "w") do file
+        println(file, "block,metacell,program,value")
+        for metacell_position in model.context.neighborhood_metacells_indices_in_environment
+            for program_index in 1:(model.n_programs)  # NOJET
+                if model.names_of_programs === nothing
+                    program_name = "$(program_index)"
+                else
+                    program_name = model.names_of_programs[program_index]
+                end
+                metacell_index = model.context.environment_metacells_indices[metacell_position]
+                value = model.values_of_programs_in_environment_metacells[program_index, metacell_position]
+                println(file, "$(model.context.block_index),$(metacell_index),$(program_name),$(value)")
+            end
+        end
+    end
+
+    open(csv_path_prefix * ".predicted_in_neighborhood.csv", "w") do file
+        println(file, "block,metacell,measured_gene,value")
+        for (metacell_position, metacell_index) in enumerate(model.context.neighborhood_metacells_indices)
+            for (gene_position, gene_index) in enumerate(model.context.measured_genes_indices)
+                metacell_index = model.context.environment_metacells_indices[metacell_position]
+                value = model.predicted_measured_genes_in_neighborhood_metacells[gene_position, metacell_position]
+                gene_name = model.context.names_of_genes[gene_index]
+                println(file, "$(model.context.block_index),$(metacell_index),$(gene_name),$(value)")
+            end
+        end
+    end
+
+    return nothing
+end
+
+function centralize(
+    values_of_profiles::AbstractMatrix{<:AbstractFloat},
+    means_of_values::Maybe{AbstractVector{<:AbstractFloat}} = nothing,
+)::Tuple{AbstractMatrix{<:AbstractFloat}, AbstractVector{<:AbstractFloat}}
+    n_values = size(values_of_profiles, 1)
+    if means_of_values === nothing
+        means_of_values = vec(mean(values_of_profiles; dims = 2))
+    end
+    @assert_vector(means_of_values, n_values)
+    return (values_of_profiles .- means_of_values, means_of_values)
+end
+
+function solve_least_squares(
+    central_predictors_in_profiles::AbstractMatrix{<:AbstractFloat},
+    central_measured_in_profiles::AbstractMatrix{<:AbstractFloat},
+)::AbstractMatrix{<:AbstractFloat}
+    n_predictors, n_profiles = size(central_predictors_in_profiles)
+    n_measured = size(central_measured_in_profiles, 1)
+    @assert_matrix(central_predictors_in_profiles, n_predictors, n_profiles, Columns)
+    @assert_matrix(central_measured_in_profiles, n_measured, n_profiles, Columns)
+    coefficients_of_predictors_of_measured =
+        transpose(central_predictors_in_profiles) \ transpose(central_measured_in_profiles)
+    @assert_matrix(coefficients_of_predictors_of_measured, n_predictors, n_measured, Columns)
+    return coefficients_of_predictors_of_measured
+end
+
+function marker_genes_of_environment(;  # untested
+    daf::DafReader,
+    gene_fraction_regularization::AbstractFloat,
+    min_marker_gene_range_fold::Real,
+    min_marker_gene_max_fraction::AbstractFloat,
+    environment_metacells_mask::Union{AbstractVector{Bool}, BitVector},
+)::Union{AbstractVector{Bool}, BitVector}
+    chain = chain_writer([daf, MemoryDaf(; name = "environment")]; name = "mask_chain")
+    set_vector!(chain, "metacell", "is_in_environment", environment_metacells_mask; overwrite = true)
+    adapter(  # NOJET
+        chain;
+        input_axes = ["metacell" => "/metacell & is_in_environment", "gene" => "="],
+        input_data = [("gene", "divergence") => "=", ("metacell", "gene", "fraction") => "="],
+        output_axes = ["gene" => "="],
+        output_data = [("gene", "is_marker") => "="],
+        overwrite = true,
+    ) do adapted
+        return identify_marker_genes!(
+            adapted;
+            gene_fraction_regularization = gene_fraction_regularization,
+            min_marker_gene_range_fold = min_marker_gene_range_fold,
+            min_marker_gene_max_fraction = min_marker_gene_max_fraction,
+            overwrite = true,
+        )
+    end
+    return get_vector(chain, "gene", "is_marker").array
+end
+
+function compute_cross_validation_of_prediction(
+    solve::Function;
+    predictors_in_profiles::AbstractMatrix{<:AbstractFloat},
+    measured_in_profiles::AbstractMatrix{<:AbstractFloat},
+    core_profiles_indices::AbstractVector{<:Integer},
+    cross_validation_parts::Integer,
+    rng::AbstractRNG,
+)::AbstractFloat
+    n_predictors, n_profiles = size(predictors_in_profiles)
+    n_measured = size(measured_in_profiles, 1)
+    n_core_profiles = length(core_profiles_indices)
+
+    @assert_matrix(predictors_in_profiles, n_predictors, n_profiles, Columns)
+    @assert_matrix(measured_in_profiles, n_measured, n_profiles, Columns)
+    @assert_vector(core_profiles_indices, n_core_profiles)
+
+    parts_size = n_core_profiles / cross_validation_parts
+    rmse_of_parts = Vector{Float32}(undef, cross_validation_parts)
+    shuffled_core_profiles_indices = shuffle(rng, core_profiles_indices)
+    train_profiles_mask = Vector{Bool}(undef, n_profiles)
+
+    for part_index in 1:cross_validation_parts
+        first_left_out_position = Int(round((part_index - 1) * parts_size)) + 1
+        last_left_out_position = Int(round(part_index * parts_size))
+        left_out_positions = first_left_out_position:last_left_out_position
+
+        test_profiles_indices = shuffled_core_profiles_indices[left_out_positions]
+        n_test_profiles = length(test_profiles_indices)
+
+        train_profiles_mask .= true
+        train_profiles_mask[test_profiles_indices] .= false
+        n_train_profiles = n_profiles - n_test_profiles
+
+        central_predictors_in_train_profiles, means_of_predictors_in_train_profiles =
+            centralize(predictors_in_profiles[:, train_profiles_mask])
+        @assert_matrix(central_predictors_in_train_profiles, n_predictors, n_train_profiles, Columns)
+        @assert_vector(means_of_predictors_in_train_profiles, n_predictors)
+
+        central_measured_in_train_profiles, means_of_measured_in_train_profiles =
+            centralize(measured_in_profiles[:, train_profiles_mask])
+        @assert_matrix(central_measured_in_train_profiles, n_measured, n_train_profiles, Columns)
+        @assert_vector(means_of_measured_in_train_profiles, n_measured)
+
+        coefficients_of_predictors_of_measured =
+            solve(central_predictors_in_train_profiles, central_measured_in_train_profiles)
+        @assert_matrix(coefficients_of_predictors_of_measured, n_predictors, n_measured, Columns)
+
+        central_predictors_in_test_profiles, _ =
+            centralize(predictors_in_profiles[:, test_profiles_indices], means_of_predictors_in_train_profiles)
+        @assert_matrix(central_predictors_in_test_profiles, n_predictors, n_test_profiles, Columns)
+
+        predicted_measured_of_test_profiles =
+            transpose(coefficients_of_predictors_of_measured) * central_predictors_in_test_profiles
+        @assert_matrix(predicted_measured_of_test_profiles, n_measured, n_test_profiles, Columns)
+        predicted_measured_of_test_profiles .+= means_of_measured_in_train_profiles
+
+        predicted_measured_of_test_profiles .-= measured_in_profiles[:, test_profiles_indices]
+        predicted_measured_of_test_profiles .*= predicted_measured_of_test_profiles
+        rmse_of_measured = sqrt.(vec(mean(predicted_measured_of_test_profiles; dims = 2)))
+        @assert_vector(rmse_of_measured, n_measured)
+
+        rmse_of_parts[part_index] = mean(rmse_of_measured)
+    end
+
+    return mean(rmse_of_parts)
 end
 
 end  # module

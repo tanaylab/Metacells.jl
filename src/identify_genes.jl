@@ -78,7 +78,7 @@ $(CONTRACT)
         (range_fold_of_genes .>= min_marker_gene_range_fold) .&
         (log_maximal_fraction_of_genes .>= log2.(min_marker_gene_max_fraction + gene_fraction_regularization))
 
-    set_vector!(daf, "gene", "is_marker", is_marker_of_genes; overwrite = overwrite)
+    set_vector!(daf, "gene", "is_marker", is_marker_of_genes; overwrite)
     return nothing
 end
 
@@ -131,7 +131,7 @@ $(CONTRACT)
     @assert all(divergence_of_genes .>= 0)
     @assert all(divergence_of_genes .< 1.0)
 
-    set_vector!(daf, "gene", "divergence", divergence_of_genes; overwrite = overwrite)
+    set_vector!(daf, "gene", "divergence", divergence_of_genes; overwrite)
     return nothing
 end
 
@@ -198,7 +198,7 @@ $(CONTRACT)
 
     is_correlated_of_genes = max_correlations_of_genes .>= threshold
 
-    set_vector!(daf, "gene", "is_correlated", is_correlated_of_genes; overwrite = overwrite)
+    set_vector!(daf, "gene", "is_correlated", is_correlated_of_genes; overwrite)
     return nothing
 end
 

@@ -219,8 +219,8 @@ end
 function import_raw_cells(destination::DafWriter, raw_cells_h5ad::AbstractString, metacells_daf::DafReader)::Nothing
     raw_cells_daf = anndata_as_daf(raw_cells_h5ad; name = "raw_cells", obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
-    copy_axis!(; destination = destination, source = raw_cells_daf, axis = "cell")
-    copy_axis!(; destination = destination, source = raw_cells_daf, axis = "gene")
+    copy_axis!(; destination, source = raw_cells_daf, axis = "cell")
+    copy_axis!(; destination, source = raw_cells_daf, axis = "gene")
 
     import_scalars_data(destination, raw_cells_daf)
 
@@ -245,8 +245,8 @@ function import_clean_cells(
         anndata_as_daf(clean_cells_h5ad; name = "clean_cells", obs_is = "cell", var_is = "gene", X_is = "UMIs")
 
     if copy_axes
-        copy_axis!(; destination = destination, source = clean_cells_daf, axis = "cell")
-        copy_axis!(; destination = destination, source = clean_cells_daf, axis = "gene")
+        copy_axis!(; destination, source = clean_cells_daf, axis = "cell")
+        copy_axis!(; destination, source = clean_cells_daf, axis = "gene")
         sparsify_umis(clean_cells_daf)
     end
 
@@ -254,9 +254,9 @@ function import_clean_cells(
 
     for axis in ("cell", "gene")
         copy_vector!(;  # NOJET
-            destination = destination,
+            destination,
             source = clean_cells_daf,
-            axis = axis,
+            axis,
             name = "is_excluded",
             default = false,
             empty = true,
@@ -282,7 +282,7 @@ function import_metacells(
     type_properties::Maybe{AbstractSet{<:AbstractString}},
     properties_defaults::Maybe{Dict},
 )::Nothing
-    copy_axis!(; destination = destination, source = metacells_daf, axis = "metacell")
+    copy_axis!(; destination, source = metacells_daf, axis = "metacell")
 
     import_scalars_data(destination, metacells_daf)
 
@@ -348,7 +348,7 @@ function import_metacell_types(
         implicit_axis = rename_type,
         empty_implicit = empty_type,
         implicit_properties = type_properties,
-        properties_defaults = properties_defaults,
+        properties_defaults,
     )
 
     copy_axis!(; destination = metacells_daf, source = destination, axis = rename_type)
@@ -363,7 +363,7 @@ end
 function import_scalars_data(destination::DafWriter, source::DafReader)::Nothing
     for scalar_name in scalars_set(source)
         if scalar_name != "__name__" && !has_scalar(destination, scalar_name)
-            copy_scalar!(; destination = destination, source = source, name = scalar_name)
+            copy_scalar!(; destination, source, name = scalar_name)
         end
     end
     return nothing
@@ -421,15 +421,7 @@ function import_vectors(
                         dtype = nothing
                     end
 
-                    copy_vector!(;  # NOJET
-                        destination = destination,
-                        source = source,
-                        axis = axis,
-                        name = vector_name,
-                        rename = rename,
-                        dtype = dtype,
-                        empty = empty,
-                    )
+                    copy_vector!(; destination, source, axis, name = vector_name, rename, dtype, empty) # NOJET
                 end
             end
         end
@@ -490,14 +482,14 @@ function import_matrices(
                 end
 
                 copy_matrix!(;  # NOJET
-                    destination = destination,
-                    source = source,
-                    rows_axis = rows_axis,
-                    columns_axis = columns_axis,
+                    destination,
+                    source,
+                    rows_axis,
+                    columns_axis,
                     name = matrix_name,
-                    rename = rename,
-                    dtype = dtype,
-                    empty = empty,
+                    rename,
+                    dtype,
+                    empty,
                     relayout = true,
                 )
             end
@@ -534,8 +526,8 @@ function import_mask_matrix(
         mask_name = "is_$(prefix)"
         set_matrix!(source, "gene", rename_type, mask_name, mask_matrix; relayout = false)
         return copy_matrix!(;  # NOJET
-            destination = destination,
-            source = source,
+            destination,
+            source,
             rows_axis = "gene",
             columns_axis = rename_type,
             name = mask_name,
