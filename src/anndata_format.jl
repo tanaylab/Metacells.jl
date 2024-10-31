@@ -352,7 +352,7 @@ function import_metacell_types(
     )
 
     copy_axis!(; destination = metacells_daf, source = destination, axis = rename_type)
-    type_names = axis_array(destination, rename_type)
+    type_names = axis_vector(destination, rename_type)
     for prefix in ("ignored", "essential", "atlas_essential", "fitted")
         import_mask_matrix(destination, metacells_daf, rename_type, type_names, prefix)
     end
@@ -407,7 +407,7 @@ function import_vectors(
                         vector .+= 1
                         set_vector!(source, axis, vector_name, sparse_vector(vector); overwrite = true)
                     elseif vector_name == "metacell_name"
-                        valid_names = Set(axis_array(metacells_daf, "metacell"))
+                        valid_names = Set(axis_vector(metacells_daf, "metacell"))
                         vector = get_vector(source, axis, vector_name)
                         vector = [name in valid_names ? name : "" for name in vector]
                         set_vector!(source, axis, vector_name, vector; overwrite = true)
