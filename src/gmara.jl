@@ -16,10 +16,10 @@ export set_gmara_genes_mask!
 
 using ConcurrentUtils
 using DataAxesFormats
-using DataAxesFormats.GenericTypes
 using GZip
 using HTTP
 using Serialization
+using TanayLabUtilities
 
 """
     normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString

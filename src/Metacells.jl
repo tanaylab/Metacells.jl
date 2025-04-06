@@ -25,7 +25,7 @@ include("contracts.jl")
 include("identify_genes.jl")
 @reexport using .IdentifyGenes
 
-include("programs.jl")
-@reexport using .Programs
+include("blocks.jl")
+@reexport using .Blocks
 
 end # module

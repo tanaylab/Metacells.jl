@@ -15,8 +15,6 @@ using Base.Iterators
 using Base.Threads
 using Clustering
 using DataAxesFormats
-using DataAxesFormats.GenericLogging
-using DataAxesFormats.GenericTypes
 using Distances
 using Distributions
 using MultivariateStats
@@ -26,6 +24,7 @@ using Printf
 using Random
 using SparseArrays
 using Statistics
+using TanayLabUtilities
 
 import Random.default_rng
 
@@ -86,8 +85,8 @@ $(CONTRACT)
     data = [
         metacell_total_UMIs_vector(RequiredInput),
         gene_divergence_vector(RequiredInput),
-        gene_is_transcription_factor_vector(RequiredInput),
-        gene_is_forbidden_factor_vector(OptionalInput),
+        #gene_is_transcription_factor_vector(RequiredInput),
+        #gene_is_forbidden_factor_vector(OptionalInput),
         gene_metacell_fraction_matrix(RequiredInput),
         gene_metacell_total_UMIs_matrix(RequiredInput),
         metacell_block_vector(GuaranteedOutput),
@@ -1166,7 +1165,7 @@ end
 
             density = depict_percent(
                 sum(nmf_model.coefficients_of_local_factor_genes_in_programs .!= 0),
-                length(nmf_model.coefficients_of_local_factor_genes_in_programs)
+                length(nmf_model.coefficients_of_local_factor_genes_in_programs),
             )
 
             @debug "TODOX NMF programs: $(nmf_model.n_programs) Density: $(density) G-RMSE: $(nmf_model.g_rmse) X-RMSE: $(nmf_model.x_rmse)"
@@ -1208,7 +1207,7 @@ end
 
                 density = depict_percent(
                     sum(filtered_nmf_model.coefficients_of_local_factor_genes_in_programs .!= 0),
-                    length(filtered_nmf_model.coefficients_of_local_factor_genes_in_programs)
+                    length(filtered_nmf_model.coefficients_of_local_factor_genes_in_programs),
                 )
 
                 @debug "TODOX Filtered NMF programs: $(nmf_model.n_programs) Threshold: $(threshold) Density: $(density) G-RMSE: $(filtered_nmf_model.g_rmse) X-RMSE: $(filtered_nmf_model.x_rmse)"
@@ -1227,8 +1226,7 @@ end
         ] .= filtered_nmf_model.coefficients_of_local_factor_genes_in_programs
 
         for program_index in 1:(filtered_nmf_model.n_programs)
-            global_factor_coefficients =
-                nmf_coefficients_of_global_factor_genes_in_programs[:, program_index]
+            global_factor_coefficients = nmf_coefficients_of_global_factor_genes_in_programs[:, program_index]
             @assert_vector(global_factor_coefficients, global_context.n_global_factor_genes)
             push!(coefficients_of_global_factors_in_nmf_programs, global_factor_coefficients)
         end
@@ -1428,9 +1426,9 @@ function read_local_context(;
         max.(rebased_scaled_log_fractions_of_local_factor_genes_in_environment_metacells, -2.0)
     rebased_scaled_log_fractions_of_local_factor_genes_in_environment_metacells .+= 2.0
 
-#   rebased_scaled_log_fractions_of_local_factor_genes_in_environment_metacells =
-#       scaled_log_fractions_of_local_factor_genes_in_environment_metacells .-
-#       log2(global_context.gene_fraction_regularization)
+    #   rebased_scaled_log_fractions_of_local_factor_genes_in_environment_metacells =
+    #       scaled_log_fractions_of_local_factor_genes_in_environment_metacells .-
+    #       log2(global_context.gene_fraction_regularization)
 
     scaled_log_fractions_of_local_measured_genes_in_environment_metacells =
         global_context.scaled_log_fractions_of_genes_in_metacells[local_measured_genes_mask, environment_metacells_mask]
@@ -1708,12 +1706,7 @@ function evaluate_global_nmf_programs(
     # TODOX @threads
     for block_index in 1:(global_context.n_blocks)
         block_name = global_context.names_of_blocks[block_index]
-        local_context = read_local_context(;
-            daf,
-            global_context,
-            block_index,
-            force_use_all_global_factor_genes = true,
-        )
+        local_context = read_local_context(; daf, global_context, block_index, force_use_all_global_factor_genes = true)
         global_nmf_program_indices_of_block =
             sort!(unique(global_nmf_program_indices_of_local_nmf_programs[blocks_of_local_nmf_programs .== block_name]))
         n_block_global_nmf_programs = length(global_nmf_program_indices_of_block)
