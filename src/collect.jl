@@ -100,7 +100,7 @@ $(CONTRACT)
     total_UMIs_per_metacell = zeros(UInt32, n_metacells)
     fraction_per_gene_per_metacell = zeros(Float32, n_genes, n_metacells)
 
-    parallel_loop_with_rng(n_metacells; rng) do metacell_index, rng
+    parallel_loop_with_rng(1:n_metacells; rng) do metacell_index, rng
         metacell_name = name_per_metacell[metacell_index]
         index_per_metacell_cell = findall(metacell_name_per_cell .== metacell_name)
         n_metacell_cells = length(index_per_metacell_cell)

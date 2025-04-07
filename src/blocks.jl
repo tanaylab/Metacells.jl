@@ -698,7 +698,7 @@ function compute_environments!(
     end
 
     progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(blocks.n_blocks; rng) do base_block_index, rng
+    parallel_loop_with_rng(1:(blocks.n_blocks); rng) do base_block_index, rng
         @views is_in_neighborhood_of_base_per_block =
             is_in_neighborhood_per_other_block_per_base_block[:, base_block_index]
         @views distance_from_base_per_block = blocks.distances_between_blocks[:, base_block_index]
@@ -735,10 +735,6 @@ function compute_environments!(
                     vcat(blocks.metacell_indices_per_block[additional_block_indices_of_environment]...)
             end
 
-            @assert isempty(
-                intersect(Set(additional_metacell_indices_of_environment), Set(metacell_indices_of_neighborhood)),
-            ) # TODOX
-
             environment_model = compute_environment_model(
                 max_principal_components,
                 metacell_indices_of_neighborhood,
@@ -749,7 +745,7 @@ function compute_environments!(
                 leaky_pca_cross_validation,
             )
 
-            #@debug "TODOX BLKs: $(environment_m_blocks) PCS: $(environment_model.n_principal_components) RMSE: $(environment_model.RMSE) XRMSE: $(environment_model.XRMSE)"
+            #@debug "BLKs: $(environment_m_blocks) PCS: $(environment_model.n_principal_components) RMSE: $(environment_model.RMSE) XRMSE: $(environment_model.XRMSE)"
             return (environment_model.XRMSE, environment_model)
         end
 
@@ -912,7 +908,7 @@ function compute_environment_model(
             ) for (trained_model, test_indices) in
             zip(trained_model_per_part, neighborhood_cross_validation_indices.test_indices_per_part)
         ]
-        #@debug "TODOX PCs: $(environment_m_principal_components) XRMSE: $(mean(RMSE_per_part))"
+        #@debug "PCs: $(environment_m_principal_components) XRMSE: $(mean(RMSE_per_part))"
         return (mean(RMSE_per_part), nothing)
     end
 
@@ -1372,9 +1368,9 @@ function compute_preferred_block_index_per_cell_per_block(
     preferred_block_index_per_cell_per_block = Vector{Maybe{SparseVector{<:Integer}}}(undef, n_blocks)
     preferred_block_index_per_cell_per_block .= nothing
 
-    #progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(n_blocks; rng) do base_block_index, rng
-        #base_block_name = name_per_block[base_block_index]
+    # progress_counter = Atomic{Int}(0)
+    parallel_loop_with_rng(1:n_blocks; rng) do base_block_index, rng
+        # base_block_name = name_per_block[base_block_index]
 
         neighborhood_cell_indices = vcat(cell_indices_per_block[block_indices_per_neighborhood[base_block_index]]...)
         n_neighborhood_cells = length(neighborhood_cell_indices)
@@ -1446,7 +1442,7 @@ function compute_preferred_block_index_of_cells(;
     n_orbited = Atomic{Int}(0)
     n_migrated = Atomic{Int}(0)
 
-    preferred_blocks_of_cells = zeros(UInt32, n_cells)
+    new_block_index_per_cell = zeros(UInt32, n_cells)
     @threads :greedy for cell_index in 1:n_cells
         original_block_index_of_cell = block_index_per_cell[cell_index]
         if original_block_index_of_cell == 0
@@ -1455,7 +1451,7 @@ function compute_preferred_block_index_of_cells(;
 
         preferred_block_index_per_block = preferred_block_index_per_cell_per_block[original_block_index_of_cell]
         if preferred_block_index_per_block === nothing
-            preferred_blocks_of_cells[cell_index] = original_block_index_of_cell
+            new_block_index_per_cell[cell_index] = original_block_index_of_cell
             atomic_add!(n_quiescent, 1)
             continue
         end
@@ -1465,7 +1461,7 @@ function compute_preferred_block_index_of_cells(;
 
         preferred_block_index_per_other_block = preferred_block_index_per_cell_per_block[preferred_block_index_of_cell]
         if preferred_block_index_per_other_block === nothing
-            preferred_blocks_of_cells[cell_index] = original_block_index_of_cell
+            new_block_index_per_cell[cell_index] = original_block_index_of_cell
             atomic_add!(n_stationary, 1)
             continue
         end
@@ -1475,10 +1471,10 @@ function compute_preferred_block_index_of_cells(;
 
         if preferred_block_index_of_cell == original_block_index_of_cell ||
            back_preferred_block_index_of_cell != preferred_block_index_of_cell
-            preferred_blocks_of_cells[cell_index] = original_block_index_of_cell
+            new_block_index_per_cell[cell_index] = original_block_index_of_cell
             atomic_add!(n_stationary, 1)
         else
-            preferred_blocks_of_cells[cell_index] = preferred_block_index_of_cell
+            new_block_index_per_cell[cell_index] = preferred_block_index_of_cell
             orbited = false
             for old_block_index_per_cell in block_index_per_cell_per_round
                 if preferred_block_index_of_cell == old_block_index_per_cell[cell_index]
@@ -1501,7 +1497,7 @@ function compute_preferred_block_index_of_cells(;
         " Migrated: $(n_migrated[]) ($(percent(n_migrated[], n_cells)))"
     )
 
-    return (preferred_blocks_of_cells, n_migrated[])
+    return (new_block_index_per_cell, n_migrated[])
 end
 
 @kwdef struct LocalClusters
@@ -1554,16 +1550,16 @@ function compute_local_clusters(
 
     local_clusters_per_block = Vector{Maybe{LocalClusters}}(undef, n_blocks)
 
-    #   progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(n_blocks; rng) do block_index, rng
-        #block_name = name_per_block[block_index]
+    # progress_counter = Atomic{Int}(0)
+    parallel_loop_with_rng(1:n_blocks; rng, policy = :serial) do block_index, rng
+        # block_name = name_per_block[block_index]
 
         block_cell_indices = findall(block_index_per_cell .== block_index)
         n_block_cells = length(block_cell_indices)
         if n_block_cells == 0
             local_clusters_per_block[block_index] = nothing
-            #counter = atomic_add!(progress_counter, 1)
-            #@debug "- Block: $(block_name) ($(percent(counter + 1, n_blocks))) Empty"
+            # counter = atomic_add!(progress_counter, 1)
+            # @debug "- Block: $(block_name) ($(percent(counter + 1, n_blocks))) Empty"
             return nothing
         end
 
@@ -1582,7 +1578,7 @@ function compute_local_clusters(
             principal_component_per_block_cell,
             n_block_clusters;
             min_cluster_size = min_metacell_size,
-            max_cluster_size = mean_metacell_cells_per_block[block_index],
+            max_cluster_size = mean_metacell_cells_per_block[block_index] * 2,
             kmeans_rounds,
             rng,
         )
@@ -1594,19 +1590,20 @@ function compute_local_clusters(
             is_too_small_per_cluster = cluster_sizes .< min_metacell_size,
         )
 
-        #       n_clusters = length(cluster_sizes)
-        #       n_large_clusters = sum(cluster_sizes .> 2 * mean_metacell_cells_per_block[block_index])
-        #       n_small_clusters = sum(cluster_sizes .< min_metacell_size)
-        #       counter = atomic_add!(progress_counter, 1)
-        #       @debug (
-        #           "- Block: $(block_name) ($(percent(counter + 1, n_blocks)))" *
-        #           " Clusters: $(n_clusters)" *
-        #           " Min: $(minimum(cluster_sizes))" *
-        #           " Mean: $(mean(cluster_sizes))" *
-        #           " Max: $(maximum(cluster_sizes))" *
-        #           " Too small: $(n_small_clusters)" *
-        #           " Too large: $(n_large_clusters)"
-        #       )
+        # n_clusters = length(cluster_sizes)
+        # n_large_clusters = sum(cluster_sizes .> 2 * mean_metacell_cells_per_block[block_index])
+        # n_small_clusters = sum(cluster_sizes .< min_metacell_size)
+        # counter = atomic_add!(progress_counter, 1)
+        # @debug (
+        #     "- Block: $(block_name) ($(percent(counter + 1, n_blocks)))" *
+        #     " Clusters: $(n_clusters)" *
+        #     " Min: $(minimum(cluster_sizes))" *
+        #     " Mean: $(mean(cluster_sizes))" *
+        #     " (MCs: $(mean_metacell_cells_per_block[block_index]))" *
+        #     " Max: $(maximum(cluster_sizes))" *
+        #     " Too small: $(n_small_clusters)" *
+        #     " Too large: $(n_large_clusters)"
+        # )
     end
 
     return local_clusters_per_block
