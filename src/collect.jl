@@ -6,17 +6,24 @@ module Collect
 export collect_metacells!
 
 using ..Contracts
-using ..Downsample
 
 using DataAxesFormats
+using Random
 using Statistics
 using StatsBase
 using TanayLabUtilities
+
+import Random.default_rng
 
 """
     collect_metacells(
         daf::DafWriter;
         UMIs_regularization::AbstractFloat = $(DEFAULT.UMIs_regularization),
+        min_downsamples::Integer = $(DEFAULT.min_downsamples),
+        min_downsamples_quantile::AbstractFloat = $(DEFAULT.min_downsamples_quantile),
+        max_downsamples_quantile::AbstractFloat = $(DEFAULT.max_downsamples_quantile),
+        rng::AbstractRNG = default_rng(),
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Given an assignment of cells to metacell, compute an estimation of the fraction of UMIs of each gene for each metacell.
@@ -65,19 +72,20 @@ $(CONTRACT)
     axes = [cell_axis(RequiredInput), gene_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
         cell_total_UMIs_vector(RequiredInput),
-        gene_cell_UMIs_matrix(RequiredInput),
+        cell_gene_UMIs_matrix(RequiredInput),
         cell_metacell_vector(RequiredInput),
         metacell_total_UMIs_vector(GuaranteedOutput),
-        gene_metacell_total_UMIs_matrix(GuaranteedOutput),
-        gene_metacell_fraction_matrix(GuaranteedOutput),
+        metacell_gene_total_UMIs_matrix(GuaranteedOutput),
+        metacell_gene_fraction_matrix(GuaranteedOutput),
     ],
 ) function collect_metacells!(
     daf::DafWriter;
     UMIs_regularization::AbstractFloat = 1 / 16,
-    min_downsamples::Integer = 750, # TODOX function_default(downsamples, :min_downsamples),
-    min_downsamples_quantile::AbstractFloat = 0.05, # TODOX function_default(downsamples, :min_downsamples_quantile),
-    max_downsamples_quantile::AbstractFloat = 0.5, # TODOX function_default(downsamples, :max_downsamples_quantile),
+    min_downsamples::Integer = function_default(downsamples, :min_downsamples),
+    min_downsamples_quantile::AbstractFloat = function_default(downsamples, :min_downsamples_quantile),
+    max_downsamples_quantile::AbstractFloat = function_default(downsamples, :max_downsamples_quantile),
     rng::AbstractRNG = default_rng(),
+    overwrite::Bool = false,
 )::Nothing
     n_genes = axis_length(daf, "gene")
     n_metacells = axis_length(daf, "metacell")
@@ -94,63 +102,60 @@ $(CONTRACT)
 
     parallel_loop_with_rng(n_metacells; rng) do metacell_index, rng
         metacell_name = name_per_metacell[metacell_index]
-        index_per_cell_in_metacell = findall(metacell_name_per_cell .== metacell_name)
-        n_cells_in_metacell = length(index_per_cell_in_metacell)
+        index_per_metacell_cell = findall(metacell_name_per_cell .== metacell_name)
+        n_metacell_cells = length(index_per_metacell_cell)
 
-        @views UMIs_per_gene_per_cell_in_metacell = UMIs_per_gene_per_cell[:, index_per_cell_in_metacell]
+        @views UMIs_per_gene_per_metacell_cell = UMIs_per_gene_per_cell[:, index_per_metacell_cell]
 
-        total_UMIs_in_metacell_per_gene = vec(sum(UMIs_per_gene_per_cell_in_metacell; dims = 2))
+        total_UMIs_in_metacell_per_gene = vec(sum(UMIs_per_gene_per_metacell_cell; dims = 2))
         @assert_vector(total_UMIs_in_metacell_per_gene, n_genes)
         total_UMIs_per_gene_per_metacell[:, metacell_index] .= total_UMIs_in_metacell_per_gene
 
-        @views total_UMIs_in_metacell_per_cell_in_metacell = total_UMIs_per_cell[index_per_cell_in_metacell]
+        @views total_UMIs_in_metacell_per_metacell_cell = total_UMIs_per_cell[index_per_metacell_cell]
 
-        total_UMIs_in_metacell = sum(total_UMIs_in_metacell_per_cell_in_metacell)
+        total_UMIs_in_metacell = sum(total_UMIs_in_metacell_per_metacell_cell)
         @assert sum(total_UMIs_in_metacell_per_gene) == total_UMIs_in_metacell
 
         total_UMIs_per_metacell[metacell_index] = total_UMIs_in_metacell
 
         downsample_UMIs_of_cells = downsamples(
-            total_UMIs_in_metacell_per_cell_in_metacell;
+            total_UMIs_in_metacell_per_metacell_cell;
             min_downsamples,
             min_downsamples_quantile,
             max_downsamples_quantile,
         )
 
-        downsampled_UMIs_per_gene_per_cell_in_metacell =
-            downsample(UMIs_per_gene_per_cell_in_metacell, downsample_UMIs_of_cells; dims = 2, rng)
+        downsampled_UMIs_per_gene_per_metacell_cell =
+            downsample(UMIs_per_gene_per_metacell_cell, downsample_UMIs_of_cells; dims = 1, rng)
 
-        total_downsampled_UMIs_per_cell_in_metacell = vec(sum(downsampled_UMIs_per_gene_per_cell_in_metacell; dims = 1))
-        @assert_vector(total_downsampled_UMIs_per_cell_in_metacell, n_cells_in_metacell)
-        @assert all(total_downsampled_UMIs_per_cell_in_metacell .<= downsample_UMIs_of_cells)
-        @assert all(total_downsampled_UMIs_per_cell_in_metacell .<= total_UMIs_in_metacell_per_cell_in_metacell)
+        total_downsampled_UMIs_per_metacell_cell = vec(sum(downsampled_UMIs_per_gene_per_metacell_cell; dims = 1))
+        @assert_vector(total_downsampled_UMIs_per_metacell_cell, n_metacell_cells)
 
-        weight_per_cell_in_metacell = log2.(total_UMIs_in_metacell_per_cell_in_metacell)
-        fraction_per_gene_per_cell_in_metacell =
-            downsampled_UMIs_per_gene_per_cell_in_metacell ./ total_downsampled_UMIs_per_cell_in_metacell
+        weight_per_metacell_cell = log2.(total_UMIs_in_metacell_per_metacell_cell)
+        fraction_per_gene_per_metacell_cell =
+            downsampled_UMIs_per_gene_per_metacell_cell ./ transpose(total_downsampled_UMIs_per_metacell_cell)
 
-        regularization_per_cell_in_metacell = UMIs_regularization ./ total_downsampled_UMIs_per_cell_in_metacell
-        fraction_per_gene_per_cell_in_metacell .+= regularization_per_cell_in_metacell
+        regularization_per_metacell_cell = UMIs_regularization ./ total_downsampled_UMIs_per_metacell_cell
+        fraction_per_gene_per_metacell_cell .+= transpose(regularization_per_metacell_cell)
 
-        fraction_per_gene =
-            weighted_geomean(fraction_per_gene_per_cell_in_metacell, weight_per_cell_in_metacell; dims = 2)
+        fraction_per_gene = weighted_geomean(fraction_per_gene_per_metacell_cell, weight_per_metacell_cell; dims = 2)
         @assert_vector(fraction_per_gene, n_genes)
 
-        regularization_in_metacell = weighted_geomean(regularization_per_cell_in_metacell, weight_per_cell_in_metacell)
+        regularization_in_metacell = weighted_geomean(regularization_per_metacell_cell, weight_per_metacell_cell)
         fraction_per_gene .-= regularization_in_metacell
 
-        total_downsampled_UMIs_of_genes = vec(sum(downsampled_UMIs_per_gene_per_cell_in_metacell; dims = 2))
-        @assert all(isapprox.(fraction_per_gene[total_downsampled_UMIs_of_genes .== 0], 0))
+        total_downsampled_UMIs_of_genes = vec(sum(downsampled_UMIs_per_gene_per_metacell_cell; dims = 2))
+        @assert all(isapprox.(fraction_per_gene[total_downsampled_UMIs_of_genes .== 0], 0; atol = 1e-6))
         fraction_per_gene[total_downsampled_UMIs_of_genes .== 0] .= 0
         @assert all(fraction_per_gene .>= 0)
         fraction_per_gene ./= sum(fraction_per_gene)
 
-        fraction_per_gene_per_metacell[:, metacell_index] .= fraction_per_gene
+        return fraction_per_gene_per_metacell[:, metacell_index] .= fraction_per_gene
     end
 
-    set_matrix!(daf, "gene", "metacell", "total_UMIs", total_UMIs_per_gene_per_metacell)
-    set_vector!(daf, "metacell", "total_UMIs", total_UMIs_per_metacell)
-    set_matrix!(daf, "gene", "metacell", fraction_per_gene_per_metacell)
+    set_matrix!(daf, "gene", "metacell", "total_UMIs", total_UMIs_per_gene_per_metacell; overwrite)
+    set_vector!(daf, "metacell", "total_UMIs", total_UMIs_per_metacell; overwrite)
+    set_matrix!(daf, "gene", "metacell", "fraction", fraction_per_gene_per_metacell; overwrite)
 
     return nothing
 end

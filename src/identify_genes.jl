@@ -31,7 +31,7 @@ import Metacells.Contracts.gene_is_skeleton_vector
 import Metacells.Contracts.gene_is_uncorrelated_vector
 import Metacells.Contracts.gene_marker_rank_vector
 import Metacells.Contracts.gene_marker_rank_vector
-import Metacells.Contracts.gene_metacell_fraction_matrix
+import Metacells.Contracts.metacell_gene_fraction_matrix
 import Metacells.Contracts.metacell_axis
 
 """
@@ -55,7 +55,7 @@ $(CONTRACT)
 """
 @logged @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [gene_metacell_fraction_matrix(RequiredInput), gene_is_marker_vector(GuaranteedOutput)],
+    data = [metacell_gene_fraction_matrix(RequiredInput), gene_is_marker_vector(GuaranteedOutput)],
 ) function identify_marker_genes!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
@@ -104,7 +104,7 @@ $(CONTRACT)
 @logged @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
-        gene_metacell_fraction_matrix(RequiredInput),
+        metacell_gene_fraction_matrix(RequiredInput),
         gene_is_marker_vector(RequiredInput),
         gene_marker_rank_vector(GuaranteedOutput),
     ],
@@ -185,7 +185,7 @@ $(CONTRACT)
 """
 @logged @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [gene_metacell_fraction_matrix(RequiredInput), gene_divergence_vector(GuaranteedOutput)],
+    data = [metacell_gene_fraction_matrix(RequiredInput), gene_divergence_vector(GuaranteedOutput)],
 ) function compute_genes_divergence!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
@@ -232,7 +232,7 @@ $(CONTRACT)
 """
 @logged @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [gene_metacell_fraction_matrix(RequiredInput), gene_is_uncorrelated_vector(GuaranteedOutput)],
+    data = [metacell_gene_fraction_matrix(RequiredInput), gene_is_uncorrelated_vector(GuaranteedOutput)],
 ) function identify_uncorrelated_genes!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,

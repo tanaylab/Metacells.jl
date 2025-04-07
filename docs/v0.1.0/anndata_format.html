@@ -1,0 +1,811 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AnnData Format · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="AnnData Format · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="AnnData Format · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="AnnData Format · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li>
+<a class="tocitem" href="index.html">Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li>
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+</li>
+<li>
+<a class="tocitem" href="identify_genes.html">Identify Genes
+</a>
+</li>
+<li>
+<a class="tocitem" href="collect.html">Collect Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="blocks.html">Blocks
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="anndata_format.html">AnnData Format
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="anndata_format.html">AnnData Format
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="AnnData-Format">
+<a class="docs-heading-anchor" href="#AnnData-Format">AnnData Format
+</a>
+<a id="AnnData-Format-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#AnnData-Format" title="Permalink">
+</a>
+</h1>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnnDataFormat" href="#Metacells.AnnDataFormat">
+<code>Metacells.AnnDataFormat
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<p>Import and export cells and metacells data from/to 
+<code>h5ad
+</code> files. This allows moving data between the old Python/C++ based 
+<a href="https://github.com/scverse/anndata">AnnData
+</a> world and the brave new Julia based 
+<a href="https://github.com/tanaylab/DataAxesFormats.jl">Daf
+</a> world.
+</p>
+<p>The expected flow is as follows:
+</p>
+<ul>
+<li>
+<p>Create a 
+<code>Daf
+</code> repository for the raw input cells and import the raw cells 
+<code>h5ad
+</code> into it using 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>import_cells_h5ad!
+</code>
+</a>.
+</p>
+</li>
+<li>
+<p>Alternatively, import just the clean cells 
+<code>h5ad
+</code> into it, but that would be leaving out some of the data so is not recommended.
+</p>
+</li>
+<li>
+<p>Create another 
+<code>Daf
+</code> repository for the metacells, chain it to the cells repository, and import the metacells into it using 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>import_metacells_h5ad!
+</code>
+</a>. Give this the cells-with-metacells data 
+<code>h5ad
+</code> - only the assignment of cells to metacells will be imported from it.
+</p>
+</li>
+<li>
+<p>If you have any per-cell or per-gene computed data in the cells-with-metacells data 
+<code>h5ad
+</code> (unlikely, as computed data typically goes into the metacells 
+<code>h5ad
+</code>), import it into the chained (metacells) repository using 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>import_cells_h5ad!
+</code>
+</a>.
+</p>
+</li>
+<li>
+<p>Create a type axis in the chained metacells 
+<code>Daf
+</code> repository using 
+<a href="anndata_format.html#Metacells.AnnDataFormat.reconstruct_type_axis!">
+<code>reconstruct_type_axis!
+</code>
+</a>.
+</p>
+</li>
+</ul>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnnDataFormat.import_cells_h5ad!" href="#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>Metacells.AnnDataFormat.import_cells_h5ad!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function import_cells_h5ad!(
+    daf::DafWriter;
+    cells_h5ad::AbstractString,
+    copy_data::Maybe{CopyAnnData} = ```nothing```,
+    bestify::Bool = ```true```,
+    min_sparse_saving_fraction::AbstractFloat = ```0.25```,
+    overwrite::Bool = ```false```,
+    insist::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Import an 
+<code>AnnData
+</code> based cells dataset into a destination 
+<code>daf
+</code> data set. Ideally you&#39;d copy the full (raw) cells into an empty 
+<code>Daf
+</code> repository. Then, you&#39;d treat this repository as read-only, and copy the metacells data using 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>import_metacells_h5ad!
+</code>
+</a> into a separate 
+<code>Daf
+</code> repository chained with the read-only cells repository. This allows separate alternative metacells computations to share the read-only cells data.
+</p>
+<p>You can copy an 
+<code>h5ad
+</code> file containing just the clean cells on top of the raw cells data, to capture any data computed during or after computing the metacells. You may need to specify the 
+<code>copy_data
+</code> to specify defaults for values of properties that exist only for clean cells and/or genes. Or, you can skip copying the raw data altogether, copying just the clean data into the base cells repository, though this is less recommended as you are needlessly discarding data that may prove to be useful later.
+</p>
+<p>The 
+<code>bestify
+</code>, 
+<code>min_sparse_saving_fraction
+</code>, 
+<code>overwrite
+</code>, and 
+<code>insist
+</code> have their usual meaning from 
+<code>Daf
+</code>&#39;s copying functions.
+</p>
+<p>When copying, we apply the following general rules:
+</p>
+<ul>
+<li>A 
+<code>something_gene
+</code> per-gene property and/or 
+<code>something_cell
+</code> per-cell property are renamed to 
+<code>is_something
+</code>, (and given a default of 
+<code>false
+</code>), because 
+<code>Daf
+</code> (unlike 
+<code>AnnData
+</code>) has no problem with properties with the same name for different axes.
+</li>
+<li>Similarly 
+<code>{gene,cell}[s]_something_module
+</code> and 
+<code>something_{gene,cell}[s]_module
+</code> properties are renamed to 
+<code>something_module
+</code>. We add 1 to the value and store the results in a 
+<code>UInt32
+</code>; that is, in 
+<code>Daf
+</code>, module indices are 1-based, and 0 is &quot;no module&quot;.
+</li>
+<li>Any 
+<code>something_umis
+</code> is renamed to 
+<code>something_UMIs
+</code>, given a default of 0, and stored as a 
+<code>UInt32
+</code>.
+</li>
+</ul>
+<p>And we make the following special exceptions:
+</p>
+<p>Scalars:
+</p>
+<ul>
+<li>We do not copy the 
+<code>__name__
+</code> scalar.
+</li>
+<li>All other scalars are copied as-is.
+</li>
+</ul>
+<p>Per-cell-per-gene:
+</p>
+<ul>
+<li>The 
+<code>X
+</code> matrix is renamed to 
+<code>UMIs
+</code>, and stored as a 
+<code>UInt32
+</code>.
+</li>
+<li>No other per-cell-per-gene matrix is copied by default.
+</li>
+</ul>
+<p>Per-gene:
+</p>
+<ul>
+<li>The per-gene 
+<code>correction_factor
+</code> is given the default value 0.
+</li>
+<li>The 
+<code>fitted
+</code> per-gene vector is renamed to 
+<code>is_fitted
+</code> and given the default 
+<code>false
+</code>.
+</li>
+<li>The 
+<code>significant_inner_folds_count
+</code> per-gene property is stored as a 
+<code>UInt32
+</code> and given the default 0.
+</li>
+<li>The 
+<code>full_gene_index
+</code> property is not copied. Either you import the full (raw) data or you don&#39;t.
+</li>
+<li>All other vectors are copied as-is.
+</li>
+</ul>
+<p>Per-cell:
+</p>
+<ul>
+<li>The 
+<code>full_cell_index
+</code> property is not copied. Either you import the full (raw) data or you don&#39;t.
+</li>
+<li>The 
+<code>metacell
+</code>, 
+<code>metacell_name
+</code>, 
+<code>metacell_level
+</code>, 
+<code>most_similar
+</code> and 
+<code>most_similar_name
+</code> per-cell properties are not copied. To import these, use 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>import_metacells_h5ad!
+</code>
+</a>.
+</li>
+<li>All other vectors are copied as-is.
+</li>
+</ul>
+<div class="admonition is-info">
+<header class="admonition-header">Note
+</header>
+<div class="admonition-body">
+<p>It is common to manually call 
+<code>reconstruct_axis!
+</code> on the result to create additional axes (e.g., if the cells were collected from a set of batches and some properties are actually per-batch).
+</p>
+</div>
+</div>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnnDataFormat.import_metacells_h5ad!" href="#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>Metacells.AnnDataFormat.import_metacells_h5ad!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function import_metacells_h5ad!(
+    daf::DafWriter;
+    cells_h5ad::AbstractString,
+    metacells_h5ad::AbstractString,
+    copy_data::Maybe{CopyAnnData} = ```nothing```,
+    bestify::Bool = ```true```,
+    min_sparse_saving_fraction::AbstractFloat = ```0.25```,
+    overwrite::Bool = ```false```,
+    insist::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Import an 
+<code>AnnData
+</code> based metacells dataset into a destination 
+<code>daf
+</code> data set. It is expected that you have first imported the per-cell data. Ideally you&#39;d create a new empty repository for the metacells data and chained it on top of the per-cell repository, which you&#39;d keep read-only to allow sharing it when you (inevitably) compute different metacells for it.
+</p>
+<p>This behaves similarly to 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>import_cells_h5ad!
+</code>
+</a>, specifically the generic rules (except that we copy per-metacell properties and not per-cell properties so the rules are adjusted accordingly), and we make the following special exceptions:
+</p>
+<p>Per-metacell-per-gene:
+</p>
+<ul>
+<li>The 
+<code>X
+</code> matrix is renamed to 
+<code>fraction
+</code> and always stored as 
+<code>Float32
+</code>.
+</li>
+<li>The 
+<code>corrected_fraction
+</code> matrix is always stored as 
+<code>Float32
+</code>.
+</li>
+<li>The 
+<code>essential
+</code> matrix is renamed to 
+<code>is_essential
+</code>.
+</li>
+<li>The 
+<code>essential
+</code>, 
+<code>fitted
+</code>, and 
+<code>misfit
+</code> matrices are renamed to 
+<code>is_essential
+</code>, 
+<code>is_fitted
+</code> and 
+<code>is_misfit
+</code>, respectively.
+</li>
+<li>The 
+<code>inner_fold
+</code>, 
+<code>inner_stdev_log
+</code>, 
+<code>projected_fold
+</code>, 
+<code>projected_fraction
+</code> matrices are always stored as 
+<code>Float32
+</code>.
+</li>
+<li>The 
+<code>total_umis
+</code> matrix is renamed to 
+<code>total_UMIs
+</code> and always stored as 
+<code>UInt32
+</code>.
+</li>
+<li>The 
+<code>zeros
+</code> matrix is always stored as 
+<code>UInt32
+</code>.
+</li>
+<li>All other matrices are copied as-is.
+</li>
+</ul>
+<p>Scalars and Per-gene:
+</p>
+<p>Same as in 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>import_cells_h5ad!
+</code>
+</a>
+</p>
+<p>Per-cell:
+</p>
+<ul>
+<li>The only properties we copy per cell are 
+<code>metacell_name
+</code> (renamed to 
+<code>metacell
+</code> with a default of the empty string), and similarly 
+<code>most_similar_name
+</code> (renamed to 
+<code>most_similar.metacell
+</code>, same default). That&#39;s the only reason we have a 
+<code>cells_h5ad
+</code> parameter. You should therefore pass here the cells-with-metacells and not the clean cells 
+<code>h5ad
+</code>.
+</li>
+</ul>
+<p>Per-metacell:
+</p>
+<ul>
+<li>The 
+<code>metacells_level
+</code> property is renamed to 
+<code>level
+</code>.
+</li>
+<li>The 
+<code>similar
+</code> property is renamed to 
+<code>is_similar
+</code>.
+</li>
+<li>The 
+<code>type
+</code> property is copied. If &quot;the&quot; type property of the metacells is different, use 
+<code>copy_data
+</code> to rename it to 
+<code>type
+</code> to match the 
+<code>Daf
+</code> naming convention.
+</li>
+<li>All other vectors are copied as-is.
+</li>
+</ul>
+<p>Per-metacell-per-metacell:
+</p>
+<ul>
+<li>The 
+<code>obs_outgoing_weights
+</code> matrix is renamed to 
+<code>outgoing_weights
+</code> and always stored as 
+<code>Float32
+</code>.
+</li>
+<li>All other matrices are copied as-is.
+</li>
+</ul>
+<div class="admonition is-info">
+<header class="admonition-header">Note
+</header>
+<div class="admonition-body">
+<p>It is common to manually call 
+<code>reconstruct_type!
+</code> on the result to create a type axis.
+</p>
+</div>
+</div>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnnDataFormat.reconstruct_type_axis!" href="#Metacells.AnnDataFormat.reconstruct_type_axis!">
+<code>Metacells.AnnDataFormat.reconstruct_type_axis!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">reconstruct_type!(
+    daf::DafWriter,
+    base_axis::AbstractString = ```&quot;metacell&quot;```,
+    type_property::AbstractString = ```&quot;type&quot;```,
+    type_axis::AbstractString = ```&quot;type&quot;```,
+    empty_type::Maybe{AbstractString} = ```nothing```,
+    type_colors_csv::Maybe{AbstractString} = ```nothing```,
+    implicit_properties::Maybe{AbstractSet{&lt;:AbstractString}} = ```nothing```,
+    skipped_properties::Maybe{AbstractSet{&lt;:AbstractString}} = ```2 x Str (Set)```,
+    properties_defaults::Maybe{Dict} = ```nothing```,
+)::Nothing
+</code>
+</pre>
+<p>Create a type axis after importing data containing type annotations. By default this will look for a type per metacell, but if you have type annotation per cell (which is 
+<strong>not
+</strong> simply the type of the metacell they belong to), you can also use this for the cells.
+</p>
+<p>By default this assumes that you have imported &quot;the&quot; type annotation to a property called &quot;type&quot;, and that you would like the new type axis to be called &quot;type&quot; as well. If you want to import secondary types (or per-cell types), change these via the 
+<code>type_property
+</code> and 
+<code>type_axis
+</code> parameters.
+</p>
+<p>If the type is equal to 
+<code>empty_type
+</code> it is replaced with the empty string to match the 
+<code>Daf
+</code> conventions for &quot;no value&quot; for string properties. Any set of per-gene properties named 
+<code>something_gene_of_type
+</code> is converted to a per-gene-per-type matrix called 
+<code>is_something
+</code> (with a default of 
+<code>false
+</code>).
+</p>
+<p>Otherwise, this is mostly just a wrapper for 
+<code>reconstruct_axis!
+</code>. It can be further enhanced by specifying a 
+<code>type_colors_csv
+</code> file mapping type names to colors. This should be a comma or tab separated file containing at least two columns, one named &quot;color&quot; and one with the same name as the 
+<code>type_property
+</code>. If this CSV file contains types that aren&#39;t actually used in the data, you will have to specify a default value for any other per-type property in 
+<code>properties_defaults
+</code>.
+</p>
+<div class="admonition is-info">
+<header class="admonition-header">Note
+</header>
+<div class="admonition-body">
+<p>Most metacells data has type annotations and colors associated with types, so it is highly recommended you invoke this to capture these into the 
+<code>Daf
+</code> repository. This will enable all types (:-) of downstream processing, coloring graphs, etc.
+</p>
+</div>
+</div>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnnDataFormat.CopyAnnData" href="#Metacells.AnnDataFormat.CopyAnnData">
+<code>Metacells.AnnDataFormat.CopyAnnData
+</code>
+</a> — 
+<span class="docstring-category">Type
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<p>Specify how to copy data from 
+<code>AnnData
+</code> to 
+<code>Daf
+</code>. The key is simply a vector or matrix name (ignoring axes), and the value is either 
+<code>nothing
+</code> to ignore the data, or a tuple with the name of the destination 
+<code>Daf
+</code> property and an optional value to use for missing entries (raw-only cells and/or genes).
+</p>
+</div>
+</section>
+</article>
+<h2 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h2>
+<ul>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat">
+<code>Metacells.AnnDataFormat
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.CopyAnnData">
+<code>Metacells.AnnDataFormat.CopyAnnData
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>Metacells.AnnDataFormat.import_cells_h5ad!
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>Metacells.AnnDataFormat.import_metacells_h5ad!
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.reconstruct_type_axis!">
+<code>Metacells.AnnDataFormat.reconstruct_type_axis!
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-prevpage" href="blocks.html">« Blocks
+</a>
+<a class="docs-footer-nextpage" href="defaults.html">Defaults »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.10.1. Using Julia version 1.11.4.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

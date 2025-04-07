@@ -2,7 +2,9 @@
 
 ```@docs
 Metacells.AnnDataFormat
-Metacells.AnnDataFormat.import_h5ads!
+Metacells.AnnDataFormat.import_cells_h5ad!
+Metacells.AnnDataFormat.import_metacells_h5ad!
+Metacells.AnnDataFormat.reconstruct_type_axis!
 Metacells.AnnDataFormat.CopyAnnData
 ```
 

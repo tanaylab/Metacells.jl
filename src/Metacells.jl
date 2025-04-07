@@ -28,4 +28,7 @@ include("identify_genes.jl")
 include("blocks.jl")
 @reexport using .Blocks
 
+include("collect.jl")
+@reexport using .Collect
+
 end # module

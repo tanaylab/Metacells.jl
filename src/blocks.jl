@@ -35,21 +35,20 @@ import Metacells.Contracts.block_principal_component_gene_covered_coefficient_te
 import Metacells.Contracts.block_principal_component_gene_skeleton_coefficient_tensor
 import Metacells.Contracts.block_principal_component_is_used_matrix
 import Metacells.Contracts.cell_axis
+import Metacells.Contracts.cell_gene_UMIs_matrix
 import Metacells.Contracts.cell_new_metacell_vector
 import Metacells.Contracts.cell_old_metacell_vector
 import Metacells.Contracts.gene_axis
-import Metacells.Contracts.gene_cell_UMIs_matrix
 import Metacells.Contracts.gene_divergence_vector
 import Metacells.Contracts.gene_is_covered_vector
 import Metacells.Contracts.gene_is_skeleton_vector
-import Metacells.Contracts.gene_metacell_covered_fraction_matrix
-import Metacells.Contracts.gene_metacell_fraction_matrix
-import Metacells.Contracts.gene_metacell_scaled_log_covered_fraction_matrix
-import Metacells.Contracts.gene_metacell_total_UMIs_matrix
-import Metacells.Contracts.gene_old_metacell_scaled_log_covered_fraction_matrix  # TODOX
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.metacell_block_vector
 import Metacells.Contracts.metacell_covered_UMIs_vector
+import Metacells.Contracts.metacell_gene_covered_fraction_matrix
+import Metacells.Contracts.metacell_gene_fraction_matrix
+import Metacells.Contracts.metacell_gene_scaled_log_covered_fraction_matrix
+import Metacells.Contracts.metacell_gene_total_UMIs_matrix
 import Metacells.Contracts.new_metacell_axis
 import Metacells.Contracts.new_metacell_block_vector
 import Metacells.Contracts.old_metacell_axis
@@ -78,10 +77,10 @@ $(CONTRACT)
     data = [
         gene_is_covered_vector(RequiredInput),
         gene_divergence_vector(OptionalInput),
-        gene_metacell_total_UMIs_matrix(RequiredInput),
-        gene_metacell_fraction_matrix(RequiredInput),
-        gene_metacell_covered_fraction_matrix(GuaranteedOutput),
-        gene_metacell_scaled_log_covered_fraction_matrix(GuaranteedOutput),
+        metacell_gene_total_UMIs_matrix(RequiredInput),
+        metacell_gene_fraction_matrix(RequiredInput),
+        metacell_gene_covered_fraction_matrix(GuaranteedOutput),
+        metacell_gene_scaled_log_covered_fraction_matrix(GuaranteedOutput),
         metacell_covered_UMIs_vector(GuaranteedOutput),
     ],
 ) function compute_covered_fractions!(  # UNTESTED
@@ -194,7 +193,7 @@ end
         max_principal_components = $(DEFAULT.max_principal_components),
         min_blocks_in_neighborhood::Integer = $(DEFAULT.min_blocks_in_neighborhood),
         min_metacells_in_neighborhood::Integer = $(DEFAULT.min_metacells_in_neighborhood),
-        min_covered_UMIs_in_neighborhood::Integer = $(DEFAULT.min_UMIs_in_neighborhood),
+        min_covered_UMIs_in_neighborhood::Integer = $(DEFAULT.min_covered_UMIs_in_neighborhood),
         cross_validation_parts::Integer = $(DEFAULT.cross_validation_parts),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -243,9 +242,9 @@ $(CONTRACT)
         gene_is_covered_vector(RequiredInput),
         gene_is_skeleton_vector(RequiredInput),
         gene_divergence_vector(RequiredInput),
-        gene_metacell_total_UMIs_matrix(RequiredInput),
-        gene_metacell_covered_fraction_matrix(RequiredInput),
-        gene_metacell_scaled_log_covered_fraction_matrix(RequiredInput),
+        metacell_gene_total_UMIs_matrix(RequiredInput),
+        metacell_gene_covered_fraction_matrix(RequiredInput),
+        metacell_gene_scaled_log_covered_fraction_matrix(RequiredInput),
         metacell_block_vector(GuaranteedOutput),
         block_block_is_in_neighborhood_matrix(GuaranteedOutput),
         block_block_is_in_environment_matrix(GuaranteedOutput),
@@ -1026,7 +1025,10 @@ function compute_local_model(;
         offset_principal_component_per_model_metacell, mean_per_principal_component =
             centralize(principal_component_per_model_metacell)
         if base_model === nothing
-            @assert maximum(abs.(mean_per_principal_component)) < 1e-3
+            max_mean_principal_component = maximum(abs.(mean_per_principal_component))
+            max_offset_principal_component = maximum(abs.(offset_principal_component_per_model_metacell))
+            max_mean_principal_component_ratio = max_mean_principal_component / max_offset_principal_component
+            @assert max_mean_principal_component_ratio < 1e-4
         end
 
         offset_scaled_log_covered_fraction_per_covered_per_model_metacell,
@@ -1057,7 +1059,6 @@ function RMSE_of_model(;
     n_metacells = size(scaled_log_covered_fraction_per_skeleton_per_metacell, 2)
     n_skeletons = size(scaled_log_covered_fraction_per_skeleton_per_metacell, 1)
     n_covered = size(scaled_log_covered_fraction_per_covered_per_metacell, 1)
-    n_model_metacells = length(metacell_indices)
 
     @assert_matrix(scaled_log_covered_fraction_per_skeleton_per_metacell, n_skeletons, n_metacells, Columns)
     @assert_matrix(scaled_log_covered_fraction_per_covered_per_metacell, n_covered, n_metacells, Columns)
@@ -1234,8 +1235,7 @@ TODOX
         gene_divergence_vector(RequiredInput),
         gene_is_covered_vector(RequiredInput),
         gene_is_skeleton_vector(RequiredInput),
-        gene_cell_UMIs_matrix(RequiredInput),
-        # TODOX gene_old_metacell_scaled_log_covered_fraction_matrix(RequiredInput),
+        cell_gene_UMIs_matrix(RequiredInput),
         cell_old_metacell_vector(RequiredInput),
         cell_new_metacell_vector(GuaranteedOutput),
         old_metacell_block_vector(RequiredInput),
@@ -1243,8 +1243,7 @@ TODOX
         block_n_principal_components_vector(RequiredInput),
         block_principal_component_is_used_matrix(RequiredInput),
         block_gene_mean_scaled_log_covered_fraction_matrix(RequiredInput),
-        block_principal_component_gene_skeleton_coefficient_tensor(RequiredInput),  # TODOX
-        # block_principal_component_gene_covered_coefficient_tensor(RequiredInput),  # TODOX
+        block_principal_component_gene_skeleton_coefficient_tensor(RequiredInput),
         block_block_is_in_neighborhood_matrix(RequiredInput),
     ],
 ) function sharpen_metacells!(
@@ -1366,7 +1365,7 @@ function compute_preferred_block_index_per_cell_per_block(
     block_indices_per_neighborhood::AbstractVector{<:AbstractVector{<:Integer}},
     rng::AbstractRNG,
 )::Vector{Maybe{SparseVector{<:Integer}}}
-    n_skeletons, n_cells = size(scaled_log_covered_fraction_per_skeleton_per_cell)
+    n_cells = length(block_index_per_cell)
     n_blocks = length(name_per_block)
 
     cell_indices_per_block = [findall(block_index_per_cell .== block_index) for block_index in 1:n_blocks]
@@ -1375,7 +1374,7 @@ function compute_preferred_block_index_per_cell_per_block(
 
     #progress_counter = Atomic{Int}(0)
     parallel_loop_with_rng(n_blocks; rng) do base_block_index, rng
-        base_block_name = name_per_block[base_block_index]
+        #base_block_name = name_per_block[base_block_index]
 
         neighborhood_cell_indices = vcat(cell_indices_per_block[block_indices_per_neighborhood[base_block_index]]...)
         n_neighborhood_cells = length(neighborhood_cell_indices)
@@ -1384,6 +1383,7 @@ function compute_preferred_block_index_per_cell_per_block(
         end
 
         local_model = load_local_model(daf; block_index = base_block_index, only_pca = true)
+        @assert local_model.n_principal_components == n_principal_components_per_block[base_block_index]
 
         principal_component_per_neighborhood_cell = compute_profiles_principal_components(;
             local_model,
@@ -1416,7 +1416,7 @@ function compute_preferred_block_index_per_cell_per_block(
 
         reorder = sortperm(neighborhood_cell_indices)
 
-        preferred_block_index_per_cell_per_block[base_block_index] = SparseVector(
+        return preferred_block_index_per_cell_per_block[base_block_index] = SparseVector(
             n_cells,
             neighborhood_cell_indices[reorder],
             preferred_block_index_per_neighborhood_cell[reorder],
@@ -1551,13 +1551,12 @@ function compute_local_clusters(
     rng::AbstractRNG,
 )::AbstractVector{Maybe{LocalClusters}}
     n_blocks = length(name_per_block)
-    n_skeletons = size(scaled_log_covered_fraction_per_skeleton_per_cell, 1)
 
     local_clusters_per_block = Vector{Maybe{LocalClusters}}(undef, n_blocks)
 
     #   progress_counter = Atomic{Int}(0)
     parallel_loop_with_rng(n_blocks; rng) do block_index, rng
-        block_name = name_per_block[block_index]
+        #block_name = name_per_block[block_index]
 
         block_cell_indices = findall(block_index_per_cell .== block_index)
         n_block_cells = length(block_cell_indices)
@@ -1569,6 +1568,7 @@ function compute_local_clusters(
         end
 
         local_model = load_local_model(daf; block_index, only_pca = true)
+        @assert local_model.n_principal_components == n_principal_components_per_block[block_index]
 
         principal_component_per_block_cell = compute_profiles_principal_components(;
             local_model,
@@ -1588,7 +1588,7 @@ function compute_local_clusters(
         )
 
         cluster_sizes = counts(kmeans_result)
-        local_clusters_per_block[block_index] = LocalClusters(;
+        return local_clusters_per_block[block_index] = LocalClusters(;
             block_cell_indices,
             cluster_index_per_block_cell = assignments(kmeans_result),
             is_too_small_per_cluster = cluster_sizes .< min_metacell_size,
@@ -1629,11 +1629,6 @@ function combine_local_clusters(;
             end
         end
     end
-
-    n_outlier_cells = sum([
-        local_clusters === nothing ? 0 : length(local_clusters.is_too_small_per_cluster) for
-        local_clusters in local_clusters_per_block
-    ])
 
     new_metacell_index_per_cell = zeros(UInt32, n_cells)
     block_index_per_new_metacell = Vector{UInt32}(undef, n_total_new_metacells - n_outlier_new_metacells)

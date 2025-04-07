@@ -11,7 +11,7 @@ The expected flow is as follows:
   - Alternatively, import just the clean cells `h5ad` into it, but that would be leaving out some of the data so is not
     recommended.
   - Create another `Daf` repository for the metacells, chain it to the cells repository, and import the metacells into
-    it using [`import_metacells_h5ads!`](@ref). Give this the cells-with-metacells data `h5ad` - only the assignment of
+    it using [`import_metacells_h5ad!`](@ref). Give this the cells-with-metacells data `h5ad` - only the assignment of
     cells to metacells will be imported from it.
   - If you have any per-cell or per-gene computed data in the cells-with-metacells data `h5ad` (unlikely, as computed
     data typically goes into the metacells `h5ad`), import it into the chained (metacells) repository using
@@ -151,7 +151,7 @@ Per-cell:
     It is common to manually call `reconstruct_axis!` on the result to create additional axes (e.g., if the cells were
     collected from a set of batches and some properties are actually per-batch).
 """
-@logged function import_cells_h5ad!(
+@documented @logged function import_cells_h5ad!(
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = nothing,
@@ -276,7 +276,7 @@ Per-metacell-per-metacell:
 
     It is common to manually call `reconstruct_type!` on the result to create a type axis.
 """
-@logged function import_metacells_h5ad!(
+@documented @logged function import_metacells_h5ad!(
     daf::DafWriter;
     cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,
@@ -396,7 +396,7 @@ aren't actually used in the data, you will have to specify a default value for a
     this to capture these into the `Daf` repository. This will enable all types (:-) of downstream processing, coloring
     graphs, etc.
 """
-@logged function reconstruct_type_axis!(
+@documented @logged function reconstruct_type_axis!(
     daf::DafWriter;
     base_axis::AbstractString = "metacell",
     type_property::AbstractString = "type",

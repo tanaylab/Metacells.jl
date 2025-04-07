@@ -1,0 +1,583 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Blocks · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="Blocks · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Blocks · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Blocks · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li>
+<a class="tocitem" href="index.html">Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li>
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+</li>
+<li>
+<a class="tocitem" href="identify_genes.html">Identify Genes
+</a>
+</li>
+<li>
+<a class="tocitem" href="collect.html">Collect Metacells
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="blocks.html">Blocks
+</a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="blocks.html">Blocks
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="blocks.html">Blocks
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="Blocks">
+<a class="docs-heading-anchor" href="#Blocks">Blocks
+</a>
+<a id="Blocks-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks" title="Permalink">
+</a>
+</h1>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Blocks" href="#Metacells.Blocks">
+<code>Metacells.Blocks
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<p>Approximate the manifold of actual cell states (captured by metacells) using linear programs in each local region.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Blocks.compute_covered_fractions!" href="#Metacells.Blocks.compute_covered_fractions!">
+<code>Metacells.Blocks.compute_covered_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_covered_fractions!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```2.0e-5```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute normalized fractions for each metacell based only on the covered genes. By changing the denominator to only this smaller set of genes, we remove effects of possibly high-expression &quot;irrelevant&quot; gene programs (e.g., cell cycle). In general whenever we talk about gene &quot;fractions&quot; we have to keep in mind what is the total the fractions are out of, and ensure it is fit for purpose (and, of course, ensure the same divergence factors are used for all the data). Here we are going to be using these fractions for creating a distance measure in the manifold, which will be used for both deciding what is a &quot;local&quot; region and for estimating errors of reconsctructing the manifold, taking into consideration only the covered genes.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_covered
+</strong>::Bool (required): A mask of genes that are covered by the local linear program.
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::Union{Float32, Float64} (optional): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>gene, metacell @ fraction
+</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ covered_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total number of the covered genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ covered_fraction
+</strong>::Union{Float32, Float64} (guaranteed): The relative fraction of covered genes.
+</p>
+<p>
+<strong>gene, metacell @ scaled
+<em>log
+</em>covered_fraction
+</strong>::Union{Float32, Float64} (guaranteed): The log of the relative fraction of covered genes, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Blocks.compute_blocks!" href="#Metacells.Blocks.compute_blocks!">
+<code>Metacells.Blocks.compute_blocks!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```2.0e-5```,
+    min_significant_gene_UMIs::Integer = ```40```,
+    fold_confidence::AbstractFloat = ```0.9```,
+    max_block_span::Real = ```2```,
+    max_principal_components = ```40```,
+    min_blocks_in_neighborhood::Integer = ```4```,
+    min_metacells_in_neighborhood::Integer = ```20```,
+    min_covered_UMIs_in_neighborhood::Integer = ```2000000```,
+    cross_validation_parts::Integer = ```5```,
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Group the metacells into blocks where the metacells in each one are &quot;similar&quot; in all the skeleton genes. That is, each block is an approximation of a single cell state, assuming the skeleton genes adequately predict the rest of the genes. Then, group these blocks into overlapping small tight neighborhoods, and larger environments, such that each block&#39;s environment can be reasonably approximated using a local linear model, evaluated using cross-validation on the RMSE in the neighborhood at its core.
+</p>
+<p>First, we compute metacell-metacell distances based on the maximal fold factor between 
+<code>is_skeleton
+</code> genes. The fold factor is log (base 2) of the gene expression using the 
+<code>gene_fraction_regularization
+</code>. For computing this fold factor, we ignore &quot;insignificant&quot; genes whose total UMIs in the compared metacells isn&#39;t at least 
+<code>min_significant_gene_UMIs
+</code>. We also we reduce the distance using the 
+<code>fold_confidence
+</code> based on the number of UMIs used to estimate the expression in the metacells, Two metacells can only belong to the same block if the final fold factor is at most 
+<code>max_block_span
+</code> in all the (significant, skeleton) genes.
+</p>
+<p>We then compute block-block distances which are the mean distance between the metacells of the blocks. Using these distances, we define a tight neighborhood of each block containing at least 
+<code>min_blocks_in_neighborhood
+</code>, 
+<code>min_metacells_in_neighborhood
+</code> and 
+<code>min_covered_UMIs_in_neighborhood
+</code> (note that the latter only counts UMIs of skeleton genes).
+</p>
+<p>Having computed the neighborhoods, we expand them (using the same block-block distances) as long as computing a local linear model for the environment gives a better approximation of the metacells in the neighborhood. This local model starts with computing 
+<code>max_principal_components
+</code>. These are assumed to over-fit the solution, so we use cross-validation (in 
+<code>cross_validation_parts
+</code>) to pick a subset of these principal components, which hopefully approximates the true dimensionality of the local data.
+</p>
+<div class="admonition is-info">
+<header class="admonition-header">Note
+</header>
+<div class="admonition-body">
+<p>There is no attempt to reconcile the local model of neighboring blocks. In general the linear model computed here isn&#39;t very useful for interpreting the data as principal components for noisy high-dimensional data are pretty opaque.
+</p>
+</div>
+</div>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_covered
+</strong>::Bool (required): A mask of genes that are covered by the local linear program.
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the (covered) genes.
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>gene, metacell @ covered_fraction
+</strong>::Union{Float32, Float64} (required): The relative fraction of covered genes.
+</p>
+<p>
+<strong>gene, metacell @ scaled
+<em>log
+</em>covered_fraction
+</strong>::Union{Float32, Float64} (required): The log of the relative fraction of covered genes, scaled by divergence.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (guaranteed): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>principal_component
+</strong> (guaranteed): A principal component of a local linear program.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (guaranteed): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n
+<em>principal
+</em>components
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The number of used principal components of the local linear model for each block.
+</p>
+<p>
+<strong>block @ linear_RMSE
+</strong>::Union{Float32, Float64} (guaranteed): The root mean squared error of predicting the covered genes using the linear model.
+</p>
+<p>
+<strong>block @ linear_XRMSE
+</strong>::Union{Float32, Float64} (guaranteed): The cross-validated root mean squared error of predicting the covered genes using the linear model.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (guaranteed): For each block, the mask of nearby blocks in its immediate neighborhood.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>environment
+</strong>::Bool (guaranteed): For each block, the mask of nearby blocks in its linear environment.
+</p>
+<p>
+<strong>block, principal
+<em>component @ is
+</em>used
+</strong>::Bool (guaranteed): Whether each principal component is used by each block.
+</p>
+<p>
+<strong>block, gene @ mean
+<em>scaled
+</em>log
+<em>covered
+</em>fraction
+</strong>::Union{Float32, Float64} (guaranteed): The mean in the metacells of the block of the log of the relative fraction of covered genes, scaled by divergence.
+</p>
+<p>
+<strong>Tensors
+</strong>
+</p>
+<p>
+<strong>block; principal
+<em>component, gene @ skeleton
+</em>coefficient
+</strong>::Union{Float32, Float64} (guaranteed): The coefficient of each skeleton gene for computing a principle component.
+</p>
+<p>
+<strong>block; principal
+<em>component, gene @ covered
+</em>coefficient
+</strong>::Union{Float32, Float64} (guaranteed): The coefficient of each principal component for computing each covered (non-skeleton) gene.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Blocks.sharpen_metacells!" href="#Metacells.Blocks.sharpen_metacells!">
+<code>Metacells.Blocks.sharpen_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<p>TODOX
+</p>
+</div>
+</section>
+</article>
+<h2 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h2>
+<ul>
+<li>
+<a href="blocks.html#Metacells.Blocks">
+<code>Metacells.Blocks
+</code>
+</a>
+</li>
+<li>
+<a href="blocks.html#Metacells.Blocks.compute_blocks!">
+<code>Metacells.Blocks.compute_blocks!
+</code>
+</a>
+</li>
+<li>
+<a href="blocks.html#Metacells.Blocks.compute_covered_fractions!">
+<code>Metacells.Blocks.compute_covered_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="blocks.html#Metacells.Blocks.sharpen_metacells!">
+<code>Metacells.Blocks.sharpen_metacells!
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-prevpage" href="collect.html">« Collect Metacells
+</a>
+<a class="docs-footer-nextpage" href="anndata_format.html">AnnData Format »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.10.1. Using Julia version 1.11.4.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

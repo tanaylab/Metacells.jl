@@ -1,35 +1,34 @@
 """
-Functions for defining a `Contract` for a metacells `Daf` data set `@computation`. This also serves as a quick
-vocabulary of the contents of a metacells `Daf` data set.
+Functions for defining a `Contract` for a metacells `Daf` data set `@computation`. This also serves as a vocabulary
+describing the data we keep when doing metacells based analysis, which is a solid basis for understanding what is going
+on. As Fred Brooks said: "Show me your flowcharts and conceal your tables, and I shall continue to be mystified. Show me
+your tables, and I won’t usually need your flowcharts; they’ll be obvious.".
 
-In the descriptions below, "fold factor" refers to the log base 2 of the ratio between expression levels. For gene RNA
-expression levels, we typically use a regularization factor of 1e-5; fold factors of 1 (2x) is typically considered to
-be irrelevant, fold factors of 2 (4x) are considered to be potentially significant, fold factor of 3 (8x) are considered
-to point to a definite significant difference, etc. When used as thresholds, fold factors are adjusted using confidence
-levels (based on the number of UMIs used for the estimates) and the [`gene_divergence_vector`](@ref).
+In the descriptions below, "fold factor" refers to the log base 2 of the ratio between expression levels. For fold
+factors between gene RNA expression levels (fractions), we typically use a regularization factor of 1e-5 to avoid
+division by zero.
 """
 module Contracts
 
 export block_axis
 export block_block_is_in_environment_matrix
 export block_block_is_in_neighborhood_matrix
+export block_gene_fraction_matrix
 export block_gene_mean_scaled_log_covered_fraction_matrix
+export block_gene_total_UMIs_matrix
 export block_linear_RMSE_vector
 export block_linear_XRMSE_vector
 export block_n_principal_components_vector
-export block_new_linear_RMSE_vector
-export block_new_linear_XRMSE_vector
 export block_principal_component_gene_covered_coefficient_tensor
 export block_principal_component_gene_skeleton_coefficient_tensor
 export block_principal_component_is_used_matrix
 export cell_axis
+export cell_gene_UMIs_matrix
 export cell_metacell_vector
 export cell_new_metacell_vector
 export cell_old_metacell_vector
+export cell_total_UMIs_vector
 export gene_axis
-export gene_cell_UMIs_matrix
-export gene_block_fraction_matrix
-export gene_block_total_UMIs_matrix
 export gene_divergence_vector
 export gene_is_covered_vector
 export gene_is_forbidden_vector
@@ -38,20 +37,20 @@ export gene_is_marker_vector
 export gene_is_skeleton_vector
 export gene_is_uncorrelated_vector
 export gene_marker_rank_vector
-export gene_metacell_covered_fraction_matrix
-export gene_metacell_fraction_matrix
-export gene_metacell_scaled_log_covered_fraction_matrix
-export gene_metacell_total_UMIs_matrix
-export gene_old_metacell_scaled_log_covered_fraction_matrix
 export metacell_axis
 export metacell_block_vector
 export metacell_covered_UMIs_vector
+export metacell_gene_covered_fraction_matrix
+export metacell_gene_fraction_matrix
+export metacell_gene_scaled_log_covered_fraction_matrix
+export metacell_gene_total_UMIs_matrix
 export metacell_total_UMIs_vector
 export metacell_type_vector
 export new_metacell_axis
 export new_metacell_block_vector
 export old_metacell_axis
 export old_metacell_block_vector
+export old_metacell_gene_scaled_log_covered_fraction_matrix
 export principal_component_axis
 export type_axis
 export type_color_vector
@@ -282,6 +281,16 @@ function gene_is_covered_vector(expectation::ContractExpectation)::Pair{VectorKe
 end
 
 """
+    cell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The total number of UMIs of all the genes in each cell. This doesn't include the UMIs of genes excluded for any reason.
+"""
+function cell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("cell", "total_UMIs") =>
+        (expectation, StorageUnsigned, "The total number of UMIs of all the genes in each cell.")
+end
+
+"""
     metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 
 The total number of UMIs used to estimate the fraction of all the genes in each metacell. This is used to estimate
@@ -321,22 +330,6 @@ function block_linear_RMSE_vector(expectation::ContractExpectation)::Pair{Vector
 end
 
 """
-    block_new_linear_RMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-
-The root mean squared error of predicting the covered genes using the old local linear models for the new metacells.
-This should show that the new metacells behave better. This is just an intermediate quality control measurement, as at
-some point you'd be computing new blocks for the new metacells which will have a different RMSE, which should be even
-better (lower).
-"""
-function block_new_linear_RMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
-    return ("block", "new_linear_RMSE") => (
-        expectation,
-        StorageFloat,
-        "The root mean squared error of predicting the covered genes using the linear model for the new metacells.",
-    )
-end
-
-"""
     block_linear_XRMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 
 The cross-validated root mean squared error of predicting the covered genes using the linear model. This is similar to
@@ -349,22 +342,6 @@ function block_linear_XRMSE_vector(expectation::ContractExpectation)::Pair{Vecto
         expectation,
         StorageFloat,
         "The cross-validated root mean squared error of predicting the covered genes using the linear model.",
-    )
-end
-
-"""
-    block_new_linear_XRMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-
-The cross-validated root mean squared error of predicting the covered genes using the old local linear models for the
-new metacells. This should show that the new metacells behave better. This is just an intermediate quality control
-measurement, as at some point you'd be computing new blocks for the new metacells which will have a different XRMSE,
-which should be even better (lower).
-"""
-function block_new_linear_XRMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
-    return ("block", "new_linear_XRMSE") => (
-        expectation,
-        StorageFloat,
-        "The cross-validated root mean squared error of predicting the covered genes using the linear model for the new metacells.",
     )
 end
 
@@ -452,37 +429,37 @@ function type_color_vector(expectation::ContractExpectation)::Pair{VectorKey, Da
 end
 
 """
-    gene_metacell_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    metacell_gene_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The estimated fraction of the UMIs of each gene in each metacell. We assume that each metacell is a sample of the
 manifold, representing a real biological state, regardless to its distance to other metacells (subject to cleaning up
 batch effects, purging doublets, and compensating for any other technical artifacts).
 """
-function gene_metacell_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function metacell_gene_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "fraction") =>
         (expectation, StorageFloat, "The estimated fraction of the UMIs of each gene in each metacell.")
 end
 
 """
-    gene_cell_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    cell_gene_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The number of UMIs collected for each gene for each cell. This is the "ground truth" everything else is built on. The
 total number of UMIs per cell differs (sometimes wildly) based on the scRNA-seq technology and protocol.
 """
-function gene_cell_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function cell_gene_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "cell", "UMIs") =>
         (expectation, StorageUnsigned, "The number of UMIs collected for each gene for each cell.")
 end
 
 """
-    gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    metacell_gene_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The total number of UMIs used to estimate the fraction of each gene in each metacell. This is used to estimate the
 robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared
 estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a
 multinomial sampling distribution).
 """
-function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function metacell_gene_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "total_UMIs") => (
         expectation,
         StorageUnsigned,
@@ -491,25 +468,25 @@ function gene_metacell_total_UMIs_matrix(expectation::ContractExpectation)::Pair
 end
 
 """
-    gene_metacell_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    metacell_gene_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The relative fraction of covered genes. This ensures the sum of the fractions of the covered genes is one in each
 metacell, to ignore the impact of any residual uncovered gene programs.
 """
-function gene_metacell_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function metacell_gene_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "covered_fraction") =>
         (expectation, StorageFloat, "The relative fraction of covered genes.")
 end
 
 """
-    gene_metacell_scaled_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    metacell_gene_scaled_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The log of the relative fraction of covered genes, scaled by divergence. This computes the log base 2 of the
-`gene_metacell_covered_fraction_matrix`, with some regularization, and then scales the result using the
+`metacell_gene_covered_fraction_matrix`, with some regularization, and then scales the result using the
 [`gene_divergence_vector`](@ref) so that the range of expression of "wild" genes is reduced. The end result is what we
 actually try to fit with local linear programs.
 """
-function gene_metacell_scaled_log_covered_fraction_matrix(
+function metacell_gene_scaled_log_covered_fraction_matrix(
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "scaled_log_covered_fraction") =>
@@ -517,12 +494,12 @@ function gene_metacell_scaled_log_covered_fraction_matrix(
 end
 
 """
-    gene_old_metacell_scaled_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    old_metacell_gene_scaled_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The log of the relative fraction of covered genes, scaled by divergence. This just uses the renamed old metacells axis
 when computing a new set of metacells for some data based on the old metacells.
 """
-function gene_old_metacell_scaled_log_covered_fraction_matrix(
+function old_metacell_gene_scaled_log_covered_fraction_matrix(
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "old_metacell", "scaled_log_covered_fraction") =>
@@ -530,14 +507,14 @@ function gene_old_metacell_scaled_log_covered_fraction_matrix(
 end
 
 """
-    gene_block_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    block_gene_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The total number of UMIs used to estimate the fraction of each gene in each block. This is used to estimate the
 robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared
 estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a
 multinomial sampling distribution).
 """
-function gene_block_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+function block_gene_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "block", "total_UMIs") => (
         expectation,
         StorageUnsigned,
@@ -569,13 +546,13 @@ function block_block_is_in_neighborhood_matrix(expectation::ContractExpectation)
 end
 
 """
-    gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    block_gene_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The estimated fraction of the UMIs of each gene in each block. This assumes the metacells in each block are samples of
 the "same" biological state, based on the fact that all these metacells have very similar expression levels for all
 the global predictive transcription factors.
 """
-function gene_block_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+function block_gene_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "block", "fraction") =>
         (expectation, StorageFloat, "The estimated fraction of the UMIs of each gene in each block.")
 end
