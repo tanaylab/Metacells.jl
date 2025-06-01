@@ -1,0 +1,17 @@
+# Analyze Approximation
+
+```@docs
+Metacells.AnalyzeApproximation
+Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_linear_covered_fractions!
+Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_scaled_linear_covered_fractions!
+Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_linear_covered_fractions!
+Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!
+Metacells.AnalyzeApproximation.compute_blocks_modules_block_RMSE!
+Metacells.AnalyzeApproximation.compute_blocks_modules_neighborhood_RMSE!
+```
+
+## Index
+
+```@index
+Pages = ["analyze_approximation.md"]
+```

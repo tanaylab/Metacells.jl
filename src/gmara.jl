@@ -86,11 +86,11 @@ end
 """
     gmara_genes(;
         species::AbstractString,
-        namespace::AbstractString,
-        [list::Maybe{AbstractString} = nothing,
-        version::AbstractString = "main"
+        [namespace::AbstractString = $(DEFAULT.namespace),
+        list::Maybe{AbstractString} = $(DEFAULT.list),
+        version::AbstractString = $(DEFAULT.version),
         cache_dir = CACHE_DIR,
-        timeout::Real = TIMEOUT],
+        timeout::Real = TIMEOUT,
     )::AbstractSet{<:AbstractString}
 
 Return the set of names of a `version` of a `list` in a `namespace` of genes of some `species`. This returns all the
@@ -99,12 +99,12 @@ list. As usual in Gmara, this includes everything that may be used as name, e.g.
 transcripts and proteins; for Symbol it includes approved and alises; etc. If the `list` is `nothing`, this just returns
 the set of known gene names in the `namespace`.
 """
-function gmara_genes(;
+@documented function gmara_genes(;
     species::AbstractString,
-    namespace::AbstractString,
+    namespace::AbstractString = "GeneSymbol",
     list::Maybe{AbstractString} = nothing,
     version::AbstractString = "main",
-    cache_dir = CACHE_DIR,
+    cache_dir::AbstractString = CACHE_DIR,
     timeout::Real = TIMEOUT,
 )::AbstractSet{<:AbstractString}
     if list === nothing
@@ -117,9 +117,9 @@ end
 
 function get_set_file(
     path::AbstractString;
-    version::AbstractString = "main",
-    cache_dir::AbstractString = CACHE_DIR,
-    timeout::Real = TIMEOUT,
+    version::AbstractString,
+    cache_dir::AbstractString,
+    timeout::Real,
 )::AbstractSet{<:AbstractString}
     cache_key = version * "/" * path
     set = lock_read(CACHE_LOCK) do
@@ -140,9 +140,9 @@ end
 
 function load_set_file(
     path::AbstractString;
-    version::AbstractString = "main",
-    cache_dir::AbstractString = CACHE_DIR,
-    timeout::Real = TIMEOUT,
+    version::AbstractString,
+    cache_dir::AbstractString,
+    timeout::Real,
 )::AbstractSet{<:AbstractString}
     cache_version_path = cache_dir * "/" * version * "/" * path
     with_lock_file(cache_version_path; timeout) do
@@ -165,9 +165,9 @@ end
 
 function ensure_is_downloaded(
     path::AbstractString;
-    version::AbstractString = "main",
+    version::AbstractString,
     etag::Maybe{AbstractString},
-    cache_dir::AbstractString = CACHE_DIR,
+    cache_dir::AbstractString,
 )::Bool
     url = github_url(path; version)
 
@@ -221,8 +221,8 @@ end
 
 function write_set_to_file(
     path::AbstractString;
-    version = "main",
-    cache_dir::AbstractString = CACHE_DIR,
+    version::AbstractString,
+    cache_dir::AbstractString,
 )::AbstractSet{<:AbstractString}
     set = GZip.open(cache_dir * "/" * version * "/" * path * ".gz") do file  # NOJET
         text = read(file, String)
@@ -241,15 +241,15 @@ end
 
 function read_set_from_file(
     path::AbstractString;
-    version::AbstractString = "main",
-    cache_dir::AbstractString = CACHE_DIR,
+    version::AbstractString,
+    cache_dir::AbstractString,
 )::AbstractSet{<:AbstractString}
     return GZip.open(cache_dir * "/" * version * "/" * path * ".jl_set.gz") do file
         return deserialize(file)
     end
 end
 
-function with_lock_file(action::Function, path::AbstractString; timeout::Real = TIMEOUT)::Any
+function with_lock_file(action::Function, path::AbstractString; timeout::Real)::Any
     file = lock_file(path; timeout)
     try
         return action()
@@ -258,13 +258,13 @@ function with_lock_file(action::Function, path::AbstractString; timeout::Real = 
     end
 end
 
-function lock_file(path::AbstractString; timeout::Real = TIMEOUT)::Base.Filesystem.File
+function lock_file(path::AbstractString; timeout::Real)::Base.Filesystem.File
     mkpath(dirname(path))  # NOJET
     start_time = time()
     lock_path = path * ".lock"
     while true
         try
-            return Base.Filesystem.open(lock_path, Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL)
+            return Base.Filesystem.open(lock_path, Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL)  # NOJET
         catch exception
             if exception isa Base.IOError  # untested
                 if timeout > 0  # untested
@@ -289,12 +289,12 @@ end
         daf::DafWriter;
         species::AbstractString,
         namespace::AbstractString,
-        [list::Maybe{AbstractString} = nothing,
-        gene_names::AbstractString = "name",
-        property::Maybe{AbstractString} = nothing,
-        overwrite::Bool = false,
+        [list::Maybe{AbstractString} = $(DEFAULT.list),
+        gene_names::AbstractString = $(DEFAULT.gene_names),
+        property::Maybe{AbstractString} = $(DEFAULT.property),
         cache_dir = CACHE_DIR,
-        timeout::Real = TIMEOUT],
+        timeout::Real = TIMEOUT,
+        overwrite::Bool = $(DEFAULT.overwrite)]
     )::Nothing
 
 Set a gene property mask in `daf` based on some `version` of a Gmara `list` of some `namespace` for some `species`. We
@@ -302,17 +302,17 @@ match the `gene_names` (by default, just the unique names in the gene axis) with
 as a per-gene `property` (by default, ``is_``_list_). If `list` is `nothing`, this just marks the gene names that exist
 in the namespace. If `overwrite`, this will overwrite an existing property of the.array same name.
 """
-function set_gmara_genes_mask!(
+@documented function set_gmara_genes_mask!(
     daf::DafWriter;
     species::AbstractString,
-    namespace::AbstractString,
-    list::Maybe{AbstractString} = nothing,
-    version::AbstractString = "main",
+    namespace::AbstractString = function_default(gmara_genes, :namespace),
+    list::Maybe{AbstractString} = function_default(gmara_genes, :list),
+    version::AbstractString = function_default(gmara_genes, :version),
     gene_names::AbstractString = "name",
     property::Maybe{AbstractString} = nothing,
-    overwrite::Bool = false,
     cache_dir = CACHE_DIR,
     timeout::Real = TIMEOUT,
+    overwrite::Bool = false,
 )::Nothing
     if property === nothing
         property = "is_$(list)"

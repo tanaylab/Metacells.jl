@@ -63,21 +63,22 @@ CELL_MATRICES_DATA = CopyAnnData(["X" => ("UMIs", UInt32(0))])
 METACELL_VECTORS_DATA = CopyAnnData([
     "metacells_level" => ("level", UInt32(0)),
     "similar" => ("is_similar", false),
+    "grouped" => ("n_cell", UInt32(0)),
     "type" => ("type", nothing),
     "*" => ("=", nothing),
 ])
 
 METACELL_MATRICES_DATA = CopyAnnData([
-    "X" => ("fraction", Float32(0.0)),
-    "corrected_fraction" => ("corrected_fraction", Float32(0.0)),
+    "X" => ("geomean_fraction", Float32(0.0)),
+    "corrected_fraction" => ("corrected_geomean_fraction", Float32(0.0)),
     "essential" => ("is_essential", false),
     "fitted" => ("is_fitted", false),
     "inner_fold" => ("inner_fold", Float32(0.0)),
     "inner_stdev_log" => ("inner_stdev_log", Float32(0.0)),
     "misfit" => ("is_misfit", false),
     "projected_fold" => ("projected_fold", Float32(0.0)),
-    "projected_fraction" => ("projected_fraction", Float32(0.0)),
-    "total_umis" => ("total_UMIs", UInt32(0)),
+    "projected_fraction" => ("projected_geomean_fraction", Float32(0.0)),
+    "total_umis" => ("UMIs", UInt32(0)),
     "zeros" => ("zeros", UInt32(0)),
     "*" => ("=", nothing),
 ])
@@ -160,7 +161,7 @@ Per-cell:
     overwrite::Bool = false,
     insist::Bool = false,
 )::Nothing
-    cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")
+    cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")  # NOJET
 
     copy_axis!(; destination = daf, source = cells_daf, axis = "cell", overwrite, insist)
     copy_axis!(; destination = daf, source = cells_daf, axis = "gene", overwrite, insist)
@@ -245,13 +246,13 @@ Per-metacell-per-gene:
   - The `essential` matrix is renamed to `is_essential`.
   - The `essential`, `fitted`, and `misfit` matrices are renamed to `is_essential`, `is_fitted` and `is_misfit`, respectively.
   - The `inner_fold`, `inner_stdev_log`, `projected_fold`, `projected_fraction` matrices are always stored as `Float32`.
-  - The `total_umis` matrix is renamed to `total_UMIs` and always stored as `UInt32`.
+  - The `total_umis` matrix is renamed to `UMIs` and always stored as `UInt32`.
   - The `zeros` matrix is always stored as `UInt32`.
   - All other matrices are copied as-is.
 
 Scalars and Per-gene:
 
-  Same as in [`import_cells_h5ad!`](@ref)
+Same as in [`import_cells_h5ad!`](@ref)
 
 Per-cell:
 
@@ -464,7 +465,7 @@ function import_mask_matrix(
 
     mask_matrix::SparseMatrixCSC{Bool} = hcat(mask_vectors...)  # NOJET
     @info "reconstruct gene-$(type_axis) matrix: is_$(prefix)"
-    set_matrix!(daf, "gene", type_axis, "is_$(prefix)", mask_matrix; relayout = true, overwrite = true)
+    set_matrix!(daf, "gene", type_axis, "is_$(prefix)", bestify(mask_matrix); relayout = true, overwrite = true)  # NOJET
 
     for type_name in type_names
         mask_name = "$(prefix)_gene_of_$(type_name)"
