@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Defaults · Metacells.jl v0.1.0
+<title>Compute Modules · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Defaults · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Defaults · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Defaults · Metacells.jl v0.1.0"/>
+<meta name="title" content="Compute Modules · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Compute Modules · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Compute Modules · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -80,9 +80,17 @@
 <a class="tocitem" href="analyze_blocks.html">Analyze Blocks
 </a>
 </li>
-<li>
+<li class="is-active">
 <a class="tocitem" href="compute_modules.html">Compute Modules
 </a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
 </li>
 <li>
 <a class="tocitem" href="analyze_modules.html">Analyze Modules
@@ -104,17 +112,9 @@
 <a class="tocitem" href="anndata_format.html">AnnData Format
 </a>
 </li>
-<li class="is-active">
+<li>
 <a class="tocitem" href="defaults.html">Defaults
 </a>
-<ul class="internal">
-<li>
-<a class="tocitem" href="#Index">
-<span>Index
-</span>
-</a>
-</li>
-</ul>
 </li>
 </ul>
 <div class="docs-version-selector field has-addons">
@@ -137,13 +137,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="defaults.html">Defaults
+<a href="compute_modules.html">Compute Modules
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="defaults.html">Defaults
+<a href="compute_modules.html">Compute Modules
 </a>
 </li>
 </ul>
@@ -162,20 +162,20 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Defaults">
-<a class="docs-heading-anchor" href="#Defaults">Defaults
+<h1 id="Compute-Modules">
+<a class="docs-heading-anchor" href="#Compute-Modules">Compute Modules
 </a>
-<a id="Defaults-1">
+<a id="Compute-Modules-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Defaults" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Compute-Modules" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Defaults" href="#Metacells.Defaults">
-<code>Metacells.Defaults
+<a class="docstring-binding" id="Metacells.ComputeModules" href="#Metacells.ComputeModules">
+<code>Metacells.ComputeModules
 </code>
 </a> — 
 <span class="docstring-category">Module
@@ -185,7 +185,7 @@
 </header>
 <section>
 <div>
-<p>Default values for parameters.
+<p>Group &quot;very correlated&quot; genes modules in each local environment.
 </p>
 </div>
 </section>
@@ -194,38 +194,188 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Defaults.GENE_FRACTION_REGULARIZATION" href="#Metacells.Defaults.GENE_FRACTION_REGULARIZATION">
-<code>Metacells.Defaults.GENE_FRACTION_REGULARIZATION
+<a class="docstring-binding" id="Metacells.ComputeModules.compute_blocks_modules!" href="#Metacells.ComputeModules.compute_blocks_modules!">
+<code>Metacells.ComputeModules.compute_blocks_modules!
 </code>
 </a> — 
-<span class="docstring-category">Constant
+<span class="docstring-category">Function
 </span>
 <span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
 <div>
-<p>When computing log (base 2) of the fraction of the gene expression out of the total, we use this regularization factor by default top avoid zero values.
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules!(
+    daf::DafWriter;
+    min_module_downsampled_UMIs::Integer = ```8```,
+    min_module_strong_cells::Integer = ```12```,
+    min_merge_fragments_correlation::Real = ```0.5```,
+    min_merge_modules_correlation::Real = ```0.8```,
+    min_downsamples::Integer = ```750```,
+    min_downsamples_quantile::AbstractFloat = ```0.05```,
+    max_downsamples_quantile::AbstractFloat = ```0.5```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Group the genes into modules based on their correlation.
+</p>
+<p>For each block:
+</p>
+<ol>
+<li>
+<p>Compute the correlation of the expression of the genes across all metacells in the block&#39;s environment.
+</p>
+</li>
+<li>
+<p>Cluster the genes based on this correlation, using the 
+<code>:complete
+</code> distance measure.
+</p>
+</li>
+<li>
+<p>Bottom-up group genes into fragments and then into complete modules. Fragments have at least 
+<code>min_merge_fragments_correlation
+</code> between all their genes. At some point, the fragment will contain enough genes so there will be at least 
+<code>min_module_strong_cells
+</code>. A &quot;strong&quot; cell is expected to have at least 
+<code>min_module_downsampled_UMIs
+</code>, if we downsample the cells in the environment using 
+<code>min_downsamples
+</code>, 
+<code>min_downsamples_quantile
+</code>, and 
+<code>max_downsamples_quantile
+</code>. If the 
+<code>divergence
+</code> is specified per gene, then it is applied to the UMIs. When this happens, we mark the fragment (which might be a single gene!) as a valid module. We will only merge two such modules if the correlation between all their genes is at least 
+<code>min_merge_modules_correlation
+</code>.
+</p>
+</li>
+<li>
+<p>Having merged some of the genes into modules, we repeat steps 2 and 3 for the unmerged genes until no new modules are found.
+</p>
+</li>
+<li>
+<p>Most of the genes will not end up in a valid module, and are given the module index 0. The other genes are given a 1-based module index. We need to store a matrix of module indices instead of module names due to 
+<code>Daf
+</code> limitations (no matrices of strings).
+</p>
+</li>
+</ol>
+<div class="admonition is-info" id="Note-96e9ab9d5b588dd8">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-96e9ab9d5b588dd8" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>This uses the virtual 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_fraction_matrix">
+<code>metacell_gene_fraction_matrix
+</code>
+</a>. You will need an 
+<code>adapter
+</code> to map these to concrete fractions (geomean, linear, scaled, ...). In addition, you might want to restrict the set of genes that are candidates to be included in the module, for example just to 
+<code>is_covered
+</code> genes.
 </p>
 </div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS" href="#Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS">
-<code>Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS
-</code>
-</a> — 
-<span class="docstring-category">Constant
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<p>When comparing gene expression levels (e.g., when computing fold factors), we do not consider the result to be significant unless at least this number of UMIs were used to compute the compared value(s).
+</div>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::Union{Float32, Float64} (optional): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>gene, metacell @ fraction
+</strong>::Union{Float32, Float64} (required): Some estimated fraction of the UMIs of each gene in each metacell.
+</p>
+<p>
+<strong>block, gene @ is
+<em>environment
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each environment.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, the (column) mask of nearby blocks in its expanded environment.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>module
+</strong> (guaranteed): A local (per block) gene module.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (guaranteed): Whether each gene module is found in each block.
+</p>
+<p>
+<strong>block, module @ min
+<em>gene
+</em>correlation
+</strong>::Union{Float32, Float64} (guaranteed): The minimal correlation between the genes of each gene module of each block.
 </p>
 </div>
 </section>
@@ -239,28 +389,12 @@
 </a>
 </h2>
 <ul>
-<li>
-<a href="defaults.html#Metacells.Defaults">
-<code>Metacells.Defaults
-</code>
-</a>
-</li>
-<li>
-<a href="defaults.html#Metacells.Defaults.GENE_FRACTION_REGULARIZATION">
-<code>Metacells.Defaults.GENE_FRACTION_REGULARIZATION
-</code>
-</a>
-</li>
-<li>
-<a href="defaults.html#Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS">
-<code>Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS
-</code>
-</a>
-</li>
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-prevpage" href="anndata_format.html">« AnnData Format
+<a class="docs-footer-prevpage" href="analyze_blocks.html">« Analyze Blocks
+</a>
+<a class="docs-footer-nextpage" href="analyze_modules.html">Analyze Modules »
 </a>
 <div class="flexbox-break">
 </div>

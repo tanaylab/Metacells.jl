@@ -22,13 +22,34 @@ include("anndata_format.jl")
 include("contracts.jl")
 @reexport using .Contracts
 
-include("identify_genes.jl")
-@reexport using .IdentifyGenes
+include("analyze_cells.jl")
+@reexport using .AnalyzeCells
 
-include("blocks.jl")
-@reexport using .Blocks
+include("analyze_metacells.jl")
+@reexport using .AnalyzeMetacells
 
-include("collect.jl")
-@reexport using .Collect
+include("analyze_genes.jl")
+@reexport using .AnalyzeGenes
+
+include("compute_blocks.jl")
+@reexport using .ComputeBlocks
+
+include("analyze_blocks.jl")
+@reexport using .AnalyzeBlocks
+
+include("compute_modules.jl")
+@reexport using .ComputeModules
+
+include("analyze_modules.jl")
+@reexport using .AnalyzeModules
+
+include("compute_approximation.jl")
+@reexport using .ComputeApproximation
+
+include("analyze_approximation.jl")
+@reexport using .AnalyzeApproximation
+
+include("sharpen_metacells.jl")
+@reexport using .SharpenMetacells
 
 end # module

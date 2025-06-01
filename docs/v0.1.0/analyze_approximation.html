@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Gmara · Metacells.jl v0.1.0
+<title>Analyze Approximation · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Gmara · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Gmara · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Gmara · Metacells.jl v0.1.0"/>
+<meta name="title" content="Analyze Approximation · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Analyze Approximation · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Analyze Approximation · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -56,29 +56,9 @@
 <a class="tocitem" href="index.html">Metacells
 </a>
 </li>
-<li class="is-active">
+<li>
 <a class="tocitem" href="gmara.html">Gmara
 </a>
-<ul class="internal">
-<li>
-<a class="tocitem" href="#Configuration">
-<span>Configuration
-</span>
-</a>
-</li>
-<li>
-<a class="tocitem" href="#Functions">
-<span>Functions
-</span>
-</a>
-</li>
-<li>
-<a class="tocitem" href="#Index">
-<span>Index
-</span>
-</a>
-</li>
-</ul>
 </li>
 <li>
 <a class="tocitem" href="contracts.html">Contracts
@@ -112,9 +92,17 @@
 <a class="tocitem" href="compute_approximation.html">Compute Approximation
 </a>
 </li>
-<li>
+<li class="is-active">
 <a class="tocitem" href="analyze_approximation.html">Analyze Approximation
 </a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
 </li>
 <li>
 <a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
@@ -149,13 +137,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="gmara.html">Gmara
+<a href="analyze_approximation.html">Analyze Approximation
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="gmara.html">Gmara
+<a href="analyze_approximation.html">Analyze Approximation
 </a>
 </li>
 </ul>
@@ -174,20 +162,20 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Gmara">
-<a class="docs-heading-anchor" href="#Gmara">Gmara
+<h1 id="Analyze-Approximation">
+<a class="docs-heading-anchor" href="#Analyze-Approximation">Analyze Approximation
 </a>
-<a id="Gmara-1">
+<a id="Analyze-Approximation-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Gmara" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Analyze-Approximation" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Gmara" href="#Metacells.Gmara">
-<code>Metacells.Gmara
+<a class="docstring-binding" id="Metacells.AnalyzeApproximation" href="#Metacells.AnalyzeApproximation">
+<code>Metacells.AnalyzeApproximation
 </code>
 </a> — 
 <span class="docstring-category">Module
@@ -197,69 +185,7 @@
 </header>
 <section>
 <div>
-<p>Access gene names lists from 
-<a href="https://github.com/tanaylab/Gmara">Gmara
-</a>.
-</p>
-<div class="admonition is-info" id="Note-821c640101f19f23">
-<header class="admonition-header">Note
-<a class="admonition-anchor" href="#Note-821c640101f19f23" title="Permalink">
-</a>
-</header>
-<div class="admonition-body">
-<p>All the functions here are thread-safe and can also be invoked from multiple parallel processes using the same 
-<a href="gmara.html#Metacells.Gmara.CACHE_DIR">
-<code>CACHE_DIR
-</code>
-</a>. This directory can even be shared between multiple users as long as they have read-write permissions to the shared directory. This should even work on NFS mounted volumes shared between multiple servers.
-</p>
-</div>
-</div>
-</div>
-</section>
-</article>
-<h2 id="Configuration">
-<a class="docs-heading-anchor" href="#Configuration">Configuration
-</a>
-<a id="Configuration-1">
-</a>
-<a class="docs-heading-anchor-permalink" href="#Configuration" title="Permalink">
-</a>
-</h2>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Gmara.CACHE_DIR" href="#Metacells.Gmara.CACHE_DIR">
-<code>Metacells.Gmara.CACHE_DIR
-</code>
-</a> — 
-<span class="docstring-category">Constant
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<p>The default (
-<code>$HOME/.cache/gmara
-</code>) location of the cache of downloaded Gmara data files.
-</p>
-<p>You can override this by setting the 
-<code>METACELLS_GMARA_CACHE_DIR
-</code> environment variable, or by passing an explicit 
-<code>cache_dir
-</code> parameter to the functions.
-</p>
-<p>The top-level under this is the version indicator, where 
-<code>main
-</code> is always the latest and greatest version. Under each version we store the files in the same path as in github, with a 
-<code>.gz
-</code> suffix for the compressed raw data, 
-<code>.jl_set.gz
-</code> for serialized Julia set objects, and 
-<code>.lock
-</code> for temporary lock files for coordinating between parallel processes.
+<p>Do simple blocks analysis.
 </p>
 </div>
 </section>
@@ -268,42 +194,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Gmara.TIMEOUT" href="#Metacells.Gmara.TIMEOUT">
-<code>Metacells.Gmara.TIMEOUT
-</code>
-</a> — 
-<span class="docstring-category">Constant
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<p>The default timeout in seconds (10) for waiting for a lock file in the Gmara cache. If not positive, will wait forever. If a process crashes very badly then a lock file may be left behind and may need to be removed by hand to allow access for the data.
-</p>
-<p>You can override this by setting the 
-<code>METACELLS_GMARA_TIMEOUT
-</code> environment variable, or by passing an explicit 
-<code>timeout
-</code> parameter to the functions.
-</p>
-</div>
-</section>
-</article>
-<h2 id="Functions">
-<a class="docs-heading-anchor" href="#Functions">Functions
-</a>
-<a id="Functions-1">
-</a>
-<a class="docs-heading-anchor-permalink" href="#Functions" title="Permalink">
-</a>
-</h2>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Gmara.normalize_gene_name" href="#Metacells.Gmara.normalize_gene_name">
-<code>Metacells.Gmara.normalize_gene_name
+<a class="docstring-binding" id="Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_linear_covered_fractions!" href="#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_linear_covered_fractions!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -314,117 +206,15 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
-</code>
-</pre>
-<p>Normalize the a gene name in some namespace. In most namespaces, this means removing the 
-<code>.[0-9]
-</code> version suffix from the name, and converting the name to upper case. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. The UCSC namespace is an exception in that it is all-lower-case and the 
-<code>.[0-9]
-</code> suffix seems to be an inherent part of the identifier.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Gmara.gmara_genes" href="#Metacells.Gmara.gmara_genes">
-<code>Metacells.Gmara.gmara_genes
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">gmara_genes(;
-    species::AbstractString,
-    namespace::AbstractString,
-    [list::Maybe{AbstractString} = nothing,
-    version::AbstractString = &quot;main&quot;
-    cache_dir = CACHE_DIR,
-    timeout::Real = TIMEOUT],
-)::AbstractSet{&lt;:AbstractString}
-</code>
-</pre>
-<p>Return the set of names of a 
-<code>version
-</code> of a 
-<code>list
-</code> in a 
-<code>namespace
-</code> of genes of some 
-<code>species
-</code>. This returns all the names that are (probably) in the list; it a name isn&#39;t in the result, it is almost certain it does not belong in the list. As usual in Gmara, this includes everything that may be used as name, e.g. for Ensembl it includes genes, transcripts and proteins; for Symbol it includes approved and alises; etc. If the 
-<code>list
-</code> is 
-<code>nothing
-</code>, this just returns the set of known gene names in the 
-<code>namespace
-</code>.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Gmara.set_gmara_genes_mask!" href="#Metacells.Gmara.set_gmara_genes_mask!">
-<code>Metacells.Gmara.set_gmara_genes_mask!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">set_gmara_genes_mask!(
+<code class="language-julia hljs">function compute_metacells_genes_approximated_linear_covered_fractions!(
     daf::DafWriter;
-    species::AbstractString,
-    namespace::AbstractString,
-    [list::Maybe{AbstractString} = nothing,
-    gene_names::AbstractString = &quot;name&quot;,
-    property::Maybe{AbstractString} = nothing,
-    overwrite::Bool = false,
-    cache_dir = CACHE_DIR,
-    timeout::Real = TIMEOUT],
+    overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
-<p>Set a gene property mask in 
-<code>daf
-</code> based on some 
-<code>version
-</code> of a Gmara 
-<code>list
-</code> of some 
-<code>namespace
-</code> for some 
-<code>species
-</code>. We match the 
-<code>gene_names
-</code> (by default, just the unique names in the gene axis) with the list names and set the result mask as a per-gene 
-<code>property
-</code> (by default, 
-<span>$is_$
-</span>
-<em>list
-</em>). If 
-<code>list
-</code> is 
-<code>nothing
-</code>, this just marks the gene names that exist in the namespace. If 
-<code>overwrite
-</code>, this will overwrite an existing property of the.array same name.
+<p>The linear fraction of each covered gene UMIs out of the total covered UMIs as approximated by the linear model. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
 </p>
 </div>
 </section>
@@ -433,8 +223,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Gmara.empty_gmara_cache!" href="#Metacells.Gmara.empty_gmara_cache!">
-<code>Metacells.Gmara.empty_gmara_cache!
+<a class="docstring-binding" id="Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_scaled_linear_covered_fractions!" href="#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_scaled_linear_covered_fractions!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -445,11 +235,166 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">empty_gmara_cache!()::Nothing
+<code class="language-julia hljs">function compute_metacells_genes_approximated_scaled_linear_covered_fractions!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
 </code>
 </pre>
-<p>All requests are cached in-memory. This makes repeated requests cheap. This consumes some (modest amount of) memory; also, if the data in the server has been updated (which rarely happens), you will keep getting the old result. This function releases all the memory and forces all subsequent requests to query the server. In the common case the server tells us our disk cache data is up to date, we don&#39;t re-download it).
+<p>The linear fraction of each covered gene UMIs out of the total covered UMIs, scaled by divergence, as approximated by the linear model. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
 </p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_linear_covered_fractions!" href="#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_linear_covered_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_genes_approximated_log_linear_covered_fractions!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of each covered gene UMIs out of the total covered UMIs as approximated by the linear model. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!" href="#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of each covered gene UMIs out of the total covered UMIs as approximated by the linear model, scaled by divergence. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeApproximation.compute_blocks_modules_block_RMSE!" href="#Metacells.AnalyzeApproximation.compute_blocks_modules_block_RMSE!">
+<code>Metacells.AnalyzeApproximation.compute_blocks_modules_block_RMSE!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_block_RMSE!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The root mean squared error of predicting the covered genes using the gene modules in the vicinity of the block, evaluated at the block metacells.
+</p>
+<div class="admonition is-info" id="Note-e7986a9ec2aa3f7b">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-e7986a9ec2aa3f7b" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>This compares the virtual 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_approximated_covered_fraction_matrix">
+<code>metacell_gene_approximated_covered_fraction_matrix
+</code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_covered_fraction_matrix">
+<code>metacell_gene_covered_fraction_matrix
+</code>
+</a>. You will need an 
+<code>adapter
+</code> to map these to concrete fractions (geomean, linear, scaled, ...).
+</p>
+</div>
+</div>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeApproximation.compute_blocks_modules_neighborhood_RMSE!" href="#Metacells.AnalyzeApproximation.compute_blocks_modules_neighborhood_RMSE!">
+<code>Metacells.AnalyzeApproximation.compute_blocks_modules_neighborhood_RMSE!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_neighborhood_RMSE!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The root mean squared error of predicting the covered genes using the gene modules in the vicinity of the block, evaluated at the neighborhood metacells. This internally computes the approximation of the neighborhood metacells based on the block&#39;s model.
+</p>
+<div class="admonition is-info" id="Note-c1cef41d27569546">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-c1cef41d27569546" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>This uses the 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_covered_fraction_matrix">
+<code>metacell_gene_covered_fraction_matrix
+</code>
+</a>. You will need an 
+<code>adapter
+</code> to map it to a concrete fraction (geomean, linear, scaled, ...).
+</p>
+</div>
+</div>
 </div>
 </section>
 </article>
@@ -463,53 +408,53 @@
 </h2>
 <ul>
 <li>
-<a href="gmara.html#Metacells.Gmara">
-<code>Metacells.Gmara
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation">
+<code>Metacells.AnalyzeApproximation
 </code>
 </a>
 </li>
 <li>
-<a href="gmara.html#Metacells.Gmara.CACHE_DIR">
-<code>Metacells.Gmara.CACHE_DIR
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_blocks_modules_block_RMSE!">
+<code>Metacells.AnalyzeApproximation.compute_blocks_modules_block_RMSE!
 </code>
 </a>
 </li>
 <li>
-<a href="gmara.html#Metacells.Gmara.TIMEOUT">
-<code>Metacells.Gmara.TIMEOUT
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_blocks_modules_neighborhood_RMSE!">
+<code>Metacells.AnalyzeApproximation.compute_blocks_modules_neighborhood_RMSE!
 </code>
 </a>
 </li>
 <li>
-<a href="gmara.html#Metacells.Gmara.empty_gmara_cache!">
-<code>Metacells.Gmara.empty_gmara_cache!
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_linear_covered_fractions!
 </code>
 </a>
 </li>
 <li>
-<a href="gmara.html#Metacells.Gmara.gmara_genes">
-<code>Metacells.Gmara.gmara_genes
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_linear_covered_fractions!
 </code>
 </a>
 </li>
 <li>
-<a href="gmara.html#Metacells.Gmara.normalize_gene_name">
-<code>Metacells.Gmara.normalize_gene_name
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!
 </code>
 </a>
 </li>
 <li>
-<a href="gmara.html#Metacells.Gmara.set_gmara_genes_mask!">
-<code>Metacells.Gmara.set_gmara_genes_mask!
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_scaled_linear_covered_fractions!
 </code>
 </a>
 </li>
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-prevpage" href="index.html">« Metacells
+<a class="docs-footer-prevpage" href="compute_approximation.html">« Compute Approximation
 </a>
-<a class="docs-footer-nextpage" href="contracts.html">Contracts »
+<a class="docs-footer-nextpage" href="sharpen_metacells.html">Sharpen Metacells »
 </a>
 <div class="flexbox-break">
 </div>

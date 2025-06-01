@@ -91,15 +91,39 @@
 </ul>
 </li>
 <li>
-<a class="tocitem" href="identify_genes.html">Identify Genes
+<a class="tocitem" href="analyze_cells.html">Analyze Cells
 </a>
 </li>
 <li>
-<a class="tocitem" href="collect.html">Collect Metacells
+<a class="tocitem" href="analyze_metacells.html">Analyze Metacells
 </a>
 </li>
 <li>
-<a class="tocitem" href="blocks.html">Blocks
+<a class="tocitem" href="compute_blocks.html">Compute Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_approximation.html">Compute Approximation
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_approximation.html">Analyze Approximation
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
 </a>
 </li>
 <li>
@@ -282,8 +306,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.old_metacell_axis" href="#Metacells.Contracts.old_metacell_axis">
-<code>Metacells.Contracts.old_metacell_axis
+<a class="docstring-binding" id="Metacells.Contracts.block_axis" href="#Metacells.Contracts.block_axis">
+<code>Metacells.Contracts.block_axis
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -294,34 +318,10 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">old_metacell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+<code class="language-julia hljs">block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
 </code>
 </pre>
-<p>Old metacells when computing new ones. This is the same as the regular metacells axis, but renamed to avoid confusion when computing a new set of metacells for some data based on the old metacells.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.new_metacell_axis" href="#Metacells.Contracts.new_metacell_axis">
-<code>Metacells.Contracts.new_metacell_axis
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">new_metacell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
-</code>
-</pre>
-<p>New metacells when improving old ones. This is the same as the regular metacells axis, but renamed to avoid confusion when computing a new set of metacells for some data based on the old metacells.
+<p>The axis of blocks, which are distinct groups of metacells with &quot;very close&quot; estimated cell state. The metacells in each block all have very close estimates of the skeleton gene expressions (maximal fold factor up to some maximal span).
 </p>
 </div>
 </section>
@@ -354,30 +354,6 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.block_axis" href="#Metacells.Contracts.block_axis">
-<code>Metacells.Contracts.block_axis
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
-</code>
-</pre>
-<p>The axis of blocks, which are distinct groups of metacells with &quot;very close&quot; estimated cell state. The metacells in each block all have very close estimates of the skeleton gene expressions (maximal fold factor up to some maximal span).
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
 <a class="docstring-binding" id="Metacells.Contracts.principal_component_axis" href="#Metacells.Contracts.principal_component_axis">
 <code>Metacells.Contracts.principal_component_axis
 </code>
@@ -393,7 +369,31 @@
 <code class="language-julia hljs">principal_component_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
 </code>
 </pre>
-<p>The axis of principal components of local linear programs.
+<p>The axis of local (per block) principal components. There&#39;s no relationship between the same-name/index principal component in different blocks; we just use this axis to be able to create matrices per-block-per-principal-component.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.module_axis" href="#Metacells.Contracts.module_axis">
+<code>Metacells.Contracts.module_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">module_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of local (per block) gene modules. There&#39;s no relationship between the same-name/index gene module in different blocks; we just use this axis to be able to create matrices per-block-per-gene-module.
 </p>
 </div>
 </section>
@@ -406,6 +406,14 @@
 <a class="docs-heading-anchor-permalink" href="#Vectors" title="Permalink">
 </a>
 </h2>
+<h3 id="Gene-Vectors">
+<a class="docs-heading-anchor" href="#Gene-Vectors">Gene Vectors
+</a>
+<a id="Gene-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Vectors" title="Permalink">
+</a>
+</h3>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
@@ -425,7 +433,11 @@
 <code class="language-julia hljs">gene_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>A mask of genes that are excluded from consideration. These genes are completely unrelated to the biological behaviors of interest. Not only that, they have strong and variable expression levels; enough to have an global impact on the expression level of the rest of the genes - for example, mitochondrial genes. Such genes make it difficult to estimate the relative expression level of genes between different cell states. Therefore, such genes aren&#39;t even counted in the total UMIs of each cell.
+<p>A mask of genes that are excluded from consideration. These genes are completely unrelated to the biological behaviors of interest. Not only that, they have strong and variable expression levels; enough to have an global impact on the expression level of the rest of the genes - for example, mitochondrial genes. Such genes make it difficult to estimate the relative expression level of genes between different cell states. Therefore, such genes aren&#39;t even counted in the total UMIs of each cell. Properties with &quot;total&quot; in their name ignore excluded genes, e.g. 
+<code>total_UMIs
+</code> do not include the UMIs of excluded genes.
+</p>
+<p>This vector is created in a supervised way based on biological and technical considerations.
 </p>
 </div>
 </section>
@@ -451,6 +463,8 @@
 </pre>
 <p>A mask of genes that are lateral to the biological behaviors of interest. These genes may satisfy all criteria for being in a group of cooperating genes, but the biological behavior they participate in isn&#39;t relevant to the behaviors of interest - for example, genes related to cell cycle or stress. Such genes make it harder to focus on the biological behaviors of interest. They are therefore masked out during the analysis.
 </p>
+<p>This vector is created in a supervised way based on biological considerations.
+</p>
 </div>
 </section>
 </article>
@@ -474,6 +488,12 @@
 </code>
 </pre>
 <p>A mask of genes that distinguish between cell states. These genes have a significant expression level at some cell state, as well as a significant range of expression across all cell states, so can be used to distinguish between cell states. Non-marker genes are by definition not useful for such analysis, but marker genes aren&#39;t necessarily useful due to other considerations.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_marker_genes!">
+<code>identify_marker_genes!
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -499,6 +519,12 @@
 </pre>
 <p>The relative ranks of the marker genes. The more the gene distinguishes between different cell states, the better (lower) rank it has. That is, 1 is for the &quot;most&quot; marker gene. Non-marker genes are given an extremely high rank (that maximal the data type allows).
 </p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.rank_marker_genes!">
+<code>rank_marker_genes!
+</code>
+</a>.
+</p>
 </div>
 </section>
 </article>
@@ -523,6 +549,12 @@
 </pre>
 <p>A mask of genes that are not correlated with other gene(s). We typically search for groups of genes that act together. Genes that have no correlation with other genes aren&#39;t useful for this sort of analysis, even if they are marker genes.
 </p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_uncorrelated_genes!">
+<code>identify_uncorrelated_genes!
+</code>
+</a>.
+</p>
 </div>
 </section>
 </article>
@@ -545,7 +577,49 @@
 <code class="language-julia hljs">gene_is_covered_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>A mask of genes that are covered by the local linear program. When we approximate the manifold using these local linear programs, we only model these genes, ignoring the rest. This allows the approximation to be unaffected by &quot;irrelevant&quot; genes.
+<p>A mask of genes that are covered by the local linear programs. When we approximate the manifold using these local linear programs, we only model these genes, ignoring the rest. This allows the approximation to be unaffected by &quot;irrelevant&quot; genes. The covered genes are typically some subset of the marker genes of the local region; in particular, they don&#39;t include lateral genes. Properties that are computed using only the covered genes contain 
+<code>_covered_
+</code> in their name, e.g., 
+<code>linear_covered_fraction
+</code> vs. 
+<code>linear_fraction
+</code>.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_covered_genes!">
+<code>identify_covered_genes!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.gene_is_skeleton_vector" href="#Metacells.Contracts.gene_is_skeleton_vector">
+<code>Metacells.Contracts.gene_is_skeleton_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">gene_is_skeleton_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are used to predict the values of the rest of the (covered) genes. We assume that knowing the expression level of the skeleton genes is sufficient to reasonably estimate the expression level of the rest of the (covered) genes. For example, if two metacells have &quot;very close&quot; expression level of all the skeleton genes, we assume that these metacells are &quot;very similar&quot;, without looking at the rest of the genes.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_skeleton_genes!">
+<code>identify_skeleton_genes!
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -571,29 +645,7 @@
 </pre>
 <p>A mask of genes that are forbidden from being used as skeleton factors. When searching for a set of genes that predict the expression of the rest of the genes, we do not consider the forbidden genes.
 </p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.gene_is_skeleton_vector" href="#Metacells.Contracts.gene_is_skeleton_vector">
-<code>Metacells.Contracts.gene_is_skeleton_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">gene_is_skeleton_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>A mask of genes that are used to predict the values of the rest of the (covered) genes. The local programs that we use to approximate the manifold are linear combinations of the skeleton genes. A linear combination of a small set of (different) such programs is used to predict the rest of the genes.
+<p>This vector is created in a supervised way based on biological considerations.
 </p>
 </div>
 </section>
@@ -617,17 +669,47 @@
 <code class="language-julia hljs">gene_divergence_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>For each gene, we scale fold factors of each gene by multiplying with (1 - divergence) of the gene. In particular this is used when considering the distance between gene expressions. Therefore genes with a non-zero divergence will require a higher fold factor
+<p>For each gene, we scale the fractions of each gene by multiplying with 
+<code>(1 - divergence)
+</code> of the gene. In particular this is used when considering the distance between gene expressions. When scaling we also renormalize the result so the fractions will sum to one again (for the chosen subset of the genes). Properties that take this scaling into account have 
+<code>scaled
+</code> in their name, e.g., 
+<code>scaled_linear_fraction
+</code> vs. 
+<code>linear_fraction
+</code>.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_genes_divergence!">
+<code>compute_genes_divergence!
+</code>
+</a>.
 </p>
 </div>
 </section>
 </article>
+<h3 id="Cell-Vectors">
+<a class="docs-heading-anchor" href="#Cell-Vectors">Cell Vectors
+</a>
+<a id="Cell-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Cell-Vectors" title="Permalink">
+</a>
+</h3>
+<h4 id="Cell-UMIs-Vectors">
+<a class="docs-heading-anchor" href="#Cell-UMIs-Vectors">Cell UMIs Vectors
+</a>
+<a id="Cell-UMIs-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Cell-UMIs-Vectors" title="Permalink">
+</a>
+</h4>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.cell_is_excluded_vector" href="#Metacells.Contracts.cell_is_excluded_vector">
-<code>Metacells.Contracts.cell_is_excluded_vector
+<a class="docstring-binding" id="Metacells.Contracts.cell_excluded_UMIs_vector" href="#Metacells.Contracts.cell_excluded_UMIs_vector">
+<code>Metacells.Contracts.cell_excluded_UMIs_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -638,10 +720,12 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">cell_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">cell_excluded_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>A mask of cells that are excluded from consideration. This can be due to any number of reasons - doublets, too low a number of UMIs, to high a percentage of excluded gene UMIs, etc.
+<p>The total number of UMIs of all the excluded genes in each cell.
+</p>
+<p>This vector is created in a supervised way based on biological considerations.
 </p>
 </div>
 </section>
@@ -667,6 +751,12 @@
 </pre>
 <p>The total number of UMIs of all the genes in each cell. This doesn&#39;t include the UMIs of genes excluded for any reason.
 </p>
+<p>This vector is populated by 
+<a href="analyze_cells.html#Metacells.AnalyzeCells.compute_cells_total_UMIs!">
+<code>compute_cells_total_UMIs!
+</code>
+</a>.
+</p>
 </div>
 </section>
 </article>
@@ -674,8 +764,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.metacell_total_UMIs_vector" href="#Metacells.Contracts.metacell_total_UMIs_vector">
-<code>Metacells.Contracts.metacell_total_UMIs_vector
+<a class="docstring-binding" id="Metacells.Contracts.cell_ribosomal_UMIs_vector" href="#Metacells.Contracts.cell_ribosomal_UMIs_vector">
+<code>Metacells.Contracts.cell_ribosomal_UMIs_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -686,10 +776,14 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">cell_ribosomal_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The total number of UMIs used to estimate the fraction of all the genes in each metacell. This is used to estimate the robustness of the gene fraction estimates.
+<p>The total number of UMIs of all the ribosomal genes in each cell.
+</p>
+<p>This vector is created in a supervised way, typically based on the naming convention that mitochondrial genes names match the pattern 
+<code>^RP[LS]-.*$
+</code>.
 </p>
 </div>
 </section>
@@ -698,8 +792,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.metacell_covered_UMIs_vector" href="#Metacells.Contracts.metacell_covered_UMIs_vector">
-<code>Metacells.Contracts.metacell_covered_UMIs_vector
+<a class="docstring-binding" id="Metacells.Contracts.cell_mitochondrial_UMIs_vector" href="#Metacells.Contracts.cell_mitochondrial_UMIs_vector">
+<code>Metacells.Contracts.cell_mitochondrial_UMIs_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -710,10 +804,14 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_covered_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">cell_mitochondrial_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The total number of UMIs of the covered genes in each metacell. This is used to estimate the robustness of the gene fraction estimates.
+<p>The total number of UMIs of all the mitochondrial genes in each cell.
+</p>
+<p>This vector is created in a supervised way, typically based on the naming convention that mitochondrial genes names match the pattern 
+<code>^MT-.*$
+</code>.
 </p>
 </div>
 </section>
@@ -722,8 +820,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.metacell_block_vector" href="#Metacells.Contracts.metacell_block_vector">
-<code>Metacells.Contracts.metacell_block_vector
+<a class="docstring-binding" id="Metacells.Contracts.cell_covered_UMIs_vector" href="#Metacells.Contracts.cell_covered_UMIs_vector">
+<code>Metacells.Contracts.cell_covered_UMIs_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -734,20 +832,34 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">cell_covered_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The unique block each metacell belongs to. All the metacells in the same block are assumed to be &quot;very close&quot; to each other, so much so that it is excusable to treat them as &quot;the same&quot; cell state.
+<p>The total number of UMIs of all the covered genes in each cell.
+</p>
+<p>This vector is populated by 
+<a href="analyze_cells.html#Metacells.AnalyzeCells.compute_cells_covered_UMIs!">
+<code>compute_cells_covered_UMIs!
+</code>
+</a>.
 </p>
 </div>
 </section>
 </article>
+<h4 id="Cell-Metadata-Vectors">
+<a class="docs-heading-anchor" href="#Cell-Metadata-Vectors">Cell Metadata Vectors
+</a>
+<a id="Cell-Metadata-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Cell-Metadata-Vectors" title="Permalink">
+</a>
+</h4>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.metacell_type_vector" href="#Metacells.Contracts.metacell_type_vector">
-<code>Metacells.Contracts.metacell_type_vector
+<a class="docstring-binding" id="Metacells.Contracts.cell_is_excluded_vector" href="#Metacells.Contracts.cell_is_excluded_vector">
+<code>Metacells.Contracts.cell_is_excluded_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -758,196 +870,14 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">cell_is_excluded_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The type each metacell belongs to.
+<p>A mask of cells that are excluded from consideration. This can be due to any number of reasons - doublets, too low a number of UMIs, to high a percentage of excluded gene UMIs, etc. Excluded cells are not grouped into metacells etc., so they are ignored in all properties that sum UMIs per group (e.g., 
+<code>total_UMIs
+</code> per metacell).
 </p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.new_metacell_block_vector" href="#Metacells.Contracts.new_metacell_block_vector">
-<code>Metacells.Contracts.new_metacell_block_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">new_metacell_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>The unique block each new metacell belongs to. This just uses the renamed old metacells axis when computing a new set of metacells for some data based on the old metacells.
-</p>
-<div class="admonition is-info">
-<header class="admonition-header">Note
-</header>
-<div class="admonition-body">
-<p>The old and new metacells are associated with the same set of blocks, at least initially. At some point you would compute brand new blocks for the new metacells, but as these are not based on the old blocks, there&#39;s no need to access both sets of blocks at the same time so no need for &quot;old blocks&quot; and &quot;new blocks&quot;.
-</p>
-</div>
-</div>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.old_metacell_block_vector" href="#Metacells.Contracts.old_metacell_block_vector">
-<code>Metacells.Contracts.old_metacell_block_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">old_metacell_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>The unique block each old metacell belongs to. This just uses the renamed old metacells axis when computing a new set of metacells for some data based on the old metacells.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.type_color_vector" href="#Metacells.Contracts.type_color_vector">
-<code>Metacells.Contracts.type_color_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">type_color_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>A unique color for each type for graphs.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.block_n_principal_components_vector" href="#Metacells.Contracts.block_n_principal_components_vector">
-<code>Metacells.Contracts.block_n_principal_components_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">block_n_principal_components_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>The number of used principal components of the local linear model for each block. Since 
-<code>Daf
-</code> can only deal with fixed-sized axes, we create a &quot;too large&quot; principal components axis. Each block actually uses a smaller (different) number of principal components that hopefully reflects the actual dimensionality of the manifold at that point. The coefficients of the rest of the principal components are set to zero.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.block_linear_RMSE_vector" href="#Metacells.Contracts.block_linear_RMSE_vector">
-<code>Metacells.Contracts.block_linear_RMSE_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">block_linear_RMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>The root mean squared error of predicting the covered genes using the local linear models. This model computes principal components from the skeleton genes and then uses these components to predict the values of all covered genes.
-</p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.block_linear_XRMSE_vector" href="#Metacells.Contracts.block_linear_XRMSE_vector">
-<code>Metacells.Contracts.block_linear_XRMSE_vector
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">block_linear_XRMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>The cross-validated root mean squared error of predicting the covered genes using the linear model. This is similar to the RMSE, but is computed using cross-validation (training a linear model on a subset of the local metacells and evaluating it on the rest). This will be higher than the RMSE; the difference is an indicator of the &quot;overfitting&quot; of the linear model, which should be low relative to the total RMSE.
-</p>
-</div>
-</section>
-</article>
-<h2 id="Matrices">
-<a class="docs-heading-anchor" href="#Matrices">Matrices
-</a>
-<a id="Matrices-1">
-</a>
-<a class="docs-heading-anchor-permalink" href="#Matrices" title="Permalink">
-</a>
-</h2>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Contracts.cell_gene_UMIs_matrix" href="#Metacells.Contracts.cell_gene_UMIs_matrix">
-<code>Metacells.Contracts.cell_gene_UMIs_matrix
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">cell_gene_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>The number of UMIs collected for each gene for each cell. This is the &quot;ground truth&quot; everything else is built on. The total number of UMIs per cell differs (sometimes wildly) based on the scRNA-seq technology and protocol.
+<p>This vector is created in a supervised way based on biological and technical considerations.
 </p>
 </div>
 </section>
@@ -973,6 +903,12 @@
 </pre>
 <p>The unique metacell each cell belongs to. All the cells in the same metacell are assumed to have &quot;the same&quot; (relevant) biological state. This is the empty string if the cell does not belong to any metacell (is excluded or outlier).
 </p>
+<p>This vector can be populated by any metacells-like algorithm (the original R metacells (1) algorithm, the Python metacells (2) algorithm, other similar algorithms). It can also be populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a> which creates a hopefully-improved version of a given grouping into metacells.
+</p>
 </div>
 </section>
 </article>
@@ -980,8 +916,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.cell_new_metacell_vector" href="#Metacells.Contracts.cell_new_metacell_vector">
-<code>Metacells.Contracts.cell_new_metacell_vector
+<a class="docstring-binding" id="Metacells.Contracts.cell_type_vector" href="#Metacells.Contracts.cell_type_vector">
+<code>Metacells.Contracts.cell_type_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -992,10 +928,16 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">cell_new_metacell_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">cell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The unique new metacell each cell belongs to. This just uses the renamed new metacells axis when computing a new set of metacells for some data based on the old metacells.
+<p>The type each cell belongs to. This is typically deduced from the type of the metacell the cell belongs to, unless we import the data from an annotated cell atlas.
+</p>
+<p>This vector can be populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_cells_types_by_metacells!">
+<code>compute_cells_types_by_metacells!
+</code>
+</a> which assigns to each cell the type of the metacell it belongs to.
 </p>
 </div>
 </section>
@@ -1004,8 +946,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.cell_old_metacell_vector" href="#Metacells.Contracts.cell_old_metacell_vector">
-<code>Metacells.Contracts.cell_old_metacell_vector
+<a class="docstring-binding" id="Metacells.Contracts.cell_linear_metacell_cross_entropy_vector" href="#Metacells.Contracts.cell_linear_metacell_cross_entropy_vector">
+<code>Metacells.Contracts.cell_linear_metacell_cross_entropy_vector
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1016,14 +958,1596 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">cell_old_metacell_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">cell_linear_metacell_cross_entropy_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The unique old metacell each cell belongs to. This just uses the renamed old metacells axis when computing a new set of metacells for some data based on the old metacells.
+<p>The cross entropy of the gene fractions of a cell given their fractions in the rest of the metacell cells.
 </p>
 </div>
 </section>
 </article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.cell_linear_covered_metacell_cross_entropy_vector" href="#Metacells.Contracts.cell_linear_covered_metacell_cross_entropy_vector">
+<code>Metacells.Contracts.cell_linear_covered_metacell_cross_entropy_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">cell_linear_covered_metacell_cross_entropy_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The cross entropy of the covered gene fractions of a cell given their fractions in the rest of the metacell cells.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.cell_linear_metacell_kl_divergence_vector" href="#Metacells.Contracts.cell_linear_metacell_kl_divergence_vector">
+<code>Metacells.Contracts.cell_linear_metacell_kl_divergence_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">cell_linear_metacell_kl_divergence_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The KL divergence of the gene fractions of a cell given their fractions in the rest of the metacell cells.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.cell_linear_covered_metacell_kl_divergence_vector" href="#Metacells.Contracts.cell_linear_covered_metacell_kl_divergence_vector">
+<code>Metacells.Contracts.cell_linear_covered_metacell_kl_divergence_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">cell_linear_covered_metacell_kl_divergence_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The KL divergence of the covered gene fractions of a cell given their fractions in the rest of the metacell cells.
+</p>
+</div>
+</section>
+</article>
+<h3 id="Metacell-Vectors">
+<a class="docs-heading-anchor" href="#Metacell-Vectors">Metacell Vectors
+</a>
+<a id="Metacell-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Vectors" title="Permalink">
+</a>
+</h3>
+<h4 id="Metacell-UMIs-Vectors">
+<a class="docs-heading-anchor" href="#Metacell-UMIs-Vectors">Metacell UMIs Vectors
+</a>
+<a id="Metacell-UMIs-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-UMIs-Vectors" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_total_UMIs_vector" href="#Metacells.Contracts.metacell_total_UMIs_vector">
+<code>Metacells.Contracts.metacell_total_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of all the genes in each metacell. This is used to estimate the robustness of the gene fraction estimates.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_total_UMIs!">
+<code>compute_metacells_total_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_scaled_total_UMIs_vector" href="#Metacells.Contracts.metacell_scaled_total_UMIs_vector">
+<code>Metacells.Contracts.metacell_scaled_total_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_scaled_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of all the genes in each metacell, scaled by divergence. This is rounded to the nearest UMI.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_scaled_total_UMIs!">
+<code>compute_metacells_scaled_total_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_covered_UMIs_vector" href="#Metacells.Contracts.metacell_covered_UMIs_vector">
+<code>Metacells.Contracts.metacell_covered_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_covered_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of the covered genes in each metacell.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_covered_UMIs!">
+<code>compute_metacells_covered_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_scaled_covered_UMIs_vector" href="#Metacells.Contracts.metacell_scaled_covered_UMIs_vector">
+<code>Metacells.Contracts.metacell_scaled_covered_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_scaled_covered_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of the covered genes in each metacell, scaled by divergence. This is rounded to the nearest UMI.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_scaled_covered_UMIs!">
+<code>compute_metacells_scaled_covered_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Metacell-Counts-Vectors">
+<a class="docs-heading-anchor" href="#Metacell-Counts-Vectors">Metacell Counts Vectors
+</a>
+<a id="Metacell-Counts-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Counts-Vectors" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_n_cells_vector" href="#Metacells.Contracts.metacell_n_cells_vector">
+<code>Metacells.Contracts.metacell_n_cells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_n_cells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells in each metacell.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_n_cells!">
+<code>compute_metacells_n_cells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Metacell-Metadata-Vectors">
+<a class="docs-heading-anchor" href="#Metacell-Metadata-Vectors">Metacell Metadata Vectors
+</a>
+<a id="Metacell-Metadata-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Metadata-Vectors" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_block_vector" href="#Metacells.Contracts.metacell_block_vector">
+<code>Metacells.Contracts.metacell_block_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The unique block each metacell belongs to. All the metacells in the same block are assumed to be &quot;very close&quot; to each other, so much so that it is excusable to treat them as &quot;the same&quot; cell state.
+</p>
+<p>This vector is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks!">
+<code>compute_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_type_vector" href="#Metacells.Contracts.metacell_type_vector">
+<code>Metacells.Contracts.metacell_type_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each metacell belongs to. This can be assigned in many ways, from manual annotation to using projection methods on an annotated atlas. Often there are multiple type annotations due to different methods. By convention these alternate type vectors are named 
+<code>type.something
+</code> (e.g., 
+<code>type.projected
+</code>, 
+<code>type.manual
+</code>) and the simple 
+<code>type
+</code> is used for &quot;the&quot; type of each metacell.
+</p>
+<p>This vector is created in a supervised way based on biological considerations.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_mean_cells_linear_cross_entropy_vector" href="#Metacells.Contracts.metacell_mean_cells_linear_cross_entropy_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_cross_entropy_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_mean_cells_linear_metacell_cross_entropy_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The mean cross entropy of the gene fractions of each metacell cell, given their fractions in the rest of the metacell cells.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_mean_cells_linear_covered_cross_entropy_vector" href="#Metacells.Contracts.metacell_mean_cells_linear_covered_cross_entropy_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_covered_cross_entropy_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_mean_cells_linear_covered_metacell_cross_entropy_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The mean cross entropy of the covered gene fractions of each metacell cell, given their fractions in the rest of the metacell cells.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_mean_cells_linear_kl_divergence_vector" href="#Metacells.Contracts.metacell_mean_cells_linear_kl_divergence_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_kl_divergence_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_mean_cells_linear_metacell_kl_divergence_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The mean KL divergence of the gene fractions of each metacell cell, given their fractions in the rest of the metacell cells.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_mean_cells_linear_covered_kl_divergence_vector" href="#Metacells.Contracts.metacell_mean_cells_linear_covered_kl_divergence_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_covered_kl_divergence_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_mean_cells_linear_covered_metacell_kl_divergence_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The mean KL divergence of the covered gene fractions of each metacell cell, given their fractions in the rest of the metacell cells.
+</p>
+</div>
+</section>
+</article>
+<h3 id="Block-Vectors">
+<a class="docs-heading-anchor" href="#Block-Vectors">Block Vectors
+</a>
+<a id="Block-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Vectors" title="Permalink">
+</a>
+</h3>
+<h4 id="Block-UMIs-Vectors">
+<a class="docs-heading-anchor" href="#Block-UMIs-Vectors">Block UMIs Vectors
+</a>
+<a id="Block-UMIs-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-UMIs-Vectors" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_total_UMIs_vector" href="#Metacells.Contracts.block_total_UMIs_vector">
+<code>Metacells.Contracts.block_total_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of all the genes in each block. This is used to estimate the robustness of the gene fraction estimates.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_total_UMIs!">
+<code>compute_blocks_total_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_scaled_total_UMIs_vector" href="#Metacells.Contracts.block_scaled_total_UMIs_vector">
+<code>Metacells.Contracts.block_scaled_total_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_scaled_total_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of all the genes in each block, scaled by divergence. This is rounded to the nearest UMI.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_scaled_total_UMIs!">
+<code>compute_blocks_scaled_total_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_covered_UMIs_vector" href="#Metacells.Contracts.block_covered_UMIs_vector">
+<code>Metacells.Contracts.block_covered_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_covered_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of the covered genes in each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_covered_UMIs!">
+<code>compute_blocks_covered_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_scaled_covered_UMIs_vector" href="#Metacells.Contracts.block_scaled_covered_UMIs_vector">
+<code>Metacells.Contracts.block_scaled_covered_UMIs_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_scaled_covered_UMIs_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of the covered genes in each block, scaled by divergence.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_scaled_covered_UMIs!">
+<code>compute_blocks_scaled_covered_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Block-Counts-Vectors">
+<a class="docs-heading-anchor" href="#Block-Counts-Vectors">Block Counts Vectors
+</a>
+<a id="Block-Counts-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Counts-Vectors" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_cells_vector" href="#Metacells.Contracts.block_n_cells_vector">
+<code>Metacells.Contracts.block_n_cells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_cells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells in the metacells in each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_cells!">
+<code>compute_blocks_n_cells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_metacells_vector" href="#Metacells.Contracts.block_n_metacells_vector">
+<code>Metacells.Contracts.block_n_metacells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_metacells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of metacells in each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_metacells!">
+<code>compute_blocks_n_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_neighborhood_blocks_vector" href="#Metacells.Contracts.block_n_neighborhood_blocks_vector">
+<code>Metacells.Contracts.block_n_neighborhood_blocks_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_neighborhood_blocks_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of blocks in the neighborhood centered at each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_neighborhood_blocks!">
+<code>compute_blocks_n_neighborhood_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_environment_blocks_vector" href="#Metacells.Contracts.block_n_environment_blocks_vector">
+<code>Metacells.Contracts.block_n_environment_blocks_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_environment_blocks_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of blocks in the environment centered at each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_environment_blocks!">
+<code>compute_blocks_n_environment_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_neighborhood_metacells_vector" href="#Metacells.Contracts.block_n_neighborhood_metacells_vector">
+<code>Metacells.Contracts.block_n_neighborhood_metacells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_neighborhood_metacells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of metacells in the blocks of the neighborhood centered at each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_neighborhood_metacells!">
+<code>compute_blocks_n_neighborhood_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_environment_metacells_vector" href="#Metacells.Contracts.block_n_environment_metacells_vector">
+<code>Metacells.Contracts.block_n_environment_metacells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_environment_metacells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of metacells in the blocks of the environment centered at each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_environment_metacells!">
+<code>compute_blocks_n_environment_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_neighborhood_cells_vector" href="#Metacells.Contracts.block_n_neighborhood_cells_vector">
+<code>Metacells.Contracts.block_n_neighborhood_cells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_neighborhood_cells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of cells in the metacells in the blocks of the neighborhood centered at each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_neighborhood_cells!">
+<code>compute_blocks_n_neighborhood_cells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_environment_cells_vector" href="#Metacells.Contracts.block_n_environment_cells_vector">
+<code>Metacells.Contracts.block_n_environment_cells_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_environment_cells_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of cells in the metacells in the blocks of the environment centered at each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_n_environment_cells!">
+<code>compute_blocks_n_environment_cells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Block-Metadata-Vectors">
+<a class="docs-heading-anchor" href="#Block-Metadata-Vectors">Block Metadata Vectors
+</a>
+<a id="Block-Metadata-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Metadata-Vectors" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_type_vector" href="#Metacells.Contracts.block_type_vector">
+<code>Metacells.Contracts.block_type_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each block belongs to. This is typically taken to be the most frequent metacell type in the block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_types!">
+<code>compute_blocks_types!
+</code>
+</a> based on the metacell types in each block.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Principal-Components-Analysis">
+<a class="docs-heading-anchor" href="#Principal-Components-Analysis">Principal Components Analysis
+</a>
+<a id="Principal-Components-Analysis-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Principal-Components-Analysis" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_used_principal_components_vector" href="#Metacells.Contracts.block_n_used_principal_components_vector">
+<code>Metacells.Contracts.block_n_used_principal_components_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_used_principal_components_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of used principal components for each block. We compute a fixed number of principal components for each block, but only actually use a smaller number, different in each block, to avoid overfitting.
+</p>
+<p>This vector is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_pca_RMSE_vector" href="#Metacells.Contracts.block_pca_RMSE_vector">
+<code>Metacells.Contracts.block_pca_RMSE_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_pca_RMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The root mean squared error of predicting the covered genes using the principal components in the vicinity of the block. Even though we only use some of the principal components, this considers all the metacells, so it is still vulnerable to overfitting.
+</p>
+<p>This vector is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_pca_XRMSE_vector" href="#Metacells.Contracts.block_pca_XRMSE_vector">
+<code>Metacells.Contracts.block_pca_XRMSE_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_pca_XRMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The cross-validated root mean squared error of predicting the covered genes using the principal components in the vicinity of the block. This is similar to the RMSE, but is computed using cross-validation (training the model on a subset of the local metacells, and evaluating it on the rest). This will be higher than the RMSE; the difference is an indicator of the overfitting of the linear model, which should be low relative to the total RMSE.
+</p>
+<p>This vector is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Gene-Modules-Analysis">
+<a class="docs-heading-anchor" href="#Gene-Modules-Analysis">Gene Modules Analysis
+</a>
+<a id="Gene-Modules-Analysis-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Analysis" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_found_modules_vector" href="#Metacells.Contracts.block_n_found_modules_vector">
+<code>Metacells.Contracts.block_n_found_modules_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_found_modules_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of found gene modules for each block. We identify a different number of gene modules for each block. Due to 
+<code>Daf
+</code> limitations, we set the size  of the 
+<code>modules
+</code> axis to the maximal number of gene modules in a block. The coefficients for the extra gene modules for each block are set to zero.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_n_found_modules!">
+<code>compute_blocks_n_found_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_n_used_modules_vector" href="#Metacells.Contracts.block_n_used_modules_vector">
+<code>Metacells.Contracts.block_n_used_modules_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_n_used_modules_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of used gene modules for each block. We disqualify some of the found gene modules, if they contain a high fraction of lateral genes.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_n_used_modules!">
+<code>compute_blocks_n_used_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_modules_RMSE_vector" href="#Metacells.Contracts.block_modules_RMSE_vector">
+<code>Metacells.Contracts.block_modules_RMSE_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_modules_RMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The root mean squared error of predicting the covered genes using the gene modules in the vicinity of the block. This considers all the metacells, so it is vulnerable to overfitting.
+</p>
+<p>This vector is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_modules_XRMSE_vector" href="#Metacells.Contracts.block_modules_XRMSE_vector">
+<code>Metacells.Contracts.block_modules_XRMSE_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_modules_XRMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The cross-validated root mean squared error of predicting the covered genes using the gene modules in the vicinity of the block. This is similar to the RMSE, but is computed using cross-validation (training the model on a subset of the local metacells, and evaluating it on the rest). This will be higher than the RMSE; the difference is an indicator of the overfitting of the linear model, which should be low relative to the total RMSE.
+</p>
+<p>This vector is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_modules_block_RMSE_vector" href="#Metacells.Contracts.block_modules_block_RMSE_vector">
+<code>Metacells.Contracts.block_modules_block_RMSE_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_modules_block_RMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The root mean squared error of predicting the covered genes using the gene modules in the vicinity of the block, evaluated at the block metacells.
+</p>
+<p>This vector is populated by 
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_blocks_modules_block_RMSE!">
+<code>compute_blocks_modules_block_RMSE!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_modules_neighborhood_RMSE_vector" href="#Metacells.Contracts.block_modules_neighborhood_RMSE_vector">
+<code>Metacells.Contracts.block_modules_neighborhood_RMSE_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_modules_neighborhood_RMSE_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The root mean squared error of predicting the covered genes using the gene modules in the vicinity of the block, evaluated at the neighborhood metacells.
+</p>
+<p>This vector is populated by 
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_blocks_modules_neighborhood_RMSE!">
+<code>compute_blocks_modules_neighborhood_RMSE!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h3 id="Type-Vectors">
+<a class="docs-heading-anchor" href="#Type-Vectors">Type Vectors
+</a>
+<a id="Type-Vectors-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Type-Vectors" title="Permalink">
+</a>
+</h3>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.type_color_vector" href="#Metacells.Contracts.type_color_vector">
+<code>Metacells.Contracts.type_color_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">type_color_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A unique color for each type for graphs.
+</p>
+<p>This vector is created in a supervised way based on biological considerations and conventions (e.g., red blood cells are often given some red color). It is also possible to use 
+<code>Chameleon
+</code> to automatically assign colors to cell types based on gene expression levels.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Matrices">
+<a class="docs-heading-anchor" href="#Matrices">Matrices
+</a>
+<a id="Matrices-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Matrices" title="Permalink">
+</a>
+</h2>
+<h3 id="Cell-Matrices">
+<a class="docs-heading-anchor" href="#Cell-Matrices">Cell Matrices
+</a>
+<a id="Cell-Matrices-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Cell-Matrices" title="Permalink">
+</a>
+</h3>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.cell_gene_UMIs_matrix" href="#Metacells.Contracts.cell_gene_UMIs_matrix">
+<code>Metacells.Contracts.cell_gene_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">cell_gene_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of UMIs collected for each gene for each cell. This is the &quot;ground truth&quot; everything else is built on. The total number of UMIs is different (sometimes wildly) in each cell, based on the scRNA-seq technology and protocol.
+</p>
+<p>This data is obtained from scRNA-seq experiments.
+</p>
+</div>
+</section>
+</article>
+<h3 id="Metacell-Matrices">
+<a class="docs-heading-anchor" href="#Metacell-Matrices">Metacell Matrices
+</a>
+<a id="Metacell-Matrices-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Matrices" title="Permalink">
+</a>
+</h3>
+<h4 id="Metacell-UMIs">
+<a class="docs-heading-anchor" href="#Metacell-UMIs">Metacell UMIs
+</a>
+<a id="Metacell-UMIs-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-UMIs" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_UMIs_matrix" href="#Metacells.Contracts.metacell_gene_UMIs_matrix">
+<code>Metacells.Contracts.metacell_gene_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of each gene in each metacell. This can be used to estimate the robustness of the fraction.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_UMIs!">
+<code>compute_metacells_genes_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Metacell-Geomean-Fractions">
+<a class="docs-heading-anchor" href="#Metacell-Geomean-Fractions">Metacell Geomean Fractions
+</a>
+<a id="Metacell-Geomean-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Geomean-Fractions" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_geomean_fraction_matrix" href="#Metacells.Contracts.metacell_gene_geomean_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_geomean_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_geomean_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>An estimated geomean fraction of the UMIs of each gene in each metacell. We use geomean in an attempt to combat the disproportionate effect of a few cells with very high gene expression (&quot;bursty&quot; genes), and then normalizes the fractions to sum to one. While effective, this has the unfortunate effect of inflating the value of weak genes.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_geomean_fractions!">
+<code>compute_metacells_genes_geomean_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_log_geomean_fraction_matrix" href="#Metacells.Contracts.metacell_gene_log_geomean_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_geomean_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_log_geomean_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated geomean fraction of the UMIs of each gene in each metacell. This adds some gene fraction regularization to deal with zero fractions. Using the log makes it easier to visualize, and the difference between log values (the &quot;fold factor&quot;, log base 2 of the ratio between the expression levels) is a good measure of difference between gene expression levels.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_log_geomean_fractions!">
+<code>compute_metacells_genes_log_geomean_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Metacell-Linear-Fractions">
+<a class="docs-heading-anchor" href="#Metacell-Linear-Fractions">Metacell Linear Fractions
+</a>
+<a id="Metacell-Linear-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Linear-Fractions" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_linear_fraction_matrix" href="#Metacells.Contracts.metacell_gene_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>An estimated linear fraction of the UMIs of each gene in each metacell, out of the total UMIs. This is the &quot;best&quot; estimate assuming multinomial sampling noise. However, this is sensitive to a few cells with very high expression levels (&quot;bursty&quot; genes), as these impact the denominator.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_linear_fractions!">
+<code>compute_metacells_genes_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_scaled_linear_fraction_matrix" href="#Metacells.Contracts.metacell_gene_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_scaled_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_scaled_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of each gene in each metacell, out of the total UMIs, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_scaled_linear_fractions!">
+<code>compute_metacells_genes_scaled_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_log_linear_fraction_matrix" href="#Metacells.Contracts.metacell_gene_log_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_log_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of each gene in each metacell, out of the total UMIs. This adds some gene fraction regularization to deal with zero fractions. Using the log makes it easier to visualize, and the difference between log values (the &quot;fold factor&quot;, log base 2 of the ratio between the expression levels) is a good measure of difference between gene expression levels.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_log_linear_fractions!">
+<code>compute_metacells_genes_log_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_log_scaled_linear_fraction_matrix" href="#Metacells.Contracts.metacell_gene_log_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_scaled_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_log_scaled_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the scaled estimated linear fraction of the UMIs of each gene in each metacell. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_log_scaled_linear_fractions!">
+<code>compute_metacells_genes_log_scaled_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Metacell-Linear-Covered-Fractions">
+<a class="docs-heading-anchor" href="#Metacell-Linear-Covered-Fractions">Metacell Linear Covered Fractions
+</a>
+<a id="Metacell-Linear-Covered-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Linear-Covered-Fractions" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>An estimated linear fraction of the UMIs of each covered gene in each metacell, out of the total covered UMIs. By considering only the covered genes this avoid the impact of highly-expressed lateral genes (e.g., cell cycle).
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_linear_covered_fractions!">
+<code>compute_metacells_genes_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of each covered gene in each metacell, out of the total covered UMIs, scaled by divergence. By considering only the covered genes this avoid the impact of highly-expressed lateral genes (e.g., cell cycle).
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_scaled_linear_covered_fractions!">
+<code>compute_metacells_genes_scaled_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_log_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_log_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of each covered gene in each metacell, out of the total covered UMIs. By considering only the covered genes this avoid the impact of highly-expressed lateral genes (e.g., cell cycle).
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_log_linear_covered_fractions!">
+<code>compute_metacells_genes_log_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_log_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_log_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of each covered gene in each metacell, out of the total covered UMIs, scaled by divergence. By considering only the covered genes this avoid the impact of highly-expressed lateral genes (e.g., cell cycle).
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_genes_log_scaled_linear_covered_fractions!">
+<code>compute_metacells_genes_log_scaled_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Metacell-Virtual-Fractions">
+<a class="docs-heading-anchor" href="#Metacell-Virtual-Fractions">Metacell Virtual Fractions
+</a>
+<a id="Metacell-Virtual-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Virtual-Fractions" title="Permalink">
+</a>
+</h4>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
@@ -1043,7 +2567,11 @@
 <code class="language-julia hljs">metacell_gene_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The estimated fraction of the UMIs of each gene in each metacell. We assume that each metacell is a sample of the manifold, representing a real biological state, regardless to its distance to other metacells (subject to cleaning up batch effects, purging doublets, and compensating for any other technical artifacts).
+<p>Some estimated fraction of the UMIs of each gene in each metacell. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_gene_*_fraction_matrix
+</code> matrices.
 </p>
 </div>
 </section>
@@ -1052,8 +2580,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_total_UMIs_matrix" href="#Metacells.Contracts.metacell_gene_total_UMIs_matrix">
-<code>Metacells.Contracts.metacell_gene_total_UMIs_matrix
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_log_fraction_matrix" href="#Metacells.Contracts.metacell_gene_log_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_fraction_matrix
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1064,10 +2592,14 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_gene_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+<code class="language-julia hljs">metacell_gene_log_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The total number of UMIs used to estimate the fraction of each gene in each metacell. This is used to estimate the robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a multinomial sampling distribution).
+<p>The log base 2 of some estimated linear fraction of the UMIs of each gene in each metacell. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_gene_log_*_fraction_matrix
+</code> matrices.
 </p>
 </div>
 </section>
@@ -1088,10 +2620,14 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_gene_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+<code class="language-julia hljs">metacell_gene_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The relative fraction of covered genes. This ensures the sum of the fractions of the covered genes is one in each metacell, to ignore the impact of any residual uncovered gene programs.
+<p>Some estimated fraction of the UMIs of each covered gene in each metacell. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_gene_*_covered_fraction_matrix
+</code> matrices.
 </p>
 </div>
 </section>
@@ -1100,8 +2636,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_scaled_log_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_scaled_log_covered_fraction_matrix">
-<code>Metacells.Contracts.metacell_gene_scaled_log_covered_fraction_matrix
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_log_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_log_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_covered_fraction_matrix
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1112,26 +2648,32 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_gene_scaled_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+<code class="language-julia hljs">metacell_gene_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The log of the relative fraction of covered genes, scaled by divergence. This computes the log base 2 of the 
-<code>metacell_gene_covered_fraction_matrix
-</code>, with some regularization, and then scales the result using the 
-<a href="contracts.html#Metacells.Contracts.gene_divergence_vector">
-<code>gene_divergence_vector
-</code>
-</a> so that the range of expression of &quot;wild&quot; genes is reduced. The end result is what we actually try to fit with local linear programs.
+<p>The log base 2 of some estimated linear fraction of the UMIs of each covered gene in each metacell. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_gene_log_*_covered_fraction_matrix
+</code> matrices.
 </p>
 </div>
 </section>
 </article>
+<h4 id="Metacell-Distances">
+<a class="docs-heading-anchor" href="#Metacell-Distances">Metacell Distances
+</a>
+<a id="Metacell-Distances-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacell-Distances" title="Permalink">
+</a>
+</h4>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.old_metacell_gene_scaled_log_covered_fraction_matrix" href="#Metacells.Contracts.old_metacell_gene_scaled_log_covered_fraction_matrix">
-<code>Metacells.Contracts.old_metacell_gene_scaled_log_covered_fraction_matrix
+<a class="docstring-binding" id="Metacells.Contracts.metacell_metacell_max_skeleton_fold_distance" href="#Metacells.Contracts.metacell_metacell_max_skeleton_fold_distance">
+<code>Metacells.Contracts.metacell_metacell_max_skeleton_fold_distance
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1142,14 +2684,768 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">old_metacell_gene_scaled_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+<code class="language-julia hljs">metacell_metacell_max_skeleton_fold_distance(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The log of the relative fraction of covered genes, scaled by divergence. This just uses the renamed old metacells axis when computing a new set of metacells for some data based on the old metacells.
+<p>The maximal fold factor between skeleton genes between the metacells. This is a symmetric distances matrix with zeros at the diagonal. The exact semantics depend on the estimated fractions used to compute the distances.
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks!">
+<code>compute_blocks!
+</code>
+</a>.
 </p>
 </div>
 </section>
 </article>
+<h4 id="Gene-Modules-Analysis-2">
+<a class="docs-heading-anchor" href="#Gene-Modules-Analysis-2">Gene Modules Analysis
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Analysis-2" title="Permalink">
+</a>
+</h4>
+<h5 id="Gene-Modules-UMIs">
+<a class="docs-heading-anchor" href="#Gene-Modules-UMIs">Gene Modules UMIs
+</a>
+<a id="Gene-Modules-UMIs-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-UMIs" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_total_UMIs_matrix" href="#Metacells.Contracts.metacell_module_total_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_total_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the genes of each module in each metacell.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_total_UMIs!">
+<code>compute_metacells_modules_total_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_scaled_total_UMIs_matrix" href="#Metacells.Contracts.metacell_module_scaled_total_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_total_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_scaled_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the genes of each module in each metacell, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_total_UMIs!">
+<code>compute_metacells_modules_scaled_total_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_covered_UMIs_matrix" href="#Metacells.Contracts.metacell_module_covered_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_covered_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_covered_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the covered genes of each module in each metacell.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_covered_UMIs!">
+<code>compute_metacells_modules_covered_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_scaled_covered_UMIs_matrix" href="#Metacells.Contracts.metacell_module_scaled_covered_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_covered_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_scaled_covered_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the covered genes of each module in each metacell, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_covered_UMIs!">
+<code>compute_metacells_modules_scaled_covered_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-Linear-Fractions">
+<a class="docs-heading-anchor" href="#Gene-Modules-Linear-Fractions">Gene Modules Linear Fractions
+</a>
+<a id="Gene-Modules-Linear-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Linear-Fractions" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_linear_fraction_matrix" href="#Metacells.Contracts.metacell_module_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_linear_fractions!">
+<code>compute_metacells_modules_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_scaled_linear_fraction_matrix" href="#Metacells.Contracts.metacell_module_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_scaled_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_fractions!">
+<code>compute_metacells_modules_scaled_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_log_linear_fraction_matrix" href="#Metacells.Contracts.metacell_module_log_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_log_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_linear_fractions!">
+<code>compute_metacells_modules_log_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_log_scaled_linear_fraction_matrix" href="#Metacells.Contracts.metacell_module_log_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_scaled_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_log_scaled_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs, scaled by divergence. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_fractions!">
+<code>compute_metacells_modules_log_scaled_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-Linear-Covered-Fractions">
+<a class="docs-heading-anchor" href="#Gene-Modules-Linear-Covered-Fractions">Gene Modules Linear Covered Fractions
+</a>
+<a id="Gene-Modules-Linear-Covered-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Linear-Covered-Fractions" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_module_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_linear_covered_fractions!">
+<code>compute_metacells_modules_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_module_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_covered_fractions!">
+<code>compute_metacells_modules_scaled_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_log_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_module_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_log_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_linear_covered_fractions!">
+<code>compute_metacells_modules_log_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_log_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_module_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_log_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs, scaled by divergence. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_covered_fractions!">
+<code>compute_metacells_modules_log_scaled_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-Approximated-Covered-Fractions">
+<a class="docs-heading-anchor" href="#Gene-Modules-Approximated-Covered-Fractions">Gene Modules Approximated Covered Fractions
+</a>
+<a id="Gene-Modules-Approximated-Covered-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Approximated-Covered-Fractions" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_approximated_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_approximated_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_approximated_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The linear fraction of each covered gene UMIs out of the total covered UMIs as approximated by the linear model.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_linear_covered_fractions!">
+<code>compute_metacells_genes_approximated_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_approximated_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_approximated_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_approximated_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The linear fraction of each covered gene UMIs out of the total covered UMIs, scaled by divergence, as approximated by the linear model.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_scaled_linear_covered_fractions!">
+<code>compute_metacells_genes_approximated_scaled_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_approximated_log_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_approximated_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_log_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_approximated_log_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of each covered gene UMIs out of the total covered UMIs as approximated by the linear model. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_linear_covered_fractions!">
+<code>compute_metacells_genes_approximated_log_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_approximated_log_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_approximated_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_log_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_approximated_log_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of each covered gene UMIs out of the total covered UMIs, scaled by divergence, as approximated by the linear model. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_approximation.html#Metacells.AnalyzeApproximation.compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!">
+<code>compute_metacells_genes_approximated_log_scaled_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-Virtual-Fractions">
+<a class="docs-heading-anchor" href="#Gene-Modules-Virtual-Fractions">Gene Modules Virtual Fractions
+</a>
+<a id="Gene-Modules-Virtual-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Virtual-Fractions" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_fraction_matrix" href="#Metacells.Contracts.metacell_module_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>Some estimated fraction of the UMIs of each gene in each module. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_module_*_fraction_matrix
+</code> matrices.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_log_fraction_matrix" href="#Metacells.Contracts.metacell_module_log_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_log_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of some estimated linear fraction of the UMIs of each module in each metacell. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_module_log_*_fraction_matrix
+</code> matrices.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_covered_fraction_matrix" href="#Metacells.Contracts.metacell_module_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>Some estimated fraction of the UMIs of each covered gene in each module. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_module_*_covered_fraction_matrix
+</code> matrices.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_module_log_covered_fraction_matrix" href="#Metacells.Contracts.metacell_module_log_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_module_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of some estimated linear fraction of the covered UMIs of each module in each metacell. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_module_log_*_covered_fraction_matrix
+</code> matrices.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_approximated_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_approximated_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_approximated_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The fraction of each covered gene UMIs out of the total covered UMIs as approximated by the linear model. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_gene_approximated_*_fraction_matrix
+</code> matrices.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.metacell_gene_approximated_log_covered_fraction_matrix" href="#Metacells.Contracts.metacell_gene_approximated_log_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_log_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_gene_approximated_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the fraction of each covered gene UMIs out of the total covered UMIs as approximated by the linear model. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>metacell_gene_approximated_log_*_fraction_matrix
+</code> matrices.
+</p>
+</div>
+</section>
+</article>
+<h3 id="Block-Matrices">
+<a class="docs-heading-anchor" href="#Block-Matrices">Block Matrices
+</a>
+<a id="Block-Matrices-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Matrices" title="Permalink">
+</a>
+</h3>
+<h4 id="Block-Distances">
+<a class="docs-heading-anchor" href="#Block-Distances">Block Distances
+</a>
+<a id="Block-Distances-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Distances" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_block_max_skeleton_fold_distance" href="#Metacells.Contracts.block_block_max_skeleton_fold_distance">
+<code>Metacells.Contracts.block_block_max_skeleton_fold_distance
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_block_max_skeleton_fold_distance(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The maximal fold factor between skeleton genes between the metacells of the blocks. This is a symmetric distances matrix. The diagonal contains the maximal fold factor between skeleton genes between metacells in a single block, which is only zero for single-metacell blocks.
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks!">
+<code>compute_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Block-Vicinities">
+<a class="docs-heading-anchor" href="#Block-Vicinities">Block Vicinities
+</a>
+<a id="Block-Vicinities-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Vicinities" title="Permalink">
+</a>
+</h4>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
@@ -1169,7 +3465,13 @@
 <code class="language-julia hljs">block_block_is_in_neighborhood_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>For each block, the mask of nearby blocks in its immediate neighborhood. The neighborhood consists of a small number of very close blocks, which we use as the basis for evaluating linear approximations (of the log of the expression of the genes).
+<p>For each block, the (column) mask of nearby blocks in its immediate neighborhood. The neighborhood consists of a small number of very close blocks, which we use as the basis for evaluating local approximations of the manifold.
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_neighborhood!">
+<code>compute_blocks_is_in_neighborhood!
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -1193,11 +3495,319 @@
 <code class="language-julia hljs">block_block_is_in_environment_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>For each block, the mask of nearby blocks in its linear environment. We expect the covered genes in the metacells in the blocks of the environment to reasonably fit a local linear model (of the log of the expression).
+<p>For each block, the (column) mask of nearby blocks in its linear environment. The environment consists of a larger region than the neighborhood, which we use as the basis for computing local approximations of the manifold.
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
 </p>
 </div>
 </section>
 </article>
+<h4 id="Block-UMIs">
+<a class="docs-heading-anchor" href="#Block-UMIs">Block UMIs
+</a>
+<a id="Block-UMIs-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-UMIs" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_UMIs_matrix" href="#Metacells.Contracts.block_gene_UMIs_matrix">
+<code>Metacells.Contracts.block_gene_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs used to estimate the fraction of each gene in each block. This can used to estimate the robustness of the fraction.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_UMIs!">
+<code>compute_blocks_genes_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Block-Linear-Fractions">
+<a class="docs-heading-anchor" href="#Block-Linear-Fractions">Block Linear Fractions
+</a>
+<a id="Block-Linear-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Linear-Fractions" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_linear_fraction_matrix" href="#Metacells.Contracts.block_gene_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>An estimated linear fraction of the UMIs of each gene out of the total UMIs in each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_linear_fractions!">
+<code>compute_blocks_genes_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_scaled_linear_fraction_matrix" href="#Metacells.Contracts.block_gene_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_scaled_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_scaled_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of each gene out of the total UMIs in each block, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_scaled_linear_fractions!">
+<code>compute_blocks_genes_scaled_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_log_linear_fraction_matrix" href="#Metacells.Contracts.block_gene_log_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_log_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of each gene out of the total UMIs in each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_log_linear_fractions!">
+<code>compute_blocks_genes_log_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_log_scaled_linear_fraction_matrix" href="#Metacells.Contracts.block_gene_log_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_scaled_linear_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_log_scaled_linear_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the scaled estimated linear fraction of the UMIs of each gene out of the total UMIs in each block, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_log_scaled_linear_fractions!">
+<code>compute_blocks_genes_log_scaled_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Block-Linear-Covered-Fractions">
+<a class="docs-heading-anchor" href="#Block-Linear-Covered-Fractions">Block Linear Covered Fractions
+</a>
+<a id="Block-Linear-Covered-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Linear-Covered-Fractions" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_linear_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>An estimated linear fraction of the UMIs of each covered gene out of the total covered UMIs in each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_linear_covered_fractions!">
+<code>compute_blocks_genes_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of each covered gene out of the total covered UMIs in each block, scaled by divergence.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_scaled_linear_covered_fractions!">
+<code>compute_blocks_genes_log_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_log_linear_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_log_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of each covered gene out of the total covered UMIs in each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_log_linear_covered_fractions!">
+<code>compute_blocks_genes_log_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_log_scaled_linear_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_scaled_linear_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_log_scaled_linear_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the scaled estimated linear fraction of the UMIs of each covered gene out of the total covered UMIs in each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_log_scaled_linear_covered_fractions!">
+<code>compute_blocks_genes_log_scaled_linear_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Block-Virtual-Fractions">
+<a class="docs-heading-anchor" href="#Block-Virtual-Fractions">Block Virtual Fractions
+</a>
+<a id="Block-Virtual-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Virtual-Fractions" title="Permalink">
+</a>
+</h4>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
@@ -1217,7 +3827,11 @@
 <code class="language-julia hljs">block_gene_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The estimated fraction of the UMIs of each gene in each block. This assumes the metacells in each block are samples of the &quot;same&quot; biological state, based on the fact that all these metacells have very similar expression levels for all the global predictive transcription factors.
+<p>Some estimated fraction of the UMIs of each gene in each block. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>block_gene_*_fraction_matrix
+</code> matrices.
 </p>
 </div>
 </section>
@@ -1226,8 +3840,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.block_gene_total_UMIs_matrix" href="#Metacells.Contracts.block_gene_total_UMIs_matrix">
-<code>Metacells.Contracts.block_gene_total_UMIs_matrix
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_log_fraction_matrix" href="#Metacells.Contracts.block_gene_log_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_fraction_matrix
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1238,10 +3852,14 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">block_gene_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+<code class="language-julia hljs">block_gene_log_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The total number of UMIs used to estimate the fraction of each gene in each block. This is used to estimate the robustness of the estimate. When computing fold factors, we require the total number of UMIs (from both compared estimates) to be some minimum, and possibly adjust the fold factor according to some confidence level (assuming a multinomial sampling distribution).
+<p>The log base 2 of some estimated linear fraction of the UMIs of each gene in each block. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>block_gene_log_*_fraction_matrix
+</code> matrices.
 </p>
 </div>
 </section>
@@ -1250,8 +3868,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.block_gene_mean_scaled_log_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_mean_scaled_log_covered_fraction_matrix">
-<code>Metacells.Contracts.block_gene_mean_scaled_log_covered_fraction_matrix
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_covered_fraction_matrix
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1262,16 +3880,120 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">block_gene_mean_scaled_log_covered_fraction_matrix(
-    expectation::ContractExpectation,
-)::Pair{VectorKey, DataSpecification}
+<code class="language-julia hljs">block_gene_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The mean in the metacells of the block of the log of the relative fraction of covered genes, scaled by divergence. This is used by the linear model; specifically, the coefficients are applied to the difference from this mean, and the results are added back to this mean. This is zero for uncovered genes.
+<p>Some estimated fraction of the UMIs of each covered gene in each block. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>block_gene_*_covered_fraction_matrix
+</code> matrices.
 </p>
 </div>
 </section>
 </article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_log_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_log_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of some estimated linear fraction of the UMIs of each covered gene in each block. This is a &quot;virtual&quot; matrix, that is, generic code uses it and expects an 
+<code>adapter
+</code> to map it to one of the concrete 
+<code>block_gene_log_*_covered_fraction_matrix
+</code> matrices.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Block-Gene-Masks">
+<a class="docs-heading-anchor" href="#Block-Gene-Masks">Block Gene Masks
+</a>
+<a id="Block-Gene-Masks-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Block-Gene-Masks" title="Permalink">
+</a>
+</h4>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_is_neighborhood_marker" href="#Metacells.Contracts.block_gene_is_neighborhood_marker">
+<code>Metacells.Contracts.block_gene_is_neighborhood_marker
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_is_neighborhood_marker(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states in each neighborhood.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_is_neighborhood_markers!">
+<code>compute_blocks_genes_is_neighborhood_markers!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_is_environment_marker" href="#Metacells.Contracts.block_gene_is_environment_marker">
+<code>Metacells.Contracts.block_gene_is_environment_marker
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_is_environment_marker(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states in each environment.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_is_environment_markers!">
+<code>compute_blocks_genes_is_environment_markers!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Principal-Components-Analysis-2">
+<a class="docs-heading-anchor" href="#Principal-Components-Analysis-2">Principal Components Analysis
+</a>
+<a class="docs-heading-anchor-permalink" href="#Principal-Components-Analysis-2" title="Permalink">
+</a>
+</h4>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
@@ -1293,13 +4015,21 @@
 </pre>
 <p>Whether each principal component is used by each block. This mask is 
 <code>true
-</code> for the first used principal components of each block and 
+</code> for the first 
+<code>n_used_principal_components
+</code> of each block and 
 <code>false
 </code> for the rest. It is useful for constructing 
 <code>Daf
 </code> queries that only return coefficients for the used principal components for a specific block (e.g., 
 <code>gene &amp; is_skeleton / principal_component &amp; is_used ; block = $(block_name) : $(block_name)_skeleton_coefficient
 </code>).
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -1308,8 +4038,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Contracts.block_principal_component_gene_covered_coefficient_tensor" href="#Metacells.Contracts.block_principal_component_gene_covered_coefficient_tensor">
-<code>Metacells.Contracts.block_principal_component_gene_covered_coefficient_tensor
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_base_covered_fraction_matrix" href="#Metacells.Contracts.block_gene_base_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_base_covered_fraction_matrix
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1320,14 +4050,16 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">block_principal_component_gene_covered_coefficient_tensor(
-    expectation::ContractExpectation
-)::Pair{TensorKey, DataSpecification}
+<code class="language-julia hljs">block_gene_base_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The coefficient of each principal component for computing each covered gene. This is zero for uncovered genes. Combined with the skeleton genes coefficients this gives a local linear model for estimating all the covered genes (
-<em>including
-</em> the skeleton genes).
+<p>The covered base fractions used by the principal component analysis. The model computes the principal components by the difference of the skeleton genes from these levels, and then uses them to predict the difference from these levels of all the covered genes (including the skeleton genes).
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -1353,7 +4085,457 @@
 )::Pair{TensorKey, DataSpecification}
 </code>
 </pre>
-<p>The coefficient of each skeleton gene for computing a principle component. This is zero for non-skeleton genes. The coefficients can be either positive or negative. Combined with the covered genes coefficients this gives a local linear model for estimating all the covered genes.
+<p>The coefficient of each skeleton gene for computing a principle component. This is zero for non-skeleton genes. The coefficients can be either positive or negative. Combined with the 
+<code>base_covered_fraction
+</code> and the 
+<code>covered_coefficient
+</code> matrices, this gives a local linear model for estimating all the covered genes (including the skeleton genes).
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_principal_component_gene_covered_coefficient_tensor" href="#Metacells.Contracts.block_principal_component_gene_covered_coefficient_tensor">
+<code>Metacells.Contracts.block_principal_component_gene_covered_coefficient_tensor
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_principal_component_gene_covered_coefficient_tensor(
+    expectation::ContractExpectation
+)::Pair{TensorKey, DataSpecification}
+</code>
+</pre>
+<p>The coefficient of each principal component for computing each covered gene. This is zero for uncovered genes. Combined with the 
+<code>base_covered_fraction
+</code> and the 
+<code>skeleton_coefficient
+</code> matrices, this gives a local linear model for estimating all the covered genes (including the skeleton genes).
+</p>
+<p>This matrix is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_blocks_is_in_environment!">
+<code>compute_blocks_is_in_environment!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h4 id="Gene-Modules-Analysis-3">
+<a class="docs-heading-anchor" href="#Gene-Modules-Analysis-3">Gene Modules Analysis
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Analysis-3" title="Permalink">
+</a>
+</h4>
+<h5 id="Gene-Modules-Counts">
+<a class="docs-heading-anchor" href="#Gene-Modules-Counts">Gene Modules Counts
+</a>
+<a id="Gene-Modules-Counts-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Counts" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_n_genes_matrix" href="#Metacells.Contracts.block_module_n_genes_matrix">
+<code>Metacells.Contracts.block_module_n_genes_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_n_genes_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of genes in each gene module in each block. This is zero for the extra (not-found) gene modules.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_n_genes!">
+<code>compute_blocks_modules_n_genes!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_n_covered_matrix" href="#Metacells.Contracts.block_module_n_covered_matrix">
+<code>Metacells.Contracts.block_module_n_covered_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_n_covered_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of covered genes in each gene module in each block. This is zero for the extra (not-found) gene modules.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_n_covered!">
+<code>compute_blocks_modules_n_covered!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-UMIs-2">
+<a class="docs-heading-anchor" href="#Gene-Modules-UMIs-2">Gene Modules UMIs
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-UMIs-2" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_total_UMIs_matrix" href="#Metacells.Contracts.block_module_total_UMIs_matrix">
+<code>Metacells.Contracts.block_module_total_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the genes in each gene module in each block.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_scaled_total_UMIs_matrix" href="#Metacells.Contracts.block_module_scaled_total_UMIs_matrix">
+<code>Metacells.Contracts.block_module_scaled_total_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_scaled_total_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the genes in each gene module in each block, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_covered_UMIs_matrix" href="#Metacells.Contracts.block_module_covered_UMIs_matrix">
+<code>Metacells.Contracts.block_module_covered_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_covered_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the covered genes in each gene module in each block.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_scaled_covered_UMIs_matrix" href="#Metacells.Contracts.block_module_scaled_covered_UMIs_matrix">
+<code>Metacells.Contracts.block_module_scaled_covered_UMIs_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_scaled_covered_UMIs_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of the covered genes in each gene module in each block, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-Masks">
+<a class="docs-heading-anchor" href="#Gene-Modules-Masks">Gene Modules Masks
+</a>
+<a id="Gene-Modules-Masks-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Masks" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_module_index_matrix" href="#Metacells.Contracts.block_gene_module_index_matrix">
+<code>Metacells.Contracts.block_gene_module_index_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_module_index_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The index of the gene module each gene belongs to in the environment of each block. This is an index and not a module name because of 
+<code>Daf
+</code> limitations (no matrices of strings). The index is zero for genes that do not belong to any module.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_is_found_matrix" href="#Metacells.Contracts.block_module_is_found_matrix">
+<code>Metacells.Contracts.block_module_is_found_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_is_found_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>Whether each gene module is found in each block. This mask is 
+<code>true
+</code> for the first 
+<code>n_found_modules
+</code> of each block and 
+<code>false
+</code> for the rest. Due to 
+<code>Daf
+</code> limitations, we create a 
+<code>module
+</code> axis with the maximal number of gene modules in each block, so only the first 
+<code>n_found_modules
+</code> of these actually contain genes.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_is_used_matrix" href="#Metacells.Contracts.block_module_is_used_matrix">
+<code>Metacells.Contracts.block_module_is_used_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_is_used_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>Whether each gene module is used in the linear model of each block. Only some of the found models are actually used in the local linear model.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_is_used!">
+<code>compute_blocks_modules_is_used!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-Metadata">
+<a class="docs-heading-anchor" href="#Gene-Modules-Metadata">Gene Modules Metadata
+</a>
+<a id="Gene-Modules-Metadata-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Metadata" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_min_gene_correlation_matrix" href="#Metacells.Contracts.block_module_min_gene_correlation_matrix">
+<code>Metacells.Contracts.block_module_min_gene_correlation_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_module_min_gene_correlation_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The minimal correlation between the genes of each gene module of each block.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<h5 id="Gene-Modules-Model">
+<a class="docs-heading-anchor" href="#Gene-Modules-Model">Gene Modules Model
+</a>
+<a id="Gene-Modules-Model-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules-Model" title="Permalink">
+</a>
+</h5>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_base_covered_fraction_matrix" href="#Metacells.Contracts.block_module_base_covered_fraction_matrix">
+<code>Metacells.Contracts.block_module_base_covered_fraction_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_base_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The base covered fractions used by the gene modules analysis. The model computes the difference of each gene module fraction in each metacell (or cell) from these levels, then uses them to predict the difference from the 
+<code>base_covered_fraction
+</code> of each covered gene (including the modules genes) using the 
+<code>covered_coefficient
+</code> matrix.
+</p>
+<p>This matrix is populated by 
+<a href="compute_approximation.html#Metacells.ComputeApproximation.compute_blocks_modules_base_covered_fractions!">
+<code>compute_blocks_modules_base_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_gene_covered_coefficient_tensor" href="#Metacells.Contracts.block_module_gene_covered_coefficient_tensor">
+<code>Metacells.Contracts.block_module_gene_covered_coefficient_tensor
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_gene_covered_coefficient_tensor(
+    expectation::ContractExpectation
+)::Pair{TensorKey, DataSpecification}
+</code>
+</pre>
+<p>The coefficient of each gene module for computing each covered gene. This is zero for unused modules and uncovered genes. Combined with the 
+<code>module_fraction
+</code> and the 
+<code>covered_coefficient
+</code> matrices, this gives a local linear model for estimating all the covered genes (including the modules genes).
+</p>
+<p>This matrix is populated by 
+<a href="compute_approximation.html#Metacells.ComputeApproximation.compute_approximation!">
+<code>compute_approximation!
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -1392,38 +4574,284 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.block_block_max_skeleton_fold_distance">
+<code>Metacells.Contracts.block_block_max_skeleton_fold_distance
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_covered_UMIs_vector">
+<code>Metacells.Contracts.block_covered_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_UMIs_matrix">
+<code>Metacells.Contracts.block_gene_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_base_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_base_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.block_gene_fraction_matrix">
 <code>Metacells.Contracts.block_gene_fraction_matrix
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.block_gene_mean_scaled_log_covered_fraction_matrix">
-<code>Metacells.Contracts.block_gene_mean_scaled_log_covered_fraction_matrix
+<a href="contracts.html#Metacells.Contracts.block_gene_is_environment_marker">
+<code>Metacells.Contracts.block_gene_is_environment_marker
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.block_gene_total_UMIs_matrix">
-<code>Metacells.Contracts.block_gene_total_UMIs_matrix
+<a href="contracts.html#Metacells.Contracts.block_gene_is_neighborhood_marker">
+<code>Metacells.Contracts.block_gene_is_neighborhood_marker
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.block_linear_RMSE_vector">
-<code>Metacells.Contracts.block_linear_RMSE_vector
+<a href="contracts.html#Metacells.Contracts.block_gene_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_linear_covered_fraction_matrix
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.block_linear_XRMSE_vector">
-<code>Metacells.Contracts.block_linear_XRMSE_vector
+<a href="contracts.html#Metacells.Contracts.block_gene_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_linear_fraction_matrix
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.block_n_principal_components_vector">
-<code>Metacells.Contracts.block_n_principal_components_vector
+<a href="contracts.html#Metacells.Contracts.block_gene_log_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_log_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_log_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_log_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_log_scaled_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_module_index_matrix">
+<code>Metacells.Contracts.block_gene_module_index_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.block_gene_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.block_gene_scaled_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_base_covered_fraction_matrix">
+<code>Metacells.Contracts.block_module_base_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_covered_UMIs_matrix">
+<code>Metacells.Contracts.block_module_covered_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_gene_covered_coefficient_tensor">
+<code>Metacells.Contracts.block_module_gene_covered_coefficient_tensor
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_is_found_matrix">
+<code>Metacells.Contracts.block_module_is_found_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_is_used_matrix">
+<code>Metacells.Contracts.block_module_is_used_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_min_gene_correlation_matrix">
+<code>Metacells.Contracts.block_module_min_gene_correlation_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_n_covered_matrix">
+<code>Metacells.Contracts.block_module_n_covered_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_n_genes_matrix">
+<code>Metacells.Contracts.block_module_n_genes_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_scaled_covered_UMIs_matrix">
+<code>Metacells.Contracts.block_module_scaled_covered_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_scaled_total_UMIs_matrix">
+<code>Metacells.Contracts.block_module_scaled_total_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_total_UMIs_matrix">
+<code>Metacells.Contracts.block_module_total_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_modules_RMSE_vector">
+<code>Metacells.Contracts.block_modules_RMSE_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_modules_XRMSE_vector">
+<code>Metacells.Contracts.block_modules_XRMSE_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_modules_block_RMSE_vector">
+<code>Metacells.Contracts.block_modules_block_RMSE_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_modules_neighborhood_RMSE_vector">
+<code>Metacells.Contracts.block_modules_neighborhood_RMSE_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_cells_vector">
+<code>Metacells.Contracts.block_n_cells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_environment_blocks_vector">
+<code>Metacells.Contracts.block_n_environment_blocks_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_environment_cells_vector">
+<code>Metacells.Contracts.block_n_environment_cells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_environment_metacells_vector">
+<code>Metacells.Contracts.block_n_environment_metacells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_found_modules_vector">
+<code>Metacells.Contracts.block_n_found_modules_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_metacells_vector">
+<code>Metacells.Contracts.block_n_metacells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_neighborhood_blocks_vector">
+<code>Metacells.Contracts.block_n_neighborhood_blocks_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_neighborhood_cells_vector">
+<code>Metacells.Contracts.block_n_neighborhood_cells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_neighborhood_metacells_vector">
+<code>Metacells.Contracts.block_n_neighborhood_metacells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_used_modules_vector">
+<code>Metacells.Contracts.block_n_used_modules_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_n_used_principal_components_vector">
+<code>Metacells.Contracts.block_n_used_principal_components_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_pca_RMSE_vector">
+<code>Metacells.Contracts.block_pca_RMSE_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_pca_XRMSE_vector">
+<code>Metacells.Contracts.block_pca_XRMSE_vector
 </code>
 </a>
 </li>
@@ -1446,8 +4874,44 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.block_scaled_covered_UMIs_vector">
+<code>Metacells.Contracts.block_scaled_covered_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_scaled_total_UMIs_vector">
+<code>Metacells.Contracts.block_scaled_total_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_total_UMIs_vector">
+<code>Metacells.Contracts.block_total_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_type_vector">
+<code>Metacells.Contracts.block_type_vector
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.cell_axis">
 <code>Metacells.Contracts.cell_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_covered_UMIs_vector">
+<code>Metacells.Contracts.cell_covered_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_excluded_UMIs_vector">
+<code>Metacells.Contracts.cell_excluded_UMIs_vector
 </code>
 </a>
 </li>
@@ -1464,26 +4928,56 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.cell_linear_covered_metacell_cross_entropy_vector">
+<code>Metacells.Contracts.cell_linear_covered_metacell_cross_entropy_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_linear_covered_metacell_kl_divergence_vector">
+<code>Metacells.Contracts.cell_linear_covered_metacell_kl_divergence_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_linear_metacell_cross_entropy_vector">
+<code>Metacells.Contracts.cell_linear_metacell_cross_entropy_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_linear_metacell_kl_divergence_vector">
+<code>Metacells.Contracts.cell_linear_metacell_kl_divergence_vector
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.cell_metacell_vector">
 <code>Metacells.Contracts.cell_metacell_vector
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.cell_new_metacell_vector">
-<code>Metacells.Contracts.cell_new_metacell_vector
+<a href="contracts.html#Metacells.Contracts.cell_mitochondrial_UMIs_vector">
+<code>Metacells.Contracts.cell_mitochondrial_UMIs_vector
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.cell_old_metacell_vector">
-<code>Metacells.Contracts.cell_old_metacell_vector
+<a href="contracts.html#Metacells.Contracts.cell_ribosomal_UMIs_vector">
+<code>Metacells.Contracts.cell_ribosomal_UMIs_vector
 </code>
 </a>
 </li>
 <li>
 <a href="contracts.html#Metacells.Contracts.cell_total_UMIs_vector">
 <code>Metacells.Contracts.cell_total_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_type_vector">
+<code>Metacells.Contracts.cell_type_vector
 </code>
 </a>
 </li>
@@ -1566,6 +5060,48 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_UMIs_matrix">
+<code>Metacells.Contracts.metacell_gene_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_approximated_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_approximated_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_approximated_log_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_log_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_approximated_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_log_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_approximated_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_log_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_approximated_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_approximated_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.metacell_gene_covered_fraction_matrix">
 <code>Metacells.Contracts.metacell_gene_covered_fraction_matrix
 </code>
@@ -1578,14 +5114,218 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.metacell_gene_scaled_log_covered_fraction_matrix">
-<code>Metacells.Contracts.metacell_gene_scaled_log_covered_fraction_matrix
+<a href="contracts.html#Metacells.Contracts.metacell_gene_geomean_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_geomean_fraction_matrix
 </code>
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.metacell_gene_total_UMIs_matrix">
-<code>Metacells.Contracts.metacell_gene_total_UMIs_matrix
+<a href="contracts.html#Metacells.Contracts.metacell_gene_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_geomean_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_geomean_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_log_scaled_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_gene_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_gene_scaled_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_mean_cells_linear_covered_cross_entropy_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_covered_cross_entropy_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_mean_cells_linear_covered_kl_divergence_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_covered_kl_divergence_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_mean_cells_linear_cross_entropy_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_cross_entropy_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_mean_cells_linear_kl_divergence_vector">
+<code>Metacells.Contracts.metacell_mean_cells_linear_kl_divergence_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_metacell_max_skeleton_fold_distance">
+<code>Metacells.Contracts.metacell_metacell_max_skeleton_fold_distance
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_covered_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_covered_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_log_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_log_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_log_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_log_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_log_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_log_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_log_scaled_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_scaled_covered_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_covered_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_scaled_linear_covered_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_linear_covered_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_scaled_linear_fraction_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_scaled_total_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_scaled_total_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_module_total_UMIs_matrix">
+<code>Metacells.Contracts.metacell_module_total_UMIs_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_n_cells_vector">
+<code>Metacells.Contracts.metacell_n_cells_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_scaled_covered_UMIs_vector">
+<code>Metacells.Contracts.metacell_scaled_covered_UMIs_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_scaled_total_UMIs_vector">
+<code>Metacells.Contracts.metacell_scaled_total_UMIs_vector
 </code>
 </a>
 </li>
@@ -1602,32 +5342,8 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.new_metacell_axis">
-<code>Metacells.Contracts.new_metacell_axis
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.new_metacell_block_vector">
-<code>Metacells.Contracts.new_metacell_block_vector
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.old_metacell_axis">
-<code>Metacells.Contracts.old_metacell_axis
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.old_metacell_block_vector">
-<code>Metacells.Contracts.old_metacell_block_vector
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.old_metacell_gene_scaled_log_covered_fraction_matrix">
-<code>Metacells.Contracts.old_metacell_gene_scaled_log_covered_fraction_matrix
+<a href="contracts.html#Metacells.Contracts.module_axis">
+<code>Metacells.Contracts.module_axis
 </code>
 </a>
 </li>
@@ -1654,7 +5370,7 @@
 <nav class="docs-footer">
 <a class="docs-footer-prevpage" href="gmara.html">« Gmara
 </a>
-<a class="docs-footer-nextpage" href="identify_genes.html">Identify Genes »
+<a class="docs-footer-nextpage" href="analyze_cells.html">Analyze Cells »
 </a>
 <div class="flexbox-break">
 </div>
@@ -1702,7 +5418,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.10.1. Using Julia version 1.11.4.
+</a> version 1.12.0. Using Julia version 1.11.5.
 </p>
 </section>
 <footer class="modal-card-foot">

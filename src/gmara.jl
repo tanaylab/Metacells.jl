@@ -264,7 +264,7 @@ function lock_file(path::AbstractString; timeout::Real = TIMEOUT)::Base.Filesyst
     lock_path = path * ".lock"
     while true
         try
-            return Base.Filesystem.open(lock_path, Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL)
+            return Base.Filesystem.open(lock_path, Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL)  # NOJET
         catch exception
             if exception isa Base.IOError  # untested
                 if timeout > 0  # untested

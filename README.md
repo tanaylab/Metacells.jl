@@ -7,7 +7,7 @@ provide a similar thin R wrapper to provide metacell analysis from R as well. Fo
 subset of the features of the Python`metacells`package, which requires users to convert data from`AnnData`(for the old
 features) to `Daf` (to the new features).
 
-See the [v0.1.0 documentation](https://tanaylab.github.io/Metacells.jl/v0.1.0) for details.
+See the [v0.1.0 documentation](https://tanaylab.github.io/dafpy/v0.1.1/html/) for details.
 
 ## Motivation
 

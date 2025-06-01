@@ -1,0 +1,1794 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Analyze Modules · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="Analyze Modules · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Analyze Modules · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Analyze Modules · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li>
+<a class="tocitem" href="index.html">Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li>
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_cells.html">Analyze Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_metacells.html">Analyze Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_blocks.html">Compute Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Counts">
+<span>Counts
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Masks">
+<span>Masks
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#UMIs">
+<span>UMIs
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Modules">
+<span>Modules
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Blocks">
+<span>Blocks
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Fractions">
+<span>Fractions
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Modules-2">
+<span>Modules
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="compute_approximation.html">Compute Approximation
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_approximation.html">Analyze Approximation
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="Analyze-Modules">
+<a class="docs-heading-anchor" href="#Analyze-Modules">Analyze Modules
+</a>
+<a id="Analyze-Modules-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Analyze-Modules" title="Permalink">
+</a>
+</h1>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules" href="#Metacells.AnalyzeModules">
+<code>Metacells.AnalyzeModules
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<p>Do simple gene module analysis.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Counts">
+<a class="docs-heading-anchor" href="#Counts">Counts
+</a>
+<a id="Counts-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Counts" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_modules_n_genes!" href="#Metacells.AnalyzeModules.compute_blocks_modules_n_genes!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_n_genes!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_n_genes!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The number of genes in each gene module in each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ n_genes
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The number of genes in each gene module in each block.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_modules_n_covered!" href="#Metacells.AnalyzeModules.compute_blocks_modules_n_covered!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_n_covered!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_n_covered!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The number of covered genes in each gene module in each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_covered
+</strong>::Bool (required): A mask of genes that are covered by the local linear program.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ n_covered
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The number of covered genes in each gene module in each block.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_n_found_modules!" href="#Metacells.AnalyzeModules.compute_blocks_n_found_modules!">
+<code>Metacells.AnalyzeModules.compute_blocks_n_found_modules!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_n_found_modules!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The number of found gene modules for each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (required): Whether each gene module is found in each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>block @ n
+<em>found
+</em>modules
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The number of found modules for each block.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_n_used_modules!" href="#Metacells.AnalyzeModules.compute_blocks_n_used_modules!">
+<code>Metacells.AnalyzeModules.compute_blocks_n_used_modules!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_n_used_modules!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The number of used gene modules for each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ is_used
+</strong>::Bool (required): Whether each gene module is used in the linear model of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>block @ n
+<em>used
+</em>modules
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The number of used modules for each block.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Masks">
+<a class="docs-heading-anchor" href="#Masks">Masks
+</a>
+<a id="Masks-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Masks" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_modules_is_used!" href="#Metacells.AnalyzeModules.compute_blocks_modules_is_used!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_is_used!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_is_used!(
+    daf::DafWriter;
+    min_used_module_covered_UMIs_fraction::Real = ```0.67```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Whether each gene module is used by each block. We only use modules that have a high fraction of covered gene UMIs (specifically, at least 
+<code>min_used_module_covered_UMIs_fraction
+</code>).
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ covered_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total UMIs of the covered genes in each gene module in each block.
+</p>
+<p>
+<strong>block, module @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total UMIs of the genes in each gene module in each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ is_used
+</strong>::Bool (guaranteed): Whether each gene module is used in the linear model of each block.
+</p>
+</div>
+</section>
+</article>
+<h2 id="UMIs">
+<a class="docs-heading-anchor" href="#UMIs">UMIs
+</a>
+<a id="UMIs-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#UMIs" title="Permalink">
+</a>
+</h2>
+<h2 id="Modules">
+<a class="docs-heading-anchor" href="#Modules">Modules
+</a>
+<a id="Modules-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Modules" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_total_UMIs!" href="#Metacells.AnalyzeModules.compute_metacells_modules_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_total_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_total_UMIs!(daf::DafWriter; overwrite::Bool = false)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the genes of each module in each metacell.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, module @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the genes of each module in each metacell.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_scaled_total_UMIs!" href="#Metacells.AnalyzeModules.compute_metacells_modules_scaled_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_total_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_scaled_total_UMIs!(daf::DafWriter; overwrite::Bool = false)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the genes of each module in each metacell, scaled by divergence.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, module @ scaled
+<em>total
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the genes of each module in each metacell, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_covered_UMIs!" href="#Metacells.AnalyzeModules.compute_metacells_modules_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_covered_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_covered_UMIs!(daf::DafWriter; overwrite::Bool = false)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the covered genes of each module in each metacell.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_covered
+</strong>::Bool (required): A mask of genes that are covered by the local linear program.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, module @ covered_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the covered genes of each module in each metacell.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_scaled_covered_UMIs!" href="#Metacells.AnalyzeModules.compute_metacells_modules_scaled_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_covered_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_scaled_covered_UMIs!(daf::DafWriter; overwrite::Bool = false)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the covered genes of each module in each metacell, scaled by divergence.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>gene @ is_covered
+</strong>::Bool (required): A mask of genes that are covered by the local linear program.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, module @ scaled
+<em>covered
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the covered genes of each module in each metacell, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Blocks">
+<a class="docs-heading-anchor" href="#Blocks">Blocks
+</a>
+<a id="Blocks-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_modules_total_UMIs!" href="#Metacells.AnalyzeModules.compute_blocks_modules_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_total_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_total_UMIs!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the genes in each gene module in each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, the (column) mask of nearby blocks in its expanded environment.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the genes in each gene module in each block.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_modules_covered_UMIs!" href="#Metacells.AnalyzeModules.compute_blocks_modules_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_covered_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_covered_UMIs!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the covered genes in each gene module in each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_covered
+</strong>::Bool (required): A mask of genes that are covered by the local linear program.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, the (column) mask of nearby blocks in its expanded environment.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ covered_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the covered genes in each gene module in each block.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_modules_scaled_total_UMIs!" href="#Metacells.AnalyzeModules.compute_blocks_modules_scaled_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_scaled_total_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_scaled_total_UMIs!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the genes in each gene module in each block, scaled by divergence.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, the (column) mask of nearby blocks in its expanded environment.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ scaled
+<em>total
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the genes in each gene module in each bloc, scaled by divergence..
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_blocks_modules_scaled_covered_UMIs!" href="#Metacells.AnalyzeModules.compute_blocks_modules_scaled_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_scaled_covered_UMIs!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules_scaled_covered_UMIs!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>The total UMIs of the covered genes in each gene module in each block, scaled by divergence.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; estimated cell state.
+</p>
+<p>
+<strong>module
+</strong> (required): A local (per block) gene module.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ divergence
+</strong>::Union{Float32, Float64} (required): Scale fold factors of each gene by multiplying with (1 - divergence) of the gene.
+</p>
+<p>
+<strong>gene @ is_covered
+</strong>::Bool (required): A mask of genes that are covered by the local linear program.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs used to estimate the fraction of each gene in each metacell.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, the (column) mask of nearby blocks in its expanded environment.
+</p>
+<p>
+<strong>block, gene @ module_index
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The index of the gene module each gene belongs to in the environment of each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ scaled
+<em>covered
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (guaranteed): The total UMIs of the covered genes in each gene module in each block, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Fractions">
+<a class="docs-heading-anchor" href="#Fractions">Fractions
+</a>
+<a id="Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Fractions" title="Permalink">
+</a>
+</h2>
+<h2 id="Modules-2">
+<a class="docs-heading-anchor" href="#Modules-2">Modules
+</a>
+<a class="docs-heading-anchor-permalink" href="#Modules-2" title="Permalink">
+</a>
+</h2>
+<h3 id="Linear-Fractions">
+<a class="docs-heading-anchor" href="#Linear-Fractions">Linear Fractions
+</a>
+<a id="Linear-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Linear-Fractions" title="Permalink">
+</a>
+</h3>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_linear_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_linear_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_linear_fractions!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_scaled_linear_fractions!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_log_linear_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_log_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_linear_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_log_linear_fractions!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_log_scaled_linear_fractions!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the genes of each module in each metacell, out of the total UMIs, scaled by divergence. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
+</p>
+</div>
+</section>
+</article>
+<h3 id="Linear-Covered-Fractions">
+<a class="docs-heading-anchor" href="#Linear-Covered-Fractions">Linear Covered Fractions
+</a>
+<a id="Linear-Covered-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Linear-Covered-Fractions" title="Permalink">
+</a>
+</h3>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_linear_covered_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_linear_covered_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_linear_covered_fractions!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_covered_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_covered_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_scaled_linear_covered_fractions!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs, scaled by divergence.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_log_linear_covered_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_log_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_linear_covered_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_log_linear_covered_fractions!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_covered_fractions!" href="#Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_covered_fractions!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_modules_log_scaled_linear_covered_fractions!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>The log base 2 of the estimated linear fraction of the UMIs of the covered genes of each module in each metacell, out of the total covered UMIs, scaled by divergence. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
+</p>
+</div>
+</section>
+</article>
+<h2 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h2>
+<ul>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules">
+<code>Metacells.AnalyzeModules
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_covered_UMIs!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_is_used!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_is_used!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_n_covered!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_n_covered!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_n_genes!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_n_genes!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_scaled_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_scaled_covered_UMIs!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_scaled_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_scaled_total_UMIs!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_blocks_modules_total_UMIs!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_n_found_modules!">
+<code>Metacells.AnalyzeModules.compute_blocks_n_found_modules!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_n_used_modules!">
+<code>Metacells.AnalyzeModules.compute_blocks_n_used_modules!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_covered_UMIs!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_linear_covered_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_linear_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_linear_covered_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_linear_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_covered_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_log_scaled_linear_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_covered_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_covered_UMIs!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_covered_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_covered_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_fractions!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_linear_fractions!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_scaled_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_scaled_total_UMIs!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_metacells_modules_total_UMIs!">
+<code>Metacells.AnalyzeModules.compute_metacells_modules_total_UMIs!
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-prevpage" href="compute_modules.html">« Compute Modules
+</a>
+<a class="docs-footer-nextpage" href="compute_approximation.html">Compute Approximation »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.12.0. Using Julia version 1.11.5.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

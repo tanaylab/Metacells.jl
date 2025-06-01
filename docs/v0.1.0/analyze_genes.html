@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Identify Genes · Metacells.jl v0.1.0
+<title>Analyze Genes · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Identify Genes · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Identify Genes · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Identify Genes · Metacells.jl v0.1.0"/>
+<meta name="title" content="Analyze Genes · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Analyze Genes · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Analyze Genes · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -64,24 +64,40 @@
 <a class="tocitem" href="contracts.html">Contracts
 </a>
 </li>
-<li class="is-active">
-<a class="tocitem" href="identify_genes.html">Identify Genes
-</a>
-<ul class="internal">
 <li>
-<a class="tocitem" href="#Index">
-<span>Index
-</span>
-</a>
-</li>
-</ul>
-</li>
-<li>
-<a class="tocitem" href="collect.html">Collect Metacells
+<a class="tocitem" href="analyze_cells.html">Analyze Cells
 </a>
 </li>
 <li>
-<a class="tocitem" href="blocks.html">Blocks
+<a class="tocitem" href="analyze_metacells.html">Analyze Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_blocks.html">Compute Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_approximation.html">Compute Approximation
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_approximation.html">Analyze Approximation
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
 </a>
 </li>
 <li>
@@ -113,13 +129,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="identify_genes.html">Identify Genes
+<a href="analyze_genes.html">Analyze Genes
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="identify_genes.html">Identify Genes
+<a href="analyze_genes.html">Analyze Genes
 </a>
 </li>
 </ul>
@@ -138,20 +154,20 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Identify-Genes">
-<a class="docs-heading-anchor" href="#Identify-Genes">Identify Genes
+<h1 id="Analyze-Genes">
+<a class="docs-heading-anchor" href="#Analyze-Genes">Analyze Genes
 </a>
-<a id="Identify-Genes-1">
+<a id="Analyze-Genes-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Identify-Genes" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Analyze-Genes" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.IdentifyGenes" href="#Metacells.IdentifyGenes">
-<code>Metacells.IdentifyGenes
+<a class="docstring-binding" id="Metacells.AnalyzeGenes" href="#Metacells.AnalyzeGenes">
+<code>Metacells.AnalyzeGenes
 </code>
 </a> — 
 <span class="docstring-category">Module
@@ -161,7 +177,7 @@
 </header>
 <section>
 <div>
-<p>Identify special genes.
+<p>Do simple per-gene analysis.
 </p>
 </div>
 </section>
@@ -170,8 +186,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.IdentifyGenes.compute_genes_divergence!" href="#Metacells.IdentifyGenes.compute_genes_divergence!">
-<code>Metacells.IdentifyGenes.compute_genes_divergence!
+<a class="docstring-binding" id="Metacells.AnalyzeGenes.compute_genes_divergence!" href="#Metacells.AnalyzeGenes.compute_genes_divergence!">
+<code>Metacells.AnalyzeGenes.compute_genes_divergence!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -184,38 +200,41 @@
 <pre>
 <code class="language-julia hljs">function compute_genes_divergence!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
-    min_divergent_gene_range_fold::Real = ```6```,
+    min_divergent_gene_range_fold::Real = ```7```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
-<p>Compute a divergence factor for all genes. This factor is typically 0.0 for most genes (and is always below 1.0). Genes that have a wide range of expression are given a higher divergence factor. When looking for significant differences in gene expressions, the divergence factor is used to scale down the difference, to compensate for the gene&#39;s inherent wider expression range. Specifically, we take the raw fold factor and multiply it by (1.0 - divergence).
-</p>
-<p>This works as follows:
-</p>
-<ol>
-<li>Compute the minimal and maximal expression level of each gene.
-</li>
-<li>Compute the fold factor (log2 of maximal over minimal value, using the 
-<code>gene_fraction_regularization
-</code>.
-</li>
-<li>The raw factor of the gene is the ratio between the fold factor and the 
+<p>Compute a divergence factor for all genes. We need this because when computing any form of squared error, &quot;bursty&quot; genes with a very wide range of expression level tend to over-influence the results. We therefore compute a scaled expression level by multiplying the raw expression level by 
+<code>1.0 - divergence
+</code>. For most (&quot;well behaved&quot;) genes, the 
+<code>divergence
+</code> will be 0. For genes whose fold factor between the highest and lowest (log base 2) expression level is above 
 <code>min_divergent_gene_range_fold
-</code>. If this is higher than 1, we set the divergence factor accordingly.
-</li>
-</ol>
-<div class="admonition is-info">
+</code>, we compute a 
+<code>divergence
+</code> factor such that the above scaling will reduce this fold factor to the 
+<code>min_divergent_gene_range_fold
+</code> threshold.
+</p>
+<div class="admonition is-info" id="Note-85d9977facd352d0">
 <header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-85d9977facd352d0" title="Permalink">
+</a>
 </header>
 <div class="admonition-body">
-<p>Ideally, all code that uses the manual 
-<code>is_noisy
-</code> mask should be modified to use the divergence factor instead.
+<p>The computation depends on the 
+<code>gene_fraction_regularization
+</code>, so it is important to give it the same value as the one given to 
+<code>compute_metacells_log_*_fractions!
+</code>.
 </p>
 </div>
 </div>
+<p>This is admittedly a blunt instrument, but it is the least-bad option we have for now. It beats the old method of manually constructing an 
+<code>is_noisy
+</code> genes mask.
+</p>
 <p>
 <strong>Inputs
 </strong>
@@ -237,8 +256,8 @@
 </strong>
 </p>
 <p>
-<strong>gene, metacell @ fraction
-</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The estimated linear fraction of the UMIs of each gene in each metacell, out of the total UMIs.
 </p>
 <p>
 <strong>Outputs
@@ -259,8 +278,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.IdentifyGenes.identify_marker_genes!" href="#Metacells.IdentifyGenes.identify_marker_genes!">
-<code>Metacells.IdentifyGenes.identify_marker_genes!
+<a class="docstring-binding" id="Metacells.AnalyzeGenes.identify_marker_genes!" href="#Metacells.AnalyzeGenes.identify_marker_genes!">
+<code>Metacells.AnalyzeGenes.identify_marker_genes!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -273,9 +292,8 @@
 <pre>
 <code class="language-julia hljs">function identify_marker_genes!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
-    min_marker_gene_range_fold::Real = ```2```,
     min_marker_gene_max_fraction::AbstractFloat = ```0.0001```,
+    min_marker_gene_range_fold::Real = ```2```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -286,20 +304,38 @@
 <code>is_marker
 </code> mask.
 </p>
-<ol>
-<li>Compute the minimal and maximal expression level of each gene.
-</li>
-<li>Compute the fold factor (log2 of maximal over minimal value, using the 
-<code>gene_fraction_regularization
-</code>.
-</li>
-<li>Identify as markers genes whose adjusted fold factor is at least 
-<code>min_marker_gene_range_fold
-</code>, and whose maximal expression is at least 
+<p>Marker genes are genes which:
+</p>
+<ul>
+<li>Have a maximal gene expression level of at least 
 <code>min_marker_gene_max_fraction
-</code>.
+</code>, and
 </li>
-</ol>
+<li>Have a range of expression of at least 
+<code>min_marker_gene_range_fold
+</code> between the maximal and minimal (log base 2) of the expression level.
+</li>
+</ul>
+<div class="admonition is-info" id="Note-d1f4feff2268b1c6">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-d1f4feff2268b1c6" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>This uses the virtual 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_fraction_matrix">
+<code>metacell_gene_fraction_matrix
+</code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_fraction_matrix">
+<code>metacell_gene_log_fraction_matrix
+</code>
+</a>. You will need an 
+<code>adapter
+</code> to map these to concrete fractions (geomean, linear, scaled, ...). Make sure you are consistent when mapping the fractions and log-fraction matrices.
+</p>
+</div>
+</div>
 <p>
 <strong>Inputs
 </strong>
@@ -322,7 +358,11 @@
 </p>
 <p>
 <strong>gene, metacell @ fraction
-</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
+</strong>::Union{Float32, Float64} (required): Some estimated fraction of the UMIs of each gene in each metacell.
+</p>
+<p>
+<strong>gene, metacell @ log_fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of some estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -343,8 +383,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.IdentifyGenes.rank_marker_genes!" href="#Metacells.IdentifyGenes.rank_marker_genes!">
-<code>Metacells.IdentifyGenes.rank_marker_genes!
+<a class="docstring-binding" id="Metacells.AnalyzeGenes.rank_marker_genes!" href="#Metacells.AnalyzeGenes.rank_marker_genes!">
+<code>Metacells.AnalyzeGenes.rank_marker_genes!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -357,7 +397,6 @@
 <pre>
 <code class="language-julia hljs">function rank_marker_genes!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -365,21 +404,37 @@
 <p>Compute the relative ranks of marker genes.
 </p>
 <ol>
-<li>Compute the log base 2 of the expression of the marker genes in the metacells (using the 
-<code>gene_fraction_regularization
-</code>).
-</li>
-<li>Compute the median of this for each gene across all the metacells.
+<li>Compute the median of the (log base 2) of the gene expression level for each marker gene across all the metacells.
 </li>
 <li>Compute the per-marker-per-metacell fold factor (absolute difference of the log expression from the median).
 </li>
 <li>Rank the markers for each metacell (1 having the largest fold factor relative to the median).
 </li>
-<li>For each markers, give it a priority which is a tuple of (1) the minimal rank it has in all metacells (2) the maximal fold it has in metacells where it has that rank (negated).
+<li>For each marker, give it a priority which is a tuple of (1) the minimal rank it has in all metacells (2) the maximal fold it has in metacells where it has that rank (negated).
 </li>
 <li>Sort the markers according to this priority.
 </li>
 </ol>
+<p>Non-marker genes are given a rank of 
+<code>typemax(UInt32)
+</code> regardless of their expression level in the metacells.
+</p>
+<div class="admonition is-info" id="Note-3b7cf67b565842bf">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-3b7cf67b565842bf" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>This uses the virtual 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_fraction_matrix">
+<code>metacell_gene_log_fraction_matrix
+</code>
+</a>. You will need an 
+<code>adapter
+</code> to map these to concrete fractions (geomean, linear, scaled, ...).
+</p>
+</div>
+</div>
 <p>
 <strong>Inputs
 </strong>
@@ -409,8 +464,8 @@
 </strong>
 </p>
 <p>
-<strong>gene, metacell @ fraction
-</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
+<strong>gene, metacell @ log_fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of some estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -431,8 +486,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.IdentifyGenes.identify_uncorrelated_genes!" href="#Metacells.IdentifyGenes.identify_uncorrelated_genes!">
-<code>Metacells.IdentifyGenes.identify_uncorrelated_genes!
+<a class="docstring-binding" id="Metacells.AnalyzeGenes.identify_uncorrelated_genes!" href="#Metacells.AnalyzeGenes.identify_uncorrelated_genes!">
+<code>Metacells.AnalyzeGenes.identify_uncorrelated_genes!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -445,24 +500,19 @@
 <pre>
 <code class="language-julia hljs">function identify_uncorrelated_genes!(
     daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     correlation_confidence::AbstractFloat = ```0.99```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
-<p>Identify genes that are correlated with other gene(s). Such genes are good candidates for looking for groups of genes that act together. If 
+<p>Identify marker genes that are correlated with other gene(s). Such genes are good candidates for looking for groups of genes that act together. If 
 <code>overwrite
 </code>, will overwrite an existing 
 <code>is_correlated
 </code> mask.
 </p>
 <ol>
-<li>Compute the log base 2 of the genes expression in each metacell (using the 
-<code>gene_fraction_regularization
-</code>).
-</li>
-<li>Correlate this between all the pairs of genes.
+<li>Correlate the (log base 2 of the) expression level between all the pairs of genes.
 </li>
 <li>For each gene, shuffle its values along all metacells, and again correlate this between all the pairs of genes.
 </li>
@@ -475,6 +525,22 @@
 <li>Identify the genes that have at least that level of correlations in the unshuffled data.
 </li>
 </ol>
+<div class="admonition is-info" id="Note-791351587356391">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-791351587356391" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>This uses the virtual 
+<a href="contracts.html#Metacells.Contracts.metacell_gene_log_fraction_matrix">
+<code>metacell_gene_log_fraction_matrix
+</code>
+</a>. You will need an 
+<code>adapter
+</code> to map these to concrete fractions (geomean, linear, scaled, ...). While at it, you should probably also restrict the set of genes to the marker genes.
+</p>
+</div>
+</div>
 <p>
 <strong>Inputs
 </strong>
@@ -496,8 +562,8 @@
 </strong>
 </p>
 <p>
-<strong>gene, metacell @ fraction
-</strong>::Union{Float32, Float64} (required): The estimated fraction of the UMIs of each gene in each metacell.
+<strong>gene, metacell @ log_fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of some estimated fraction of the UMIs of each gene in each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -518,8 +584,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.IdentifyGenes.identify_covered_genes!" href="#Metacells.IdentifyGenes.identify_covered_genes!">
-<code>Metacells.IdentifyGenes.identify_covered_genes!
+<a class="docstring-binding" id="Metacells.AnalyzeGenes.identify_covered_genes!" href="#Metacells.AnalyzeGenes.identify_covered_genes!">
+<code>Metacells.AnalyzeGenes.identify_covered_genes!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -536,7 +602,7 @@
 )::Nothing
 </code>
 </pre>
-<p>Identify the genes that will be approximated by the local linear programs. Picking them is simple: we cover all marker genes that are not lateral and not uncorrelated.
+<p>Identify the genes that will be approximated by the local linear programs. Picking them is simple: we cover all marker genes, that are not lateral, and not uncorrelated.
 </p>
 <p>
 <strong>Inputs
@@ -585,8 +651,8 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.IdentifyGenes.identify_skeleton_genes!" href="#Metacells.IdentifyGenes.identify_skeleton_genes!">
-<code>Metacells.IdentifyGenes.identify_skeleton_genes!
+<a class="docstring-binding" id="Metacells.AnalyzeGenes.identify_skeleton_genes!" href="#Metacells.AnalyzeGenes.identify_skeleton_genes!">
+<code>Metacells.AnalyzeGenes.identify_skeleton_genes!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -659,56 +725,50 @@
 </h2>
 <ul>
 <li>
-<a href="identify_genes.html#Metacells.IdentifyGenes">
-<code>Metacells.IdentifyGenes
+<a href="analyze_genes.html#Metacells.AnalyzeGenes">
+<code>Metacells.AnalyzeGenes
 </code>
 </a>
 </li>
 <li>
-<a href="identify_genes.html#Metacells.IdentifyGenes.compute_genes_divergence!">
-<code>Metacells.IdentifyGenes.compute_genes_divergence!
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_genes_divergence!">
+<code>Metacells.AnalyzeGenes.compute_genes_divergence!
 </code>
 </a>
 </li>
 <li>
-<a href="identify_genes.html#Metacells.IdentifyGenes.identify_covered_genes!">
-<code>Metacells.IdentifyGenes.identify_covered_genes!
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_covered_genes!">
+<code>Metacells.AnalyzeGenes.identify_covered_genes!
 </code>
 </a>
 </li>
 <li>
-<a href="identify_genes.html#Metacells.IdentifyGenes.identify_marker_genes!">
-<code>Metacells.IdentifyGenes.identify_marker_genes!
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_marker_genes!">
+<code>Metacells.AnalyzeGenes.identify_marker_genes!
 </code>
 </a>
 </li>
 <li>
-<a href="identify_genes.html#Metacells.IdentifyGenes.identify_skeleton_genes!">
-<code>Metacells.IdentifyGenes.identify_skeleton_genes!
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_skeleton_genes!">
+<code>Metacells.AnalyzeGenes.identify_skeleton_genes!
 </code>
 </a>
 </li>
 <li>
-<a href="identify_genes.html#Metacells.IdentifyGenes.identify_uncorrelated_genes!">
-<code>Metacells.IdentifyGenes.identify_uncorrelated_genes!
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.identify_uncorrelated_genes!">
+<code>Metacells.AnalyzeGenes.identify_uncorrelated_genes!
 </code>
 </a>
 </li>
 <li>
-<a href="identify_genes.html#Metacells.IdentifyGenes.rank_marker_genes!">
-<code>Metacells.IdentifyGenes.rank_marker_genes!
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.rank_marker_genes!">
+<code>Metacells.AnalyzeGenes.rank_marker_genes!
 </code>
 </a>
 </li>
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-prevpage" href="contracts.html">« Contracts
-</a>
-<a class="docs-footer-nextpage" href="collect.html">Collect Metacells »
-</a>
-<div class="flexbox-break">
-</div>
 <p class="footer-message">Powered by 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
 </a> and the 
@@ -753,7 +813,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.10.1. Using Julia version 1.11.4.
+</a> version 1.12.0. Using Julia version 1.11.5.
 </p>
 </section>
 <footer class="modal-card-foot">
