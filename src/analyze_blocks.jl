@@ -4,16 +4,14 @@ Do simple blocks analysis.
 module AnalyzeBlocks
 
 export compute_blocks_covered_UMIs!
+export compute_blocks_genes_covered_fractions!
 export compute_blocks_genes_is_environment_markers!
-export compute_blocks_genes_UMIs!
-export compute_blocks_genes_linear_covered_fractions!
 export compute_blocks_genes_linear_fractions!
-export compute_blocks_genes_log_linear_covered_fractions!
+export compute_blocks_genes_log_covered_fractions!
 export compute_blocks_genes_log_linear_fractions!
-export compute_blocks_genes_log_scaled_linear_covered_fractions!
-export compute_blocks_genes_log_scaled_linear_fractions!
-export compute_blocks_genes_scaled_linear_covered_fractions!
-export compute_blocks_genes_scaled_linear_fractions!
+export compute_blocks_genes_UMIs!
+export compute_blocks_max_skeleton_fold_distances!
+export compute_blocks_mean_euclidean_distances!
 export compute_blocks_n_cells!
 export compute_blocks_n_environment_blocks!
 export compute_blocks_n_environment_cells!
@@ -22,12 +20,12 @@ export compute_blocks_n_metacells!
 export compute_blocks_n_neighborhood_blocks!
 export compute_blocks_n_neighborhood_cells!
 export compute_blocks_n_neighborhood_metacells!
-export compute_blocks_scaled_covered_UMIs!
-export compute_blocks_scaled_total_UMIs!
 export compute_blocks_total_UMIs!
 export compute_blocks_types!
 
+using Base.Threads
 using DataAxesFormats
+using StatsBase
 using TanayLabUtilities
 
 using ..AnalyzeGenes
@@ -38,16 +36,14 @@ using ..Contracts
 import Metacells.Contracts.block_axis
 import Metacells.Contracts.block_block_is_in_environment_matrix
 import Metacells.Contracts.block_block_is_in_neighborhood_matrix
+import Metacells.Contracts.block_block_max_skeleton_fold_distance
+import Metacells.Contracts.block_block_mean_euclidean_skeleton_distance
 import Metacells.Contracts.block_covered_UMIs_vector
+import Metacells.Contracts.block_gene_covered_fraction_matrix
 import Metacells.Contracts.block_gene_is_environment_marker_matrix
-import Metacells.Contracts.block_gene_linear_covered_fraction_matrix
 import Metacells.Contracts.block_gene_linear_fraction_matrix
-import Metacells.Contracts.block_gene_log_linear_covered_fraction_matrix
+import Metacells.Contracts.block_gene_log_covered_fraction_matrix
 import Metacells.Contracts.block_gene_log_linear_fraction_matrix
-import Metacells.Contracts.block_gene_log_scaled_linear_covered_fraction_matrix
-import Metacells.Contracts.block_gene_log_scaled_linear_fraction_matrix
-import Metacells.Contracts.block_gene_scaled_linear_covered_fraction_matrix
-import Metacells.Contracts.block_gene_scaled_linear_fraction_matrix
 import Metacells.Contracts.block_gene_UMIs_matrix
 import Metacells.Contracts.block_n_cells_vector
 import Metacells.Contracts.block_n_environment_blocks_vector
@@ -57,22 +53,120 @@ import Metacells.Contracts.block_n_metacells_vector
 import Metacells.Contracts.block_n_neighborhood_blocks_vector
 import Metacells.Contracts.block_n_neighborhood_cells_vector
 import Metacells.Contracts.block_n_neighborhood_metacells_vector
-import Metacells.Contracts.block_scaled_covered_UMIs_vector
-import Metacells.Contracts.block_scaled_total_UMIs_vector
 import Metacells.Contracts.block_total_UMIs_vector
 import Metacells.Contracts.block_type_vector
 import Metacells.Contracts.gene_axis
-import Metacells.Contracts.gene_divergence_vector
 import Metacells.Contracts.gene_is_covered_vector
 import Metacells.Contracts.gene_is_excluded_vector
-import Metacells.Contracts.gene_is_skeleton_vector
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.metacell_block_vector
-import Metacells.Contracts.metacell_gene_fraction_matrix
-import Metacells.Contracts.metacell_gene_log_fraction_matrix
+import Metacells.Contracts.metacell_gene_covered_fraction_matrix
+import Metacells.Contracts.metacell_gene_log_covered_fraction_matrix
 import Metacells.Contracts.metacell_gene_UMIs_matrix
+import Metacells.Contracts.metacell_metacell_euclidean_skeleton_distance
+import Metacells.Contracts.metacell_metacell_max_skeleton_fold_distance
 import Metacells.Contracts.metacell_n_cells_vector
 import Metacells.Contracts.metacell_type_vector
+
+"""
+    compute_blocks_max_skeleton_fold_distances!(
+        daf::DafWriter;
+        overwrite::Bool = false,
+    )::Nothing
+
+The maximal significant skeleton genes covered fractions fold factor between metacells of the blocks.
+"""
+@logged @computation Contract(;
+    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        metacell_metacell_max_skeleton_fold_distance(RequiredInput),
+        metacell_block_vector(RequiredInput),
+        block_block_max_skeleton_fold_distance(GuaranteedOutput),
+    ],
+) function compute_blocks_max_skeleton_fold_distances!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    distances_between_metacells = get_matrix(daf, "metacell", "metacell", "max_skeleton_fold_distance").array
+    block_index_per_metacell = daf["/ metacell : block => index"].array
+
+    metacell_indices_per_block = collect_group_members(block_index_per_metacell)
+    distances_between_blocks = compute_distances_between_blocks(;
+        distances_between_metacells,
+        metacell_indices_per_block,
+        aggregation = maximum,
+    )
+
+    set_matrix!(daf, "block", "block", "max_skeleton_fold_distance", distances_between_blocks; overwrite)
+    return nothing
+end
+
+"""
+    compute_blocks_mean_euclidean_distances!(
+        daf::DafWriter;
+        overwrite::Bool = false,
+    )::Nothing
+
+The mean Euclidean skeleton genes covered fractions distance between the metacells of the blocks.
+"""
+@logged @computation Contract(;
+    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        metacell_metacell_euclidean_skeleton_distance(RequiredInput),
+        metacell_block_vector(RequiredInput),
+        block_block_mean_euclidean_skeleton_distance(GuaranteedOutput),
+    ],
+) function compute_blocks_mean_euclidean_distances!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    distances_between_metacells = get_matrix(daf, "metacell", "metacell", "euclidean_skeleton_distance").array
+    block_index_per_metacell = daf["/ metacell : block => index"].array
+
+    metacell_indices_per_block = collect_group_members(block_index_per_metacell)
+    distances_between_blocks =
+        compute_distances_between_blocks(; distances_between_metacells, metacell_indices_per_block, aggregation = mean)
+
+    set_matrix!(daf, "block", "block", "mean_euclidean_skeleton_distance", distances_between_blocks; overwrite)
+    return nothing
+end
+
+function compute_distances_between_blocks(;  # untested
+    distances_between_metacells::AbstractMatrix{<:AbstractFloat},
+    metacell_indices_per_block::AbstractVector{<:AbstractVector{<:Integer}},
+    aggregation::Function,
+)::AbstractMatrix{<:AbstractFloat}
+    n_metacells = size(distances_between_metacells, 1)
+    @assert_matrix(distances_between_metacells, n_metacells, n_metacells, Columns)
+
+    n_blocks = length(metacell_indices_per_block)
+    distances_between_blocks = Matrix{Float32}(undef, n_blocks, n_blocks)
+
+    @threads :greedy for base_block_index in reverse(1:n_blocks)
+        base_metacells_indices = metacell_indices_per_block[base_block_index]
+
+        @views distance_per_metacell_per_base_metacell = distances_between_metacells[:, base_metacells_indices]
+
+        aggregated_distance_from_base_per_metacell = vec(aggregation(distance_per_metacell_per_base_metacell; dims = 2))
+        @assert length(aggregated_distance_from_base_per_metacell) == n_metacells
+
+        for other_block_index in 1:base_block_index
+            other_metacells_indices = metacell_indices_per_block[other_block_index]
+
+            aggregated_distance_from_base_per_other_metacell =
+                aggregated_distance_from_base_per_metacell[other_metacells_indices]
+
+            aggregated_distance_between_base_and_other_block =
+                aggregation(aggregated_distance_from_base_per_other_metacell)
+
+            distances_between_blocks[base_block_index, other_block_index] =
+                aggregated_distance_between_base_and_other_block
+            distances_between_blocks[other_block_index, base_block_index] =
+                aggregated_distance_between_base_and_other_block
+        end
+
+        if base_block_index > 1
+            @views distances_between_base_and_other_blocks =
+                distances_between_blocks[1:(base_block_index - 1), base_block_index]
+        end
+    end
+
+    return distances_between_blocks
+end
 
 """
     function compute_blocks_genes_UMIs!(
@@ -153,64 +247,7 @@ $(CONTRACT)
 end
 
 """
-    function compute_blocks_genes_scaled_linear_fractions!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each gene in each block, scaled by divergence. We apply this scaling to
-reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        gene_divergence_vector(RequiredInput),
-        block_gene_linear_fraction_matrix(RequiredInput),
-        block_gene_scaled_linear_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_blocks_genes_scaled_linear_fractions!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_blocks_genes_scaled_fractions(daf; qualifier = "linear", overwrite)
-    return nothing
-end
-
-"""
-    function compute_blocks_genes_log_scaled_linear_fractions!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each gene in each block, scaled by divergence. We apply this scaling to
-reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        block_gene_scaled_linear_fraction_matrix(RequiredInput),
-        block_gene_log_scaled_linear_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_blocks_genes_log_scaled_linear_fractions!(  # UNTESTED
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = function_default(
-        compute_blocks_genes_log_linear_fractions!,
-        :gene_fraction_regularization,
-    ),
-    overwrite::Bool = false,
-)::Nothing
-    @assert gene_fraction_regularization > 0
-    do_compute_blocks_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "scaled_linear", overwrite)
-    return nothing
-end
-
-"""
-    function compute_blocks_genes_linear_covered_fractions!(
+    function compute_blocks_genes_covered_fractions!(
         daf::DafWriter;
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
@@ -226,18 +263,18 @@ $(CONTRACT)
     data = [
         gene_is_covered_vector(RequiredInput),
         block_gene_UMIs_matrix(RequiredInput),
-        block_gene_linear_covered_fraction_matrix(GuaranteedOutput),
+        block_gene_covered_fraction_matrix(GuaranteedOutput),
     ],
-) function compute_blocks_genes_linear_covered_fractions!(  # UNTESTED
+) function compute_blocks_genes_covered_fractions!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
-    do_compute_blocks_genes_linear_fractions(daf; qualifier = "linear_covered", genes_mask = "is_covered", overwrite)
+    do_compute_blocks_genes_linear_fractions(daf; qualifier = "covered", genes_mask = "is_covered", overwrite)
     return nothing
 end
 
 """
-    function compute_blocks_genes_log_linear_covered_fractions!(
+    function compute_blocks_genes_log_covered_fractions!(
         daf::DafWriter;
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -251,77 +288,15 @@ $(CONTRACT)
 @logged @computation Contract(;
     axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
-        block_gene_linear_covered_fraction_matrix(RequiredInput),
-        block_gene_log_linear_covered_fraction_matrix(GuaranteedOutput),
+        block_gene_covered_fraction_matrix(RequiredInput),
+        block_gene_log_covered_fraction_matrix(GuaranteedOutput),
     ],
-) function compute_blocks_genes_log_linear_covered_fractions!(  # UNTESTED
+) function compute_blocks_genes_log_covered_fractions!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
     overwrite::Bool = false,
 )::Nothing
-    do_compute_blocks_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "linear_covered", overwrite)
-    return nothing
-end
-
-"""
-    function compute_blocks_genes_scaled_linear_covered_fractions!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each covered gene in each block, scaled by divergence. We apply this
-scaling to reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        gene_divergence_vector(RequiredInput),
-        block_gene_linear_covered_fraction_matrix(RequiredInput),
-        block_gene_scaled_linear_covered_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_blocks_genes_scaled_linear_covered_fractions!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_blocks_genes_scaled_fractions(daf; qualifier = "linear_covered", overwrite)
-    return nothing
-end
-
-"""
-    function compute_blocks_genes_log_scaled_linear_covered_fractions!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each covered gene in each block, scaled by divergence. We apply this
-scaling to reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        block_gene_scaled_linear_covered_fraction_matrix(RequiredInput),
-        block_gene_log_scaled_linear_covered_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_blocks_genes_log_scaled_linear_covered_fractions!(  # UNTESTED
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = function_default(
-        compute_blocks_genes_log_linear_fractions!,
-        :gene_fraction_regularization,
-    ),
-    overwrite::Bool = false,
-)::Nothing
-    @assert gene_fraction_regularization > 0
-    do_compute_blocks_genes_log_fractions(
-        daf;
-        gene_fraction_regularization,
-        qualifier = "scaled_linear_covered",
-        overwrite,
-    )
+    do_compute_blocks_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "covered", overwrite)
     return nothing
 end
 
@@ -573,38 +548,6 @@ $(CONTRACT)
 end
 
 """
-    function compute_blocks_scaled_total_UMIs!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The total UMIs of genes per block, scaled by divergence.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        gene_divergence_vector(RequiredInput),
-        block_gene_UMIs_matrix(RequiredInput),
-        block_scaled_total_UMIs_vector(GuaranteedOutput),
-    ],
-) function compute_blocks_scaled_total_UMIs!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    divergence_per_gene = get_vector(daf, "gene", "divergence").array
-    do_compute_blocks_UMIs(
-        daf;
-        qualifier = "scaled_total",
-        genes_mask = "",
-        scale_per_gene = 1.0 .- divergence_per_gene,
-        overwrite,
-    )
-    return nothing
-end
-
-"""
     function compute_blocks_covered_UMIs!(
         daf::DafWriter;
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -630,39 +573,6 @@ $(CONTRACT)
 end
 
 """
-    function compute_blocks_scaled_covered_UMIs!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The total UMIs of covered genes per block, scaled by divergence.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        gene_divergence_vector(RequiredInput),
-        gene_is_covered_vector(RequiredInput),
-        block_gene_UMIs_matrix(RequiredInput),
-        block_scaled_covered_UMIs_vector(GuaranteedOutput),
-    ],
-) function compute_blocks_scaled_covered_UMIs!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    divergence_per_scaled_gene = daf["/ gene & is_covered : divergence"].array
-    do_compute_blocks_UMIs(
-        daf;
-        qualifier = "scaled_covered",
-        genes_mask = "is_covered",
-        scale_per_gene = 1.0 .- divergence_per_scaled_gene,
-        overwrite,
-    )
-    return nothing
-end
-
-"""
     compute_blocks_genes_is_environment_markers!(
         daf::DafWriter;
         min_marker_gene_max_fraction::AbstractFloat = $(DEFAULT.min_marker_gene_max_fraction),
@@ -672,20 +582,14 @@ end
 
 A mask of genes that distinguish between cell states in each environment. Otherwise similar to
 [`identify_marker_genes!`](@ref).
-
-!!! note
-
-    This uses the virtual [`metacell_gene_fraction_matrix`](@ref) and [`metacell_gene_log_fraction_matrix`](@ref). You
-    will need an `adapter` to map these to concrete fractions (geomean, linear, scaled, ...). Make sure you are
-    consistent when mapping the fractions and log-fraction matrices.
 """
 @logged @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
         block_block_is_in_environment_matrix(RequiredInput),
         metacell_block_vector(RequiredInput),
-        metacell_gene_fraction_matrix(RequiredInput),
-        metacell_gene_log_fraction_matrix(RequiredInput),
+        metacell_gene_covered_fraction_matrix(RequiredInput),
+        metacell_gene_log_covered_fraction_matrix(RequiredInput),
         block_gene_is_environment_marker_matrix(GuaranteedOutput),
     ],
 ) function compute_blocks_genes_is_environment_markers!(
@@ -708,7 +612,10 @@ A mask of genes that distinguish between cell states in each environment. Otherw
         adapter(  # NOJET
             daf;
             input_axes = ["metacell" => "/ metacell & block => is_in_environment ;= $(block_name)", "gene" => "="],
-            input_data = [("metacell", "gene", "fraction") => "=", ("metacell", "gene", "log_fraction") => "="],
+            input_data = [
+                ("metacell", "gene", "linear_fraction") => "covered_fraction",
+                ("metacell", "gene", "log_linear_fraction") => "log_covered_fraction",
+            ],
             output_axes = [],
             output_data = [],
         ) do adapted
@@ -790,27 +697,6 @@ function do_compute_blocks_genes_log_fractions(
         log_fraction_per_gene_per_block .= log2.(fraction_per_gene_per_block .+ gene_fraction_regularization)
         return nothing
     end
-
-    return nothing
-end
-
-function do_compute_blocks_genes_scaled_fractions(daf::DafWriter; qualifier::AbstractString, overwrite::Bool)::Nothing
-    name = "$(qualifier)_fraction"
-    fraction_per_gene_per_block = get_matrix(daf, "gene", "block", name).array
-
-    divergence_per_gene = get_vector(daf, "gene", "divergence").array
-    scale_per_gene = 1.0 .- divergence_per_gene
-
-    scaled_fraction_per_gene_per_block = fraction_per_gene_per_block .* scale_per_gene
-
-    set_matrix!(
-        daf,
-        "gene",
-        "block",
-        "scaled_$(name)",
-        bestify(scaled_fraction_per_gene_per_block; eltype = Float32);
-        overwrite,
-    )
 
     return nothing
 end

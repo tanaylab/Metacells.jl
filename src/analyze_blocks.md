@@ -34,22 +34,16 @@ Metacells.AnalyzeBlocks.compute_blocks_n_environment_blocks!
 ```@docs
 Metacells.AnalyzeBlocks.compute_blocks_genes_UMIs!
 Metacells.AnalyzeBlocks.compute_blocks_total_UMIs!
-Metacells.AnalyzeBlocks.compute_blocks_scaled_total_UMIs!
 Metacells.AnalyzeBlocks.compute_blocks_covered_UMIs!
-Metacells.AnalyzeBlocks.compute_blocks_scaled_covered_UMIs!
 ```
 
 ## Fractions
 
 ```@docs
 Metacells.AnalyzeBlocks.compute_blocks_genes_linear_fractions!
-Metacells.AnalyzeBlocks.compute_blocks_genes_scaled_linear_fractions!
 Metacells.AnalyzeBlocks.compute_blocks_genes_log_linear_fractions!
-Metacells.AnalyzeBlocks.compute_blocks_genes_log_scaled_linear_fractions!
-Metacells.AnalyzeBlocks.compute_blocks_genes_linear_covered_fractions!
-Metacells.AnalyzeBlocks.compute_blocks_genes_scaled_linear_covered_fractions!
-Metacells.AnalyzeBlocks.compute_blocks_genes_log_linear_covered_fractions!
-Metacells.AnalyzeBlocks.compute_blocks_genes_log_scaled_linear_covered_fractions!
+Metacells.AnalyzeBlocks.compute_blocks_genes_covered_fractions!
+Metacells.AnalyzeBlocks.compute_blocks_genes_log_covered_fractions!
 ```
 
 ## Genes
@@ -62,6 +56,13 @@ Metacells.AnalyzeBlocks.compute_blocks_genes_is_environment_markers!
 
 ```@docs
 Metacells.AnalyzeBlocks.compute_blocks_types!
+```
+
+## Distances
+
+```@docs
+Metacells.AnalyzeBlocks.compute_blocks_mean_euclidean_distances!
+Metacells.AnalyzeBlocks.compute_blocks_max_skeleton_fold_distances!
 ```
 
 ## Index

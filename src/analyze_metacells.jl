@@ -3,38 +3,28 @@ Do simple metacells analysis.
 """
 module AnalyzeMetacells
 
-export compute_cells_linear_covered_metacell_cross_entropy!
-export compute_cells_linear_covered_metacell_kl_divergence!
-export compute_cells_linear_metacell_cross_entropy!
-export compute_cells_linear_metacell_kl_divergence!
 export compute_cells_types_by_metacells!
 export compute_metacells_covered_UMIs!
+export compute_metacells_euclidean_distances!
+export compute_metacells_genes_covered_fractions!
 export compute_metacells_genes_geomean_fractions!
-export compute_metacells_genes_linear_covered_fractions!
 export compute_metacells_genes_linear_fractions!
+export compute_metacells_genes_log_covered_fractions!
 export compute_metacells_genes_log_geomean_fractions!
-export compute_metacells_genes_log_linear_covered_fractions!
 export compute_metacells_genes_log_linear_fractions!
-export compute_metacells_genes_log_scaled_linear_covered_fractions!
-export compute_metacells_genes_log_scaled_linear_fractions!
-export compute_metacells_genes_scaled_linear_covered_fractions!
-export compute_metacells_genes_scaled_linear_fractions!
 export compute_metacells_genes_UMIs!
-export compute_metacells_mean_cells_linear_covered_cross_entropy!
-export compute_metacells_mean_cells_linear_covered_kl_divergence!
-export compute_metacells_mean_cells_linear_cross_entropy!
-export compute_metacells_mean_cells_linear_kl_divergence!
+export compute_metacells_max_skeleton_fold_distances!
 export compute_metacells_n_cells!
-export compute_metacells_scaled_covered_UMIs!
-export compute_metacells_scaled_total_UMIs!
 export compute_metacells_total_UMIs!
 export compute_metacells_types_by_cells!
 
 using Base.Threads
 using DataAxesFormats
+using Distances
+using Distributions
 using TanayLabUtilities
 using Random
-using Statistics
+using StatsBase
 
 using ..Defaults
 using ..Contracts
@@ -44,37 +34,25 @@ import Random.default_rng
 # Needed because of JET:
 import Metacells.Contracts.cell_axis
 import Metacells.Contracts.cell_gene_UMIs_matrix
-import Metacells.Contracts.cell_linear_covered_metacell_cross_entropy_vector
-import Metacells.Contracts.cell_linear_covered_metacell_kl_divergence_vector
-import Metacells.Contracts.cell_linear_metacell_cross_entropy_vector
-import Metacells.Contracts.cell_linear_metacell_kl_divergence_vector
 import Metacells.Contracts.cell_metacell_vector
-import Metacells.Contracts.cell_type_vector
 import Metacells.Contracts.cell_total_UMIs_vector
+import Metacells.Contracts.cell_type_vector
 import Metacells.Contracts.gene_axis
-import Metacells.Contracts.gene_divergence_vector
 import Metacells.Contracts.gene_is_covered_vector
 import Metacells.Contracts.gene_is_excluded_vector
+import Metacells.Contracts.gene_is_skeleton_vector
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.metacell_covered_UMIs_vector
+import Metacells.Contracts.metacell_gene_covered_fraction_matrix
 import Metacells.Contracts.metacell_gene_geomean_fraction_matrix
-import Metacells.Contracts.metacell_gene_linear_covered_fraction_matrix
 import Metacells.Contracts.metacell_gene_linear_fraction_matrix
+import Metacells.Contracts.metacell_gene_log_covered_fraction_matrix
 import Metacells.Contracts.metacell_gene_log_geomean_fraction_matrix
-import Metacells.Contracts.metacell_gene_log_linear_covered_fraction_matrix
 import Metacells.Contracts.metacell_gene_log_linear_fraction_matrix
-import Metacells.Contracts.metacell_gene_log_scaled_linear_covered_fraction_matrix
-import Metacells.Contracts.metacell_gene_log_scaled_linear_fraction_matrix
-import Metacells.Contracts.metacell_gene_scaled_linear_covered_fraction_matrix
-import Metacells.Contracts.metacell_gene_scaled_linear_fraction_matrix
 import Metacells.Contracts.metacell_gene_UMIs_matrix
-import Metacells.Contracts.metacell_mean_cells_linear_covered_cross_entropy_vector
-import Metacells.Contracts.metacell_mean_cells_linear_covered_kl_divergence_vector
-import Metacells.Contracts.metacell_mean_cells_linear_cross_entropy_vector
-import Metacells.Contracts.metacell_mean_cells_linear_kl_divergence_vector
+import Metacells.Contracts.metacell_metacell_euclidean_skeleton_distance
+import Metacells.Contracts.metacell_metacell_max_skeleton_fold_distance
 import Metacells.Contracts.metacell_n_cells_vector
-import Metacells.Contracts.metacell_scaled_covered_UMIs_vector
-import Metacells.Contracts.metacell_scaled_total_UMIs_vector
 import Metacells.Contracts.metacell_total_UMIs_vector
 import Metacells.Contracts.metacell_type_vector
 
@@ -150,69 +128,13 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
     overwrite::Bool = false,
 )::Nothing
+    @assert gene_fraction_regularization >= 0
     do_compute_metacells_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "linear", overwrite)
     return nothing
 end
 
 """
-    function compute_metacells_genes_scaled_linear_fractions!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each gene in each metacell, scaled by divergence. We apply this scaling to
-reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        gene_divergence_vector(RequiredInput),
-        metacell_gene_linear_fraction_matrix(RequiredInput),
-        metacell_gene_scaled_linear_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_metacells_genes_scaled_linear_fractions!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_metacells_genes_scaled_fractions(daf; qualifier = "linear", overwrite)
-    return nothing
-end
-
-"""
-    function compute_metacells_genes_log_scaled_linear_fractions!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each gene in each metacell, scaled by divergence. We apply this scaling to
-reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        metacell_gene_scaled_linear_fraction_matrix(RequiredInput),
-        metacell_gene_log_scaled_linear_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_metacells_genes_log_scaled_linear_fractions!(  # UNTESTED
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = function_default(
-        compute_metacells_genes_log_linear_fractions!,
-        :gene_fraction_regularization,
-    ),
-    overwrite::Bool = false,
-)::Nothing
-    @assert gene_fraction_regularization > 0
-    do_compute_metacells_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "scaled_linear", overwrite)
-    return nothing
-end
-
-"""
-    function compute_metacells_genes_linear_covered_fractions!(
+    function compute_metacells_genes_covered_fractions!(
         daf::DafWriter;
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
@@ -228,18 +150,18 @@ $(CONTRACT)
     data = [
         gene_is_covered_vector(RequiredInput),
         metacell_gene_UMIs_matrix(RequiredInput),
-        metacell_gene_linear_covered_fraction_matrix(GuaranteedOutput),
+        metacell_gene_covered_fraction_matrix(GuaranteedOutput),
     ],
-) function compute_metacells_genes_linear_covered_fractions!(  # UNTESTED
+) function compute_metacells_genes_covered_fractions!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
-    do_compute_metacells_genes_linear_fractions(daf; qualifier = "linear_covered", genes_mask = "is_covered", overwrite)
+    do_compute_metacells_genes_linear_fractions(daf; qualifier = "covered", genes_mask = "is_covered", overwrite)
     return nothing
 end
 
 """
-    function compute_metacells_genes_log_linear_covered_fractions!(
+    function compute_metacells_genes_log_covered_fractions!(
         daf::DafWriter;
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -253,77 +175,16 @@ $(CONTRACT)
 @logged @computation Contract(;
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
-        metacell_gene_linear_covered_fraction_matrix(RequiredInput),
-        metacell_gene_log_linear_covered_fraction_matrix(GuaranteedOutput),
+        metacell_gene_covered_fraction_matrix(RequiredInput),
+        metacell_gene_log_covered_fraction_matrix(GuaranteedOutput),
     ],
-) function compute_metacells_genes_log_linear_covered_fractions!(  # UNTESTED
+) function compute_metacells_genes_log_covered_fractions!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
     overwrite::Bool = false,
 )::Nothing
-    do_compute_metacells_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "linear_covered", overwrite)
-    return nothing
-end
-
-"""
-    function compute_metacells_genes_scaled_linear_covered_fractions!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each covered gene in each metacell, scaled by divergence. We apply this
-scaling to reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        gene_divergence_vector(RequiredInput),
-        metacell_gene_linear_covered_fraction_matrix(RequiredInput),
-        metacell_gene_scaled_linear_covered_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_metacells_genes_scaled_linear_covered_fractions!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_metacells_genes_scaled_fractions(daf; qualifier = "linear_covered", overwrite)
-    return nothing
-end
-
-"""
-    function compute_metacells_genes_log_scaled_linear_covered_fractions!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The estimated linear fraction of the UMIs of each covered gene in each metacell, scaled by divergence. We apply this
-scaling to reduce the disproportionate impact of highly variable ("bursty") genes when using square-error methods.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        metacell_gene_scaled_linear_covered_fraction_matrix(RequiredInput),
-        metacell_gene_log_scaled_linear_covered_fraction_matrix(GuaranteedOutput),
-    ],
-) function compute_metacells_genes_log_scaled_linear_covered_fractions!(  # UNTESTED
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = function_default(
-        compute_metacells_genes_log_linear_fractions!,
-        :gene_fraction_regularization,
-    ),
-    overwrite::Bool = false,
-)::Nothing
-    @assert gene_fraction_regularization > 0
-    do_compute_metacells_genes_log_fractions(
-        daf;
-        gene_fraction_regularization,
-        qualifier = "scaled_linear_covered",
-        overwrite,
-    )
+    @assert gene_fraction_regularization >= 0
+    do_compute_metacells_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "covered", overwrite)
     return nothing
 end
 
@@ -396,39 +257,6 @@ $(CONTRACT)
 end
 
 """
-    function compute_metacells_scaled_total_UMIs!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The total number of UMIs used to estimate the fraction of all the genes in each metacell, scaled by divergence.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        gene_is_excluded_vector(RequiredInput),
-        gene_divergence_vector(RequiredInput),
-        metacell_gene_UMIs_matrix(RequiredInput),
-        metacell_scaled_total_UMIs_vector(GuaranteedOutput),
-    ],
-) function compute_metacells_scaled_total_UMIs!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    divergence_per_gene = daf["/ gene &! is_excluded : divergence"].array
-    do_compute_metacells_UMIs(
-        daf;
-        qualifier = "scaled_total",
-        genes_mask = "!is_excluded",
-        scale_per_gene = 1.0 .- divergence_per_gene,
-        overwrite,
-    )
-    return nothing
-end
-
-"""
     function compute_metacells_covered_UMIs!(
         daf::DafWriter;
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -450,39 +278,6 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     do_compute_metacells_UMIs(daf; qualifier = "covered", genes_mask = "is_covered", overwrite)
-    return nothing
-end
-
-"""
-    function compute_metacells_scaled_covered_UMIs!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The total UMIs of covered genes per metacell, scaled by divergence.
-
-$(CONTRACT)
-"""
-@logged @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        gene_divergence_vector(RequiredInput),
-        gene_is_covered_vector(RequiredInput),
-        metacell_gene_UMIs_matrix(RequiredInput),
-        metacell_scaled_covered_UMIs_vector(GuaranteedOutput),
-    ],
-) function compute_metacells_scaled_covered_UMIs!(  # UNTESTED
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
-    divergence_per_gene = daf["/ gene & is_covered : divergence"].array
-    do_compute_metacells_UMIs(
-        daf;
-        qualifier = "scaled_covered",
-        genes_mask = "is_covered",
-        scale_per_gene = 1.0 .- divergence_per_gene,
-        overwrite,
-    )
     return nothing
 end
 
@@ -676,6 +471,7 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
     overwrite::Bool = false,
 )::Nothing
+    @assert gene_fraction_regularization >= 0
     do_compute_metacells_genes_log_fractions(daf; gene_fraction_regularization, qualifier = "geomean", overwrite)
     return nothing
 end
@@ -736,29 +532,6 @@ function do_compute_metacells_genes_log_fractions(
     return nothing
 end
 
-function do_compute_metacells_genes_scaled_fractions(
-    daf::DafWriter;
-    qualifier::AbstractString,
-    overwrite::Bool,
-)::Nothing
-    name = "$(qualifier)_fraction"
-
-    fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", name).array
-    divergence_per_gene = get_vector(daf, "gene", "divergence").array
-
-    scaled_fraction_per_gene_per_metacell = fraction_per_gene_per_metacell .* (1.0 .- divergence_per_gene)
-
-    set_matrix!(
-        daf,
-        "gene",
-        "metacell",
-        "scaled_$(name)",
-        bestify(scaled_fraction_per_gene_per_metacell; eltype = Float32);
-        overwrite,
-    )
-    return nothing
-end
-
 function do_compute_metacells_UMIs(
     daf::DafWriter;
     qualifier::AbstractString,
@@ -775,366 +548,6 @@ function do_compute_metacells_UMIs(
     UMIs_per_metacell = UInt32.(vec(sum(UMIs_per_gene_per_metacell; dims = 1)))
     set_vector!(daf, "metacell", "$(qualifier)_UMIs", UMIs_per_metacell; overwrite)
 
-    return nothing
-end
-
-"""
-    compute_cells_linear_metacell_cross_entropy!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-        overwrite::Bool = false,
-    )::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        gene_is_excluded_vector(RequiredInput),
-        cell_gene_UMIs_matrix(RequiredInput),
-        cell_metacell_vector(RequiredInput),
-        cell_linear_metacell_cross_entropy_vector(GuaranteedOutput),
-    ],
-) function compute_cells_linear_metacell_cross_entropy!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_cells_linear_metacell_cross_entropy(
-        daf;
-        gene_fraction_regularization,
-        genes_mask = "!is_excluded",
-        qualifier = "",
-        overwrite,
-    )
-    return nothing
-end
-
-"""
-    compute_cells_linear_covered_metacell_cross_entropy!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION
-        overwrite::Bool = false,
-    )::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        cell_gene_UMIs_matrix(RequiredInput),
-        cell_metacell_vector(RequiredInput),
-        gene_is_covered_vector(RequiredInput),
-        cell_linear_covered_metacell_cross_entropy_vector(GuaranteedOutput),
-    ],
-) function compute_cells_linear_covered_metacell_cross_entropy!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_cells_linear_metacell_cross_entropy(
-        daf;
-        gene_fraction_regularization,
-        genes_mask = "is_covered",
-        qualifier = "covered",
-        overwrite,
-    )
-    return nothing
-end
-
-function do_compute_cells_linear_metacell_cross_entropy(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat,
-    genes_mask::AbstractString,
-    qualifier::AbstractString,
-    overwrite::Bool,
-)::Nothing
-    n_cells = axis_length(daf, "cell")
-    n_metacells = axis_length(daf, "metacell")
-    name_per_metacell = axis_vector(daf, "metacell")
-
-    linear_metacell_cross_entropy_per_cell = zeros(Float32, n_cells)
-
-    @threads :greedy for metacell_index in 1:n_metacells
-        metacell_name = name_per_metacell[metacell_index]
-
-        UMIs_per_masked_gene_per_metacell_cell =
-            daf["/ gene &$(genes_mask) / cell & metacell = $(metacell_name) : UMIs"].array
-        n_masked_genes, n_metacell_cells = size(UMIs_per_masked_gene_per_metacell_cell)
-
-        total_UMIs_per_metacell_cell = vec(sum(UMIs_per_masked_gene_per_metacell_cell; dims = 1))
-        @assert_vector(total_UMIs_per_metacell_cell, n_metacell_cells)
-
-        total_UMIs_in_metacell = sum(total_UMIs_per_metacell_cell)
-
-        total_UMIs_per_masked_gene = vec(sum(UMIs_per_masked_gene_per_metacell_cell; dims = 2))
-        @assert_vector(total_UMIs_per_masked_gene, n_masked_genes)
-
-        fraction_per_masked_gene_per_metacell_cell =
-            UMIs_per_masked_gene_per_metacell_cell ./ transpose(total_UMIs_per_metacell_cell)
-        @assert_matrix(fraction_per_masked_gene_per_metacell_cell, n_masked_genes, n_metacell_cells)
-
-        UMIs_per_masked_gene_per_other_cell = total_UMIs_per_masked_gene .- UMIs_per_masked_gene_per_metacell_cell  # NOJET
-        @assert_matrix(UMIs_per_masked_gene_per_other_cell, n_masked_genes, n_metacell_cells)
-
-        total_UMIs_per_other_cell = total_UMIs_in_metacell .- total_UMIs_per_metacell_cell  # NOJET # TODOX
-
-        fraction_per_masked_gene_per_other_cell =
-            UMIs_per_masked_gene_per_other_cell ./ transpose(total_UMIs_per_other_cell)
-        @assert_matrix(fraction_per_masked_gene_per_other_cell, n_masked_genes, n_metacell_cells)
-
-        cross_entropy_per_metacell_cell = vec(
-            .- sum(fraction_per_masked_gene_per_metacell_cell .* log2.(fraction_per_masked_gene_per_other_cell .+ gene_fraction_regularization); dims = 1),
-        )
-        @assert_vector(cross_entropy_per_metacell_cell, n_metacell_cells)
-
-        indices_of_metacell_cells = daf["/ cell & metacell = $(metacell_name) : index"].array
-        linear_metacell_cross_entropy_per_cell[indices_of_metacell_cells] .= cross_entropy_per_metacell_cell
-    end
-
-    if qualifier == ""
-        name = "linear_metacell_cross_entropy"
-        @debug "Mean cells linear cross_entropy: $(mean(linear_metacell_cross_entropy_per_cell[linear_metacell_cross_entropy_per_cell .!= 0]))"
-    else
-        name = "linear_$(qualifier)_metacell_cross_entropy"
-        @debug "Mean cells linear $(qualifier) cross_entropy: $(mean(linear_metacell_cross_entropy_per_cell[linear_metacell_cross_entropy_per_cell .!= 0]))"
-    end
-    set_vector!(daf, "cell", name, linear_metacell_cross_entropy_per_cell; overwrite)
-    return nothing
-end
-
-"""
-    compute_metacells_mean_cells_linear_cross_entropy!(daf::DafWriter; overwrite::Bool = false)::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        cell_metacell_vector(RequiredInput),
-        cell_linear_metacell_cross_entropy_vector(RequiredInput),
-        metacell_mean_cells_linear_cross_entropy_vector(GuaranteedOutput),
-    ],
-) function compute_metacells_mean_cells_linear_cross_entropy!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    mean_cells_linear_cross_entropy_per_metacell =
-        daf["/ cell : linear_metacell_cross_entropy @ metacell ! %> Mean"].array
-    set_vector!(
-        daf,
-        "metacell",
-        "mean_cells_linear_cross_entropy",
-        mean_cells_linear_cross_entropy_per_metacell;
-        overwrite,
-    )
-    @debug "Mean metacells linear cross_entropy: $(mean(mean_cells_linear_cross_entropy_per_metacell))"
-    return nothing
-end
-
-"""
-    compute_metacells_mean_cells_linear_covered_cross_entropy!(daf::DafWriter; overwrite::Bool = false)::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        cell_metacell_vector(RequiredInput),
-        cell_linear_covered_metacell_cross_entropy_vector(RequiredInput),
-        metacell_mean_cells_linear_covered_cross_entropy_vector(GuaranteedOutput),
-    ],
-) function compute_metacells_mean_cells_linear_covered_cross_entropy!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    mean_cells_linear_covered_cross_entropy_per_metacell =
-        daf["/ cell : linear_covered_metacell_cross_entropy @ metacell ! %> Mean"].array
-    set_vector!(
-        daf,
-        "metacell",
-        "mean_cells_linear_covered_cross_entropy",
-        mean_cells_linear_covered_cross_entropy_per_metacell;
-        overwrite,
-    )
-    @debug "Mean metacells linear covered cross_entropy: $(mean(mean_cells_linear_covered_cross_entropy_per_metacell))"
-    return nothing
-end
-
-"""
-    compute_cells_linear_metacell_kl_divergence!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-        overwrite::Bool = false,
-    )::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        gene_is_excluded_vector(RequiredInput),
-        cell_gene_UMIs_matrix(RequiredInput),
-        cell_metacell_vector(RequiredInput),
-        cell_linear_metacell_kl_divergence_vector(GuaranteedOutput),
-    ],
-) function compute_cells_linear_metacell_kl_divergence!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_cells_linear_metacell_kl_divergence(
-        daf;
-        gene_fraction_regularization,
-        genes_mask = "!is_excluded",
-        qualifier = "",
-        overwrite,
-    )
-    return nothing
-end
-
-"""
-    compute_cells_linear_covered_metacell_kl_divergence!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION
-        overwrite::Bool = false,
-    )::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        cell_gene_UMIs_matrix(RequiredInput),
-        cell_metacell_vector(RequiredInput),
-        gene_is_covered_vector(RequiredInput),
-        cell_linear_covered_metacell_kl_divergence_vector(GuaranteedOutput),
-    ],
-) function compute_cells_linear_covered_metacell_kl_divergence!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
-    overwrite::Bool = false,
-)::Nothing
-    do_compute_cells_linear_metacell_kl_divergence(
-        daf;
-        gene_fraction_regularization,
-        genes_mask = "is_covered",
-        qualifier = "covered",
-        overwrite,
-    )
-    return nothing
-end
-
-function do_compute_cells_linear_metacell_kl_divergence(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat,
-    genes_mask::AbstractString,
-    qualifier::AbstractString,
-    overwrite::Bool,
-)::Nothing
-    n_cells = axis_length(daf, "cell")
-    n_metacells = axis_length(daf, "metacell")
-    name_per_metacell = axis_vector(daf, "metacell")
-
-    linear_metacell_kl_divergence_per_cell = zeros(Float32, n_cells)
-
-    @threads :greedy for metacell_index in 1:n_metacells
-        metacell_name = name_per_metacell[metacell_index]
-
-        UMIs_per_masked_gene_per_metacell_cell =
-            daf["/ gene &$(genes_mask) / cell & metacell = $(metacell_name) : UMIs"].array
-        n_masked_genes, n_metacell_cells = size(UMIs_per_masked_gene_per_metacell_cell)
-
-        total_UMIs_per_metacell_cell = vec(sum(UMIs_per_masked_gene_per_metacell_cell; dims = 1))
-        @assert_vector(total_UMIs_per_metacell_cell, n_metacell_cells)
-
-        total_UMIs_in_metacell = sum(total_UMIs_per_metacell_cell)
-
-        total_UMIs_per_masked_gene = vec(sum(UMIs_per_masked_gene_per_metacell_cell; dims = 2))
-        @assert_vector(total_UMIs_per_masked_gene, n_masked_genes)
-
-        fraction_per_masked_gene_per_metacell_cell =
-            UMIs_per_masked_gene_per_metacell_cell ./ transpose(total_UMIs_per_metacell_cell)
-        @assert_matrix(fraction_per_masked_gene_per_metacell_cell, n_masked_genes, n_metacell_cells)
-
-        UMIs_per_masked_gene_per_other_cell = total_UMIs_per_masked_gene .- UMIs_per_masked_gene_per_metacell_cell
-        @assert_matrix(UMIs_per_masked_gene_per_other_cell, n_masked_genes, n_metacell_cells)
-
-        total_UMIs_per_other_cell = total_UMIs_in_metacell .- total_UMIs_per_metacell_cell  # NOJET # TODOX
-
-        fraction_per_masked_gene_per_other_cell =
-            UMIs_per_masked_gene_per_other_cell ./ transpose(total_UMIs_per_other_cell)
-        @assert_matrix(fraction_per_masked_gene_per_other_cell, n_masked_genes, n_metacell_cells)
-
-        kl_divergence_per_metacell_cell = vec(
-            sum(
-                fraction_per_masked_gene_per_metacell_cell .* (
-                    log2.(fraction_per_masked_gene_per_metacell_cell .+ gene_fraction_regularization) .-
-                    log2.(fraction_per_masked_gene_per_other_cell .+ gene_fraction_regularization)
-                );
-                dims = 1,
-            ),
-        )
-        @assert_vector(kl_divergence_per_metacell_cell, n_metacell_cells)
-
-        indices_of_metacell_cells = daf["/ cell & metacell = $(metacell_name) : index"].array
-        linear_metacell_kl_divergence_per_cell[indices_of_metacell_cells] .= kl_divergence_per_metacell_cell
-    end
-
-    if qualifier == ""
-        name = "linear_metacell_kl_divergence"
-        @debug "Mean cells linear kl_divergence: $(mean(linear_metacell_kl_divergence_per_cell[linear_metacell_kl_divergence_per_cell .!= 0]))"
-    else
-        name = "linear_$(qualifier)_metacell_kl_divergence"
-        @debug "Mean cells linear $(qualifier) kl_divergence: $(mean(linear_metacell_kl_divergence_per_cell[linear_metacell_kl_divergence_per_cell .!= 0]))"
-    end
-    set_vector!(daf, "cell", name, linear_metacell_kl_divergence_per_cell; overwrite)
-    return nothing
-end
-
-"""
-    compute_metacells_mean_cells_linear_kl_divergence!(daf::DafWriter; overwrite::Bool = false)::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        cell_metacell_vector(RequiredInput),
-        cell_linear_metacell_kl_divergence_vector(RequiredInput),
-        metacell_mean_cells_linear_kl_divergence_vector(GuaranteedOutput),
-    ],
-) function compute_metacells_mean_cells_linear_kl_divergence!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    mean_cells_linear_kl_divergence_per_metacell =
-        daf["/ cell : linear_metacell_kl_divergence @ metacell ! %> Mean"].array
-    set_vector!(
-        daf,
-        "metacell",
-        "mean_cells_linear_kl_divergence",
-        mean_cells_linear_kl_divergence_per_metacell;
-        overwrite,
-    )
-    @debug "Mean metacells linear kl_divergence: $(mean(mean_cells_linear_kl_divergence_per_metacell))"
-    return nothing
-end
-
-"""
-    compute_metacells_mean_cells_linear_covered_kl_divergence!(daf::DafWriter; overwrite::Bool = false)::Nothing
-
-TODOX
-"""
-@logged @computation Contract(
-    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        cell_metacell_vector(RequiredInput),
-        cell_linear_covered_metacell_kl_divergence_vector(RequiredInput),
-        metacell_mean_cells_linear_covered_kl_divergence_vector(GuaranteedOutput),
-    ],
-) function compute_metacells_mean_cells_linear_covered_kl_divergence!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    mean_cells_linear_covered_kl_divergence_per_metacell =
-        daf["/ cell : linear_covered_metacell_kl_divergence @ metacell ! %> Mean"].array
-    set_vector!(
-        daf,
-        "metacell",
-        "mean_cells_linear_covered_kl_divergence",
-        mean_cells_linear_covered_kl_divergence_per_metacell;
-        overwrite,
-    )
-    @debug "Mean metacells linear covered kl_divergence: $(mean(mean_cells_linear_covered_kl_divergence_per_metacell))"
     return nothing
 end
 
@@ -1189,6 +602,171 @@ $(CONTRACT)
     type_per_metacell = daf["/ cell : type @ metacell ! %> Mode"].array
     set_vector!(daf, "metacell", "type", type_per_metacell; overwrite)
     return nothing
+end
+
+"""
+    function compute_metacells_euclidean_distances!(
+        daf::DafWriter;
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+The Euclidean distance between the log of the covered fraction of the skeleton genes between the metacells.
+
+$(CONTRACT)
+"""
+@logged @computation Contract(;
+    axes = [metacell_axis(RequiredInput), gene_axis(RequiredInput)],
+    data = [
+        gene_is_skeleton_vector(RequiredInput),
+        metacell_gene_log_covered_fraction_matrix(RequiredInput),
+        metacell_metacell_euclidean_skeleton_distance(GuaranteedOutput),
+    ],
+) function compute_metacells_euclidean_distances!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    log_covered_fraction_per_skeleton_per_metacell = daf["/ gene & is_skeleton / metacell : log_covered_fraction"].array
+    distances_between_metacells = pairwise(Euclidean(), log_covered_fraction_per_skeleton_per_metacell)  # NOJET
+    set_matrix!(daf, "metacell", "metacell", "euclidean_skeleton_distance", distances_between_metacells; overwrite)
+    return nothing
+end
+
+"""
+    function compute_metacells_max_skeleton_fold_distances!(
+        daf::DafWriter;
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        fold_confidence::AbstractFloat = $(DEFAULT.fold_confidence),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+The maximal significant fold factor between the covered fraction of skeleton genes between the metacells. This uses
+heuristics to require the fold factor be based on a sufficient number of UMIs to be robust.
+
+The fold factor is log (base 2) of the gene expression using the `gene_fraction_regularization`. For computing this fold
+factor, we ignore "insignificant" genes whose total UMIs in the compared metacells isn't at least
+`min_significant_gene_UMIs`. We also we reduce the distance using the `fold_confidence` based on the number of UMIs used
+to estimate the expression in the metacells.
+
+$(CONTRACT)
+"""
+@logged @computation Contract(;
+    axes = [metacell_axis(RequiredInput), gene_axis(RequiredInput)],
+    data = [
+        gene_is_skeleton_vector(RequiredInput),
+        metacell_gene_covered_fraction_matrix(RequiredInput),
+        metacell_covered_UMIs_vector(RequiredInput),
+        metacell_gene_UMIs_matrix(RequiredInput),
+        metacell_metacell_max_skeleton_fold_distance(GuaranteedOutput),
+    ],
+) function compute_metacells_max_skeleton_fold_distances!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = function_default(
+        compute_metacells_genes_log_linear_fractions!,
+        :gene_fraction_regularization,
+    ),
+    min_significant_gene_UMIs::Integer = 40,
+    fold_confidence::AbstractFloat = 0.9,
+    overwrite::Bool = false,
+)::Nothing
+    @assert gene_fraction_regularization >= 0
+    @assert min_significant_gene_UMIs >= 0
+    @assert 0 < fold_confidence < 1
+
+    covered_fraction_per_skeleton_per_metacell = daf["/ gene & is_skeleton / metacell : covered_fraction"].array
+    covered_UMIs_per_metacell = get_vector(daf, "metacell", "covered_UMIs").array
+
+    confidence_stdevs = quantile(Normal(), fold_confidence)
+
+    confidence_covered_fractions_per_skeleton_per_metacells =  # NOJET
+        confidence_stdevs .* sqrt.(covered_fraction_per_skeleton_per_metacell .* transpose(covered_UMIs_per_metacell)) ./
+        transpose(covered_UMIs_per_metacell)
+
+    low_log_covered_fraction_per_skeleton_per_metacell = # NOJET
+        log2.(
+            max.(
+                covered_fraction_per_skeleton_per_metacell .- confidence_covered_fractions_per_skeleton_per_metacells,
+                0.0,
+            ) .+ gene_fraction_regularization,
+        )
+
+    high_log_covered_fraction_per_skeleton_per_metacell = # NOJET
+        log2.(
+            covered_fraction_per_skeleton_per_metacell .+ confidence_covered_fractions_per_skeleton_per_metacells .+
+            gene_fraction_regularization,
+        )
+
+    UMIs_per_skeleton_per_metacell = daf["/ gene & is_skeleton / metacell : UMIs"].array
+
+    n_skeletons, n_metacells = size(UMIs_per_skeleton_per_metacell)
+
+    distances_between_metacells = Matrix{Float32}(undef, n_metacells, n_metacells)
+    distances_between_metacells[1, 1] = 0.0
+
+    @threads :greedy for base_metacell_index in reverse(2:(n_metacells))
+        distances_between_metacells[base_metacell_index, base_metacell_index] = 0.0
+
+        @views base_metacell_UMIs_per_skeleton = vec(UMIs_per_skeleton_per_metacell[:, base_metacell_index])
+        @views base_metacell_low_log_covered_fraction_per_skeleton =
+            vec(low_log_covered_fraction_per_skeleton_per_metacell[:, base_metacell_index])
+        @views base_metacell_high_log_covered_fraction_per_skeleton =
+            vec(high_log_covered_fraction_per_skeleton_per_metacell[:, base_metacell_index])
+
+        n_other_metacells = base_metacell_index - 1
+        other_metacells_indices = 1:(base_metacell_index - 1)
+        @views UMIs_per_skeleton_per_other_metacells = UMIs_per_skeleton_per_metacell[:, other_metacells_indices]
+        @views low_log_covered_fraction_per_skeleton_per_other_metacells =
+            low_log_covered_fraction_per_skeleton_per_metacell[:, other_metacells_indices]
+        @views high_log_covered_fraction_per_skeleton_per_other_metacells =
+            high_log_covered_fraction_per_skeleton_per_metacell[:, other_metacells_indices]
+
+        significant_fold_per_skeleton_per_other_metacell = confident_gene_distance.(
+            min_significant_gene_UMIs,
+            base_metacell_UMIs_per_skeleton,
+            base_metacell_low_log_covered_fraction_per_skeleton,
+            base_metacell_high_log_covered_fraction_per_skeleton,
+            UMIs_per_skeleton_per_other_metacells,
+            low_log_covered_fraction_per_skeleton_per_other_metacells,
+            high_log_covered_fraction_per_skeleton_per_other_metacells,
+        )
+        @assert_matrix(significant_fold_per_skeleton_per_other_metacell, n_skeletons, n_other_metacells, Columns)
+
+        distances_between_base_and_other_metacells =
+            vec(maximum(significant_fold_per_skeleton_per_other_metacell; dims = 1))
+        @assert_vector(distances_between_base_and_other_metacells, n_other_metacells)
+
+        distances_between_metacells[other_metacells_indices, base_metacell_index] .=
+            distances_between_base_and_other_metacells
+        distances_between_metacells[base_metacell_index, other_metacells_indices] .=
+            distances_between_base_and_other_metacells
+    end
+
+    set_matrix!(daf, "metacell", "metacell", "max_skeleton_fold_distance", distances_between_metacells; overwrite)
+    return nothing
+end
+
+@inline function confident_gene_distance(  # UNTESTED
+    min_significant_gene_UMIs::Integer,
+    base_metacell_total_UMIs_of_gene::Integer,
+    base_metacell_low_log_covered_fraction_of_gene::AbstractFloat,
+    base_metacell_high_log_covered_fraction_of_gene::AbstractFloat,
+    other_metacell_total_UMIs_of_gene::Integer,
+    other_metacell_low_log_covered_fraction_of_gene::AbstractFloat,
+    other_metacell_high_log_covered_fraction_of_gene::AbstractFloat,
+)::AbstractFloat
+    total_UMIs_of_gene = base_metacell_total_UMIs_of_gene + other_metacell_total_UMIs_of_gene
+    is_significant = total_UMIs_of_gene >= min_significant_gene_UMIs
+
+    is_base_low = base_metacell_high_log_covered_fraction_of_gene < other_metacell_high_log_covered_fraction_of_gene
+
+    highest_low_log_covered_fraction_of_gene =
+        is_base_low * base_metacell_high_log_covered_fraction_of_gene +
+        !is_base_low * other_metacell_high_log_covered_fraction_of_gene
+
+    lowest_high_log_covered_fraction_of_gene =
+        is_base_low * other_metacell_low_log_covered_fraction_of_gene +
+        !is_base_low * base_metacell_low_log_covered_fraction_of_gene
+
+    confident_gap = lowest_high_log_covered_fraction_of_gene - highest_low_log_covered_fraction_of_gene
+
+    return (is_significant * max(confident_gap, 0.0))
 end
 
 end  # module

@@ -37,19 +37,4 @@ include("compute_blocks.jl")
 include("analyze_blocks.jl")
 @reexport using .AnalyzeBlocks
 
-#TODOX include("compute_modules.jl")
-#TODOX @reexport using .ComputeModules
-
-#TODOX include("analyze_modules.jl")
-#TODOX @reexport using .AnalyzeModules
-
-#TODOX include("compute_approximation.jl")
-#TODOX @reexport using .ComputeApproximation
-
-#TODOX include("analyze_approximation.jl")
-#TODOX @reexport using .AnalyzeApproximation
-
-#TODOX include("sharpen_metacells.jl")
-#TODOX @reexport using .SharpenMetacells
-
 end # module
