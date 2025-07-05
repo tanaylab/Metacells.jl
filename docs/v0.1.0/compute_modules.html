@@ -5,11 +5,11 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Defaults · Metacells.jl v0.1.0
+<title>Compute Modules · Metacells.jl v0.1.0
 </title>
-<meta name="title" content="Defaults · Metacells.jl v0.1.0"/>
-<meta property="og:title" content="Defaults · Metacells.jl v0.1.0"/>
-<meta property="twitter:title" content="Defaults · Metacells.jl v0.1.0"/>
+<meta name="title" content="Compute Modules · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Compute Modules · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Compute Modules · Metacells.jl v0.1.0"/>
 <meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
 <meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
@@ -80,20 +80,8 @@
 <a class="tocitem" href="analyze_blocks.html">Analyze Blocks
 </a>
 </li>
-<li>
-<a class="tocitem" href="compute_modules.html">Compute Modules
-</a>
-</li>
-<li>
-<a class="tocitem" href="analyze_modules.html">Analyze Modules
-</a>
-</li>
-<li>
-<a class="tocitem" href="anndata_format.html">AnnData Format
-</a>
-</li>
 <li class="is-active">
-<a class="tocitem" href="defaults.html">Defaults
+<a class="tocitem" href="compute_modules.html">Compute Modules
 </a>
 <ul class="internal">
 <li>
@@ -103,6 +91,18 @@
 </a>
 </li>
 </ul>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
 </li>
 </ul>
 <div class="docs-version-selector field has-addons">
@@ -125,13 +125,13 @@
 <nav class="breadcrumb">
 <ul class="is-hidden-mobile">
 <li class="is-active">
-<a href="defaults.html">Defaults
+<a href="compute_modules.html">Compute Modules
 </a>
 </li>
 </ul>
 <ul class="is-hidden-tablet">
 <li class="is-active">
-<a href="defaults.html">Defaults
+<a href="compute_modules.html">Compute Modules
 </a>
 </li>
 </ul>
@@ -150,20 +150,20 @@
 </div>
 </header>
 <article class="content" id="documenter-page">
-<h1 id="Defaults">
-<a class="docs-heading-anchor" href="#Defaults">Defaults
+<h1 id="Compute-Modules">
+<a class="docs-heading-anchor" href="#Compute-Modules">Compute Modules
 </a>
-<a id="Defaults-1">
+<a id="Compute-Modules-1">
 </a>
-<a class="docs-heading-anchor-permalink" href="#Defaults" title="Permalink">
+<a class="docs-heading-anchor-permalink" href="#Compute-Modules" title="Permalink">
 </a>
 </h1>
 <article class="docstring">
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Defaults" href="#Metacells.Defaults">
-<code>Metacells.Defaults
+<a class="docstring-binding" id="Metacells.ComputeModules" href="#Metacells.ComputeModules">
+<code>Metacells.ComputeModules
 </code>
 </a> — 
 <span class="docstring-category">Module
@@ -173,7 +173,7 @@
 </header>
 <section>
 <div>
-<p>Default values for parameters.
+<p>Group covered genes in each environment to modules, each associated with some anchor gene.
 </p>
 </div>
 </section>
@@ -182,38 +182,160 @@
 <header>
 <a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
 </a>
-<a class="docstring-binding" id="Metacells.Defaults.GENE_FRACTION_REGULARIZATION" href="#Metacells.Defaults.GENE_FRACTION_REGULARIZATION">
-<code>Metacells.Defaults.GENE_FRACTION_REGULARIZATION
+<a class="docstring-binding" id="Metacells.ComputeModules.compute_blocks_modules!" href="#Metacells.ComputeModules.compute_blocks_modules!">
+<code>Metacells.ComputeModules.compute_blocks_modules!
 </code>
 </a> — 
-<span class="docstring-category">Constant
+<span class="docstring-category">Function
 </span>
 <span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
 </span>
 </header>
 <section>
 <div>
-<p>When computing log (base 2) of the fraction of the gene expression out of the total, we use this regularization factor by default top avoid zero values.
+<pre>
+<code class="language-julia hljs">function compute_blocks_modules!(
+    daf::DafWriter;
+    mean_genes_per_cluster::Integer = ```200```,
+    anchor_correlation_genes::Integer = ```30```,
+    min_anchor_correlation_genes_fraction::AbstractFloat = ```0.05```,
+    max_anchor_correlation_genes_fraction::AbstractFloat = ```0.5```,
+    min_gene_migration_correlation::AbstractFloat = ```0.7```,
+    max_anchor_kept_cluster_genes_baseline::Integer = ```100```,
+    min_anchor_kept_cluster_genes_likelihood::AbstractFloat = ```1.5```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Group covered genes in each environment to modules, each associated with some anchor gene.
 </p>
-</div>
-</section>
-</article>
-<article class="docstring">
-<header>
-<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
-</a>
-<a class="docstring-binding" id="Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS" href="#Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS">
-<code>Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS
-</code>
-</a> — 
-<span class="docstring-category">Constant
-</span>
-<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
-</span>
-</header>
-<section>
-<div>
-<p>When comparing gene expression levels (e.g., when computing fold factors), we do not consider the result to be significant unless at least this number of UMIs were used to compute the compared value(s).
+<p>For each block:
+</p>
+<ol>
+<li>Compute the correlation of the expression of the covered genes across all metacells in the block&#39;s environment.
+</li>
+<li>Cluster the genes based on this correlation, using Ward. The number of clusters is such that the mean number of genes per cluster is at least 
+<code>mean_genes_per_cluster
+</code>.
+</li>
+<li>For each cluster, pick an anchor gene out of the skeleton genes. For each skeleton, look at its worst correlation in the top 
+<code>anchor_correlation_genes
+</code> (but at least 
+<code>min_anchor_correlation_genes_fraction
+</code> and at most 
+<code>max_anchor_correlation_genes_fraction
+</code>). Pick as anchor the skeleton gene with the highest result.
+</li>
+<li>For each gene in the cluster, keep it in the anchor&#39;s module if it is more correlated with the anchor than with any other anchor. Any gene with a correlation of more than 
+<code>min_gene_migration_correlation
+</code> with some anchor is moved to the module of its most correlated anchor, regardless of the original cluster it was in.
+</li>
+<li>For each cluster, consider the up to 
+<code>max_anchor_kept_cluster_genes_baseline
+</code> genes most correlated with the cluster&#39;s anchor. If the fraction of the most correlated 
+<code>max_anchor_kept_cluster_genes_baseline
+</code> genes that were kept in the anchor module is less than 
+<code>min_anchor_kept_cluster_genes_likelihood
+</code> times the base fraction of 1/number of anchors, then discard the anchor.
+</li>
+<li>The result is one module per anchor with the genes that were kept from its original cluster or were migrated to it. Some (most) genes will not participate in any module.
+</li>
+</ol>
+<p>We name the resulting modules after their anchor gene for interpretability, but add a 
+<code>.MOD
+</code> suffix to clarify this is the name of a module and not of a gene. It is possible that an anchor in one block will end up being a member of a different anchor&#39;s module in a neighbouring block, or even not to be used in any of the neighbouring block gene modules.
+</p>
+<p>Due to 
+<code>Daf
+</code> limitations, the modules axis must therefore be the union of all the modules from all the blocks, so we provide an 
+<code>is_found
+</code> mask to specify which module is used for each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the (covered) genes.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, the (column) mask of nearby blocks in its expanded environment.
+</p>
+<p>
+<strong>block, gene @ is
+<em>environment
+</em>marker
+</strong>::Bool (required): A mask of covered genes that distinguish between cell states in each environment.
+</p>
+<p>
+<strong>metacell, gene @ log
+<em>covered
+</em>fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each covered gene in each metacell, out of the total covered UMIs.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>module
+</strong> (guaranteed): Groups of genes that together predict the rest of the covered genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>module @ gene.anchor
+</strong>::AbstractString (guaranteed): The anchor gene each module is based on.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (guaranteed): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (guaranteed): The module each gene belongs to in each block.
 </p>
 </div>
 </section>
@@ -227,28 +349,12 @@
 </a>
 </h2>
 <ul>
-<li>
-<a href="defaults.html#Metacells.Defaults">
-<code>Metacells.Defaults
-</code>
-</a>
-</li>
-<li>
-<a href="defaults.html#Metacells.Defaults.GENE_FRACTION_REGULARIZATION">
-<code>Metacells.Defaults.GENE_FRACTION_REGULARIZATION
-</code>
-</a>
-</li>
-<li>
-<a href="defaults.html#Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS">
-<code>Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS
-</code>
-</a>
-</li>
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-prevpage" href="anndata_format.html">« AnnData Format
+<a class="docs-footer-prevpage" href="analyze_blocks.html">« Analyze Blocks
+</a>
+<a class="docs-footer-nextpage" href="analyze_modules.html">Analyze Modules »
 </a>
 <div class="flexbox-break">
 </div>

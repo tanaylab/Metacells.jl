@@ -41,6 +41,8 @@ makedocs(;
         "analyze_metacells.md",
         "compute_blocks.md",
         "analyze_blocks.md",
+        "compute_modules.md",
+        "analyze_modules.md",
         "anndata_format.md",
         "defaults.md",
     ],

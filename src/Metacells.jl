@@ -37,4 +37,10 @@ include("compute_blocks.jl")
 include("analyze_blocks.jl")
 @reexport using .AnalyzeBlocks
 
+include("compute_modules.jl")
+@reexport using .ComputeModules
+
+include("analyze_modules.jl")
+@reexport using .AnalyzeModules
+
 end # module

@@ -95,6 +95,12 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="#Modules">
+<span>Modules
+</span>
+</a>
+</li>
+<li>
 <a class="tocitem" href="#Index">
 <span>Index
 </span>
@@ -116,6 +122,14 @@
 </li>
 <li>
 <a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
 </a>
 </li>
 <li>
@@ -1116,7 +1130,7 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_module_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+<code class="language-julia hljs">metacell_gene_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
 <p>The log base 2 of the linear fraction of the UMIs of each covered gene in each metacell, out of the total covered UMIs. This adds some gene fraction regularization to deal with zero fractions.
@@ -2138,6 +2152,372 @@
 </div>
 </section>
 </article>
+<h2 id="Modules">
+<a class="docs-heading-anchor" href="#Modules">Modules
+</a>
+<a id="Modules-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Modules" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.module_axis" href="#Metacells.Contracts.module_axis">
+<code>Metacells.Contracts.module_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">module_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of modules, which are groups of genes that together can predict the rest of the covered genes. Each module is based on a single anchor regulator gene, and may contain additional regulator and regular genes. The set and composition of modules varies between blocks across the manifold. The names of the modules are the names of their anchors (for interpretability) followed by a 
+<code>.MOD
+</code> suffix (to clarify this is the name of a module and not a gene).
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.module_anchor_gene_vector" href="#Metacells.Contracts.module_anchor_gene_vector">
+<code>Metacells.Contracts.module_anchor_gene_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">module_anchor_gene_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The anchor gene each module is based on. Even though the &quot;same&quot; module in different blocks is based on the same anchor gene, the rest of the composition of the module may vary wildly, even between neighboring blocks.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_module_matrix" href="#Metacells.Contracts.block_gene_module_matrix">
+<code>Metacells.Contracts.block_gene_module_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_module_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The module each gene belongs to in each block. Most genes do not belong to any module and therefore have an empty string as the value.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_is_found_matrix" href="#Metacells.Contracts.block_module_is_found_matrix">
+<code>Metacells.Contracts.block_module_is_found_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_is_found_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of the modules that were found for each block. Due to 
+<code>Daf
+</code> limitations, the modules axis must cover all the modules of all the blocks. This mask specifies which of the modules were actually found for each of the blocks.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_is_strong_matrix" href="#Metacells.Contracts.block_module_is_strong_matrix">
+<code>Metacells.Contracts.block_module_is_strong_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_is_strong_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of the strong modules that have enough UMIs in enough cells. Since cells have much less UMIs than metacells, not all modules have a high enough number of UMIs in enough cells to be useful.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_is_strong!">
+<code>compute_blocks_modules_is_strong!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_n_genes_matrix" href="#Metacells.Contracts.block_module_n_genes_matrix">
+<code>Metacells.Contracts.block_module_n_genes_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_n_genes_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of genes in each gene module in each block. This is zero for the extra (not-found) gene modules.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_n_genes!">
+<code>compute_blocks_modules_n_genes!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_module_n_skeletons_matrix" href="#Metacells.Contracts.block_module_n_skeletons_matrix">
+<code>Metacells.Contracts.block_module_n_skeletons_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_module_n_skeletons_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of skeleton genes in each gene module in each block. This is zero for the extra (not-found) gene modules.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_blocks_modules_n_skeletons!">
+<code>compute_blocks_modules_n_skeletons!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_metacell_module_environment_total_UMIs_tensor" href="#Metacells.Contracts.block_metacell_module_environment_total_UMIs_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_total_UMIs_tensor
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_metacell_module_environment_total_UMIs_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total UMIs of each environment module in each environment metacell. This is zero for metacells that are not part of the block&#39;s environment, or modules that aren&#39;t found in that environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_block_metacell_module_environment_total_UMIs!">
+<code>compute_block_metacell_module_environment_total_UMIs!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_metacell_module_environment_linear_fraction_tensor" href="#Metacells.Contracts.block_metacell_module_environment_linear_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_linear_fraction_tensor
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_metacell_module_environment_linear_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total UMIs. This is zero for metacells that are not part of the block&#39;s environment, or modules that aren&#39;t found in that environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_block_metacell_module_environment_linear_fractions!">
+<code>compute_block_metacell_module_environment_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_metacell_module_environment_log_linear_fraction_tensor" href="#Metacells.Contracts.block_metacell_module_environment_log_linear_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_log_linear_fraction_tensor
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_metacell_module_environment_log_linear_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of the total UMIs. This adds some gene fraction regularization to deal with zero fractions. This is zero for metacells that are not part of the block&#39;s environment, or modules that aren&#39;t found in that environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_block_metacell_module_environment_log_linear_fractions!">
+<code>compute_block_metacell_module_environment_log_linear_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_metacell_module_environment_covered_fraction_tensor" href="#Metacells.Contracts.block_metacell_module_environment_covered_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_covered_fraction_tensor
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_metacell_module_environment_covered_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total covered UMIs. This is zero for metacells that are not part of the block&#39;s environment, or modules that aren&#39;t found in that environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_block_metacell_module_environment_covered_fractions!">
+<code>compute_block_metacell_module_environment_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_metacell_module_environment_log_covered_fraction_tensor" href="#Metacells.Contracts.block_metacell_module_environment_log_covered_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_log_covered_fraction_tensor
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_metacell_module_environment_log_covered_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of the total covered UMIs. This adds some gene fraction regularization to deal with zero fractions. This is zero for metacells that are not part of the block&#39;s environment, or modules that aren&#39;t found in that environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_block_metacell_module_environment_log_covered_fractions!">
+<code>compute_block_metacell_module_environment_log_covered_fractions!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -2222,6 +2602,66 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.block_gene_log_linear_fraction_matrix">
 <code>Metacells.Contracts.block_gene_log_linear_fraction_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_module_matrix">
+<code>Metacells.Contracts.block_gene_module_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_metacell_module_environment_covered_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_covered_fraction_tensor
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_metacell_module_environment_linear_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_linear_fraction_tensor
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_metacell_module_environment_log_covered_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_log_covered_fraction_tensor
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_metacell_module_environment_log_linear_fraction_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_log_linear_fraction_tensor
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_metacell_module_environment_total_UMIs_tensor">
+<code>Metacells.Contracts.block_metacell_module_environment_total_UMIs_tensor
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_is_found_matrix">
+<code>Metacells.Contracts.block_module_is_found_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_is_strong_matrix">
+<code>Metacells.Contracts.block_module_is_strong_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_n_genes_matrix">
+<code>Metacells.Contracts.block_module_n_genes_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_module_n_skeletons_matrix">
+<code>Metacells.Contracts.block_module_n_skeletons_matrix
 </code>
 </a>
 </li>
@@ -2498,6 +2938,18 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.metacell_type_vector">
 <code>Metacells.Contracts.metacell_type_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.module_anchor_gene_vector">
+<code>Metacells.Contracts.module_anchor_gene_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.module_axis">
+<code>Metacells.Contracts.module_axis
 </code>
 </a>
 </li>

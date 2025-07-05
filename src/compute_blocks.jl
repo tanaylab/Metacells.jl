@@ -252,7 +252,7 @@ function compute_blocks_is_in_vicinity!(
                   vicinity_covered_UMIs < min_covered_UMIs_in_vicinity
             vicinity_n_blocks += 1
             next_block_index = ordered_block_indices[vicinity_n_blocks]
-            is_in_vicinity_per_other_block_per_base_block[base_block_index, next_block_index] = true
+            is_in_vicinity_per_other_block_per_base_block[next_block_index, base_block_index] = true
             vicinity_n_metacells += n_metacells_per_block[next_block_index]
             vicinity_covered_UMIs += covered_UMIs_per_block[next_block_index]
         end

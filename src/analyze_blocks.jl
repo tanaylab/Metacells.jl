@@ -586,6 +586,7 @@ A mask of genes that distinguish between cell states in each environment. Otherw
 @logged @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
+        gene_is_covered_vector(RequiredInput),
         block_block_is_in_environment_matrix(RequiredInput),
         metacell_block_vector(RequiredInput),
         metacell_gene_covered_fraction_matrix(RequiredInput),
@@ -605,13 +606,17 @@ A mask of genes that distinguish between cell states in each environment. Otherw
     n_blocks = axis_length(daf, "block")
     name_per_block = axis_vector(daf, "block")
 
-    is_environment_marker_per_gene_per_block = Matrix{Bool}(undef, n_genes, n_blocks)
+    is_environment_marker_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
+    covered_gene_indices = daf["/ gene & is_covered : index"].array
 
     for block_index in 1:n_blocks
         block_name = name_per_block[block_index]
         adapter(  # NOJET
             daf;
-            input_axes = ["metacell" => "/ metacell & block => is_in_environment ;= $(block_name)", "gene" => "="],
+            input_axes = [
+                "metacell" => "/ metacell & block => is_in_environment ;= $(block_name)",
+                "gene" => "/ gene & is_covered",
+            ],
             input_data = [
                 ("metacell", "gene", "linear_fraction") => "covered_fraction",
                 ("metacell", "gene", "log_linear_fraction") => "log_covered_fraction",
@@ -620,7 +625,8 @@ A mask of genes that distinguish between cell states in each environment. Otherw
             output_data = [],
         ) do adapted
             identify_marker_genes!(adapted; min_marker_gene_max_fraction, min_marker_gene_range_fold)
-            is_environment_marker_per_gene_per_block[:, block_index] = get_vector(adapted, "gene", "is_marker").array
+            is_environment_marker_per_gene_per_block[covered_gene_indices, block_index] =
+                get_vector(adapted, "gene", "is_marker").array
             return nothing
         end
     end

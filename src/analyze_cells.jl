@@ -31,7 +31,7 @@ Compute the total UMIs of the genes in each cell.
 $(CONTRACT)
 """
 @logged @computation Contract(;
-    axes = [cell_axis(OptionalInput), gene_axis(RequiredInput)],
+    axes = [cell_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
         gene_is_excluded_vector(RequiredInput),
         cell_gene_UMIs_matrix(RequiredInput),
@@ -57,7 +57,7 @@ Compute the total UMIs of the covered genes in each cell.
 $(CONTRACT)
 """
 @logged @computation Contract(;
-    axes = [cell_axis(OptionalInput), gene_axis(RequiredInput)],
+    axes = [cell_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
         cell_gene_UMIs_matrix(RequiredInput),
         gene_is_covered_vector(RequiredInput),

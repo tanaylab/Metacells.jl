@@ -34,6 +34,13 @@ export block_gene_linear_fraction_matrix
 export block_gene_log_covered_fraction_matrix
 export block_gene_log_linear_fraction_matrix
 export block_gene_UMIs_matrix
+export block_metacell_module_environment_covered_fraction_tensor
+export block_metacell_module_environment_linear_fraction_tensor
+export block_metacell_module_environment_log_covered_fraction_tensor
+export block_metacell_module_environment_log_linear_fraction_tensor
+export block_metacell_module_environment_total_UMIs_tensor
+export block_module_n_genes_matrix
+export block_module_n_skeletons_matrix
 export block_n_cells_vector
 export block_n_environment_blocks_vector
 export block_n_environment_cells_vector
@@ -70,9 +77,9 @@ export metacell_block_vector
 export metacell_covered_UMIs_vector
 export metacell_gene_covered_fraction_matrix
 export metacell_gene_geomean_fraction_matrix
-export metacell_gene_log_geomean_fraction_matrix
 export metacell_gene_linear_fraction_matrix
 export metacell_gene_log_covered_fraction_matrix
+export metacell_gene_log_geomean_fraction_matrix
 export metacell_gene_log_linear_fraction_matrix
 export metacell_gene_UMIs_matrix
 export metacell_metacell_euclidean_skeleton_distance
@@ -541,7 +548,7 @@ function metacell_gene_covered_fraction_matrix(expectation::ContractExpectation)
 end
 
 """
-    metacell_module_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+    metacell_gene_log_covered_fraction_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
 
 The log base 2 of the linear fraction of the UMIs of each covered gene in each metacell, out of the total
 covered UMIs. This adds some gene fraction regularization to deal with zero fractions.
@@ -997,6 +1004,193 @@ metacell types in each block.
 """
 function block_type_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "type") => (expectation, AbstractString, "The type each block belongs to.")
+end
+
+## Gene Modules
+
+"""
+    module_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+
+The axis of modules, which are groups of genes that together can predict the rest of the covered genes. Each module is
+based on a single anchor regulator gene, and may contain additional regulator and regular genes. The set and composition
+of modules varies between blocks across the manifold. The names of the modules are the names of their anchors (for
+interpretability) followed by a `.MOD` suffix (to clarify this is the name of a module and not a gene).
+"""
+function module_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
+    return "module" => (expectation, "Groups of genes that together predict the rest of the covered genes.")
+end
+
+"""
+    module_anchor_gene_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The anchor gene each module is based on. Even though the "same" module in different blocks is based on the same anchor
+gene, the rest of the composition of the module may vary wildly, even between neighboring blocks.
+
+This matrix is populated by [`compute_blocks_modules!`](@ref Metacells.ComputeModules.compute_blocks_modules!).
+"""
+function module_anchor_gene_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("module", "gene.anchor") => (expectation, AbstractString, "The anchor gene each module is based on.")
+end
+
+"""
+    block_module_is_found_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+A mask of the modules that were found for each block. Due to `Daf` limitations, the modules axis must cover all the
+modules of all the blocks. This mask specifies which of the modules were actually found for each of the blocks.
+
+This matrix is populated by [`compute_blocks_modules!`](@ref Metacells.ComputeModules.compute_blocks_modules!).
+"""
+function block_module_is_found_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "module", "is_found") =>
+        (expectation, Bool, "A mask of the modules that were found for each block.")
+end
+
+"""
+    block_gene_module_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The module each gene belongs to in each block. Most genes do not belong to any module and therefore
+have an empty string as the value.
+
+This matrix is populated by [`compute_blocks_modules!`](@ref Metacells.ComputeModules.compute_blocks_modules!).
+"""
+function block_gene_module_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "gene", "module") =>
+        (expectation, AbstractString, "The module each gene belongs to in each block.")
+end
+
+"""
+    block_module_is_strong_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+A mask of the strong modules that have enough UMIs in enough cells. Since cells have much less UMIs than metacells,
+not all modules have a high enough number of UMIs in enough cells to be useful.
+
+This matrix is populated by [`compute_blocks_modules_is_strong!`](@ref
+Metacells.AnalyzeModules.compute_blocks_modules_is_strong!).
+"""
+function block_module_is_strong_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "module", "is_strong") =>
+        (expectation, Bool, "A mask of the modules that have enough UMIs in enough cells.")
+end
+
+"""
+    block_module_n_genes_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The number of genes in each gene module in each block. This is zero for the extra (not-found) gene modules.
+
+This matrix is populated by [`compute_blocks_modules_n_genes!`](@ref
+Metacells.AnalyzeModules.compute_blocks_modules_n_genes!).
+"""
+function block_module_n_genes_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "module", "n_genes") =>
+        (expectation, StorageUnsigned, "The number of genes in each gene module in each block.")
+end
+
+"""
+    block_module_n_skeletons_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The number of skeleton genes in each gene module in each block. This is zero for the extra (not-found) gene modules.
+
+This matrix is populated by [`compute_blocks_modules_n_skeletons!`](@ref
+Metacells.AnalyzeModules.compute_blocks_modules_n_skeletons!).
+"""
+function block_module_n_skeletons_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "module", "n_skeletons") =>
+        (expectation, StorageUnsigned, "The number of skeleton genes in each gene module in each block.")
+end
+
+"""
+    block_metacell_module_environment_total_UMIs_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The total UMIs of each environment module in each environment metacell. This is zero for metacells that are not part of
+the block's environment, or modules that aren't found in that environment.
+
+This vector is populated by [`compute_block_metacell_module_environment_total_UMIs!`](@ref
+Metacells.AnalyzeModules.compute_block_metacell_module_environment_total_UMIs!).
+"""
+function block_metacell_module_environment_total_UMIs_tensor(
+    expectation::ContractExpectation,
+)::Pair{TensorKey, DataSpecification}
+    return ("block", "metacell", "module", "total_UMIs") =>
+        (expectation, StorageUnsigned, "The total UMIs of each environment module in each environment metacell.")
+end
+
+"""
+    block_metacell_module_environment_linear_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total UMIs. This is zero
+for metacells that are not part of the block's environment, or modules that aren't found in that environment.
+
+This vector is populated by [`compute_block_metacell_module_environment_linear_fractions!`](@ref
+Metacells.AnalyzeModules.compute_block_metacell_module_environment_linear_fractions!).
+"""
+function block_metacell_module_environment_linear_fraction_tensor(
+    expectation::ContractExpectation,
+)::Pair{TensorKey, DataSpecification}
+    return ("block", "metacell", "module", "linear_fraction") => (
+        expectation,
+        StorageFloat,
+        "The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total UMIs.",
+    )
+end
+
+"""
+    block_metacell_module_environment_log_linear_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of
+the total UMIs. This adds some gene fraction regularization to deal with zero fractions. This is zero for metacells that
+are not part of the block's environment, or modules that aren't found in that environment.
+
+This vector is populated by [`compute_block_metacell_module_environment_log_linear_fractions!`](@ref
+Metacells.AnalyzeModules.compute_block_metacell_module_environment_log_linear_fractions!).
+"""
+function block_metacell_module_environment_log_linear_fraction_tensor(
+    expectation::ContractExpectation,
+)::Pair{TensorKey, DataSpecification}
+    return ("block", "metacell", "module", "log_linear_fraction") => (
+        expectation,
+        StorageFloat,
+        "The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of the total UMIs.",
+    )
+end
+
+"""
+    block_metacell_module_environment_covered_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total covered
+UMIs. This is zero for metacells that are not part of the block's environment, or modules that aren't found in that
+environment.
+
+This vector is populated by [`compute_block_metacell_module_environment_covered_fractions!`](@ref
+Metacells.AnalyzeModules.compute_block_metacell_module_environment_covered_fractions!).
+"""
+function block_metacell_module_environment_covered_fraction_tensor(
+    expectation::ContractExpectation,
+)::Pair{TensorKey, DataSpecification}
+    return ("block", "metacell", "module", "covered_fraction") => (
+        expectation,
+        StorageFloat,
+        "The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total covered UMIs.",
+    )
+end
+
+"""
+    block_metacell_module_environment_log_covered_fraction_tensor(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+
+The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of
+the total covered UMIs. This adds some gene fraction regularization to deal with zero fractions. This is zero for
+metacells that are not part of the block's environment, or modules that aren't found in that environment.
+
+This vector is populated by [`compute_block_metacell_module_environment_log_covered_fractions!`](@ref
+Metacells.AnalyzeModules.compute_block_metacell_module_environment_log_covered_fractions!).
+"""
+function block_metacell_module_environment_log_covered_fraction_tensor(
+    expectation::ContractExpectation,
+)::Pair{TensorKey, DataSpecification}
+    return ("block", "metacell", "module", "log_covered_fraction") => (
+        expectation,
+        StorageFloat,
+        "The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of the total covered UMIs.",
+    )
 end
 
 end  # module

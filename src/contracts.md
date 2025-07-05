@@ -144,6 +144,23 @@ Metacells.Contracts.cell_type_vector
 Metacells.Contracts.block_type_vector
 ```
 
+## Modules
+
+```@docs
+Metacells.Contracts.module_axis
+Metacells.Contracts.module_anchor_gene_vector
+Metacells.Contracts.block_gene_module_matrix
+Metacells.Contracts.block_module_is_found_matrix
+Metacells.Contracts.block_module_is_strong_matrix
+Metacells.Contracts.block_module_n_genes_matrix
+Metacells.Contracts.block_module_n_skeletons_matrix
+Metacells.Contracts.block_metacell_module_environment_total_UMIs_tensor
+Metacells.Contracts.block_metacell_module_environment_linear_fraction_tensor
+Metacells.Contracts.block_metacell_module_environment_log_linear_fraction_tensor
+Metacells.Contracts.block_metacell_module_environment_covered_fraction_tensor
+Metacells.Contracts.block_metacell_module_environment_log_covered_fraction_tensor
+```
+
 ## Index
 
 ```@index
