@@ -65,6 +65,16 @@ Metacells.AnalyzeBlocks.compute_blocks_mean_euclidean_distances!
 Metacells.AnalyzeBlocks.compute_blocks_max_skeleton_fold_distances!
 ```
 
+## Correlations
+
+```@docs
+Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!
+Metacells.AnalyzeBlocks.compute_blocks_genes_is_correlated_with_metacells
+Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!
+Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!
+Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!
+```
+
 ## Index
 
 ```@index

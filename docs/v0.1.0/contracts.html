@@ -133,6 +133,10 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
+</a>
+</li>
+<li>
 <a class="tocitem" href="anndata_format.html">AnnData Format
 </a>
 </li>
@@ -1990,6 +1994,158 @@
 </div>
 </section>
 </article>
+<h3 id="Blocks-Correlations">
+<a class="docs-heading-anchor" href="#Blocks-Correlations">Blocks Correlations
+</a>
+<a id="Blocks-Correlations-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-Correlations" title="Permalink">
+</a>
+</h3>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_neighborhood_correlation_matrix" href="#Metacells.Contracts.block_gene_neighborhood_correlation_matrix">
+<code>Metacells.Contracts.block_gene_neighborhood_correlation_matrix
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_neighborhood_correlation_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between cells and metacells gene expression levels in each block&#39;s neighborhood. This is zero for excluded genes.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!">
+<code>compute_blocks_genes_neighborhood_correlations!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_gene_is_correlated_with_metacells" href="#Metacells.Contracts.block_gene_is_correlated_with_metacells">
+<code>Metacells.Contracts.block_gene_is_correlated_with_metacells
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_gene_is_correlated_with_metacells(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>Whether each gene is strongly correlated between cells and metacells in each neighborhood.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_mean_neighborhood_correlation_vector" href="#Metacells.Contracts.block_mean_neighborhood_correlation_vector">
+<code>Metacells.Contracts.block_mean_neighborhood_correlation_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_mean_neighborhood_correlation_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The mean correlation between cells and metacells gene expression levels in each block&#39;s neighborhood.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!">
+<code>compute_blocks_mean_neighborhood_correlations!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_mean_covered_neighborhood_correlation_vector" href="#Metacells.Contracts.block_mean_covered_neighborhood_correlation_vector">
+<code>Metacells.Contracts.block_mean_covered_neighborhood_correlation_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_mean_neighborhood_covered_correlation_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The mean correlation between cells and metacells covered gene expression levels in each block&#39;s neighborhood.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!">
+<code>compute_blocks_mean_covered_neighborhood_correlations!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.Contracts.block_mean_modules_neighborhood_correlation_vector" href="#Metacells.Contracts.block_mean_modules_neighborhood_correlation_vector">
+<code>Metacells.Contracts.block_mean_modules_neighborhood_correlation_vector
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_mean_neighborhood_modules_correlation_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The mean correlation between cells and metacells modules gene expression levels in each block&#39;s neighborhood.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!">
+<code>compute_blocks_mean_modules_neighborhood_correlations!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</article>
 <h2 id="Type-Annotations">
 <a class="docs-heading-anchor" href="#Type-Annotations">Type Annotations
 </a>
@@ -2582,6 +2738,12 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.block_gene_is_correlated_with_metacells">
+<code>Metacells.Contracts.block_gene_is_correlated_with_metacells
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.block_gene_is_environment_marker_matrix">
 <code>Metacells.Contracts.block_gene_is_environment_marker_matrix
 </code>
@@ -2608,6 +2770,30 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.block_gene_module_matrix">
 <code>Metacells.Contracts.block_gene_module_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_gene_neighborhood_correlation_matrix">
+<code>Metacells.Contracts.block_gene_neighborhood_correlation_matrix
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_mean_covered_neighborhood_correlation_vector">
+<code>Metacells.Contracts.block_mean_covered_neighborhood_correlation_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_mean_modules_neighborhood_correlation_vector">
+<code>Metacells.Contracts.block_mean_modules_neighborhood_correlation_vector
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_mean_neighborhood_correlation_vector">
+<code>Metacells.Contracts.block_mean_neighborhood_correlation_vector
 </code>
 </a>
 </li>

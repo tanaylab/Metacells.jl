@@ -5,13 +5,18 @@ module AnalyzeBlocks
 
 export compute_blocks_covered_UMIs!
 export compute_blocks_genes_covered_fractions!
+export compute_blocks_genes_is_correlated_with_metacells
 export compute_blocks_genes_is_environment_markers!
 export compute_blocks_genes_linear_fractions!
 export compute_blocks_genes_log_covered_fractions!
 export compute_blocks_genes_log_linear_fractions!
+export compute_blocks_genes_neighborhood_correlations!
 export compute_blocks_genes_UMIs!
 export compute_blocks_max_skeleton_fold_distances!
+export compute_blocks_mean_covered_neighborhood_correlations!
 export compute_blocks_mean_euclidean_distances!
+export compute_blocks_mean_modules_neighborhood_correlations!
+export compute_blocks_mean_neighborhood_correlations!
 export compute_blocks_n_cells!
 export compute_blocks_n_environment_blocks!
 export compute_blocks_n_environment_cells!
@@ -40,11 +45,17 @@ import Metacells.Contracts.block_block_max_skeleton_fold_distance
 import Metacells.Contracts.block_block_mean_euclidean_skeleton_distance
 import Metacells.Contracts.block_covered_UMIs_vector
 import Metacells.Contracts.block_gene_covered_fraction_matrix
+import Metacells.Contracts.block_gene_is_correlated_with_metacells
 import Metacells.Contracts.block_gene_is_environment_marker_matrix
 import Metacells.Contracts.block_gene_linear_fraction_matrix
 import Metacells.Contracts.block_gene_log_covered_fraction_matrix
 import Metacells.Contracts.block_gene_log_linear_fraction_matrix
+import Metacells.Contracts.block_gene_module_matrix
+import Metacells.Contracts.block_gene_neighborhood_correlation_matrix
 import Metacells.Contracts.block_gene_UMIs_matrix
+import Metacells.Contracts.block_mean_covered_neighborhood_correlation_vector
+import Metacells.Contracts.block_mean_modules_neighborhood_correlation_vector
+import Metacells.Contracts.block_mean_neighborhood_correlation_vector
 import Metacells.Contracts.block_n_cells_vector
 import Metacells.Contracts.block_n_environment_blocks_vector
 import Metacells.Contracts.block_n_environment_cells_vector
@@ -55,12 +66,17 @@ import Metacells.Contracts.block_n_neighborhood_cells_vector
 import Metacells.Contracts.block_n_neighborhood_metacells_vector
 import Metacells.Contracts.block_total_UMIs_vector
 import Metacells.Contracts.block_type_vector
+import Metacells.Contracts.cell_axis
+import Metacells.Contracts.cell_gene_UMIs_matrix
+import Metacells.Contracts.cell_metacell_vector
+import Metacells.Contracts.cell_total_UMIs_vector
 import Metacells.Contracts.gene_axis
 import Metacells.Contracts.gene_is_covered_vector
 import Metacells.Contracts.gene_is_excluded_vector
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.metacell_block_vector
 import Metacells.Contracts.metacell_gene_covered_fraction_matrix
+import Metacells.Contracts.metacell_gene_linear_fraction_matrix
 import Metacells.Contracts.metacell_gene_log_covered_fraction_matrix
 import Metacells.Contracts.metacell_gene_UMIs_matrix
 import Metacells.Contracts.metacell_metacell_euclidean_skeleton_distance
@@ -607,7 +623,7 @@ A mask of genes that distinguish between cell states in each environment. Otherw
     name_per_block = axis_vector(daf, "block")
 
     is_environment_marker_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
-    covered_gene_indices = daf["/ gene & is_covered : index"].array
+    covered_gene_indices = daf["/ gene & is_covered : index"].array # TODOX - kill covered
 
     for block_index in 1:n_blocks
         block_name = name_per_block[block_index]
@@ -725,6 +741,213 @@ function do_compute_blocks_UMIs(
     end
     UMIs_per_block = UInt32.(vec(sum(UMIs_per_gene_per_block; dims = 1)))
     set_vector!(daf, "block", "$(qualifier)_UMIs", UMIs_per_block; overwrite)
+    return nothing
+end
+
+"""
+    compute_blocks_genes_neighborhood_correlations!(
+        daf::DafWriter;
+        overwrite::Bool,
+    )::Nothing
+
+The correlation between cells and metacells gene expression levels in each block's neighborhood.
+"""
+@logged @computation Contract(
+    axes = [
+        block_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        gene_axis(RequiredInput),
+    ],
+    data = [
+        cell_metacell_vector(RequiredInput),
+        cell_total_UMIs_vector(RequiredInput),
+        metacell_block_vector(RequiredInput),
+        block_block_is_in_neighborhood_matrix(RequiredInput),
+        metacell_gene_linear_fraction_matrix(RequiredInput),
+        gene_is_excluded_vector(RequiredInput),
+        cell_gene_UMIs_matrix(RequiredInput),
+        block_gene_neighborhood_correlation_matrix(GuaranteedOutput),
+    ],
+) function compute_blocks_genes_neighborhood_correlations!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    n_genes = axis_length(daf, "gene")
+    n_blocks = axis_length(daf, "block")
+    name_per_block = axis_vector(daf, "block")
+
+    included_gene_indices = daf["/ gene &! is_excluded : index"].array
+
+    metacell_index_per_cell = daf["/ cell : metacell ?? 0 => index"].array
+    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs")
+    UMIs_per_cell_per_included_gene = daf["/ cell / gene &! is_excluded : UMIs"].array
+    fraction_per_metacell_per_included_gene = daf["/ metacell / gene &! is_excluded : linear_fraction"].array
+
+    correlation_per_gene_per_block = zeros(Float32, n_genes, n_blocks)
+
+    @threads :greedy for block_index in 1:n_blocks
+        block_name = name_per_block[block_index]
+
+        neighborhood_cell_indices =
+            daf["/ cell & metacell ?? => block => is_in_neighborhood ;= $(block_name) : index"].array
+
+        if length(neighborhood_cell_indices) == 0
+            @debug "Block: $(block_name) Mean correlation: NA"
+        else
+            metacell_index_per_neighborhood_cell = metacell_index_per_cell[neighborhood_cell_indices]
+            @views metacell_fraction_per_neighborhood_cell_per_included_gene =
+                fraction_per_metacell_per_included_gene[metacell_index_per_neighborhood_cell, :]
+
+            @views UMIs_per_neighborhood_cell_per_included_gene =
+                UMIs_per_cell_per_included_gene[neighborhood_cell_indices, :]
+            total_UMIs_per_neighborhood_cell = vec(total_UMIs_per_cell[neighborhood_cell_indices])
+            cell_fraction_per_neighborhood_cell_per_included_gene =
+                UMIs_per_neighborhood_cell_per_included_gene ./ total_UMIs_per_neighborhood_cell
+
+            correlation_per_included_gene = cor.(
+                eachcol(cell_fraction_per_neighborhood_cell_per_included_gene),
+                eachcol(metacell_fraction_per_neighborhood_cell_per_included_gene),
+            )
+            correlation_per_included_gene[isnan.(correlation_per_included_gene)] .= 0
+            correlation_per_gene_per_block[included_gene_indices, block_index] .= correlation_per_included_gene
+
+            @debug "Block: $(block_name) Mean correlation: $(mean(correlation_per_included_gene))"  # NOLINT
+        end
+    end
+
+    set_matrix!(daf, "gene", "block", "neighborhood_correlation", bestify(correlation_per_gene_per_block); overwrite)
+    return nothing
+end
+
+"""
+    compute_blocks_mean_neighborhood_correlations!(
+        daf::DafWriter;
+        overwrite::Bool = false
+    )::Nothing
+
+The mean correlation between cells and metacells gene expression levels in each block's neighborhood.
+"""
+@logged @computation Contract(
+    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        gene_is_excluded_vector(RequiredInput),
+        block_gene_neighborhood_correlation_matrix(RequiredInput),
+        block_mean_neighborhood_correlation_vector(GuaranteedOutput),
+    ],
+) function compute_blocks_mean_neighborhood_correlations!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    mean_neighborhood_correlation_per_block =
+        daf["/ gene &! is_excluded / block : neighborhood_correlation %> Mean"].array
+
+    set_vector!(daf, "block", "mean_neighborhood_correlation", mean_neighborhood_correlation_per_block; overwrite)
+
+    @debug "Mean mean_neighborhood_correlation_per_block: $(mean(mean_neighborhood_correlation_per_block))"  # NOLINT
+    return nothing
+end
+
+"""
+    compute_blocks_mean_covered_neighborhood_correlations!(
+        daf::DafWriter;
+        overwrite::Bool = false
+    )::Nothing
+
+The mean correlation between cells and metacells gene expression levels in each block's neighborhood.
+"""
+@logged @computation Contract(
+    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        gene_is_covered_vector(RequiredInput),
+        block_gene_neighborhood_correlation_matrix(RequiredInput),
+        block_mean_covered_neighborhood_correlation_vector(GuaranteedOutput),
+    ],
+) function compute_blocks_mean_covered_neighborhood_correlations!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    mean_covered_neighborhood_correlation_per_block =
+        daf["/ gene & is_covered / block : neighborhood_correlation %> Mean"].array
+
+    set_vector!(
+        daf,
+        "block",
+        "mean_covered_neighborhood_correlation",
+        mean_covered_neighborhood_correlation_per_block;
+        overwrite,
+    )
+
+    @debug "Mean mean_covered_neighborhood_correlation_per_block: $(mean(mean_covered_neighborhood_correlation_per_block))"  # NOLINT
+    return nothing
+end
+
+"""
+    compute_blocks_mean_modules_neighborhood_correlations!(
+        daf::DafWriter;
+        overwrite::Bool = false
+    )::Nothing
+
+The mean correlation between cells and metacells gene expression levels in each block's neighborhood.
+"""
+@logged @computation Contract(
+    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        block_gene_module_matrix(RequiredInput),
+        block_gene_neighborhood_correlation_matrix(RequiredInput),
+        block_mean_modules_neighborhood_correlation_vector(GuaranteedOutput),
+    ],
+) function compute_blocks_mean_modules_neighborhood_correlations!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    n_blocks = axis_length(daf, "block")
+
+    neighborhood_correlation_per_gene_per_block = get_matrix(daf, "gene", "block", "neighborhood_correlation").array
+    module_per_gene_per_block = get_matrix(daf, "gene", "block", "module")
+
+    mean_modules_neighborhood_correlation_per_block = Vector{Float32}(undef, n_blocks)
+
+    @threads :greedy for block_index in 1:n_blocks
+        @views module_per_gene_of_block = module_per_gene_per_block[:, block_index]
+        module_genes_mask = module_per_gene_of_block .!= ""
+        @views neighborhood_correlation_per_module_gene_per_block =
+            neighborhood_correlation_per_gene_per_block[module_genes_mask, :]
+
+        mean_modules_neighborhood_correlation_per_block = mean(neighborhood_correlation_per_module_gene_per_block)  # NOLINT
+    end
+
+    set_vector!(
+        daf,
+        "block",
+        "mean_modules_neighborhood_correlation",
+        mean_modules_neighborhood_correlation_per_block;
+        overwrite,
+    )
+
+    @debug "Mean mean_modules_neighborhood_correlation_per_block: $(mean(mean_modules_neighborhood_correlation_per_block))"  # NOLINT
+    return nothing
+end
+
+"""
+    compute_blocks_genes_is_correlated_with_metacells(
+        Daf::DafWriter;
+        min_correlation::AbstractFloat = $(DEFAULT.min_correlation),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Whether each gene is strongly correlated between cells and metacells in each neighborhood.
+"""
+@logged @computation Contract(
+    axes = [block_axis(RequiredInput), gene_axis(RequiredInput)],
+    data = [
+        block_gene_neighborhood_correlation_matrix(RequiredInput),
+        block_gene_is_correlated_with_metacells(GuaranteedOutput),
+    ],
+) function compute_blocks_genes_is_correlated_with_metacells(
+    daf::DafWriter;
+    min_correlation::AbstractFloat = 0.2,
+    overwrite::Bool = false,
+)::Nothing
+    @assert 0 <= min_correlation <= 1
+    correlation_per_gene_per_block = get_matrix(daf, "gene", "block", "neighborhood_correlation")
+    is_correlated_per_gene_per_block = correlation_per_gene_per_block .>= min_correlation
+    set_matrix!(
+        daf,
+        "gene",
+        "block",
+        "is_correlated_with_metacells",
+        bestify(is_correlated_per_gene_per_block);
+        overwrite,
+    )
     return nothing
 end
 

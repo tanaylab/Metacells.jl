@@ -56,6 +56,7 @@ makedocs(;
         "analyze_blocks.md",
         "compute_modules.md",
         "analyze_modules.md",
+        "sharpen_metacells.md",
         "anndata_format.md",
         "defaults.md",
     ],

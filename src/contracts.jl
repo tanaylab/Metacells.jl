@@ -29,11 +29,17 @@ export block_block_max_skeleton_fold_distance
 export block_block_mean_euclidean_skeleton_distance
 export block_covered_UMIs_vector
 export block_gene_covered_fraction_matrix
+export block_gene_is_correlated_with_metacells
 export block_gene_is_environment_marker_matrix
 export block_gene_linear_fraction_matrix
 export block_gene_log_covered_fraction_matrix
 export block_gene_log_linear_fraction_matrix
+export block_gene_module_matrix
+export block_gene_neighborhood_correlation_matrix
 export block_gene_UMIs_matrix
+export block_mean_covered_neighborhood_correlation_vector
+export block_mean_modules_neighborhood_correlation_vector
+export block_mean_neighborhood_correlation_vector
 export block_metacell_module_environment_covered_fraction_tensor
 export block_metacell_module_environment_linear_fraction_tensor
 export block_metacell_module_environment_log_covered_fraction_tensor
@@ -933,6 +939,93 @@ Metacells.AnalyzeBlocks.compute_blocks_genes_is_environment_markers!).
 function block_gene_is_environment_marker_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("block", "gene", "is_environment_marker") =>
         (expectation, Bool, "A mask of covered genes that distinguish between cell states in each environment.")
+end
+
+### Blocks Correlations
+
+"""
+    block_gene_neighborhood_correlation_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The correlation between cells and metacells gene expression levels in each block's neighborhood. This is zero for excluded genes.
+
+This matrix is populated by [`compute_blocks_genes_neighborhood_correlations!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!).
+"""
+function block_gene_neighborhood_correlation_matrix(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "gene", "neighborhood_correlation") => (
+        expectation,
+        StorageFloat,
+        "The correlation between cells and metacells gene expression levels in each block's neighborhood.",
+    )
+end
+
+"""
+    block_mean_neighborhood_correlation_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The mean correlation between cells and metacells gene expression levels in each block's neighborhood.
+
+This matrix is populated by [`compute_blocks_mean_neighborhood_correlations!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!).
+"""
+function block_mean_neighborhood_correlation_vector(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}  # untested
+    return ("block", "mean_neighborhood_correlation") => (
+        expectation,
+        StorageFloat,
+        "The mean correlation between cells and metacells gene expression levels in each block's neighborhood.",
+    )
+end
+
+"""
+    block_mean_neighborhood_covered_correlation_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The mean correlation between cells and metacells covered gene expression levels in each block's neighborhood.
+
+This matrix is populated by [`compute_blocks_mean_covered_neighborhood_correlations!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!).
+"""
+function block_mean_covered_neighborhood_correlation_vector(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}  # untested
+    return ("block", "mean_covered_neighborhood_correlation") => (
+        expectation,
+        StorageFloat,
+        "The mean correlation between cells and metacells covered gene expression levels in each block's neighborhood.",
+    )
+end
+
+"""
+    block_mean_neighborhood_modules_correlation_vector(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+The mean correlation between cells and metacells modules gene expression levels in each block's neighborhood.
+
+This matrix is populated by [`compute_blocks_mean_modules_neighborhood_correlations!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!).
+"""
+function block_mean_modules_neighborhood_correlation_vector(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}  # untested
+    return ("block", "mean_modules_neighborhood_correlation") => (
+        expectation,
+        StorageFloat,
+        "The mean correlation between cells and metacells modules gene expression levels in each block's neighborhood.",
+    )
+end
+
+"""
+    block_gene_is_correlated_with_metacells(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+
+Whether each gene is strongly correlated between cells and metacells in each neighborhood.
+"""
+function block_gene_is_correlated_with_metacells(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "gene", "is_correlated_with_metacells") => (
+        expectation,
+        Bool,
+        "Whether each gene is strongly correlated between cells and metacells in each neighborhood.",
+    )
 end
 
 ## Type Annotations

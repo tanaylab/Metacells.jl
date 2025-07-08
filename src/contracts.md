@@ -134,6 +134,16 @@ Metacells.Contracts.block_n_environment_cells_vector
 Metacells.Contracts.block_gene_is_environment_marker_matrix
 ```
 
+### Blocks Correlations
+
+```@docs
+Metacells.Contracts.block_gene_neighborhood_correlation_matrix
+Metacells.Contracts.block_gene_is_correlated_with_metacells
+Metacells.Contracts.block_mean_neighborhood_correlation_vector
+Metacells.Contracts.block_mean_covered_neighborhood_correlation_vector
+Metacells.Contracts.block_mean_modules_neighborhood_correlation_vector
+```
+
 ## Type Annotations
 
 ```@docs

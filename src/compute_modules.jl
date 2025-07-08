@@ -8,6 +8,7 @@ export compute_blocks_modules!
 using Base.Threads
 using Clustering
 using DataAxesFormats
+using Distances
 using TanayLabUtilities
 using StatsBase
 
@@ -60,6 +61,8 @@ For each block:
     1/number of anchors, then discard the anchor.
  6. The result is one module per anchor with the genes that were kept from its original cluster or were migrated to it.
     Some (most) genes will not participate in any module.
+
+TODOX Euclidean
 
 We name the resulting modules after their anchor gene for interpretability, but add a `.MOD` suffix to clarify this is
 the name of a module and not of a gene. It is possible that an anchor in one block will end up being a member of a
@@ -201,11 +204,12 @@ function compute_block_modules!(
         skeleton_indices = findall(is_skeleton_per_gene)
         @assert length(skeleton_indices) > 0
 
-        distances_between_genes = cor(log_fraction_per_metacell_per_gene)  # NOLINT
-        @assert_matrix(distances_between_genes, n_genes, n_genes, Columns)
-        distances_between_genes .= 1 .- distances_between_genes
-        distances_between_genes[isnan.(distances_between_genes)] .= 2
+        correlations_between_genes = cor(log_fraction_per_metacell_per_gene)  # NOLINT
+        @assert_matrix(correlations_between_genes, n_genes, n_genes, Columns)
+        @assert !any(isnan.(correlations_between_genes))
 
+        distances_between_genes = pairwise(Euclidean(), correlations_between_genes)
+        @assert_matrix(distances_between_genes, n_genes, n_genes, Columns)
         genes_tree = hclust(distances_between_genes; linkage = :ward)
 
         n_clusters = Int(ceil(n_genes / mean_genes_per_cluster))
@@ -224,7 +228,7 @@ function compute_block_modules!(
             #@debug "  - Cluster: $(cluster_index)"
             anchor_index, n_original_genes, most_correlated_genes_of_anchor = find_cluster_anchor(;  # NOLINT
                 cluster_index,
-                distances_between_genes,
+                correlations_between_genes,
                 skeleton_indices,
                 cluster_index_per_gene,
                 anchor_correlation_genes,
@@ -246,7 +250,7 @@ function compute_block_modules!(
                 cluster_index_per_gene,
                 anchor_index_per_cluster,
                 gene_index,
-                distances_between_genes,
+                correlations_between_genes,
                 min_gene_migration_correlation,
                 anchor_indices,
                 name_per_gene,
@@ -255,7 +259,7 @@ function compute_block_modules!(
 
         n_anchors = length(anchor_indices)
         @assert n_anchors > 0
-        min_kept_genes_fraction = min_anchor_kept_cluster_genes_likelihood / n_anchors
+        min_kept_genes_fraction = max(min_anchor_kept_cluster_genes_likelihood / n_anchors, 0.15)  # TODOX parameter
 
         full_index_per_gene = get_vector(adapted, "gene", "full_index")
 
@@ -269,6 +273,7 @@ function compute_block_modules!(
                 if n_kept_genes >= n_most_correlated_genes * min_kept_genes_fraction
                     #@debug "  - Keep Anchor: $(name_per_gene[anchor_index]) Original: $(n_most_correlated_genes) Kept: $(n_kept_genes) Min: $(n_most_correlated_genes * min_kept_genes_fraction)"
                     anchor_full_index = full_index_per_gene[anchor_index]
+                    # TODOX - only the most_correlated_genes_of_anchor and the migrated genes should be in the result
                     genes_full_indices = full_index_per_gene[cluster_index_per_gene .== cluster_index]
                     genes_full_indices_of_anchor_full_index[anchor_full_index] = genes_full_indices
                 else
@@ -285,7 +290,7 @@ end
 function find_cluster_anchor(;
     cluster_index::Integer,
     cluster_index_per_gene::AbstractVector{<:Integer},
-    distances_between_genes::AbstractMatrix{<:AbstractFloat},
+    correlations_between_genes::AbstractMatrix{<:AbstractFloat},
     skeleton_indices::AbstractVector{<:Integer},
     anchor_correlation_genes::Integer,
     min_anchor_correlation_genes_fraction::AbstractFloat,
@@ -305,14 +310,14 @@ function find_cluster_anchor(;
     #@debug "    Anchor quantile: $(anchor_correlation_quantile) Genes: $(anchor_correlation_quantile * n_cluster_genes) Out of: $(n_cluster_genes)"
 
     anchor_index = 0
-    anchor_distance = 3
+    anchor_correlation = -2
 
     for skeleton_index in skeleton_indices
         if is_cluster_gene[skeleton_index]
-            @views distances_from_skeleton = distances_between_genes[:, skeleton_index]
-            skeleton_distance = quantile(distances_from_skeleton, anchor_correlation_quantile)  # NOLINT
-            if skeleton_distance < anchor_distance
-                anchor_distance = skeleton_distance
+            @views correlations_with_skeleton = correlations_between_genes[:, skeleton_index]
+            skeleton_correlation = quantile(correlations_with_skeleton, 1 - anchor_correlation_quantile)  # NOLINT
+            if skeleton_correlation > anchor_correlation
+                anchor_correlation = skeleton_correlation
                 anchor_index = skeleton_index
             end
         end
@@ -325,17 +330,17 @@ function find_cluster_anchor(;
         if n_cluster_genes <= max_anchor_kept_cluster_genes_baseline
             most_correlated_genes_of_anchor = gene_indices_of_cluster
         else
-            distances_of_cluster_genes_from_anchor = vec(distances_between_genes[gene_indices_of_cluster, anchor_index])
+            correlations_of_cluster_genes_with_anchor = vec(correlations_between_genes[gene_indices_of_cluster, anchor_index])
             threshold = quantile(  # NOLINT
-                distances_of_cluster_genes_from_anchor,
-                max_anchor_kept_cluster_genes_baseline / n_cluster_genes,
+                correlations_of_cluster_genes_with_anchor,
+                1 - max_anchor_kept_cluster_genes_baseline / n_cluster_genes,
             )
             most_correlated_genes_of_anchor =
-                gene_indices_of_cluster[distances_of_cluster_genes_from_anchor .<= threshold]
+                gene_indices_of_cluster[correlations_of_cluster_genes_with_anchor .>= threshold]
         end
     end
 
-    #@debug "    Anchor Distance: $(anchor_distance) Correlation: $(1 - anchor_distance)"
+    #@debug "    Anchor Distance: $(anchor_correlation) Correlation: $(anchor_correlation)"
 
     return (anchor_index, n_cluster_genes, most_correlated_genes_of_anchor)
 end
@@ -344,7 +349,7 @@ function patch_cluster_index_per_gene!(;
     cluster_index_per_gene::AbstractVector{<:Integer},
     anchor_index_per_cluster::AbstractVector{<:Integer},
     gene_index::Integer,
-    distances_between_genes::AbstractMatrix{<:AbstractFloat},
+    correlations_between_genes::AbstractMatrix{<:AbstractFloat},
     min_gene_migration_correlation::AbstractFloat,
     anchor_indices::AbstractVector{<:Integer},
     name_per_gene::AbstractVector{<:AbstractString},  # NOLINT TODOX
@@ -352,16 +357,14 @@ function patch_cluster_index_per_gene!(;
     cluster_index = cluster_index_per_gene[gene_index]
     anchor_index = anchor_index_per_cluster[cluster_index]  # NOLINT TODOX
 
-    anchors_distances_from_gene = distances_between_genes[anchor_indices, gene_index]
-    closest_anchor_index = anchor_indices[argmin(anchors_distances_from_gene)]
-    closest_cluster_index = cluster_index_per_gene[closest_anchor_index]
+    anchors_correlations_with_gene = correlations_between_genes[anchor_indices, gene_index]
+    most_correlated_anchor_index = anchor_indices[argmax(anchors_correlations_with_gene)]
+    cluster_of_most_correlated_anchor = cluster_index_per_gene[most_correlated_anchor_index]
 
-    if closest_cluster_index != cluster_index
-        if distances_between_genes[closest_anchor_index, gene_index] <= 1 - min_gene_migration_correlation
-            #@debug "    - Move Gene: $(name_per_gene[gene_index]) from Cluster: $(cluster_index) Anchor: $(anchor_index == 0 ? nothing : name_per_gene[anchor_index]) Correlation: $(anchor_index == 0 ? -2 : 1 - distances_between_genes[anchor_index, gene_index]) to  Cluster: $(closest_cluster_index) Anchor: $(name_per_gene[closest_anchor_index]) Correlation: $(1 - distances_between_genes[closest_anchor_index, gene_index])"
-            cluster_index_per_gene[gene_index] = closest_cluster_index
+    if cluster_of_most_correlated_anchor != cluster_index
+        if correlations_between_genes[most_correlated_anchor_index, gene_index] >= min_gene_migration_correlation
+            cluster_index_per_gene[gene_index] = cluster_of_most_correlated_anchor
         else
-            #@debug "    - Drop Gene: $(name_per_gene[gene_index]) from Cluster: $(cluster_index) Anchor: $(anchor_index == 0 ? nothing : name_per_gene[anchor_index]) Correlation: $(anchor_index == 0 ? -2 : 1 - distances_between_genes[anchor_index, gene_index]) because Cluster: $(closest_cluster_index) Anchor: $(name_per_gene[closest_anchor_index]) Correlation: $(1 - distances_between_genes[closest_anchor_index, gene_index])"
             cluster_index_per_gene[gene_index] = 0
         end
     end

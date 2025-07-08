@@ -111,6 +111,12 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="#Correlations">
+<span>Correlations
+</span>
+</a>
+</li>
+<li>
 <a class="tocitem" href="#Index">
 <span>Index
 </span>
@@ -124,6 +130,10 @@
 </li>
 <li>
 <a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
 </a>
 </li>
 <li>
@@ -1489,6 +1499,150 @@
 </div>
 </section>
 </article>
+<h2 id="Correlations">
+<a class="docs-heading-anchor" href="#Correlations">Correlations
+</a>
+<a id="Correlations-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Correlations" title="Permalink">
+</a>
+</h2>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!" href="#Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_blocks_genes_neighborhood_correlations!(
+    daf::DafWriter;
+    overwrite::Bool,
+)::Nothing
+</code>
+</pre>
+<p>The correlation between cells and metacells gene expression levels in each block&#39;s neighborhood.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeBlocks.compute_blocks_genes_is_correlated_with_metacells" href="#Metacells.AnalyzeBlocks.compute_blocks_genes_is_correlated_with_metacells">
+<code>Metacells.AnalyzeBlocks.compute_blocks_genes_is_correlated_with_metacells
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_blocks_genes_is_correlated_with_metacells(
+    Daf::DafWriter;
+    min_correlation::AbstractFloat = 0.2,
+    overwrite::Bool = false
+)::Nothing
+</code>
+</pre>
+<p>Whether each gene is strongly correlated between cells and metacells in each neighborhood.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!" href="#Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_blocks_mean_neighborhood_correlations!(
+    daf::DafWriter;
+    overwrite::Bool = false
+)::Nothing
+</code>
+</pre>
+<p>The mean correlation between cells and metacells gene expression levels in each block&#39;s neighborhood.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!" href="#Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_blocks_mean_covered_neighborhood_correlations!(
+    daf::DafWriter;
+    overwrite::Bool = false
+)::Nothing
+</code>
+</pre>
+<p>The mean correlation between cells and metacells gene expression levels in each block&#39;s neighborhood.
+</p>
+</div>
+</section>
+</article>
+<article class="docstring">
+<header>
+<a class="docstring-article-toggle-button fa-solid fa-chevron-down" href="javascript:;" title="Collapse docstring">
+</a>
+<a class="docstring-binding" id="Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!" href="#Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+<span class="is-flex-grow-1 docstring-article-toggle-button" title="Collapse docstring">
+</span>
+</header>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_blocks_mean_modules_neighborhood_correlations!(
+    daf::DafWriter;
+    overwrite::Bool = false
+)::Nothing
+</code>
+</pre>
+<p>The mean correlation between cells and metacells gene expression levels in each block&#39;s neighborhood.
+</p>
+</div>
+</section>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -1523,6 +1677,12 @@
 </a>
 </li>
 <li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_is_correlated_with_metacells">
+<code>Metacells.AnalyzeBlocks.compute_blocks_genes_is_correlated_with_metacells
+</code>
+</a>
+</li>
+<li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_is_environment_markers!">
 <code>Metacells.AnalyzeBlocks.compute_blocks_genes_is_environment_markers!
 </code>
@@ -1547,14 +1707,38 @@
 </a>
 </li>
 <li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_genes_neighborhood_correlations!
+</code>
+</a>
+</li>
+<li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_max_skeleton_fold_distances!">
 <code>Metacells.AnalyzeBlocks.compute_blocks_max_skeleton_fold_distances!
 </code>
 </a>
 </li>
 <li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_mean_covered_neighborhood_correlations!
+</code>
+</a>
+</li>
+<li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_mean_euclidean_distances!">
 <code>Metacells.AnalyzeBlocks.compute_blocks_mean_euclidean_distances!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_mean_modules_neighborhood_correlations!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_mean_neighborhood_correlations!
 </code>
 </a>
 </li>
