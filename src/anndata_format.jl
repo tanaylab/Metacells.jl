@@ -74,7 +74,7 @@ METACELL_MATRICES_DATA = CopyAnnData([
     "essential" => ("is_essential", false),
     "fitted" => ("is_fitted", false),
     "inner_fold" => ("inner_fold", Float32(0.0)),
-    "inner_stdev_log" => ("inner_stdev_log", Float32(0.0)),
+    "inner_stdev_log" => ("inner_std_log", Float32(0.0)),
     "misfit" => ("is_misfit", false),
     "projected_fold" => ("projected_fold", Float32(0.0)),
     "projected_fraction" => ("projected_geomean_fraction", Float32(0.0)),
@@ -245,7 +245,8 @@ Per-metacell-per-gene:
   - The `corrected_fraction` matrix is always stored as `Float32`.
   - The `essential` matrix is renamed to `is_essential`.
   - The `essential`, `fitted`, and `misfit` matrices are renamed to `is_essential`, `is_fitted` and `is_misfit`, respectively.
-  - The `inner_fold`, `inner_stdev_log`, `projected_fold`, `projected_fraction` matrices are always stored as `Float32`.
+  - The `inner_fold`, `inner_stdev_log` (renamed to `inner_std_log`), `projected_fold`, `projected_fraction` matrices
+    are always stored as `Float32`.
   - The `total_umis` matrix is renamed to `UMIs` and always stored as `UInt32`.
   - The `zeros` matrix is always stored as `UInt32`.
   - All other matrices are copied as-is.
@@ -371,6 +372,7 @@ end
         implicit_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.implicit_properties),
         skipped_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.skipped_properties),
         properties_defaults::Maybe{Dict} = $(DEFAULT.properties_defaults),
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Create a type axis after importing data containing type annotations. By default this will look for a type per metacell,
@@ -467,10 +469,10 @@ function import_mask_matrix(
     @info "reconstruct gene-$(type_axis) matrix: is_$(prefix)"
     set_matrix!(daf, "gene", type_axis, "is_$(prefix)", bestify(mask_matrix); relayout = true, overwrite = true)  # NOJET
 
-    for type_name in type_names
-        mask_name = "$(prefix)_gene_of_$(type_name)"
-        delete_vector!(daf, "gene", mask_name; must_exist = false)
-    end
+    # TODOX for type_name in type_names
+    # TODOX mask_name = "$(prefix)_gene_of_$(type_name)"
+    # TODOX delete_vector!(daf, "gene", mask_name; must_exist = false)
+    # TODOX end
 
     return nothing
 end

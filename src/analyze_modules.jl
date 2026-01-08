@@ -3,51 +3,53 @@ Do simple gene module analysis.
 """
 module AnalyzeModules
 
-export compute_block_metacell_module_environment_covered_fractions!
-export compute_block_metacell_module_environment_linear_fractions!
-export compute_block_metacell_module_environment_log_covered_fractions!
-export compute_block_metacell_module_environment_log_linear_fractions!
-export compute_block_metacell_module_environment_total_UMIs!
 export compute_blocks_modules_is_strong!
 export compute_blocks_modules_n_genes!
 export compute_blocks_modules_n_skeletons!
+export compute_blocks_modules_neighborhood_metacells_linear_fraction_todox!
+export compute_blocks_modules_neighborhood_metacells_linear_fraction!
+export compute_blocks_modules_neighborhood_metacells_log_linear_fraction!
+export compute_metacells_modules_variance_over_mean!
+export compute_metacells_modules_significance!
 
 using Base.Threads
 using DataAxesFormats
+using Distances
+using Random
+using StatsBase
 using TanayLabUtilities
 
 using ..AnalyzeMetacells
 using ..Contracts
 using ..Defaults
 
+import Random.default_rng
+
 # Needed because of JET:
 import Metacells.Contracts.block_axis
 import Metacells.Contracts.block_block_is_in_environment_matrix
 import Metacells.Contracts.block_gene_module_matrix
-import Metacells.Contracts.block_metacell_module_environment_covered_fraction_tensor
-import Metacells.Contracts.block_metacell_module_environment_linear_fraction_tensor
-import Metacells.Contracts.block_metacell_module_environment_log_covered_fraction_tensor
-import Metacells.Contracts.block_metacell_module_environment_log_linear_fraction_tensor
-import Metacells.Contracts.block_metacell_module_environment_total_UMIs_tensor
 import Metacells.Contracts.block_module_is_found_matrix
+import Metacells.Contracts.block_module_is_marker_in_environment_matrix
 import Metacells.Contracts.block_module_is_strong_matrix
 import Metacells.Contracts.block_module_n_genes_matrix
 import Metacells.Contracts.block_module_n_skeletons_matrix
 import Metacells.Contracts.cell_axis
-import Metacells.Contracts.cell_covered_UMIs_vector
 import Metacells.Contracts.cell_gene_UMIs_matrix
 import Metacells.Contracts.cell_metacell_vector
+import Metacells.Contracts.cell_total_UMIs_vector
 import Metacells.Contracts.gene_axis
 import Metacells.Contracts.gene_is_skeleton_vector
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.metacell_block_vector
 import Metacells.Contracts.metacell_gene_UMIs_matrix
+import Metacells.Contracts.metacell_module_variance_over_mean_matrix
 import Metacells.Contracts.metacell_total_UMIs_vector
 import Metacells.Contracts.metacell_total_UMIs_vector
 import Metacells.Contracts.module_axis
 
 """
-    function compute_blocks_modules_is_strong!(
+    function compute_blocks_modules_is_strong(
         daf::DafWriter;
         min_downsamples::Integer = $(DEFAULT.min_downsamples),
         min_downsamples_quantile::AbstractFloat = $(DEFAULT.min_downsamples_quantile),
@@ -57,8 +59,10 @@ import Metacells.Contracts.module_axis
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
+TODOX
+
 A mask of the strong modules that have enough UMIs in enough cells. Enough UMIs means that, if we downsample the cells
-to a common total covered UMIs using `downsamples` with the `min_downsamples`, `min_downsamples_quantile`,
+to a common total UMIs using `downsamples` with the `min_downsamples`, `min_downsamples_quantile`,
 `max_downsamples_quantile`, the expected total UMIs of the module will be at least `min_strong_UMIs`. Enough cells mean
 that this will happen in at least `min_strong_cells` in the environment. Modules which achieve this are marked as strong
 enough to be meaningfully applicable to single cells.
@@ -76,24 +80,21 @@ $(CONTRACT)
     data = [
         cell_metacell_vector(RequiredInput),
         metacell_block_vector(RequiredInput),
-        block_block_is_in_environment_matrix(RequiredInput),
         cell_gene_UMIs_matrix(RequiredInput),
-        cell_covered_UMIs_vector(RequiredInput),
+        cell_total_UMIs_vector(RequiredInput),
         block_gene_module_matrix(RequiredInput),
         block_module_is_found_matrix(RequiredInput),
         block_module_is_strong_matrix(GuaranteedOutput),
+        block_block_is_in_neighborhood_matrix(RequiredInput),
     ],
 ) function compute_blocks_modules_is_strong!(  # UNTESTED
     daf::DafWriter;
-    min_downsamples::Integer = function_default(downsamples, :min_downsamples),
-    min_downsamples_quantile::AbstractFloat = function_default(downsamples, :min_downsamples_quantile),
-    max_downsamples_quantile::AbstractFloat = function_default(downsamples, :max_downsamples_quantile),
-    min_strong_UMIs::Integer = 8,
+    min_strong_fraction::AbstractFloat = 2e-3,
+    min_strong_UMIs::Integer = 7,
     min_strong_cells::Integer = 12,
     overwrite::Bool = false,
 )::Nothing
-    @assert min_downsamples >= 0
-    @assert 0 <= min_downsamples_quantile <= max_downsamples_quantile <= 1
+    @assert min_strong_fraction >= 0
     @assert min_strong_UMIs >= 0
     @assert min_strong_cells >= 0
 
@@ -103,8 +104,8 @@ $(CONTRACT)
     name_per_block = axis_vector(daf, "block")
     name_per_module = axis_vector(daf, "module")
 
-    is_found_per_module_per_block = get_matrix(daf, "module", "block", "is_found")
-    module_per_gene_per_block = get_matrix(daf, "gene", "block", "module")
+    is_found_per_module_per_block = get_matrix(daf, "module", "block", "is_found").array
+    module_per_gene_per_block = get_matrix(daf, "gene", "block", "module").array
     is_strong_per_module_per_block = zeros(Bool, n_modules, n_blocks)
 
     @threads :greedy for block_index in 1:n_blocks
@@ -114,9 +115,7 @@ $(CONTRACT)
             block_index,
             block_name,
             name_per_module,
-            min_downsamples,
-            min_downsamples_quantile,
-            max_downsamples_quantile,
+            min_strong_fraction,
             min_strong_UMIs,
             min_strong_cells,
             module_per_gene_per_block,
@@ -125,7 +124,7 @@ $(CONTRACT)
         )
     end
 
-    set_matrix!(daf, "module", "block", "is_strong", is_strong_per_module_per_block; overwrite)
+    set_matrix!(daf, "module", "block", "is_strong", bestify(is_strong_per_module_per_block); overwrite)
     return nothing
 end
 
@@ -134,52 +133,85 @@ function compute_block_modules_is_strong!(  # UNTESTED
     block_index::Integer,
     block_name::AbstractString,
     name_per_module::AbstractVector{<:AbstractString},
-    min_downsamples::Integer,
-    min_downsamples_quantile::AbstractFloat,
-    max_downsamples_quantile::AbstractFloat,
+    min_strong_fraction::AbstractFloat,
     min_strong_UMIs::Integer,
     min_strong_cells::Integer,
     module_per_gene_per_block::AbstractMatrix{<:AbstractString},
     is_found_per_module_per_block::AbstractMatrix{Bool},
     is_strong_per_module_per_block::AbstractMatrix{Bool},
 )::Nothing
-    covered_UMIs_per_environment_cell =
-        daf["/ cell & metacell ?? => block => is_in_environment ;= $(block_name) : covered_UMIs"].array
-    n_environment_cells = length(covered_UMIs_per_environment_cell)
+    total_UMIs_per_neighborhood_cell =
+        daf["/ cell & metacell ?? => block => is_in_neighborhood ;= $(block_name) : total_UMIs"].array
+    n_neighborhood_cells = length(total_UMIs_per_neighborhood_cell)
 
-    UMIs_per_gene_per_environment_cell =
-        daf["/ gene / cell & metacell ?? => block => is_in_environment ;= $(block_name) : UMIs"].array
-
-    downsampled_UMIs = downsamples(
-        covered_UMIs_per_environment_cell;
-        min_downsamples,
-        min_downsamples_quantile,
-        max_downsamples_quantile,
-    )
-    downscale_per_environment_cell = downsampled_UMIs ./ covered_UMIs_per_environment_cell
+    UMIs_per_gene_per_neighborhood_cell =
+        daf["/ gene / cell & metacell ?? => block => is_in_neighborhood ;= $(block_name) : UMIs"].array
 
     @views module_per_gene_of_block = module_per_gene_per_block[:, block_index]
     @views is_found_per_module_of_block = is_found_per_module_per_block[:, block_index]
     @views is_strong_per_module_of_block = is_strong_per_module_per_block[:, block_index]
 
     n_modules = length(name_per_module)
+
+    strong_UMIs_per_module = Vector{UInt32}(undef, n_modules)
+    strong_fraction_per_module = Vector{Float32}(undef, n_modules)
     for module_index in 1:n_modules
-        if is_found_per_module_of_block[module_index]
+        if !is_found_per_module_of_block[module_index]
+            strong_UMIs_per_module[module_index] = 0
+            strong_fraction_per_module[module_index] = 0
+        else
             module_name = name_per_module[module_index]
             module_genes_mask = module_per_gene_of_block .== module_name
-            @views UMIs_per_module_gene_per_environment_cell = UMIs_per_gene_per_environment_cell[module_genes_mask, :]
-            scaled_module_UMIs_per_environment_cell = vec(sum(UMIs_per_module_gene_per_environment_cell; dims = 1))
-            scaled_module_UMIs_per_environment_cell =
-                scaled_module_UMIs_per_environment_cell .* downscale_per_environment_cell
-            @assert_vector(scaled_module_UMIs_per_environment_cell, n_environment_cells)
-            n_strong_cells = sum(scaled_module_UMIs_per_environment_cell .>= min_strong_UMIs)
-            if n_strong_cells >= min_strong_cells
-                is_strong_per_module_of_block[module_index] = true
-                @debug "Block: $(block_name) Module: $(module_name) Strong: $(n_strong_cells) Out of: $(n_environment_cells)"
-            else
-                @debug "Block: $(block_name) Module: $(module_name) Weak: $(n_strong_cells) Out of: $(n_environment_cells)"
-            end
+            @views UMIs_per_module_gene_per_neighborhood_cell =
+                UMIs_per_gene_per_neighborhood_cell[module_genes_mask, :]
+            total_module_UMIs_per_neighborhood_cell = vec(sum(UMIs_per_module_gene_per_neighborhood_cell; dims = 1))
+            @assert_vector(total_module_UMIs_per_neighborhood_cell, n_neighborhood_cells)
+            total_module_fraction_per_neighborhood_cell =
+                total_module_UMIs_per_neighborhood_cell ./ total_UMIs_per_neighborhood_cell
+            @assert n_neighborhood_cells > min_strong_cells
+            strong_UMIs_per_module[module_index] = UInt32(
+                round(
+                    quantile(
+                        total_module_UMIs_per_neighborhood_cell,
+                        1 - (min_strong_cells - 1) / (n_neighborhood_cells - 1),
+                    ),
+                ),
+            )
+            strong_fraction_per_module[module_index] = quantile(
+                total_module_fraction_per_neighborhood_cell,
+                1 - (min_strong_cells - 1) / (n_neighborhood_cells - 1),
+            )
+            @debug "Block: $(block_name) Large: $(n_neighborhood_cells) Module: $(module_name) Strong: $(strong_fraction_per_module[module_index]) UMIs: $(strong_UMIs_per_module[module_index])"
         end
+    end
+
+    is_strong_per_module_of_block .=
+        (strong_UMIs_per_module .>= min_strong_UMIs) .& (strong_fraction_per_module .>= min_strong_fraction)
+    n_strong_modules = sum(is_strong_per_module_of_block)
+    if n_strong_modules > 1
+        @debug "Block: $(block_name) picked Strong modules: $(n_strong_modules)"
+    else
+        strong_score_per_module =
+            strong_UMIs_per_module ./ Float32(min_strong_UMIs) .+ strong_fraction_per_module ./ min_strong_fraction
+        is_score_per_module = strong_score_per_module .> 0
+        n_score_modules = sum(is_score_per_module)
+        if n_score_modules == 0
+            @debug "TODOX A BLOCK $(block_name) HAS NO STRONG MODULES"
+        end
+        @assert n_score_modules > 0
+        if n_score_modules == 1
+            is_strong_per_module_of_block .= is_score_per_module
+            n_strong_modules = sum(is_strong_per_module_of_block)
+            @assert n_strong_modules == 1
+        else
+            strong_module_indices = partialsortperm(strong_score_per_module, 1:2; rev = true)
+            is_strong_per_module_of_block .= false
+            is_strong_per_module_of_block[strong_module_indices] .= true
+            n_strong_modules = sum(is_strong_per_module_of_block)
+            @assert n_strong_modules == 2
+        end
+        @assert all((is_found_per_module_of_block .& is_strong_per_module_of_block) .== is_strong_per_module_of_block)
+        @debug "Block: $(block_name) forced Strong modules: $(n_strong_modules)"
     end
 
     return nothing
@@ -263,9 +295,109 @@ function do_compute_blocks_module_n_genes(
 end
 
 """
-    compute_block_metacell_module_environment_total_UMIs!(daf::DafWriter; overwrite::Bool = false)::Nothing
+    compute_metacells_modules_linear_fraction_todox!(
+        daf::DafWriter;
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
 
-The total UMIs of each environment module in each environment metacell.
+TODOX
+"""
+@logged @computation Contract(
+    axes = [
+        block_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        module_axis(RequiredInput),
+        gene_axis(RequiredInput),
+    ],
+    data = [
+        cell_total_UMIs_vector(RequiredInput),
+        cell_gene_UMIs_matrix(RequiredInput),
+        cell_metacell_vector(RequiredInput),
+        metacell_block_vector(RequiredInput),
+        block_block_is_in_neighborhood_matrix(RequiredInput),
+        block_gene_module_matrix(RequiredInput),
+        block_module_neighborhood_mean_linear_fraction_matrix(GuaranteedOutput),
+        block_module_neighborhood_std_linear_fraction_matrix(GuaranteedOutput),
+    ],
+) function compute_blocks_modules_neighborhood_metacells_linear_fraction_todox!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+    n_cells = axis_length(daf, "cell")
+    n_metacells = axis_length(daf, "metacell")
+
+    n_modules = axis_length(daf, "module")
+    name_per_module = axis_vector(daf, "module")
+
+    n_blocks = axis_length(daf, "block")
+    name_per_block = axis_vector(daf, "block")
+
+    module_per_gene_per_block = get_matrix(daf, "gene", "block", "module").array
+
+    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+
+    mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
+    std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
+
+    progress_counter = Atomic{Int}(0)  # TODOX Refactor this everywhere
+    @threads :greedy for block_index in 1:n_blocks
+        block_name = name_per_block[block_index]
+        indices_of_neighborhood_cells =
+            daf["/ cell & metacell ?? => block => is_in_neighborhood ;= $(block_name) : index"].array
+        n_neighborhood_cells = length(indices_of_neighborhood_cells)
+        @views module_per_gene = module_per_gene_per_block[:, block_index]
+        for module_index in 1:n_modules
+            module_name = name_per_module[module_index]
+            indices_of_module_genes = findall(module_per_gene .== module_name)
+            if length(indices_of_module_genes) == 0
+                mean_linear_fraction_per_module_per_block[module_index, block_index] = 0
+                std_linear_fraction_per_module_per_block[module_index, block_index] = 0
+            else
+                module_UMIs_per_neighborhood_cell =
+                    vec(sum(UMIs_per_cell_per_gene[indices_of_neighborhood_cells, indices_of_module_genes]; dims = 2))
+                @assert_vector(module_UMIs_per_neighborhood_cell, n_neighborhood_cells)
+
+                linear_fraction_per_neighborhood_cell =
+                    module_UMIs_per_neighborhood_cell ./ total_UMIs_per_cell[indices_of_neighborhood_cells]
+                mean_linear_fraction_per_module_per_block[module_index, block_index] =
+                    mean(linear_fraction_per_neighborhood_cell)
+                std_linear_fraction_per_module_per_block[module_index, block_index] =
+                    std(linear_fraction_per_neighborhood_cell)
+            end
+        end
+        counter = atomic_add!(progress_counter, 1)
+        print("\r$(progress_counter[]) ($(percent(counter + 1, n_blocks))) ...")
+    end
+
+    set_matrix!(
+        daf,
+        "module",
+        "block",
+        "neighborhood_mean_linear_fraction",
+        bestify(mean_linear_fraction_per_module_per_block);
+        overwrite,
+    )
+    set_matrix!(
+        daf,
+        "module",
+        "block",
+        "neighborhood_std_linear_fraction",
+        bestify(std_linear_fraction_per_module_per_block);
+        overwrite,
+    )
+
+    return nothing
+end
+
+"""
+    compute_metacells_modules_linear_fraction!(
+        daf::DafWriter;
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+TODOX
 """
 @logged @computation Contract(
     axes = [
@@ -275,48 +407,62 @@ The total UMIs of each environment module in each environment metacell.
         gene_axis(RequiredInput),
     ],
     data = [
-        metacell_block_vector(RequiredInput),
-        block_block_is_in_environment_matrix(RequiredInput),
-        block_gene_module_matrix(RequiredInput),
+        metacell_total_UMIs_vector(RequiredInput),
         metacell_gene_UMIs_matrix(RequiredInput),
-        block_metacell_module_environment_total_UMIs_tensor(GuaranteedOutput),
+        metacell_block_vector(RequiredInput),
+        block_gene_module_matrix(RequiredInput),
+        block_block_is_in_neighborhood_matrix(RequiredInput),
+        block_metacell_module_linear_fraction_tensor(GuaranteedOutput),
     ],
-) function compute_block_metacell_module_environment_total_UMIs!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    n_blocks = axis_length(daf, "block")
-    n_modules = axis_length(daf, "module")
+) function compute_blocks_modules_neighborhood_metacells_linear_fraction!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
     n_metacells = axis_length(daf, "metacell")
-    name_per_block = axis_vector(daf, "block")
+
+    n_modules = axis_length(daf, "module")
     name_per_module = axis_vector(daf, "module")
 
-    UMIs_per_metacell_per_gene = daf["/ metacell / gene : UMIs"].array
+    n_blocks = axis_length(daf, "block")
+    name_per_block = axis_vector(daf, "block")
+
+    module_per_gene_per_block = get_matrix(daf, "gene", "block", "module").array
+
+    UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
 
     @threads :greedy for block_index in 1:n_blocks
+        linear_fraction_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
         block_name = name_per_block[block_index]
-        environment_module_per_gene = daf["/ block = $(block_name) / gene : module"]
-        environment_metacell_indices = daf["/ metacell & block => is_in_environment ;= $(block_name) : index"].array
-        n_environment_metacells = length(environment_metacell_indices)
-
-        total_UMIs_per_metacell_per_module = zeros(UInt32, n_metacells, n_modules)
-        for module_index in n_modules
+        indices_of_neighborhood_metacells =
+            daf["/ metacell & block => is_in_neighborhood ;= $(block_name) : index"].array
+        n_neighborhood_metacells = length(indices_of_neighborhood_metacells)
+        @views module_per_gene = module_per_gene_per_block[:, block_index]
+        n_found_modules = 0
+        for module_index in 1:n_modules
             module_name = name_per_module[module_index]
-            module_genes_mask = environment_module_per_gene .== module_name
-            if any(module_genes_mask)
-                UMIs_per_environment_metacell_per_module_gene =
-                    UMIs_per_metacell_per_gene[environment_metacell_indices, module_genes_mask]
-                total_module_UMIs_per_environment_metacell =
-                    vec(sum(UMIs_per_environment_metacell_per_module_gene; dims = 2))
-                @assert_vector(total_module_UMIs_per_environment_metacell, n_environment_metacells)
-                total_UMIs_per_metacell_per_module[environment_metacell_indices, module_index] .=
-                    total_module_UMIs_per_environment_metacell
+            indices_of_module_genes = findall(module_per_gene .== module_name)
+            if length(indices_of_module_genes) > 0
+                n_found_modules += 1
+                module_UMIs_per_neighborhood_metacell = vec(
+                    sum(
+                        UMIs_per_metacell_per_gene[indices_of_neighborhood_metacells, indices_of_module_genes];
+                        dims = 2,
+                    ),
+                )
+                @assert_vector(module_UMIs_per_neighborhood_metacell, n_neighborhood_metacells)
+
+                linear_fraction_per_module_per_metacell[module_index, indices_of_neighborhood_metacells] .=
+                    module_UMIs_per_neighborhood_metacell ./ total_UMIs_per_metacell[indices_of_neighborhood_metacells]
             end
         end
-
+        @debug "Block: $(block_name) neighborhood metacells: $(n_neighborhood_metacells) found modules: $(n_found_modules)"
         set_matrix!(
             daf,
-            "metacell",
             "module",
-            "$(block_name)_total_UMIs",
-            bestify(total_UMIs_per_metacell_per_module);
+            "metacell",
+            "$(block_name)_linear_fraction",
+            bestify(linear_fraction_per_module_per_metacell);
             overwrite,
         )
     end
@@ -325,197 +471,275 @@ The total UMIs of each environment module in each environment metacell.
 end
 
 """
-    compute_block_metacell_module_environment_linear_fractions!(
+    compute_blocks_modules_neighborhood_metacells_log_linear_fraction!(
         daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite)
-    )::Nothing
-
-The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total UMIs.
-"""
-@logged @computation Contract(
-    axes = [block_axis(RequiredInput), metacell_axis(RequiredInput), module_axis(RequiredInput)],
-    data = [
-        metacell_block_vector(RequiredInput),
-        block_block_is_in_environment_matrix(RequiredInput),
-        block_metacell_module_environment_total_UMIs_tensor(RequiredInput),
-        metacell_total_UMIs_vector(RequiredInput),
-        block_metacell_module_environment_linear_fraction_tensor(GuaranteedOutput),
-    ],
-) function compute_block_metacell_module_environment_linear_fractions!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    return do_compute_block_metacell_module_linear_fractions!(
-        daf;
-        name = "linear",
-        denominator = "total_UMIs",
-        overwrite,
-    )
-end
-
-"""
-    compute_block_metacell_module_environment_log_linear_fractions!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of
-the total UMIs.
+TODOX
 """
 @logged @computation Contract(
-    axes = [block_axis(RequiredInput), metacell_axis(RequiredInput), module_axis(RequiredInput)],
+    axes = [
+        block_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        gene_axis(RequiredInput),
+        module_axis(RequiredInput),
+    ],
     data = [
-        metacell_block_vector(RequiredInput),
-        block_block_is_in_environment_matrix(RequiredInput),
+        block_gene_module_matrix(RequiredInput),
         block_module_is_found_matrix(RequiredInput),
-        block_metacell_module_environment_linear_fraction_tensor(RequiredInput),
-        block_metacell_module_environment_log_linear_fraction_tensor(GuaranteedOutput),
-    ],
-) function compute_block_metacell_module_environment_log_linear_fractions!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = function_default(
-        compute_metacells_genes_log_linear_fractions!,
-        :gene_fraction_regularization,
-    ),
-    overwrite::Bool = false,
-)::Nothing
-    return do_compute_block_metacell_module_log_linear_fraction(
-        daf;
-        name = "linear",
-        gene_fraction_regularization,
-        overwrite,
-    )
-end
-
-"""
-    compute_block_metacell_module_environment_covered_fractions!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The linear fraction of the total UMIs of each environment module in each environment metacell, out of the total covered
-UMIs.
-"""
-@logged @computation Contract(
-    axes = [block_axis(RequiredInput), metacell_axis(RequiredInput), module_axis(RequiredInput)],
-    data = [
         metacell_block_vector(RequiredInput),
-        block_block_is_in_environment_matrix(RequiredInput),
-        block_metacell_module_environment_total_UMIs_tensor(RequiredInput),
-        metacell_total_UMIs_vector(RequiredInput),
-        block_metacell_module_environment_covered_fraction_tensor(GuaranteedOutput),
+        block_block_is_in_neighborhood_matrix(RequiredInput),
+        block_metacell_module_linear_fraction_tensor(RequiredInput),
+        block_metacell_module_log_linear_fraction_tensor(GuaranteedOutput),
     ],
-) function compute_block_metacell_module_environment_covered_fractions!(
+) function compute_blocks_modules_neighborhood_metacells_log_linear_fraction!(
     daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION,
     overwrite::Bool = false,
 )::Nothing
-    return do_compute_block_metacell_module_linear_fractions!(
-        daf;
-        name = "covered",
-        denominator = "total_UMIs",
-        overwrite,
-    )
-end
-
-"""
-    compute_block_metacell_module_environment_log_covered_fractions!(
-        daf::DafWriter;
-        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-The log base 2 of the linear fraction of the total UMIs of each environment module in each environment metacell, out of
-the total covered UMIs.
-"""
-@logged @computation Contract(
-    axes = [block_axis(RequiredInput), metacell_axis(RequiredInput), module_axis(RequiredInput)],
-    data = [
-        metacell_block_vector(RequiredInput),
-        block_block_is_in_environment_matrix(RequiredInput),
-        block_module_is_found_matrix(RequiredInput),
-        block_metacell_module_environment_covered_fraction_tensor(RequiredInput),
-        block_metacell_module_environment_log_covered_fraction_tensor(GuaranteedOutput),
-    ],
-) function compute_block_metacell_module_environment_log_covered_fractions!(
-    daf::DafWriter;
-    gene_fraction_regularization::AbstractFloat = function_default(
-        compute_metacells_genes_log_covered_fractions!,
-        :gene_fraction_regularization,
-    ),
-    overwrite::Bool = false,
-)::Nothing
-    return do_compute_block_metacell_module_log_linear_fraction(
-        daf;
-        name = "covered",
-        gene_fraction_regularization,
-        overwrite,
-    )
-end
-
-function do_compute_block_metacell_module_linear_fractions!(
-    daf::DafWriter;
-    name::AbstractString,
-    denominator::AbstractString,
-    overwrite::Bool = false,
-)::Nothing
-    n_blocks = axis_length(daf, "block")
-    n_modules = axis_length(daf, "module")
     n_metacells = axis_length(daf, "metacell")
+
+    n_modules = axis_length(daf, "module")
+    name_per_module = axis_vector(daf, "module")
+
+    n_blocks = axis_length(daf, "block")
     name_per_block = axis_vector(daf, "block")
+
+    module_per_gene_per_block = get_matrix(daf, "gene", "block", "module").array
+    is_found_per_module_per_block = get_matrix(daf, "module", "block", "is_found").array
 
     @threads :greedy for block_index in 1:n_blocks
         block_name = name_per_block[block_index]
-        environment_metacell_indices = daf["/ metacell & block => is_in_environment ;= $(block_name) : index"].array
-        total_UMIs_per_module_per_environment_metacell =
-            daf["/ module / metacell & block => is_in_environment ;= $(block_name) : $(block_name)_total_UMIs"].array
-        total_UMIs_per_environment_metacell =
-            daf["/ metacell & block => is_in_environment ;= $(block_name) : $(denominator)"].array
-        fraction_per_module_per_environment_metacell =
-            total_UMIs_per_module_per_environment_metacell ./ transpose(total_UMIs_per_environment_metacell)
-        linear_fraction_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
-        linear_fraction_per_module_per_metacell[:, environment_metacell_indices] .=
-            fraction_per_module_per_environment_metacell
-        set_matrix!(
-            daf,
-            "module",
-            "metacell",
-            "$(block_name)_$(name)_fraction",
-            bestify(linear_fraction_per_module_per_metacell);
-            overwrite,
-        )
-    end
-end
+        linear_fraction_per_module_per_metacell = get_matrix(daf, "module", "metacell", "$(block_name)_linear_fraction")
+        indices_of_neighborhood_metacells =
+            daf["/ metacell & block => is_in_neighborhood ;= $(block_name) : index"].array
+        indices_of_found_modules = daf["/ module & is_found ; block = $(block_name) : index"].array
 
-function do_compute_block_metacell_module_log_linear_fraction(
-    daf::DafWriter;
-    name::AbstractString,
-    gene_fraction_regularization::AbstractFloat,
-    overwrite::Bool,
-)::Nothing
-    n_blocks = axis_length(daf, "block")
-    n_modules = axis_length(daf, "module")
-    n_metacells = axis_length(daf, "metacell")
-    name_per_block = axis_vector(daf, "block")
+        @views linear_fraction_per_found_module_per_neighborhood_metacell =
+            linear_fraction_per_module_per_metacell[indices_of_found_modules, indices_of_neighborhood_metacells]
 
-    @threads :greedy for block_index in 1:n_blocks
-        block_name = name_per_block[block_index]
-        environment_metacell_indices = daf["/ metacell & block => is_in_environment ;= $(block_name) : index"].array
-        is_found_per_module = daf["/ block = $(block_name) / module : is_found"].array
-        linear_fraction_per_found_module_per_environment_metacell =
-            daf["/ module & is_found ; block = $(block_name) / metacell & block => is_in_environment ;= $(block_name) : $(block_name)_$(name)_fraction"].array
-        log_linear_fraction_per_found_module_per_environment_metacell =
-            log2.(linear_fraction_per_found_module_per_environment_metacell .+ gene_fraction_regularization)
         log_linear_fraction_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
-        log_linear_fraction_per_module_per_metacell[is_found_per_module, environment_metacell_indices] .=
-            log_linear_fraction_per_found_module_per_environment_metacell
+        log_linear_fraction_per_module_per_metacell[indices_of_found_modules, indices_of_neighborhood_metacells] .=
+            log2.(linear_fraction_per_found_module_per_neighborhood_metacell .+ gene_fraction_regularization)
+
         set_matrix!(
             daf,
             "module",
             "metacell",
-            "$(block_name)_log_$(name)_fraction",
+            "$(block_name)_log_linear_fraction",
             bestify(log_linear_fraction_per_module_per_metacell);
             overwrite,
         )
+        @debug "Block: $(block_name) neighborhood metacells: $(length(indices_of_neighborhood_metacells)) found modules: $(length(indices_of_found_modules))"
     end
 
+    return nothing
+end
+
+"""
+    compute_metacells_modules_variance_over_mean!(
+        daf::DafWriter;
+        min_downsamples::Integer = $(DEFAULT.min_downsamples),
+        min_downsamples_quantile::AbstractFloat = $(DEFAULT.min_downsamples_quantile),
+        max_downsamples_quantile::AbstractFloat = $(DEFAULT.max_downsamples_quantile),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+The variance over mean of the total downsampled UMIs of each found module in the neighborhood of each block. This
+ignores cells with less than the target downsampled UMIs per cell, to make the estimate more robust.
+"""
+@logged @computation Contract(
+    axes = [
+        block_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        module_axis(RequiredInput),
+        gene_axis(RequiredInput),
+    ],
+    data = [
+        gene_is_excluded_vector(RequiredInput),
+        cell_metacell_vector(RequiredInput),
+        metacell_block_vector(RequiredInput),
+        block_gene_module_matrix(RequiredInput),
+        cell_gene_UMIs_matrix(RequiredInput),
+        cell_total_UMIs_vector(RequiredInput),
+        metacell_module_variance_over_mean_matrix(GuaranteedOutput),
+    ],
+) function compute_metacells_modules_variance_over_mean!(
+    daf::DafWriter;
+    min_downsamples::Integer = function_default(downsamples, :min_downsamples),
+    min_downsamples_quantile::AbstractFloat = 0.25,
+    max_downsamples_quantile::AbstractFloat = function_default(downsamples, :max_downsamples_quantile),
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = false,
+)::Nothing
+    n_metacells = axis_length(daf, "metacell")
+    name_per_metacell = axis_vector(daf, "metacell")
+
+    n_modules = axis_length(daf, "module")
+    name_per_module = axis_vector(daf, "module")
+
+    block_index_per_metacell = daf["/ metacell : block => index"].array
+    module_per_included_gene_per_block = daf["/ gene &! is_excluded / block : module"].array
+
+    variance_over_mean_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
+
+    progress_counter = Atomic{Int}(0)
+    parallel_loop_with_rng(1:n_metacells; rng, policy = :serial) do metacell_index, rng  # TODOX
+        metacell_name = name_per_metacell[metacell_index]
+        block_index = block_index_per_metacell[metacell_index]
+
+        @views module_per_included_gene = module_per_included_gene_per_block[:, block_index]
+
+        UMIs_per_included_gene_per_metacell_cell =
+            daf["/ gene &! is_excluded / cell & metacell = $(metacell_name) : UMIs"].array
+        total_UMIs_per_metacell_cell = daf["/ cell & metacell = $(metacell_name) : total_UMIs"].array
+
+        downsamples_UMIs = downsamples(
+            total_UMIs_per_metacell_cell;
+            min_downsamples,
+            min_downsamples_quantile,
+            max_downsamples_quantile,
+        )
+
+        is_significant_per_metacell_cell = total_UMIs_per_metacell_cell .>= downsamples_UMIs
+        n_significant_metacell_cells = sum(is_significant_per_metacell_cell)
+
+        @views UMIs_per_included_per_significant_metacell_cell =
+            UMIs_per_included_gene_per_metacell_cell[:, is_significant_per_metacell_cell]
+        downsampled_UMIs_per_included_per_significant_metacell_cell =
+            downsample(UMIs_per_included_per_significant_metacell_cell, downsamples_UMIs; dims = 2, rng)
+
+        total_downsampled_UMIs_per_significant_metacell_cell =
+            vec(sum(downsampled_UMIs_per_included_per_significant_metacell_cell; dims = 1))
+        @assert_vector(total_downsampled_UMIs_per_significant_metacell_cell, n_significant_metacell_cells)
+        @assert all(total_downsampled_UMIs_per_significant_metacell_cell .== downsamples_UMIs)
+
+        for module_index in 1:n_modules
+            module_name = name_per_module[module_index]
+            is_of_module_per_included_gene = module_per_included_gene .== module_name
+            if any(is_of_module_per_included_gene)
+                @views downsampled_UMIs_per_module_gene_per_significant_metacell_cell =
+                    downsampled_UMIs_per_included_per_significant_metacell_cell[is_of_module_per_included_gene, :]
+                module_total_downsampled_UMIs_per_significant_metacell_cell =
+                    vec(sum(downsampled_UMIs_per_module_gene_per_significant_metacell_cell; dims = 1))
+                @assert_vector(
+                    module_total_downsampled_UMIs_per_significant_metacell_cell,
+                    n_significant_metacell_cells
+                )
+                mean_module_total_downsampled_UMIs = mean(module_total_downsampled_UMIs_per_significant_metacell_cell)  # NOLINT
+                if mean_module_total_downsampled_UMIs == 0
+                    variance_over_mean = 1
+                else
+                    variance_of_module_total_downsampled_UMIs =
+                        var(module_total_downsampled_UMIs_per_significant_metacell_cell)  # NOLINT
+                    variance_over_mean = variance_of_module_total_downsampled_UMIs ./ mean_module_total_downsampled_UMIs
+                end
+                variance_over_mean_per_module_per_metacell[module_index, metacell_index] = variance_over_mean
+            end
+        end
+
+        counter = atomic_add!(progress_counter, 1)
+        print("\r$(progress_counter[]) ($(percent(counter + 1, n_metacells))) ...")
+        return nothing
+    end
+
+    set_matrix!(
+        daf,
+        "module",
+        "metacell",
+        "variance_over_mean",
+        bestify(variance_over_mean_per_module_per_metacell);
+        overwrite,
+    )
+    return nothing
+end
+
+"""
+    compute_metacells_modules_significance!(
+        daf::DafWriter;
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+TODOX
+"""
+@logged @computation Contract(
+    axes = [
+        block_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        gene_axis(RequiredInput),
+        module_axis(RequiredInput),
+    ],
+    data = [
+        cell_metacell_vector(RequiredInput),
+        metacell_block_vector(RequiredInput),
+        block_gene_module_matrix(RequiredInput),
+        cell_gene_UMIs_matrix(RequiredInput),
+        cell_total_UMIs_vector(RequiredInput),
+        metacell_mean_modules_distance_vector(GuaranteedOutput),
+        metacell_std_modules_distance_vector(GuaranteedOutput),
+    ],
+) function compute_metacells_modules_significance!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+    n_metacells = axis_length(daf, "metacell")
+    name_per_metacell = axis_vector(daf, "metacell")
+
+    n_modules = axis_length(daf, "module")
+    name_per_module = axis_vector(daf, "module")
+
+    block_index_per_metacell = daf["/ metacell : block => index"].array
+    module_per_gene_per_block = daf["/ gene / block : module"].array
+
+    mean_distance_per_metacell = zeros(Float32, n_metacells)
+    std_distance_per_meyacell = zeros(Float32, n_metacells)
+
+    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+
+    progress_counter = Atomic{Int}(0)
+    @threads :greedy for metacell_index in 1:n_metacells
+        metacell_name = name_per_metacell[metacell_index]
+        block_index = block_index_per_metacell[metacell_index]
+
+        indices_of_metacell_cells = daf["/ cell & metacell = $(metacell_name) : index"].array
+        n_metacell_cells = length(indices_of_metacell_cells)
+        @assert n_metacell_cells > 0
+        total_UMIs_per_metacell_cell = total_UMIs_per_cell[indices_of_metacell_cells]
+        total_UMIs_of_metacell = sum(total_UMIs_per_metacell_cell)
+
+        fraction_per_module_per_cell = zeros(Float32, n_modules, n_metacell_cells)
+        mean_fraction_per_module = zeros(Float32, n_modules)
+
+        @views module_per_gene = module_per_gene_per_block[:, block_index]
+        for module_index in 1:n_modules
+            module_name = name_per_module[module_index]
+            indices_of_module_genes = findall(module_per_gene .== module_name)
+            n_module_genes = length(indices_of_module_genes)
+            if n_module_genes > 0
+                module_UMIs_per_metacell_cell =
+                    vec(sum(UMIs_per_cell_per_gene[indices_of_metacell_cells, indices_of_module_genes]; dims = 2))
+                @assert_vector(module_UMIs_per_metacell_cell, n_metacell_cells)
+                fraction_per_module_per_cell[module_index, :] = module_UMIs_per_metacell_cell ./ total_UMIs_per_metacell_cell
+                module_total_UMIs_of_metacell = sum(module_UMIs_per_metacell_cell)
+                mean_fraction_per_module[module_index] = module_total_UMIs_of_metacell ./ total_UMIs_of_metacell
+            end
+        end
+
+        distance_per_cell = pairwise(Euclidean(), Ref(mean_fraction_per_module), eachcol(fraction_per_module_per_cell))
+        mean_distance_per_metacell[metacell_index] = mean(distance_per_cell)
+        std_distance_per_meyacell[metacell_index] = std(distance_per_cell)
+
+        counter = atomic_add!(progress_counter, 1)
+        print("\r$(progress_counter[]) ($(percent(counter + 1, n_metacells))) ...")
+    end
+
+    set_vector!(daf, "metacell", "mean_modules_distance", bestify(mean_distance_per_metacell); overwrite)
+    set_vector!(daf, "metacell", "std_modules_distance", bestify(std_distance_per_meyacell); overwrite)
     return nothing
 end
 

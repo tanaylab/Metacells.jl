@@ -15,7 +15,6 @@ Metacells.AnalyzeMetacells.compute_metacells_n_cells!
 ```@docs
 Metacells.AnalyzeMetacells.compute_metacells_genes_UMIs!
 Metacells.AnalyzeMetacells.compute_metacells_total_UMIs!
-Metacells.AnalyzeMetacells.compute_metacells_covered_UMIs!
 ```
 
 ## Linear Fractions
@@ -23,13 +22,6 @@ Metacells.AnalyzeMetacells.compute_metacells_covered_UMIs!
 ```@docs
 Metacells.AnalyzeMetacells.compute_metacells_genes_linear_fractions!
 Metacells.AnalyzeMetacells.compute_metacells_genes_log_linear_fractions!
-```
-
-## Covered Fractions
-
-```@docs
-Metacells.AnalyzeMetacells.compute_metacells_genes_covered_fractions!
-Metacells.AnalyzeMetacells.compute_metacells_genes_log_covered_fractions!
 ```
 
 ## Geomean Fractions
@@ -51,6 +43,12 @@ Metacells.AnalyzeMetacells.compute_metacells_types_by_cells!
 ```@docs
 Metacells.AnalyzeMetacells.compute_metacells_euclidean_distances!
 Metacells.AnalyzeMetacells.compute_metacells_max_skeleton_fold_distances!
+```
+
+## Correlations
+
+```@docs
+Metacells.AnalyzeMetacells.compute_metacells_regulators_correlations!
 ```
 
 ## Index
