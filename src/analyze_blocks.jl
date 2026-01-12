@@ -1,5 +1,5 @@
 """
-ro simple blocks analysis.
+Do simple blocks analysis.
 """
 module AnalyzeBlocks
 
@@ -31,6 +31,9 @@ export compute_blocks_total_UMIs!
 export compute_blocks_types_by_metacells!
 export compute_genes_most_changed_correlation_in_neighborhood_metacells_ranks!
 export compute_suspect_genes!
+
+using Profile
+using PProf
 
 using Base.Threads
 using DataAxesFormats
@@ -597,7 +600,7 @@ end
 
     is_neighborhood_marker_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
 
-    for block_index in 1:n_blocks
+    @threads :greedy for block_index in 1:n_blocks
         block_name = name_per_block[block_index]
         adapter(  # NOJET
             daf;
@@ -1190,8 +1193,7 @@ $(CONTRACT)
         correlation_between_pertinent_neighborhood_markers[1, 1] = 0
         @threads :greedy for base_position in reverse(2:n_pertinent_neighborhood_markers)
             correlation_between_pertinent_neighborhood_markers[base_position, base_position] = 0
-            @views base_column =
-                log_fraction_per_neighborhood_cell_per_pertinent_neighborhood_marker[:, base_position]
+            @views base_column = log_fraction_per_neighborhood_cell_per_pertinent_neighborhood_marker[:, base_position]
             for other_position in 1:(base_position - 1)
                 @views other_column =
                     log_fraction_per_neighborhood_cell_per_pertinent_neighborhood_marker[:, other_position]
@@ -1291,8 +1293,7 @@ $(CONTRACT)
     n_genes = axis_length(base_daf, "gene")
     name_per_gene = axis_vector(base_daf, "gene")
 
-    linear_fraction_per_other_metacell_per_gene =
-        get_matrix(other_daf, "metacell", "gene", "linear_fraction").array
+    linear_fraction_per_other_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "linear_fraction").array
     other_metacells_per_cell = get_vector(other_daf, "cell", "metacell").array
     projected_metacells_per_cell = get_vector(other_daf, "cell", "metacell.projected").array
 
@@ -1364,21 +1365,18 @@ $(CONTRACT)
             @views metacell_fraction_per_other_metacell_of_friend_gene =
                 linear_fraction_per_other_metacell_per_gene[:, friend_gene_index]
 
-            @views other_metacell_log_fraction_per_grouped_neighborhood_cell_of_friend_gene =
-                log2.(
-                    metacell_fraction_per_other_metacell_of_friend_gene[other_metacell_index_per_grouped_neighborhood_cell] .+
-                    gene_cell_fraction_regularization
-                )
-            @views other_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene =
-                log2.(
-                    metacell_fraction_per_other_metacell_of_gene[other_metacell_index_per_grouped_neighborhood_cell] .+
-                    gene_cell_fraction_regularization
-                )
-            @views projected_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene =
-                log2.(
-                    metacell_fraction_per_other_metacell_of_gene[projected_metacell_index_per_grouped_neighborhood_cell] .+
-                    gene_cell_fraction_regularization
-                )
+            @views other_metacell_log_fraction_per_grouped_neighborhood_cell_of_friend_gene = log2.(
+                metacell_fraction_per_other_metacell_of_friend_gene[other_metacell_index_per_grouped_neighborhood_cell] .+
+                gene_cell_fraction_regularization,
+            )
+            @views other_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene = log2.(
+                metacell_fraction_per_other_metacell_of_gene[other_metacell_index_per_grouped_neighborhood_cell] .+
+                gene_cell_fraction_regularization,
+            )
+            @views projected_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene = log2.(
+                metacell_fraction_per_other_metacell_of_gene[projected_metacell_index_per_grouped_neighborhood_cell] .+
+                gene_cell_fraction_regularization,
+            )
 
             if minimum(cell_log_fraction_per_grouped_neighborhood_cell) ==
                maximum(cell_log_fraction_per_grouped_neighborhood_cell) ||
@@ -1634,9 +1632,16 @@ $(CONTRACT)
         confusion_per_other_block_per_original_block[closest_block_index, original_block_index] += 1
     end
 
-    set_matrix!(daf, "block", "block", "confusion_by_closest_by_pertinent_markers", confusion_per_other_block_per_original_block)
+    set_matrix!(
+        daf,
+        "block",
+        "block",
+        "confusion_by_closest_by_pertinent_markers",
+        confusion_per_other_block_per_original_block,
+    )
 
-    n_stable_cells = sum(confusion_per_other_block_per_original_block[diagind(confusion_per_other_block_per_original_block)])
+    n_stable_cells =
+        sum(confusion_per_other_block_per_original_block[diagind(confusion_per_other_block_per_original_block)])
     @debug "Stable cells: $(n_stable_cells) ($(percent(n_stable_cells, sum(n_cells_per_block))))"
 
     return nothing
@@ -1681,7 +1686,8 @@ $(CONTRACT)
         get_matrix(daf, "block", "block", "mean_euclidean_skeleton_distance")
     n_metacells_per_block = get_vector(daf, "block", "n_metacells")
     total_UMIs_per_block = get_vector(daf, "block", "total_UMIs")
-    confusion_per_other_block_per_original_block = get_matrix(daf, "block", "block", "confusion_by_closest_by_pertinent_markers").array
+    confusion_per_other_block_per_original_block =
+        get_matrix(daf, "block", "block", "confusion_by_closest_by_pertinent_markers").array
 
     confusion_fraction_per_block_per_block = Float32.(confusion_per_other_block_per_original_block ./ n_cells_per_block)
     confusion_fraction_per_block_per_block .+= transpose(confusion_fraction_per_block_per_block)
@@ -1707,17 +1713,20 @@ $(CONTRACT)
             next_block_index = ordered_block_indices[neighborhood_n_blocks + 1]
             include_next_block = false
 
-            if confusion_fraction_per_other_block[next_block_index] >= min_neighbour_confusion_fractions
+            if neighborhood_n_blocks == 0
+                include_next_block = true
+                neighborhood_n_confused_blocks += 1
+            elseif confusion_fraction_per_other_block[next_block_index] >= min_neighbour_confusion_fractions
                 if neighborhood_n_blocks <= max_blocks_in_neighborhood &&
-                        neighborhood_n_metacells <= max_metacells_in_neighborhood &&
-                        neighborhood_total_UMIs <= max_total_UMIs_in_neighborhood
+                   neighborhood_n_metacells <= max_metacells_in_neighborhood &&
+                   neighborhood_total_UMIs <= max_total_UMIs_in_neighborhood
                     include_next_block = true
                     neighborhood_n_confused_blocks += 1
                 end
             else
                 if neighborhood_n_blocks < min_blocks_in_neighborhood ||
-                        neighborhood_n_metacells < min_metacells_in_neighborhood ||
-                        neighborhood_total_UMIs < min_total_UMIs_in_neighborhood
+                   neighborhood_n_metacells < min_metacells_in_neighborhood ||
+                   neighborhood_total_UMIs < min_total_UMIs_in_neighborhood
                     include_next_block = true
                     neighborhood_n_disjoint_blocks += 1
                 end
@@ -1783,7 +1792,10 @@ function add_sample!(incremental_correlation::IncrementalCorrelation, x::Float64
     return nothing
 end
 
-function combine_into!(into_incremental_correlation::IncrementalCorrelation, from_incremental_correlation::IncrementalCorrelation)::IncrementalCorrelation
+function combine_into!(
+    into_incremental_correlation::IncrementalCorrelation,
+    from_incremental_correlation::IncrementalCorrelation,
+)::IncrementalCorrelation
     @assert !isnan(into_incremental_correlation.sum_x)
     @assert !isnan(into_incremental_correlation.sum_x2)
     @assert !isnan(into_incremental_correlation.sum_y)
@@ -1816,15 +1828,12 @@ function correlation(incremental_correlation::IncrementalCorrelation)::Float64
                     incremental_correlation.num * incremental_correlation.sum_xy -
                     incremental_correlation.sum_x * incremental_correlation.sum_y
                 ) / (
-                    (
-                        incremental_correlation.num * incremental_correlation.sum_x2 -
-                        incremental_correlation.sum_x ^ 2
-                    ) * (
+                    (incremental_correlation.num * incremental_correlation.sum_x2 - incremental_correlation.sum_x ^ 2) * (
                         incremental_correlation.num * incremental_correlation.sum_y2 -
                         incremental_correlation.sum_y ^ 2
                     )
-                )
-            )
+                ),
+            ),
         )
         if isnan(result)
             return 0.0
@@ -1834,11 +1843,7 @@ function correlation(incremental_correlation::IncrementalCorrelation)::Float64
     end
 end
 
-@logged function compute_suspect_genes!(
-    daf::DafWriter;
-    method::Symbol,
-    overwrite::Bool = false
-)::Nothing
+@logged function compute_suspect_genes!(daf::DafWriter; method::Symbol, overwrite::Bool = false)::Nothing
     n_genes = axis_length(daf, "gene")
     name_per_gene = axis_vector(daf, "gene")
 
@@ -1848,12 +1853,15 @@ end
     indices_of_pertinent_markers = daf["/ gene & is_marker &! is_lateral : index"].array
     n_pertinent_markers = length(indices_of_pertinent_markers)
 
-    confusion_per_other_block_per_original_block = get_matrix(daf, "block", "block", "confusion_by_closest_by_pertinent_markers").array
+    confusion_per_other_block_per_original_block =
+        get_matrix(daf, "block", "block", "confusion_by_closest_by_pertinent_markers").array
 
     into_per_other_block = vec(sum(confusion_per_other_block_per_original_block; dims = 2))
 
-    log_fraction_per_block_per_pertinent_marker = daf["/ block / gene & is_marker &! is_lateral : log_linear_fraction"].array
-    log_fraction_per_pertinent_marker_per_block = daf["/ gene & is_marker &! is_lateral / block : log_linear_fraction"].array
+    log_fraction_per_block_per_pertinent_marker =
+        daf["/ block / gene & is_marker &! is_lateral : log_linear_fraction"].array
+    log_fraction_per_pertinent_marker_per_block =
+        daf["/ gene & is_marker &! is_lateral / block : log_linear_fraction"].array
 
     UMIs_per_cell_per_pertinent_marker = daf["/ cell / gene & is_marker &! is_lateral : UMIs"].array
     total_UMIs_per_cell = daf["/ cell : total_UMIs"].array
@@ -1872,7 +1880,8 @@ end
         @debug "TODOX NON-CONFUSING RANGE: $(low) .. $(high)"
 
         z_score_per_pertinent_marker = correlation_per_pertinent_marker ./ stdev
-        is_suspect_per_pertinent_marker = (correlation_per_pertinent_marker .< low) .| (high .< correlation_per_pertinent_marker)
+        is_suspect_per_pertinent_marker =
+            (correlation_per_pertinent_marker .< low) .| (high .< correlation_per_pertinent_marker)
 
     elseif method == :b
         # TODOX
@@ -1883,7 +1892,8 @@ end
         original_block_index_per_cell = daf["/ cell : metacell ?? 0 => block => index"].array
         closest_block_index_per_cell = daf["/ cell : block.closest_by_pertinent_markers => index"].array
 
-        incremental_correlation_per_pertinent_marker_per_block = Matrix{IncrementalCorrelation}(undef, n_pertinent_markers, n_blocks)
+        incremental_correlation_per_pertinent_marker_per_block =
+            Matrix{IncrementalCorrelation}(undef, n_pertinent_markers, n_blocks)
         for block_index in 1:n_blocks
             for pertinent_marker_position in 1:n_pertinent_markers
                 incremental_correlation_per_pertinent_marker_per_block[pertinent_marker_position, block_index] =
@@ -1900,10 +1910,11 @@ end
                 if from_block_index != into_block_index
                     indices_of_migrated_cells = findall(
                         (original_block_index_per_cell .== from_block_index) .&
-                        (closest_block_index_per_cell .== into_block_index)
+                        (closest_block_index_per_cell .== into_block_index),
                     )
                     n_migrated_cells = length(indices_of_migrated_cells)
-                    @assert n_migrated_cells == confusion_per_other_block_per_original_block[into_block_index, from_block_index]
+                    @assert n_migrated_cells ==
+                            confusion_per_other_block_per_original_block[into_block_index, from_block_index]
                     if n_migrated_cells > 0
                         fraction_from_to_into =
                             confusion_per_other_block_per_original_block[into_block_index, from_block_index] ./
@@ -1913,31 +1924,41 @@ end
                             n_cells_per_block[into_block_index]
                         into_more_than_from_fraction = fraction_from_to_into - fraction_into_to_from
 
-                        log_fraction_per_migrated_cell_per_pertinent_marker =
-                            log2.(
-                                1e-4 .+  # TODOx
-                                UMIs_per_cell_per_pertinent_marker[indices_of_migrated_cells, :] ./
-                                total_UMIs_per_cell[indices_of_migrated_cells]
-                            )
+                        log_fraction_per_migrated_cell_per_pertinent_marker = log2.(
+                            1e-4 .+  # TODOx
+                            UMIs_per_cell_per_pertinent_marker[indices_of_migrated_cells, :] ./
+                            total_UMIs_per_cell[indices_of_migrated_cells],
+                        )
                         log_fraction_per_pertinent_marker_per_migrated_cell =
                             flip(log_fraction_per_migrated_cell_per_pertinent_marker)
-                        @assert_matrix(log_fraction_per_pertinent_marker_per_migrated_cell, n_pertinent_markers, n_migrated_cells)
+                        @assert_matrix(
+                            log_fraction_per_pertinent_marker_per_migrated_cell,
+                            n_pertinent_markers,
+                            n_migrated_cells
+                        )
 
-                        into_distance_per_pertinent_marker_per_migrated_cell =
-                            abs.(
-                                log_fraction_per_pertinent_marker_per_migrated_cell .-
-                                log_fraction_of_into_per_pertinent_marker
-                            )
-                        @assert_matrix(into_distance_per_pertinent_marker_per_migrated_cell, n_pertinent_markers, n_migrated_cells)
+                        into_distance_per_pertinent_marker_per_migrated_cell = abs.(
+                            log_fraction_per_pertinent_marker_per_migrated_cell .-
+                            log_fraction_of_into_per_pertinent_marker,
+                        )
+                        @assert_matrix(
+                            into_distance_per_pertinent_marker_per_migrated_cell,
+                            n_pertinent_markers,
+                            n_migrated_cells
+                        )
 
-                        log_fraction_of_from_per_pertinent_marker = log_fraction_per_pertinent_marker_per_block[:, from_block_index]
+                        log_fraction_of_from_per_pertinent_marker =
+                            log_fraction_per_pertinent_marker_per_block[:, from_block_index]
                         @assert_vector(log_fraction_of_from_per_pertinent_marker, n_pertinent_markers)
-                        from_distance_per_pertinent_marker_per_migrated_cell =
-                            abs.(
-                                log_fraction_per_pertinent_marker_per_migrated_cell .-
-                                log_fraction_of_from_per_pertinent_marker
-                            )
-                        @assert_matrix(from_distance_per_pertinent_marker_per_migrated_cell, n_pertinent_markers, n_migrated_cells)
+                        from_distance_per_pertinent_marker_per_migrated_cell = abs.(
+                            log_fraction_per_pertinent_marker_per_migrated_cell .-
+                            log_fraction_of_from_per_pertinent_marker,
+                        )
+                        @assert_matrix(
+                            from_distance_per_pertinent_marker_per_migrated_cell,
+                            n_pertinent_markers,
+                            n_migrated_cells
+                        )
 
                         into_better_than_from_per_pertinent_marker_per_migrated_cell =
                             from_distance_per_pertinent_marker_per_migrated_cell .-
@@ -1953,7 +1974,7 @@ end
                                 add_sample!(
                                     incremental_correlation_per_pertinent_marker_per_block[
                                         pertinent_marker_position,
-                                        from_block_index
+                                        from_block_index,
                                     ],
                                     into_better_than_from_per_pertinent_marker_per_migrated_cell[
                                         pertinent_marker_position,
@@ -1976,10 +1997,11 @@ end
             for block_index in 1:n_blocks
                 combine_into!(
                     pertinent_marker_incremental_correlation,
-                    incremental_correlation_per_pertinent_marker_per_block[pertinent_marker_position, block_index]
+                    incremental_correlation_per_pertinent_marker_per_block[pertinent_marker_position, block_index],
                 )
             end
-            correlation_per_pertinent_marker[pertinent_marker_position] = correlation(pertinent_marker_incremental_correlation)
+            correlation_per_pertinent_marker[pertinent_marker_position] =
+                correlation(pertinent_marker_incremental_correlation)
         end
 
         @debug "TODOX QUANTILES: $(quantile(correlation_per_pertinent_marker, (0:10)./10))"
@@ -1989,7 +2011,9 @@ end
         high = mean(correlation_per_pertinent_marker) + 2 * std(correlation_per_pertinent_marker)
         @debug "TODOX NON-CONFUSING RANGE: 0 .. $(high)"
 
-        z_score_per_pertinent_marker = (correlation_per_pertinent_marker .- mean(correlation_per_pertinent_marker)) ./ std(correlation_per_pertinent_marker)
+        z_score_per_pertinent_marker =
+            (correlation_per_pertinent_marker .- mean(correlation_per_pertinent_marker)) ./
+            std(correlation_per_pertinent_marker)
         is_suspect_per_pertinent_marker = correlation_per_pertinent_marker .> high
     else
         @assert false

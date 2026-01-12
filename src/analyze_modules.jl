@@ -682,10 +682,7 @@ TODOX
         metacell_mean_modules_distance_vector(GuaranteedOutput),
         metacell_std_modules_distance_vector(GuaranteedOutput),
     ],
-) function compute_metacells_modules_significance!(
-    daf::DafWriter;
-    overwrite::Bool = false,
-)::Nothing
+) function compute_metacells_modules_significance!(daf::DafWriter; overwrite::Bool = false)::Nothing
     n_metacells = axis_length(daf, "metacell")
     name_per_metacell = axis_vector(daf, "metacell")
 
@@ -724,7 +721,8 @@ TODOX
                 module_UMIs_per_metacell_cell =
                     vec(sum(UMIs_per_cell_per_gene[indices_of_metacell_cells, indices_of_module_genes]; dims = 2))
                 @assert_vector(module_UMIs_per_metacell_cell, n_metacell_cells)
-                fraction_per_module_per_cell[module_index, :] = module_UMIs_per_metacell_cell ./ total_UMIs_per_metacell_cell
+                fraction_per_module_per_cell[module_index, :] =
+                    module_UMIs_per_metacell_cell ./ total_UMIs_per_metacell_cell
                 module_total_UMIs_of_metacell = sum(module_UMIs_per_metacell_cell)
                 mean_fraction_per_module[module_index] = module_total_UMIs_of_metacell ./ total_UMIs_of_metacell
             end

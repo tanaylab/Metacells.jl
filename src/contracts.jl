@@ -1089,7 +1089,9 @@ end
 
 TODOX
 """
-function block_block_confusion_by_closest_by_pertinent_markers_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function block_block_confusion_by_closest_by_pertinent_markers_matrix(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
     return ("block", "block", "confusion_by_closest_by_pertinent_markers") => (expectation, StorageUnsigned, "TODOX.")
 end
 
@@ -2029,7 +2031,9 @@ end
 
 TODOX
 """
-function block_cell_pertinent_markers_correlation_matrix(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function block_cell_pertinent_markers_correlation_matrix(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
     return ("block", "cell", "pertinent_markers_correlation") => (expectation, StorageFloat, "TODOX")
 end
 
@@ -2047,7 +2051,9 @@ end
 """
 TODOX
 """
-function cell_closest_by_pertinent_markers_block_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function cell_closest_by_pertinent_markers_block_vector(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
     return ("cell", "block.closest_by_pertinent_markers") => (expectation, AbstractString, "TODOX")
 end
 
@@ -2108,7 +2114,9 @@ end
 
 TODOX
 """
-function cell_projected_metacell_modules_z_score_vector(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function cell_projected_metacell_modules_z_score_vector(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
     return ("cell", "projected_metacell_modules_z_score") => (expectation, StorageFloat, "TODOX.")
 end
 
@@ -2135,7 +2143,9 @@ end
 
 TODOX
 """
-function cell_provisional_block_pertinent_markers_z_score(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function cell_provisional_block_pertinent_markers_z_score(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
     return ("cell", "provisional_block_pertinent_markers_z_score") => (expectation, StorageFloat, "TODOX.")
 end
 

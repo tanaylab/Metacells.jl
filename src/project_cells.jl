@@ -49,7 +49,14 @@ TODOX
     gene_UMIs_regularization::Real = 1 / 7,
     overwrite::Bool = false,
 )::Nothing
-    todox_distances(; blocks_daf, cells_daf, gene_UMIs_regularization, prefix = "pertinent_", which = "marker", overwrite)
+    todox_distances(;
+        blocks_daf,
+        cells_daf,
+        gene_UMIs_regularization,
+        prefix = "pertinent_",
+        which = "marker",
+        overwrite,
+    )
     return nothing
 end
 
@@ -75,16 +82,20 @@ function todox_distances(;
     total_UMIs_per_cell = get_vector(cells_daf, "cell", "total_UMIs").array
     UMIs_per_cell_per_gene = get_matrix(cells_daf, "cell", "gene", "UMIs").array
     @views UMIs_per_cell_per_which = UMIs_per_cell_per_gene[:, cells_gene_index_per_which]
+    @debug "TODOX prepare..."
     UMIs_per_which_per_cell = densify(flip(UMIs_per_cell_per_which))
 
+    @debug "TODOX log_fraction_per_which_per_cell..."
     log_fraction_per_which_per_cell = log2.(1e-4 .+ UMIs_per_which_per_cell ./ transpose(total_UMIs_per_cell))  # TODOX
     log_fraction_per_which_per_block =
         log2.(1e-4 .+ densify(blocks_daf["/ gene & is_$(which) &! is_lateral / block : linear_fraction"].array))
 
+    @debug "TODOX distances..."
     distances_between_cells_and_blocks =
-        pairwise(Euclidean(), log_fraction_per_which_per_cell, log_fraction_per_which_per_block)
+        parallel_pairwise(Euclidean(), log_fraction_per_which_per_cell, log_fraction_per_which_per_block; dims = 2)
     set_matrix!(cells_daf, "cell", "block", "$(prefix)$(which)s_euclidean_distance", distances_between_cells_and_blocks)
 
+    @debug "TODOX correlations..."
     correlations_between_cells_and_blocks = cor(log_fraction_per_which_per_cell, log_fraction_per_which_per_block)
     set_matrix!(cells_daf, "cell", "block", "$(prefix)$(which)s_correlation", correlations_between_cells_and_blocks)
 
@@ -130,10 +141,7 @@ TODOX
         block_mean_pertinent_markers_distance_vector(GuaranteedOutput),
         block_std_pertinent_markers_distance_vector(GuaranteedOutput),
     ],
-) function compute_blocks_cells_pertinent_markers_significance!(
-    daf::DafReader;
-    overwrite::Bool = false,
-)::Nothing
+) function compute_blocks_cells_pertinent_markers_significance!(daf::DafReader; overwrite::Bool = false)::Nothing
     n_blocks = axis_length(daf, "block")
 
     distance_per_cell_per_block = get_matrix(daf, "cell", "block", "pertinent_markers_euclidean_distance").array
@@ -217,11 +225,7 @@ TODOX
 end
 
 @logged @computation Contract(;
-    axes = [
-        metacell_axis(RequiredInput),
-        block_axis(RequiredInput),
-        gene_axis(RequiredInput),
-    ],
+    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
         gene_is_marker_vector(RequiredInput),
         gene_is_lateral_vector(RequiredInput),
@@ -230,10 +234,7 @@ end
         block_std_pertinent_markers_distance_vector(RequiredInput),
     ],
 ) Contract(;
-    axes = [
-        cell_axis(RequiredInput),
-        gene_axis(RequiredInput),
-    ],
+    axes = [cell_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
         cell_total_UMIs_vector(RequiredInput),
         cell_gene_UMIs_matrix(RequiredInput),
@@ -252,10 +253,12 @@ end
     n_blocks = axis_length(modules_daf, "block")
     name_per_block = axis_vector(modules_daf, "block")
 
-    mean_pertinent_markers_distance_per_block = get_vector(modules_daf, "block", "mean_pertinent_markers_distance").array
+    mean_pertinent_markers_distance_per_block =
+        get_vector(modules_daf, "block", "mean_pertinent_markers_distance").array
     std_pertinent_markers_distance_per_block = get_vector(modules_daf, "block", "std_pertinent_markers_distance").array
 
-    linear_fraction_per_pertinent_marker_per_block = modules_daf["/ gene & is_marker &! is_lateral / block : linear_fraction"].array
+    linear_fraction_per_pertinent_marker_per_block =
+        modules_daf["/ gene & is_marker &! is_lateral / block : linear_fraction"].array
     log_linear_fraction_per_pertinent_marker_per_block =
         log2.(gene_cell_fraction_regularization .+ linear_fraction_per_pertinent_marker_per_block)
 
@@ -276,8 +279,13 @@ end
         log_linear_fraction_per_pertinent_marker =
             log2.(gene_cell_fraction_regularization .+ UMIs_per_pertinent_marker ./ total_UMIs_per_cell[cell_index])
 
-        distances_to_blocks =
-            vec(pairwise(Euclidean(), Ref(log_linear_fraction_per_pertinent_marker), eachcol(log_linear_fraction_per_pertinent_marker_per_block)))
+        distances_to_blocks = vec(
+            pairwise(
+                Euclidean(),
+                Ref(log_linear_fraction_per_pertinent_marker),
+                eachcol(log_linear_fraction_per_pertinent_marker_per_block),
+            ),
+        )
         @assert_vector(distances_to_blocks, n_blocks)
 
         provisional_block_index = argmin(distances_to_blocks)
@@ -286,7 +294,8 @@ end
         minimal_distance = distances_to_blocks[provisional_block_index]
         mean_pertinent_markers_distance = mean_pertinent_markers_distance_per_block[provisional_block_index]
         std_pertinent_markers_distance = std_pertinent_markers_distance_per_block[provisional_block_index]
-        z_score_per_cell[cell_index] = (minimal_distance - mean_pertinent_markers_distance) / std_pertinent_markers_distance
+        z_score_per_cell[cell_index] =
+            (minimal_distance - mean_pertinent_markers_distance) / std_pertinent_markers_distance
         counter = atomic_add!(progress_counter, 1)
         if cell_index % 100 == 1
             print("\r$(counter) ($(percent(counter, n_cells)))   ")
@@ -318,10 +327,7 @@ end
         block_module_neighborhood_mean_linear_fraction_matrix(RequiredInput),  # TODOX: Normalized only
     ],
 ) Contract(;
-    axes = [
-        cell_axis(RequiredInput),
-        gene_axis(RequiredInput),
-    ],
+    axes = [cell_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
         cell_total_UMIs_vector(RequiredInput),
         cell_gene_UMIs_matrix(RequiredInput),
@@ -339,7 +345,8 @@ end
 )::Nothing
     n_cells = axis_length(cells_daf, "cell")
     provisional_block_per_cell = get_vector(cells_daf, "cell", "block.provisional").array
-    provisional_markers_z_score_per_cell = get_vector(cells_daf, "cell", "provisional_block_pertinent_markers_z_score").array
+    provisional_markers_z_score_per_cell =
+        get_vector(cells_daf, "cell", "provisional_block_pertinent_markers_z_score").array
 
     UMIs_per_cell_per_gene = get_matrix(cells_daf, "cell", "gene", "UMIs").array
     total_UMIs_per_cell = get_vector(cells_daf, "cell", "total_UMIs").array
@@ -356,8 +363,10 @@ end
 
     projected_block_per_cell = copy_array(provisional_block_per_cell; eltype = AbstractString)
 
-    mean_linear_fraction_per_module_per_block = get_matrix(modules_daf, "module", "block", "neighborhood_mean_linear_fraction").array
-    std_linear_fraction_per_module_per_block = get_matrix(modules_daf, "module", "block", "neighborhood_std_linear_fraction").array
+    mean_linear_fraction_per_module_per_block =
+        get_matrix(modules_daf, "module", "block", "neighborhood_mean_linear_fraction").array
+    std_linear_fraction_per_module_per_block =
+        get_matrix(modules_daf, "module", "block", "neighborhood_std_linear_fraction").array
     module_per_gene_per_block = get_matrix(modules_daf, "gene", "block", "module").array
 
     mean_modules_distance_per_metacell = get_vector(modules_daf, "metacell", "mean_modules_distance").array
@@ -367,9 +376,8 @@ end
     projected_metacell_per_cell = fill("", n_cells)
     modules_z_score_per_cell = zeros(Float32, n_cells)
 
-    next_indices_of_cells_per_block = [
-        findall(provisional_block_index_per_cell .== block_index) for block_index in 1:n_blocks
-    ]
+    next_indices_of_cells_per_block =
+        [findall(provisional_block_index_per_cell .== block_index) for block_index in 1:n_blocks]
 
     spin_lock = SpinLock()
 
@@ -413,15 +421,17 @@ end
 
                 @views module_per_gene = module_per_gene_per_block[:, block_index]
                 total_UMIs_per_block_cell = total_UMIs_per_cell[indices_of_block_cells]
-                linear_fraction_per_strong_module_per_block_cell = Matrix{Float32}(undef, n_strong_modules, n_block_cells)
+                linear_fraction_per_strong_module_per_block_cell =
+                    Matrix{Float32}(undef, n_strong_modules, n_block_cells)
 
                 for (strong_module_position, strong_module_index) in enumerate(indices_of_strong_modules)
                     strong_module_name = name_per_module[strong_module_index]
                     indices_of_strong_module_genes = findall(module_per_gene .== strong_module_name)
                     n_strong_module_genes = length(indices_of_strong_module_genes)
                     @assert n_strong_module_genes > 0
-                    strong_module_UMIs_per_block_cell =
-                        vec(sum(UMIs_per_cell_per_gene[indices_of_block_cells, indices_of_strong_module_genes]; dims = 2))
+                    strong_module_UMIs_per_block_cell = vec(
+                        sum(UMIs_per_cell_per_gene[indices_of_block_cells, indices_of_strong_module_genes]; dims = 2),
+                    )
                     @assert_vector(strong_module_UMIs_per_block_cell, n_block_cells)
                     linear_fraction_per_strong_module_per_block_cell[strong_module_position, :] .=
                         strong_module_UMIs_per_block_cell ./ total_UMIs_per_block_cell
@@ -434,28 +444,26 @@ end
                         std_linear_fraction_per_module_per_block[indices_of_strong_modules, block_index]
                     linear_fraction_per_strong_module_per_candidate_metacell .=
                         (
-                            linear_fraction_per_strong_module_per_candidate_metacell .- mean_linear_fraction_per_strong_module
+                            linear_fraction_per_strong_module_per_candidate_metacell .-
+                            mean_linear_fraction_per_strong_module
                         ) ./ std_linear_fraction_per_strong_module
                     linear_fraction_per_strong_module_per_block_cell .=
-                        (
-                            linear_fraction_per_strong_module_per_block_cell .- mean_linear_fraction_per_strong_module
-                        ) ./ std_linear_fraction_per_strong_module
+                        (linear_fraction_per_strong_module_per_block_cell .- mean_linear_fraction_per_strong_module) ./
+                        std_linear_fraction_per_strong_module
                 end
 
-                distances_between_candidate_metacells_and_block_cells =
-                    pairwise(
-                        Euclidean(),
-                        linear_fraction_per_strong_module_per_candidate_metacell,
-                        linear_fraction_per_strong_module_per_block_cell,
-                    )
+                distances_between_candidate_metacells_and_block_cells = pairwise(
+                    Euclidean(),
+                    linear_fraction_per_strong_module_per_candidate_metacell,
+                    linear_fraction_per_strong_module_per_block_cell,
+                )
 
                 minimal_position_per_block_cell =
                     vec(argmin(distances_between_candidate_metacells_and_block_cells; dims = 1))
                 minimal_distance_per_block_cell =
                     distances_between_candidate_metacells_and_block_cells[minimal_position_per_block_cell]
-                position_of_nearest_candidate_metacell_per_block_cell = [
-                    position.I[1] for position in minimal_position_per_block_cell
-                ]
+                position_of_nearest_candidate_metacell_per_block_cell =
+                    [position.I[1] for position in minimal_position_per_block_cell]
 
                 if block_index_per_candidate_metacell === nothing
                     positions_of_stable_cells = 1:n_block_cells
@@ -488,9 +496,7 @@ end
                 n_stable_cells = length(positions_of_stable_cells)
                 if n_stable_cells > 0
                     metacell_index_per_stable_cell =
-                        indices_of_candidate_metacells[
-                            position_of_nearest_candidate_metacell_per_block_cell[positions_of_stable_cells]
-                        ]
+                        indices_of_candidate_metacells[position_of_nearest_candidate_metacell_per_block_cell[positions_of_stable_cells]]
                     metacell_per_stable_cell = name_per_metacell[metacell_index_per_stable_cell]
 
                     indices_of_stable_cells = indices_of_block_cells[positions_of_stable_cells]
@@ -500,9 +506,7 @@ end
                         (
                             minimal_distance_per_block_cell[positions_of_stable_cells] .-
                             mean_modules_distance_per_metacell[metacell_index_per_stable_cell]
-                        ) ./ (
-                            std_modules_distance_per_metacell[metacell_index_per_stable_cell]
-                        )
+                        ) ./ (std_modules_distance_per_metacell[metacell_index_per_stable_cell])
                 end
                 atomic_add!(determined_counter, n_stable_cells)
             end

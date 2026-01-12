@@ -259,7 +259,7 @@ function compute_block_modules!(
         @assert_matrix(correlations_between_genes, n_genes, n_genes, Columns)
 
         correlations_between_genes[isnan.(correlations_between_genes)] .= 0
-        distances_between_genes = pairwise(Euclidean(), correlations_between_genes)
+        distances_between_genes = parallel_pairwise(Euclidean(), correlations_between_genes; dims = 2)
         @assert_matrix(distances_between_genes, n_genes, n_genes, Columns)
         genes_tree = hclust(distances_between_genes; linkage = :ward)
 

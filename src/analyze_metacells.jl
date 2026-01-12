@@ -546,7 +546,8 @@ $(CONTRACT)
     ],
 ) function compute_metacells_euclidean_distances!(daf::DafWriter; overwrite::Bool = false)::Nothing
     log_linear_fraction_per_skeleton_per_metacell = daf["/ gene & is_skeleton / metacell : log_linear_fraction"].array
-    distances_between_metacells = pairwise(Euclidean(), log_linear_fraction_per_skeleton_per_metacell)  # NOJET
+    distances_between_metacells =
+        parallel_pairwise(Euclidean(), log_linear_fraction_per_skeleton_per_metacell; dims = 2)  # NOJET
     set_matrix!(daf, "metacell", "metacell", "euclidean_skeleton_distance", distances_between_metacells; overwrite)
     return nothing
 end
@@ -751,7 +752,8 @@ $(CONTRACT)
         @threads :greedy for gene_index in 1:n_genes
             @views UMIs_per_cell = UMIs_per_cell_per_gene[:, gene_index]
             @views metacell_UMIs_per_metacell = UMIs_per_metacell_per_gene[:, gene_index]
-            cell_log_fraction_per_cell = log2.(UMIs_per_cell ./ total_UMIs_per_cell .+ gene_cell_fraction_regularization)
+            cell_log_fraction_per_cell =
+                log2.(UMIs_per_cell ./ total_UMIs_per_cell .+ gene_cell_fraction_regularization)
             punctuated_metacell_log_fraction_per_cell = log2.(
                 (
                     (metacell_UMIs_per_metacell[metacell_index_per_cell] .- UMIs_per_cell) ./
@@ -1210,11 +1212,11 @@ $(CONTRACT)
 
     is_in_metacell_per_cell = metacell_index_per_cell .> 0
     for (correlation_index, (cells_property, title)) in enumerate((
-        #"genes_correlation_with_punctuated_metacells",
-        #"markers_correlation_with_punctuated_metacells",
+    #"genes_correlation_with_punctuated_metacells",
+    #"markers_correlation_with_punctuated_metacells",
         ("pertinent_markers_correlation_with_punctuated_metacells", "pertinent markers"),
-        #"regulators_correlation_with_punctuated_metacells",
-        #"pertinent_regulators_correlation_with_punctuated_metacells",
+    #"regulators_correlation_with_punctuated_metacells",
+    #"pertinent_regulators_correlation_with_punctuated_metacells",
     ))
         @debug "Mean correlation of cells with their punctuated metacells (of $(title)): $(mean(correlation_per_cell[correlation_index][is_in_metacell_per_cell]))"
         set_vector!(daf, "cell", cells_property, correlation_per_cell[correlation_index]; overwrite)
@@ -1294,7 +1296,13 @@ TODOX
         end
     end
 
-    set_vector!(cells_daf, "cell", "pertinent_markers_correlation_with_projected_metacells", correlation_per_cell; overwrite)
+    set_vector!(
+        cells_daf,
+        "cell",
+        "pertinent_markers_correlation_with_projected_metacells",
+        correlation_per_cell;
+        overwrite,
+    )
     @debug "Mean correlation of cells and their projected metacells (of pertinent markers): $(mean(correlation_per_cell))"
 
     return nothing
@@ -1358,8 +1366,7 @@ TODOX
         gene_index_in_modules = indices_in_cells_per_included_gene[included_gene_position]
         @views metacell_UMIs_per_metacell = UMIs_per_metacell_per_gene[:, gene_index_in_modules]
         metacell_log_fraction_per_cell = log2.(
-            metacell_UMIs_per_metacell[metacell_index_per_cell] ./ total_UMIs_per_metacell[metacell_index_per_cell] .+
-            gene_cell_fraction_regularization,
+            metacell_UMIs_per_metacell[metacell_index_per_cell] ./ total_UMIs_per_metacell[metacell_index_per_cell] .+ gene_cell_fraction_regularization,
         )
 
         correlation_between_cells_and_projected_metacells_per_gene[gene_index_in_cells] =
