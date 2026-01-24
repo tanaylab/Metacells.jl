@@ -32,9 +32,6 @@ export compute_blocks_types_by_metacells!
 export compute_genes_most_changed_correlation_in_neighborhood_metacells_ranks!
 export compute_suspect_genes!
 
-using Profile
-using PProf
-
 using Base.Threads
 using DataAxesFormats
 using Distances
@@ -152,7 +149,7 @@ function compute_distances_between_blocks(;  # untested
     n_blocks = length(metacell_indices_per_block)
     distances_between_blocks = Matrix{Float32}(undef, n_blocks, n_blocks)
 
-    @threads :greedy for base_block_index in reverse(1:n_blocks)
+    parallel_loop_wo_rng(reverse(1:n_blocks)) do base_block_index
         indices_of_base_metacells = metacell_indices_per_block[base_block_index]
 
         @views distance_per_metacell_per_base_metacell = distances_between_metacells[:, indices_of_base_metacells]
@@ -179,6 +176,8 @@ function compute_distances_between_blocks(;  # untested
             @views distances_between_base_and_other_blocks =
                 distances_between_blocks[1:(base_block_index - 1), base_block_index]
         end
+
+        return nothing
     end
 
     return distances_between_blocks
@@ -352,10 +351,11 @@ $(CONTRACT)
     n_blocks = axis_length(daf, "block")
     name_per_block = axis_vector(daf, "block")
     n_neighborhood_metacells_per_block = Vector{UInt32}(undef, n_blocks)
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         n_neighborhood_metacells_per_block[block_index] =
             daf["/ metacell & block => is_in_neighborhood ;= $(block_name) %> Count || 0"]
+        return nothing
     end
     set_vector!(daf, "block", "n_neighborhood_metacells", n_neighborhood_metacells_per_block; overwrite)
     return nothing
@@ -385,10 +385,11 @@ $(CONTRACT)
     n_blocks = axis_length(daf, "block")
     name_per_block = axis_vector(daf, "block")
     n_environment_metacells_per_block = Vector{UInt32}(undef, n_blocks)
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         n_environment_metacells_per_block[block_index] =
             daf["/ metacell & block => is_in_environment ;= $(block_name) %> Count || 0"]
+        return nothing
     end
     set_vector!(daf, "block", "n_environment_metacells", n_environment_metacells_per_block; overwrite)
     return nothing
@@ -445,10 +446,11 @@ $(CONTRACT)
     n_blocks = axis_length(daf, "block")
     name_per_block = axis_vector(daf, "block")
     n_neighborhood_cells_per_block = Vector{UInt32}(undef, n_blocks)
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         n_neighborhood_cells_per_block[block_index] =
             daf["/ metacell & block => is_in_neighborhood ;= $(block_name) : n_cells %> Sum"]
+        return nothing
     end
     set_vector!(daf, "block", "n_neighborhood_cells", n_neighborhood_cells_per_block; overwrite)
     return nothing
@@ -479,10 +481,11 @@ $(CONTRACT)
     n_blocks = axis_length(daf, "block")
     name_per_block = axis_vector(daf, "block")
     n_environment_cells_per_block = Vector{UInt32}(undef, n_blocks)
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         n_environment_cells_per_block[block_index] =
             daf["/ metacell & block => is_in_environment ;= $(block_name) : n_cells %> Sum"]
+        return nothing
     end
     set_vector!(daf, "block", "n_environment_cells", n_environment_cells_per_block; overwrite)
     return nothing
@@ -543,7 +546,7 @@ A mask of genes that distinguish between cell states in each environment. Otherw
 
     is_environment_marker_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
 
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         adapter(  # NOJET
             daf;
@@ -566,6 +569,7 @@ A mask of genes that distinguish between cell states in each environment. Otherw
             @debug "Block: $(block_name) environment markers: $(sum(is_environment_marker_per_gene))"
             return nothing
         end
+        return nothing
     end
     set_matrix!(
         daf,
@@ -600,7 +604,7 @@ end
 
     is_neighborhood_marker_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
 
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         adapter(  # NOJET
             daf;
@@ -623,6 +627,7 @@ end
             @debug "Block: $(block_name) neighborhood markers: $(sum(is_neighborhood_marker_per_gene))"
             return nothing
         end
+        return nothing
     end
     set_matrix!(
         daf,
@@ -675,7 +680,7 @@ TODOX
 
     is_correlated_with_skeleton_in_neighborhood_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
 
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         adapter(  # NOJET
             daf;
@@ -703,6 +708,7 @@ TODOX
             @debug "Block: $(block_name) genes correlated with skeleton in neighborhood: $(sum(is_correlated_with_skeleton_in_neighborhood_per_gene))"
             return nothing
         end
+        return nothing
     end
     set_matrix!(
         daf,
@@ -749,7 +755,7 @@ A mask of genes that distinguish between cell states in each neighborhood. Other
 
     is_neighborhood_marker_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
 
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         adapter(  # NOJET
             daf;
@@ -770,6 +776,7 @@ A mask of genes that distinguish between cell states in each neighborhood. Other
             is_neighborhood_marker_per_gene_per_block[:, block_index] = get_vector(adapted, "gene", "is_marker").array
             return nothing
         end
+        return nothing
     end
     set_matrix!(
         daf,
@@ -990,7 +997,7 @@ The correlation between cells and metacells gene expression levels in each block
             @views metacell_UMIs_per_neighborhood_cell_per_gene =
                 UMIs_per_metacell_per_gene[metacell_index_per_neighborhood_cell, :]
 
-            @threads :greedy for included_gene_position in 1:n_included_genes
+            parallel_loop_wo_rng(1:n_included_genes) do included_gene_position
                 gene_index = indices_of_included_genes[included_gene_position]
                 UMIs_per_neighborhood_cell = UMIs_per_neighborhood_cell_per_gene[:, gene_index]
                 metacell_UMIs_per_neighborhood_cell = metacell_UMIs_per_neighborhood_cell_per_gene[:, gene_index]
@@ -1005,13 +1012,18 @@ The correlation between cells and metacells gene expression levels in each block
                     ) .+ gene_cell_fraction_regularization,
                 )
 
-                correlation =
-                    cor(cell_log_fraction_per_neighborhood_cell, punctuated_metacell_log_fraction_per_neighborhood_cell)
+                correlation = flame_timed("cor") do
+                    return cor(
+                        cell_log_fraction_per_neighborhood_cell,
+                        punctuated_metacell_log_fraction_per_neighborhood_cell,
+                    )
+                end
                 if isnan(correlation)
                     correlation = 0
                 end
 
                 correlation_per_gene_per_block[gene_index, block_index] = correlation
+                return nothing
             end
 
             mean_correlation_per_block[block_index] =
@@ -1020,7 +1032,7 @@ The correlation between cells and metacells gene expression levels in each block
         end
     end
 
-    @debug "Mean correlation in blocks: $(mean(mean_correlation_per_block))"
+    @info "Mean correlation in blocks: $(mean(mean_correlation_per_block))"
 
     set_matrix!(
         daf,
@@ -1191,26 +1203,35 @@ $(CONTRACT)
         correlation_between_pertinent_neighborhood_markers =
             Matrix{Float32}(undef, n_pertinent_neighborhood_markers, n_pertinent_neighborhood_markers)
         correlation_between_pertinent_neighborhood_markers[1, 1] = 0
-        @threads :greedy for base_position in reverse(2:n_pertinent_neighborhood_markers)
+        parallel_loop_wo_rng(
+            reverse(2:n_pertinent_neighborhood_markers);
+            name = "compute_correlation_between_pertinent_neighborhood_markers",
+        ) do base_position
             correlation_between_pertinent_neighborhood_markers[base_position, base_position] = 0
             @views base_column = log_fraction_per_neighborhood_cell_per_pertinent_neighborhood_marker[:, base_position]
             for other_position in 1:(base_position - 1)
                 @views other_column =
                     log_fraction_per_neighborhood_cell_per_pertinent_neighborhood_marker[:, other_position]
-                correlation = cor(base_column, other_column)
+                correlation = flame_timed("cor") do
+                    return cor(base_column, other_column)
+                end
                 if isnan(correlation)
                     correlation = 0
                 end
                 correlation_between_pertinent_neighborhood_markers[base_position, other_position] = correlation
                 correlation_between_pertinent_neighborhood_markers[other_position, base_position] = correlation
             end
+            return nothing
         end
 
         correlation_between_pertinent_neighborhood_markers[isnan.(
             correlation_between_pertinent_neighborhood_markers,
         )] .= 0
 
-        for pertinent_neighborhood_marker_position in 1:n_pertinent_neighborhood_markers
+        parallel_loop_wo_rng(
+            1:n_pertinent_neighborhood_markers;
+            name = "compute_most_correlated_pertinent_neighborhood_markers",
+        ) do pertinent_neighborhood_marker_position
             pertinent_neighborhood_marker_index =
                 indices_of_pertinent_neighborhood_markers[pertinent_neighborhood_marker_position]
             @views correlation_with_pertinent_neighborhood_marker =
@@ -1223,6 +1244,7 @@ $(CONTRACT)
                 most_correlated_neighborhood_marker_index,
                 pertinent_neighborhood_marker_index,
             ] = true
+            return nothing
         end
 
         @debug "- Block: $(block_name) cells: $(length(indices_of_neighborhood_cells)) base genes: $(n_pertinent_neighborhood_markers)"
@@ -1287,70 +1309,106 @@ $(CONTRACT)
         other_name = "." * other_daf.name
     end
 
-    @assert axis_vector(base_daf, "gene") == axis_vector(other_daf, "gene")
-    @assert axis_vector(base_daf, "cell") == axis_vector(other_daf, "cell")
+    local linear_fraction_per_other_metacell_per_gene
+    local other_metacells_per_cell
+    local projected_metacells_per_cell
 
-    n_genes = axis_length(base_daf, "gene")
-    name_per_gene = axis_vector(base_daf, "gene")
+    local n_base_blocks
+    local name_per_base_block
 
-    linear_fraction_per_other_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "linear_fraction").array
-    other_metacells_per_cell = get_vector(other_daf, "cell", "metacell").array
-    projected_metacells_per_cell = get_vector(other_daf, "cell", "metacell.projected").array
+    local UMIs_per_cell_per_gene
+    local total_UMIs_per_cell
 
-    n_base_blocks = axis_length(base_daf, "block")
-    name_per_base_block = axis_vector(base_daf, "block")
+    local most_correlation_per_gene_per_base_block
+    local correlation_per_gene_per_base_block
+    local projected_correlation_per_gene_per_base_block
 
-    UMIs_per_cell_per_gene = get_matrix(base_daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(base_daf, "cell", "total_UMIs").array
+    local mean_most_correlation_per_base_block
+    local mean_correlation_per_base_block
+    local mean_projected_correlation_per_base_block
 
-    most_correlation_per_gene_per_base_block = zeros(Float32, n_genes, n_base_blocks)
-    correlation_per_gene_per_base_block = zeros(Float32, n_genes, n_base_blocks)
-    projected_correlation_per_gene_per_base_block = zeros(Float32, n_genes, n_base_blocks)
+    flame_timed(".prepare") do
+        @assert axis_vector(base_daf, "gene") == axis_vector(other_daf, "gene")
+        @assert axis_vector(base_daf, "cell") == axis_vector(other_daf, "cell")
 
-    mean_most_correlation_per_base_block = Vector{Float32}(undef, n_base_blocks)
-    mean_correlation_per_base_block = Vector{Float32}(undef, n_base_blocks)
-    mean_projected_correlation_per_base_block = Vector{Float32}(undef, n_base_blocks)
+        n_genes = axis_length(base_daf, "gene")
 
-    @threads :greedy for base_block_index in 1:n_base_blocks
-        base_block_name = name_per_base_block[base_block_index]
+        linear_fraction_per_other_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "linear_fraction").array
+        other_metacells_per_cell = get_vector(other_daf, "cell", "metacell").array
+        projected_metacells_per_cell = get_vector(other_daf, "cell", "metacell.projected").array
 
-        is_most_correlated_per_gene_per_gene =
-            get_matrix(base_daf, "gene", "gene", "$(base_block_name)_is_most_correlated_in_neighborhood_cells").array
-        is_correlated_per_gene = vec(maximum(is_most_correlated_per_gene_per_gene; dims = 1))
-        indices_of_correlated_genes = findall(is_correlated_per_gene)
-        n_correlated_genes = length(indices_of_correlated_genes)
+        n_base_blocks = axis_length(base_daf, "block")
+        name_per_base_block = axis_vector(base_daf, "block")
 
-        indices_of_neighborhood_cells =
-            base_daf["/ cell & metacell ?? => block => is_in_neighborhood ;= $(base_block_name) : index"].array
-        other_metacell_per_neighborhood_cell = other_metacells_per_cell[indices_of_neighborhood_cells]
-        projected_metacell_per_neighborhood_cell = projected_metacells_per_cell[indices_of_neighborhood_cells]
-        is_grouped_per_neighborhood_cell = other_metacell_per_neighborhood_cell .!= ""
+        UMIs_per_cell_per_gene = get_matrix(base_daf, "cell", "gene", "UMIs").array
+        total_UMIs_per_cell = get_vector(base_daf, "cell", "total_UMIs").array
 
-        indices_of_grouped_neighborhood_cells = indices_of_neighborhood_cells[is_grouped_per_neighborhood_cell]
-        n_grouped_neighborhood_cells = length(indices_of_grouped_neighborhood_cells)
-        other_metacell_per_grouped_neighborhood_cell =
-            other_metacell_per_neighborhood_cell[is_grouped_per_neighborhood_cell]
-        projected_metacell_per_grouped_neighborhood_cell =
-            projected_metacell_per_neighborhood_cell[is_grouped_per_neighborhood_cell]
-        other_metacell_index_per_grouped_neighborhood_cell =
-            axis_indices(other_daf, "metacell", other_metacell_per_grouped_neighborhood_cell)
-        projected_metacell_index_per_grouped_neighborhood_cell =
-            axis_indices(other_daf, "metacell", projected_metacell_per_grouped_neighborhood_cell)
+        most_correlation_per_gene_per_base_block = zeros(Float32, n_genes, n_base_blocks)
+        correlation_per_gene_per_base_block = zeros(Float32, n_genes, n_base_blocks)
+        projected_correlation_per_gene_per_base_block = zeros(Float32, n_genes, n_base_blocks)
 
-        total_UMIs_per_grouped_neighborhood_cell = total_UMIs_per_cell[indices_of_grouped_neighborhood_cells]
+        mean_most_correlation_per_base_block = Vector{Float32}(undef, n_base_blocks)
+        mean_correlation_per_base_block = Vector{Float32}(undef, n_base_blocks)
+        return mean_projected_correlation_per_base_block = Vector{Float32}(undef, n_base_blocks)
+    end
 
-        UMIs_per_grouped_neighborhood_cell_per_correlated_gene =
-            densify(UMIs_per_cell_per_gene[indices_of_grouped_neighborhood_cells, indices_of_correlated_genes])
-        cell_log_fraction_per_grouped_neighborhood_cell_per_correlated_gene = log2.(
-            UMIs_per_grouped_neighborhood_cell_per_correlated_gene ./ total_UMIs_per_grouped_neighborhood_cell .+
-            gene_cell_fraction_regularization,
-        )
+    for base_block_index in 1:n_base_blocks
+        local base_block_name
+        local is_most_correlated_per_gene_per_gene
+        local is_correlated_per_gene
+        local indices_of_correlated_genes
+        local n_correlated_genes
+        local indices_of_neighborhood_cells
+        local indices_of_grouped_neighborhood_cells
+        local n_grouped_neighborhood_cells
+        local other_metacell_index_per_grouped_neighborhood_cell
+        local projected_metacell_index_per_grouped_neighborhood_cell
+        local cell_log_fraction_per_grouped_neighborhood_cell_per_correlated_gene
+        local most_correlation_per_gene
+        local correlation_per_gene
+        local projected_correlation_per_gene
 
-        @views most_correlation_per_gene = most_correlation_per_gene_per_base_block[:, base_block_index]
-        @views correlation_per_gene = correlation_per_gene_per_base_block[:, base_block_index]
-        @views projected_correlation_per_gene = projected_correlation_per_gene_per_base_block[:, base_block_index]
+        flame_timed(".begin_block") do
+            base_block_name = name_per_base_block[base_block_index]
 
-        @threads :greedy for correlated_gene_position in 1:n_correlated_genes
+            is_most_correlated_per_gene_per_gene =
+                get_matrix(base_daf, "gene", "gene", "$(base_block_name)_is_most_correlated_in_neighborhood_cells").array
+            is_correlated_per_gene = vec(maximum(is_most_correlated_per_gene_per_gene; dims = 1))
+            indices_of_correlated_genes = findall(is_correlated_per_gene)
+            n_correlated_genes = length(indices_of_correlated_genes)
+
+            indices_of_neighborhood_cells =
+                base_daf["/ cell & metacell ?? => block => is_in_neighborhood ;= $(base_block_name) : index"].array
+            other_metacell_per_neighborhood_cell = other_metacells_per_cell[indices_of_neighborhood_cells]
+            projected_metacell_per_neighborhood_cell = projected_metacells_per_cell[indices_of_neighborhood_cells]
+            is_grouped_per_neighborhood_cell = other_metacell_per_neighborhood_cell .!= ""
+
+            indices_of_grouped_neighborhood_cells = indices_of_neighborhood_cells[is_grouped_per_neighborhood_cell]
+            n_grouped_neighborhood_cells = length(indices_of_grouped_neighborhood_cells)
+            other_metacell_per_grouped_neighborhood_cell =
+                other_metacell_per_neighborhood_cell[is_grouped_per_neighborhood_cell]
+            projected_metacell_per_grouped_neighborhood_cell =
+                projected_metacell_per_neighborhood_cell[is_grouped_per_neighborhood_cell]
+            other_metacell_index_per_grouped_neighborhood_cell =
+                axis_indices(other_daf, "metacell", other_metacell_per_grouped_neighborhood_cell)
+            projected_metacell_index_per_grouped_neighborhood_cell =
+                axis_indices(other_daf, "metacell", projected_metacell_per_grouped_neighborhood_cell)
+
+            total_UMIs_per_grouped_neighborhood_cell = total_UMIs_per_cell[indices_of_grouped_neighborhood_cells]
+
+            UMIs_per_grouped_neighborhood_cell_per_correlated_gene =
+                densify(UMIs_per_cell_per_gene[indices_of_grouped_neighborhood_cells, indices_of_correlated_genes])
+            cell_log_fraction_per_grouped_neighborhood_cell_per_correlated_gene = log2.(
+                UMIs_per_grouped_neighborhood_cell_per_correlated_gene ./ total_UMIs_per_grouped_neighborhood_cell .+
+                gene_cell_fraction_regularization,
+            )
+
+            @views most_correlation_per_gene = most_correlation_per_gene_per_base_block[:, base_block_index]
+            @views correlation_per_gene = correlation_per_gene_per_base_block[:, base_block_index]
+            @views projected_correlation_per_gene = projected_correlation_per_gene_per_base_block[:, base_block_index]
+        end
+
+        parallel_loop_wo_rng(1:n_correlated_genes) do correlated_gene_position
             @views cell_log_fraction_per_grouped_neighborhood_cell =
                 cell_log_fraction_per_grouped_neighborhood_cell_per_correlated_gene[:, correlated_gene_position]
             @assert_vector(cell_log_fraction_per_grouped_neighborhood_cell, n_grouped_neighborhood_cells)
@@ -1384,10 +1442,12 @@ $(CONTRACT)
                maximum(other_metacell_log_fraction_per_grouped_neighborhood_cell_of_friend_gene)
                 most_correlation = 0
             else
-                most_correlation = cor(
-                    cell_log_fraction_per_grouped_neighborhood_cell,
-                    other_metacell_log_fraction_per_grouped_neighborhood_cell_of_friend_gene,
-                )
+                most_correlation = flame_timed("cor") do
+                    return cor(
+                        cell_log_fraction_per_grouped_neighborhood_cell,
+                        other_metacell_log_fraction_per_grouped_neighborhood_cell_of_friend_gene,
+                    )
+                end
                 @assert !isnan(most_correlation) && most_correlation != 0.0
             end
             most_correlation_per_gene[correlated_gene_index] = most_correlation
@@ -1398,10 +1458,12 @@ $(CONTRACT)
                maximum(other_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene)
                 correlation = 0
             else
-                correlation = cor(
-                    cell_log_fraction_per_grouped_neighborhood_cell,
-                    other_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene,
-                )
+                correlation = flame_timed("cor") do
+                    return cor(
+                        cell_log_fraction_per_grouped_neighborhood_cell,
+                        other_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene,
+                    )
+                end
                 @assert !isnan(correlation) && correlation != 0.0
             end
             correlation_per_gene[correlated_gene_index] = correlation
@@ -1412,61 +1474,70 @@ $(CONTRACT)
                maximum(projected_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene)
                 projected_correlation = 0
             else
-                projected_correlation = cor(
-                    cell_log_fraction_per_grouped_neighborhood_cell,
-                    projected_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene,
-                )
+                projected_correlation = flame_timed("cor") do
+                    return cor(
+                        cell_log_fraction_per_grouped_neighborhood_cell,
+                        projected_metacell_log_fraction_per_grouped_neighborhood_cell_of_gene,
+                    )
+                end
                 @assert !isnan(projected_correlation) && projected_correlation != 0.0
             end
             projected_correlation_per_gene[correlated_gene_index] = projected_correlation
+            return nothing
         end
 
-        mean_most_correlation = mean(most_correlation_per_gene[is_correlated_per_gene])
-        @assert mean_most_correlation > 0
+        flame_timed(".end_block") do
+            mean_most_correlation = mean(most_correlation_per_gene[is_correlated_per_gene])
+            @assert mean_most_correlation > 0
 
-        mean_correlation = mean(correlation_per_gene[is_correlated_per_gene])
-        @assert mean_correlation > 0
+            mean_correlation = mean(correlation_per_gene[is_correlated_per_gene])
+            @assert mean_correlation > 0
 
-        mean_projected_correlation = mean(projected_correlation_per_gene[is_correlated_per_gene])
-        @assert mean_projected_correlation > 0
+            mean_projected_correlation = mean(projected_correlation_per_gene[is_correlated_per_gene])
+            @assert mean_projected_correlation > 0
 
-        mean_most_correlation_per_base_block[base_block_index] = mean_most_correlation
-        mean_correlation_per_base_block[base_block_index] = mean_correlation
-        mean_projected_correlation_per_base_block[base_block_index] = mean_projected_correlation
+            mean_most_correlation_per_base_block[base_block_index] = mean_most_correlation
+            mean_correlation_per_base_block[base_block_index] = mean_correlation
+            mean_projected_correlation_per_base_block[base_block_index] = mean_projected_correlation
 
-        @debug "- Block: $(base_block_name) cells: $(percent(length(indices_of_grouped_neighborhood_cells), length(indices_of_neighborhood_cells))) out of $(length(indices_of_neighborhood_cells)) genes: $(n_correlated_genes) mean most: $(mean_most_correlation) self: $(mean_correlation) projected: $(mean_projected_correlation)"
+            @debug "- Block: $(base_block_name) cells: $(percent(length(indices_of_grouped_neighborhood_cells), length(indices_of_neighborhood_cells))) out of $(length(indices_of_neighborhood_cells)) genes: $(n_correlated_genes) mean most: $(mean_most_correlation) self: $(mean_correlation) projected: $(mean_projected_correlation)"
+        end
+
+        return nothing
     end
 
-    set_matrix!(
-        base_daf,
-        "gene",
-        "block",
-        "most_correlation_in_neighborhood_metacells$(other_name)",
-        bestify(most_correlation_per_gene_per_base_block);
-        overwrite,
-    )
+    flame_timed(".end") do
+        set_matrix!(
+            base_daf,
+            "gene",
+            "block",
+            "most_correlation_in_neighborhood_metacells$(other_name)",
+            bestify(most_correlation_per_gene_per_base_block);
+            overwrite,
+        )
 
-    set_matrix!(
-        base_daf,
-        "gene",
-        "block",
-        "correlation_in_neighborhood_metacells$(other_name)",
-        bestify(correlation_per_gene_per_base_block);
-        overwrite,
-    )
+        set_matrix!(
+            base_daf,
+            "gene",
+            "block",
+            "correlation_in_neighborhood_metacells$(other_name)",
+            bestify(correlation_per_gene_per_base_block);
+            overwrite,
+        )
 
-    set_matrix!(
-        base_daf,
-        "gene",
-        "block",
-        "projected_correlation_in_neighborhood_metacells$(other_name)",
-        bestify(projected_correlation_per_gene_per_base_block);
-        overwrite,
-    )
+        set_matrix!(
+            base_daf,
+            "gene",
+            "block",
+            "projected_correlation_in_neighborhood_metacells$(other_name)",
+            bestify(projected_correlation_per_gene_per_base_block);
+            overwrite,
+        )
 
-    @debug "Mean correlation of pertinent marker genes with friends (between cells and their metacells in neighborhoods): $(mean(mean_most_correlation_per_base_block))"
-    @debug "Mean correlation of pertinent marker genes with self (between cells and their metacells in neighborhoods): $(mean(mean_correlation_per_base_block))"
-    @debug "Mean correlation of pertinent marker genes with self (between cells and projected metacells in neighborhoods): $(mean(mean_projected_correlation_per_base_block))"
+        @info "Mean correlation of pertinent marker genes with friends (between cells and their metacells in neighborhoods): $(mean(mean_most_correlation_per_base_block))"
+        @info "Mean correlation of pertinent marker genes with self (between cells and their metacells in neighborhoods): $(mean(mean_correlation_per_base_block))"
+        @info "Mean correlation of pertinent marker genes with self (between cells and projected metacells in neighborhoods): $(mean(mean_projected_correlation_per_base_block))"
+    end
 
     return nothing
 end
@@ -1550,7 +1621,7 @@ end
     median_log_linear_fraction_per_gene = daf["/ metacell / gene : log_linear_fraction %> Median"].array
     @assert_vector(median_log_linear_fraction_per_gene, n_genes)
 
-    for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         @views is_neighborhood_distinct_per_gene = is_neighborhood_distinct_per_gene_per_block[:, block_index]
         compute_block_genes_is_neighborhood_distincts!(
@@ -1563,6 +1634,7 @@ end
             median_log_linear_fraction_per_gene,
             is_neighborhood_distinct_per_gene,
         )
+        return nothing
     end
     set_matrix!(
         daf,
@@ -1694,7 +1766,7 @@ $(CONTRACT)
 
     is_in_neighborhood_per_other_block_per_base_block = zeros(Bool, n_blocks, n_blocks)
 
-    for base_block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do base_block_index
         @views confusion_fraction_per_other_block = confusion_fraction_per_block_per_block[:, base_block_index]
         @views distance_per_other_block = mean_euclidean_skeleton_distance_per_block_per_block[:, base_block_index]
         priority_per_other_block = collect(zip(.-confusion_fraction_per_other_block, distance_per_other_block))
@@ -1761,6 +1833,7 @@ $(CONTRACT)
             " Covered M-UMIs: $(neighborhood_total_UMIs / 1e6)"
         )
         @assert neighborhood_n_disjoint_blocks == 0 || neighborhood_n_overflow_blocks == 0
+        return nothing
     end
 
     set_matrix!(daf, "block", "block", "is_in_neighborhood", is_in_neighborhood_per_other_block_per_base_block)
@@ -1867,7 +1940,9 @@ end
     total_UMIs_per_cell = daf["/ cell : total_UMIs"].array
 
     if method == :a
-        correlation_per_pertinent_marker = vec(cor(into_per_other_block, log_fraction_per_block_per_pertinent_marker))
+        correlation_per_pertinent_marker = flame_timed("cor") do
+            return vec(cor(into_per_other_block, log_fraction_per_block_per_pertinent_marker))
+        end
         correlation_per_pertinent_marker[isnan.(correlation_per_pertinent_marker)] .= 0
 
         @debug "TODOX QUANTILES: $(quantile(correlation_per_pertinent_marker, (0:10)./10))"
@@ -1894,19 +1969,16 @@ end
 
         incremental_correlation_per_pertinent_marker_per_block =
             Matrix{IncrementalCorrelation}(undef, n_pertinent_markers, n_blocks)
-        for block_index in 1:n_blocks
-            for pertinent_marker_position in 1:n_pertinent_markers
-                incremental_correlation_per_pertinent_marker_per_block[pertinent_marker_position, block_index] =
-                    IncrementalCorrelation()
-            end
+        for index in 1:length(incremental_correlation_per_pertinent_marker_per_block)
+            incremental_correlation_per_pertinent_marker_per_block[index] = IncrementalCorrelation()
         end
 
-        progress_counter = Atomic{Int}(0)
+        progress = DebugProgress(n_blocks * n_blocks)
         for into_block_index in 1:n_blocks
             log_fraction_of_into_per_pertinent_marker = log_fraction_per_pertinent_marker_per_block[:, into_block_index]
             @assert_vector(log_fraction_of_into_per_pertinent_marker, n_pertinent_markers)
 
-            @threads :greedy for from_block_index in 1:n_blocks
+            parallel_loop_wo_rng(1:n_blocks; name = ".loop1", progress) do from_block_index
                 if from_block_index != into_block_index
                     indices_of_migrated_cells = findall(
                         (original_block_index_per_cell .== from_block_index) .&
@@ -1986,13 +2058,12 @@ end
                         end
                     end
                 end
+                return nothing
             end
-            counter = atomic_add!(progress_counter, 1)
-            print("\r$(progress_counter[]) ($(percent(counter + 1, n_blocks))) ...")
         end
 
         correlation_per_pertinent_marker = Vector{Float32}(undef, n_pertinent_markers)
-        @threads :greedy for pertinent_marker_position in 1:n_pertinent_markers
+        parallel_loop_wo_rng(1:n_pertinent_markers; name = ".loop2") do pertinent_marker_position
             pertinent_marker_incremental_correlation = IncrementalCorrelation()
             for block_index in 1:n_blocks
                 combine_into!(
@@ -2002,6 +2073,7 @@ end
             end
             correlation_per_pertinent_marker[pertinent_marker_position] =
                 correlation(pertinent_marker_incremental_correlation)
+            return nothing
         end
 
         @debug "TODOX QUANTILES: $(quantile(correlation_per_pertinent_marker, (0:10)./10))"

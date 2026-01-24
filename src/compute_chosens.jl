@@ -102,8 +102,10 @@ $(CONTRACT)
 
     distances_between_strong_modules = Matrix{Float32}(undef, n_strong_modules, n_strong_modules)
     distances_between_strong_modules[1, 1] = 0
-    progress_counter = Atomic{Int}(0)
-    @threads :greedy for base_strong_module_index in reverse(2:n_strong_modules)
+    parallel_loop_wo_rng(
+        reverse(2:n_strong_modules);
+        progress = DebugProgress(n_strong_modules - 1),
+    ) do base_strong_module_index
         distances_between_strong_modules[base_strong_module_index, base_strong_module_index] = 0
         @views is_member_per_gene_of_base_strong_module =
             is_member_per_gene_per_strong_module[:, base_strong_module_index]
@@ -125,10 +127,8 @@ $(CONTRACT)
             distances_between_strong_modules[other_strong_module_index, base_strong_module_index] = distance
         end
 
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_strong_modules))) ...")
+        return nothing
     end
-    println("")
 
     chosens = hclust(distances_between_strong_modules; linkage = :ward)  # NOJET
     n_chosens = n_modules

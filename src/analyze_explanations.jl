@@ -99,7 +99,7 @@ TODOX
         return GeneGeneStorage(zeros(Float32, n_genes, n_genes))
     end
 
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
 
         indices_of_environment_metacells = daf["/ metacell & block => is_in_environment ;= $(block_name) : index"].array
@@ -129,7 +129,9 @@ TODOX
         log_linear_fraction_per_environment_metacell_per_significant_gene =
             log_linear_fraction_per_metacell_per_gene[indices_of_environment_metacells, indices_of_significant_genes]
 
-        correlation_between_significant_genes = cor(log_linear_fraction_per_environment_metacell_per_significant_gene)  # NOLINT
+        correlation_between_significant_genes = flame_timed("cor") do
+            return cor(log_linear_fraction_per_environment_metacell_per_significant_gene)  # NOLINT
+        end
         @assert_matrix(correlation_between_significant_genes, n_significant_genes, n_significant_genes)
         correlation_between_significant_genes[diagind(correlation_between_significant_genes)] .= 0
 
@@ -225,6 +227,7 @@ TODOX
             " Significant: $(n_significant_genes) " *
             " Unexplained: $(n_unexplained_genes)"
         )
+        return nothing
     end
 
     set_matrix!(

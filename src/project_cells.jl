@@ -91,12 +91,19 @@ function todox_distances(;
         log2.(1e-4 .+ densify(blocks_daf["/ gene & is_$(which) &! is_lateral / block : linear_fraction"].array))
 
     @debug "TODOX distances..."
-    distances_between_cells_and_blocks =
-        parallel_pairwise(Euclidean(), log_fraction_per_which_per_cell, log_fraction_per_which_per_block; dims = 2)
+    distances_between_cells_and_blocks = parallel_pairwise(
+        Euclidean(),
+        log_fraction_per_which_per_cell,
+        log_fraction_per_which_per_block;
+        dims = 2,
+        progress = DebugProgress(n_blocks; desc = "distances_between_cells_and_blocks"),
+    )
     set_matrix!(cells_daf, "cell", "block", "$(prefix)$(which)s_euclidean_distance", distances_between_cells_and_blocks)
 
     @debug "TODOX correlations..."
-    correlations_between_cells_and_blocks = cor(log_fraction_per_which_per_cell, log_fraction_per_which_per_block)
+    correlations_between_cells_and_blocks = flame_timed("cor") do
+        return cor(log_fraction_per_which_per_cell, log_fraction_per_which_per_block)
+    end
     set_matrix!(cells_daf, "cell", "block", "$(prefix)$(which)s_correlation", correlations_between_cells_and_blocks)
 
     return nothing
@@ -273,19 +280,20 @@ end
     provisional_block_per_cell = Vector{AbstractString}(undef, n_cells)
     z_score_per_cell = Vector{Float32}(undef, n_cells)
 
-    progress_counter = Atomic{Int}(0)
-    @threads :greedy for cell_index in 1:n_cells
+    parallel_loop_wo_rng(1:n_cells; progress = DebugProgress(n_cells)) do cell_index
         UMIs_per_pertinent_marker = densify(UMIs_per_cell_per_gene[cell_index, index_per_pertinent_marker])
         log_linear_fraction_per_pertinent_marker =
             log2.(gene_cell_fraction_regularization .+ UMIs_per_pertinent_marker ./ total_UMIs_per_cell[cell_index])
 
-        distances_to_blocks = vec(
-            pairwise(
-                Euclidean(),
-                Ref(log_linear_fraction_per_pertinent_marker),
-                eachcol(log_linear_fraction_per_pertinent_marker_per_block),
-            ),
-        )
+        distances_to_blocks = flame_timed("pairwise.Euclidean") do
+            return vec(
+                pairwise(
+                    Euclidean(),
+                    Ref(log_linear_fraction_per_pertinent_marker),
+                    eachcol(log_linear_fraction_per_pertinent_marker_per_block),
+                ),
+            )
+        end
         @assert_vector(distances_to_blocks, n_blocks)
 
         provisional_block_index = argmin(distances_to_blocks)
@@ -296,10 +304,7 @@ end
         std_pertinent_markers_distance = std_pertinent_markers_distance_per_block[provisional_block_index]
         z_score_per_cell[cell_index] =
             (minimal_distance - mean_pertinent_markers_distance) / std_pertinent_markers_distance
-        counter = atomic_add!(progress_counter, 1)
-        if cell_index % 100 == 1
-            print("\r$(counter) ($(percent(counter, n_cells)))   ")
-        end
+        return nothing
     end
 
     set_vector!(cells_daf, "cell", "block.provisional", provisional_block_per_cell; overwrite)
@@ -388,7 +393,7 @@ end
         next_indices_of_cells_per_block = [Int32[] for _ in 1:n_blocks]
 
         @debug "TODOX Determined: $(determined_counter[]) $(percent(determined_counter[], n_cells)) Phase $(phase)..."
-        @threads :greedy for block_index in 1:n_blocks
+        parallel_loop_wo_rng(1:n_blocks) do block_index
             block_name = name_per_block[block_index]
 
             indices_of_block_cells = indices_of_cells_per_block[block_index]
@@ -452,11 +457,13 @@ end
                         std_linear_fraction_per_strong_module
                 end
 
-                distances_between_candidate_metacells_and_block_cells = pairwise(
-                    Euclidean(),
-                    linear_fraction_per_strong_module_per_candidate_metacell,
-                    linear_fraction_per_strong_module_per_block_cell,
-                )
+                distances_between_candidate_metacells_and_block_cells = flame_timed("pairwise.Euclidean") do
+                    return pairwise(
+                        Euclidean(),
+                        linear_fraction_per_strong_module_per_candidate_metacell,
+                        linear_fraction_per_strong_module_per_block_cell,
+                    )
+                end
 
                 minimal_position_per_block_cell =
                     vec(argmin(distances_between_candidate_metacells_and_block_cells; dims = 1))
@@ -510,6 +517,7 @@ end
                 end
                 atomic_add!(determined_counter, n_stable_cells)
             end
+            return nothing
         end
     end
 

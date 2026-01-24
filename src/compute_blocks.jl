@@ -228,7 +228,7 @@ function compute_blocks_is_in_vicinity!(
 
     min_blocks_in_vicinity = min(min_blocks_in_vicinity, n_blocks)
 
-    @threads :greedy for base_block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do base_block_index
         @views distance_from_base_per_block = mean_euclidean_skeleton_distance_per_block_per_block[:, base_block_index]
         ordered_block_indices = sortperm(distance_from_base_per_block)
         if ordered_block_indices[1] != base_block_index
@@ -259,6 +259,7 @@ function compute_blocks_is_in_vicinity!(
             " Metacells: $(vicinity_n_metacells)" *
             " Covered M-UMIs: $(vicinity_total_UMIs / 1e6)"
         )
+        return nothing
     end
 
     set_matrix!(  # NOJET

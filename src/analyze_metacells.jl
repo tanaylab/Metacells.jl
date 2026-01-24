@@ -162,13 +162,14 @@ $(CONTRACT)
     UMIs_per_gene_per_metacell = Matrix{UInt32}(undef, n_genes, n_metacells)
     metacell_per_cell = get_vector(daf, "cell", "metacell").array
 
-    @threads :greedy for metacell_index in 1:n_metacells
+    parallel_loop_wo_rng(1:n_metacells) do metacell_index
         metacell_name = name_per_metacell[metacell_index]
         index_per_metacell_cell = findall(metacell_per_cell .== metacell_name)
         @assert length(index_per_metacell_cell) > 0
 
         @views UMIs_per_gene_per_metacell_cell = UMIs_per_gene_per_cell[:, index_per_metacell_cell]
         UMIs_per_gene_per_metacell[:, metacell_index] .= vec(sum(UMIs_per_gene_per_metacell_cell; dims = 2))
+        return nothing
     end
 
     set_matrix!(daf, "gene", "metacell", "UMIs", bestify(UMIs_per_gene_per_metacell); overwrite)  # NOJET
@@ -285,8 +286,7 @@ $(CONTRACT)
 
     geomean_fraction_per_gene_per_metacell = zeros(Float32, n_genes, n_metacells)
 
-    progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(1:n_metacells; rng) do metacell_index, rng
+    parallel_loop_with_rng(1:n_metacells; rng, progress = DebugProgress(n_metacells)) do metacell_index, rng
         metacell_name = name_per_metacell[metacell_index]
         index_per_metacell_cell = findall(metacell_name_per_cell .== metacell_name)
         n_metacell_cells = length(index_per_metacell_cell)
@@ -345,8 +345,6 @@ $(CONTRACT)
         geomean_fraction_per_gene_per_metacell[index_per_included_gene, metacell_index] .=
             geomean_fraction_per_included_gene
 
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_metacells))) ...")
         return nothing
     end
 
@@ -617,14 +615,15 @@ $(CONTRACT)
             gene_fraction_regularization,
         )
 
-    UMIs_per_skeleton_per_metacell = daf["/ gene & is_skeleton / metacell : UMIs"].array
+    UMIs_per_metacell_per_skeleton = daf["/ metacell / gene & is_skeleton : UMIs"].array
+    UMIs_per_skeleton_per_metacell = flip(UMIs_per_metacell_per_skeleton)
 
     n_skeletons, n_metacells = size(UMIs_per_skeleton_per_metacell)
 
     distances_between_metacells = Matrix{Float32}(undef, n_metacells, n_metacells)
     distances_between_metacells[1, 1] = 0.0
 
-    @threads :greedy for base_metacell_index in reverse(2:(n_metacells))
+    parallel_loop_wo_rng(reverse(2:(n_metacells))) do base_metacell_index
         distances_between_metacells[base_metacell_index, base_metacell_index] = 0.0
 
         @views base_metacell_UMIs_per_skeleton = vec(UMIs_per_skeleton_per_metacell[:, base_metacell_index])
@@ -660,6 +659,7 @@ $(CONTRACT)
             distances_between_base_and_other_metacells
         distances_between_metacells[base_metacell_index, index_per_other_metacell] .=
             distances_between_base_and_other_metacells
+        return nothing
     end
 
     set_matrix!(daf, "metacell", "metacell", "max_skeleton_fold_distance", distances_between_metacells; overwrite)
@@ -747,9 +747,9 @@ $(CONTRACT)
         total_punctuated_metacell_UMIs_per_cell =
             total_UMIs_per_metacell[metacell_index_per_cell] .- total_UMIs_per_cell
 
-        progress_counter = Atomic{Int}(0)
         correlation_between_cells_and_metacells_per_gene = Vector{Float32}(undef, n_genes)
-        @threads :greedy for gene_index in 1:n_genes
+
+        parallel_loop_wo_rng(1:n_genes; progress = DebugProgress(n_genes)) do gene_index
             @views UMIs_per_cell = UMIs_per_cell_per_gene[:, gene_index]
             @views metacell_UMIs_per_metacell = UMIs_per_metacell_per_gene[:, gene_index]
             cell_log_fraction_per_cell =
@@ -760,15 +760,13 @@ $(CONTRACT)
                     total_punctuated_metacell_UMIs_per_cell
                 ) .+ gene_cell_fraction_regularization,
             )
-            correlation_between_cells_and_metacells_per_gene[gene_index] =
-                cor(cell_log_fraction_per_cell, punctuated_metacell_log_fraction_per_cell)
+            correlation_between_cells_and_metacells_per_gene[gene_index] = flame_timed("cor") do
+                return cor(cell_log_fraction_per_cell, punctuated_metacell_log_fraction_per_cell)
+            end
             if isnan(correlation_between_cells_and_metacells_per_gene[gene_index])
                 correlation_between_cells_and_metacells_per_gene[gene_index] = 0.0
             end
-            counter = atomic_add!(progress_counter, 1)
-            if counter % 100 == 0
-                print("\r$(progress_counter[]) ($(percent(counter + 1, n_genes))) ...")
-            end
+            return nothing
         end
 
         set_vector!(
@@ -780,7 +778,7 @@ $(CONTRACT)
         )
         is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
         is_pertinent_marker_per_gene = .!get_vector(daf, "gene", "is_lateral").array .& is_marker_per_gene
-        @debug "Mean correlation of pertinent marker genes (between cells and their punctuated metacells): $(mean(correlation_between_cells_and_metacells_per_gene[is_pertinent_marker_per_gene]))"
+        @info "Mean correlation of pertinent marker genes (between cells and their punctuated metacells): $(mean(correlation_between_cells_and_metacells_per_gene[is_pertinent_marker_per_gene]))"
         return nothing
     end
 end
@@ -859,8 +857,7 @@ $(CONTRACT)
     low_p_value_per_gene_per_metacell = zeros(Float32, n_genes, n_metacells)
     low_q_value_per_gene_per_metacell = zeros(Float32, n_genes, n_metacells)
 
-    progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(1:n_metacells; rng) do metacell_index, rng
+    parallel_loop_with_rng(1:n_metacells; rng, progress = DebugProgress(n_metacells)) do metacell_index, rng
         metacell_name = name_per_metacell[metacell_index]
         total_UMIs_per_metacell_cell = daf["/ cell & metacell = $(metacell_name) : total_UMIs"].array
 
@@ -1021,8 +1018,6 @@ $(CONTRACT)
         end
 
         # @assert false  # TODOX
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_metacells))) ...")
         return nothing
     end
 
@@ -1061,11 +1056,12 @@ function spearman_with_pvalue(
     correlations = Matrix{Float64}(undef, n_left_columns, n_right_columns)
     p_values = Matrix{Float64}(undef, n_left_columns, n_right_columns)
 
-    for left_column in 1:n_left_columns
+    parallel_loop_wo_rng(1:n_left_columns; name = "spearman_with_pvalue") do left_column
         for right_column in 1:n_right_columns
             correlations[left_column, right_column], p_values[left_column, right_column] =
                 spearman_with_pvalue(left_matrix[:, left_column], right_matrix[:, right_column])
         end
+        return nothing
     end
 
     return correlations, p_values
@@ -1086,7 +1082,9 @@ function spearman_with_pvalue(
     right_ranks = tiedrank(right_values)
 
     # Compute Spearman correlation
-    correlation = cor(left_ranks, right_ranks)
+    correlation = flame_timed("cor") do
+        return cor(left_ranks, right_ranks)
+    end
 
     # Compute p-value using t-distribution approximation
     # t = correlation * sqrt((n_values-2)/(1-correlation^2))
@@ -1172,8 +1170,7 @@ $(CONTRACT)
     # is_regulator_per_gene = get_vector(daf, "gene", "is_regulator").array .& is_included_per_gene
     # is_pertinent_regulator_per_gene = .!get_vector(daf, "gene", "is_lateral").array .& is_regulator_per_gene
 
-    progress_counter = Atomic{Int}(0)
-    @threads for cell_index in 1:n_cells
+    parallel_loop_wo_rng(1:n_cells; progress = DebugProgress(n_cells)) do cell_index
         metacell_index = metacell_index_per_cell[cell_index]
         if metacell_index > 0
             total_cell_UMIs = total_UMIs_per_cell[cell_index]
@@ -1196,19 +1193,17 @@ $(CONTRACT)
                     ((metacell_UMIs_per_masked_gene .- cell_UMIs_per_masked_gene) ./ total_punctuated_metacell_UMIs) .+ gene_cell_fraction_regularization,
                 )
 
-                correlation = cor(cell_log_fraction_per_masked_gene, punctuated_metacell_log_fraction_per_masked_gene)
+                correlation = flame_timed("cor") do
+                    return cor(cell_log_fraction_per_masked_gene, punctuated_metacell_log_fraction_per_masked_gene)
+                end
                 if isnan(correlation)
                     correlation = 0.0
                 end
                 correlation_per_cell[correlation_index][cell_index] = correlation
             end
         end
-        counter = atomic_add!(progress_counter, 1)
-        if counter % 100 == 0
-            print("\r$(progress_counter[]) ($(percent(counter + 1, n_cells))) ...")
-        end
+        return nothing
     end
-    println()
 
     is_in_metacell_per_cell = metacell_index_per_cell .> 0
     for (correlation_index, (cells_property, title)) in enumerate((
@@ -1218,11 +1213,11 @@ $(CONTRACT)
     #"regulators_correlation_with_punctuated_metacells",
     #"pertinent_regulators_correlation_with_punctuated_metacells",
     ))
-        @debug "Mean correlation of cells with their punctuated metacells (of $(title)): $(mean(correlation_per_cell[correlation_index][is_in_metacell_per_cell]))"
+        @info "Mean correlation of cells with their punctuated metacells (of $(title)): $(mean(correlation_per_cell[correlation_index][is_in_metacell_per_cell]))"
         set_vector!(daf, "cell", cells_property, correlation_per_cell[correlation_index]; overwrite)
 
         correlation_per_metacell = daf["/ cell : $(cells_property) @ metacell ! %> Mean"].array
-        @debug "Mean correlation of punctuated metacells and their cells (of $(title)): $(mean(correlation_per_metacell))"
+        @info "Mean correlation of punctuated metacells and their cells (of $(title)): $(mean(correlation_per_metacell))"
         set_vector!(daf, "metacell", "mean_cells_$(cells_property)", correlation_per_metacell; overwrite)
     end
 
@@ -1270,8 +1265,7 @@ TODOX
     pertinent_genes = modules_daf["/ gene & is_marker &! is_lateral"]
     indices_of_pertinent_genes = axis_indices(cells_daf, "gene", pertinent_genes)
 
-    progress_counter = Atomic{Int}(0)
-    @threads for cell_index in 1:n_cells
+    parallel_loop_wo_rng(1:n_cells; progress = DebugProgress(n_cells)) do cell_index
         total_cell_UMIs = total_UMIs_per_cell[cell_index]
         cell_UMIs_per_pertinent_marker = UMIs_per_cell_per_gene[cell_index, indices_of_pertinent_genes]
         cell_log_fraction_per_pertinent_marker =
@@ -1284,16 +1278,15 @@ TODOX
         metacell_log_fraction_per_pertinent_marker =
             log2.(metacell_UMIs_per_pertinent_marker ./ total_metacell_UMIs .+ gene_cell_fraction_regularization)
 
-        correlation = cor(cell_log_fraction_per_pertinent_marker, metacell_log_fraction_per_pertinent_marker)
+        correlation = flame_timed("cor") do
+            return cor(cell_log_fraction_per_pertinent_marker, metacell_log_fraction_per_pertinent_marker)
+        end
         if isnan(correlation)
             correlation = 0.0
         end
         correlation_per_cell[cell_index] = correlation
 
-        counter = atomic_add!(progress_counter, 1)
-        if counter % 100 == 0
-            print("\r$(progress_counter[]) ($(percent(counter + 1, n_cells))) ...")
-        end
+        return nothing
     end
 
     set_vector!(
@@ -1303,7 +1296,7 @@ TODOX
         correlation_per_cell;
         overwrite,
     )
-    @debug "Mean correlation of cells and their projected metacells (of pertinent markers): $(mean(correlation_per_cell))"
+    @info "Mean correlation of cells and their projected metacells (of pertinent markers): $(mean(correlation_per_cell))"
 
     return nothing
 end
@@ -1355,10 +1348,9 @@ TODOX
     metacell_per_cell = cells_daf["/ cell : metacell.projected"].array
     metacell_index_per_cell = axis_indices(modules_daf, "metacell", metacell_per_cell)
 
-    progress_counter = Atomic{Int}(0)
     correlation_between_cells_and_projected_metacells_per_gene = zeros(Float32, n_genes_in_cells)
 
-    @threads :greedy for included_gene_position in 1:n_included_genes
+    parallel_loop_wo_rng(1:n_included_genes; progress = DebugProgress(n_included_genes)) do included_gene_position
         gene_index_in_cells = indices_in_cells_per_included_gene[included_gene_position]
         @views UMIs_per_cell = UMIs_per_cell_per_gene[:, gene_index_in_cells]
         cell_log_fraction_per_cell = log2.(UMIs_per_cell ./ total_UMIs_per_cell .+ gene_cell_fraction_regularization)
@@ -1369,16 +1361,14 @@ TODOX
             metacell_UMIs_per_metacell[metacell_index_per_cell] ./ total_UMIs_per_metacell[metacell_index_per_cell] .+ gene_cell_fraction_regularization,
         )
 
-        correlation_between_cells_and_projected_metacells_per_gene[gene_index_in_cells] =
-            cor(cell_log_fraction_per_cell, metacell_log_fraction_per_cell)
+        correlation_between_cells_and_projected_metacells_per_gene[gene_index_in_cells] = flame_timed("cor") do
+            return cor(cell_log_fraction_per_cell, metacell_log_fraction_per_cell)
+        end
 
         if isnan(correlation_between_cells_and_projected_metacells_per_gene[gene_index_in_cells])
             correlation_between_cells_and_projected_metacells_per_gene[gene_index_in_cells] = 0.0
         end
-        counter = atomic_add!(progress_counter, 1)
-        if counter % 100 == 0
-            print("\r$(progress_counter[]) ($(percent(counter + 1, n_included_genes))) ...")
-        end
+        return nothing
     end
 
     set_vector!(
@@ -1394,7 +1384,7 @@ TODOX
         return gene in pertinent_markers
     end
     indices_in_cells_per_pertinent_marker = axis_indices(cells_daf, "gene", included_genes)
-    @debug "Mean correlation of pertinent marker genes (between cells and their projected metacells): $(mean(correlation_between_cells_and_projected_metacells_per_gene[indices_in_cells_per_pertinent_marker]))"
+    @info "Mean correlation of pertinent marker genes (between cells and their projected metacells): $(mean(correlation_between_cells_and_projected_metacells_per_gene[indices_in_cells_per_pertinent_marker]))"
     return nothing
 end
 

@@ -128,14 +128,16 @@ $(CONTRACT2)
         ]
 
         mean_metacell_cells_per_block = Vector{Float32}(undef, n_blocks)
-        progress_counter = Atomic{Int}(0)
-        @threads :greedy for block_index in 1:n_blocks
+        parallel_loop_wo_rng(
+            1:n_blocks;
+            name = "compute_mean_metacells_cells_per_block",
+            progress = DebugProgress(n_blocks; desc = "compute_mean_metacells_cells_per_block"),
+        ) do block_index
             block_name = name_per_block[block_index]
             mean_metacell_cells_per_block[block_index] =
                 original["/ cell & metacell ?? => block => is_in_neighborhood ;= $(block_name) : index %> Count"] /
                 original["/ metacell & block => is_in_neighborhood ;= $(block_name) : index %> Count"]
-            counter = atomic_add!(progress_counter, 1)
-            print("\r$(counter) ($(percent(counter, n_blocks)))   ")
+            return nothing
         end
 
         block_index_per_cell = original["/ cell : metacell ?? 0 => block => index"].array
@@ -184,7 +186,12 @@ $(CONTRACT2)
 
     else
         local_clusters_per_block = Vector{Maybe{LocalClusters}}(undef, n_blocks)
-        parallel_loop_with_rng(1:n_blocks; rng) do block_index, rng
+        parallel_loop_with_rng(
+            1:n_blocks;
+            rng,
+            name = "compute_local_clusters_per_block",
+            progress = DebugProgress(n_blocks, desc = "compute_local_clusters_per_block"),
+        ) do block_index, rng
             block_name = name_per_block[block_index]
             local_clusters_per_block[block_index] = sharpen_block_without_migration(
                 original;
@@ -252,8 +259,12 @@ function compute_preferred_block_index_per_cell_per_block(
     preferred_block_index_per_cell_per_block = Vector{Maybe{SparseVector{<:Integer}}}(undef, n_blocks)
     preferred_block_index_per_cell_per_block .= nothing
 
-    progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(1:n_blocks; rng) do block_index, rng  # TODOX
+    parallel_loop_with_rng(
+        1:n_blocks;
+        rng,
+        name = "compute_preferred_block_index_per_cell_per_block",
+        progress = DebugProgress(n_blocks; desc = "compute_preferred_block_index_per_cell_per_block"),
+    ) do block_index, rng
         block_name = name_per_block[block_index]
 
         neighborhood_cell_indices = vcat(cell_indices_per_block[block_indices_per_neighborhood[block_index]]...)
@@ -286,12 +297,14 @@ function compute_preferred_block_index_per_cell_per_block(
                 std_fraction_per_used_module
         end
 
-        kmeans_result = kmeans_in_rounds(
-            fraction_per_used_module_per_neighborhood_cell,
-            n_neighborhood_clusters;
-            rounds = kmeans_rounds,
-            rng,
-        )
+        kmeans_result = flame_timed("kmeans_in_rounds") do
+            return kmeans_in_rounds(
+                fraction_per_used_module_per_neighborhood_cell,
+                n_neighborhood_clusters;
+                rounds = kmeans_rounds,
+                rng,
+            )
+        end
         cluster_index_per_neighborhood_cell = assignments(kmeans_result)
         n_cells_per_cluster = counts(kmeans_result)
         n_clusters = length(counts(kmeans_result))
@@ -322,8 +335,6 @@ function compute_preferred_block_index_per_cell_per_block(
             preferred_block_index_per_neighborhood_cell[reorder],
         )
 
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(counter) ($(percent(counter, n_blocks)))   ")
         return nothing
     end
 
@@ -394,19 +405,20 @@ function compute_preferred_block_index_of_cells(;
     n_migrated = Atomic{Int}(0)
 
     new_block_index_per_cell = zeros(UInt32, n_cells)
-    progress_counter = Atomic{Int}(0)
-    @threads :greedy for cell_index in 1:n_cells
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(counter) ($(percent(counter, n_cells)))   ")
+    parallel_loop_wo_rng(
+        1:n_cells;
+        name = "compute_preferred_block_index_of_cells",
+        progress = DebugProgress(n_cells),
+    ) do cell_index
         original_block_index_of_cell = block_index_per_cell[cell_index]
         if original_block_index_of_cell == 0
-            continue
+            return nothing
         end
 
         preferred_block_index_per_block = preferred_block_index_per_cell_per_block[original_block_index_of_cell]
         if preferred_block_index_per_block === nothing
             new_block_index_per_cell[cell_index] = original_block_index_of_cell
-            continue
+            return nothing
         end
 
         preferred_block_index_of_cell = preferred_block_index_per_block[cell_index]
@@ -420,7 +432,7 @@ function compute_preferred_block_index_of_cells(;
         if preferred_block_index_per_other_block === nothing
             new_block_index_per_cell[cell_index] = original_block_index_of_cell
             atomic_add!(n_stationary, 1)
-            continue
+            return nothing
         end
 
         back_preferred_block_index_of_cell = preferred_block_index_per_other_block[cell_index]
@@ -445,6 +457,7 @@ function compute_preferred_block_index_of_cells(;
                 atomic_add!(n_migrated, 1)
             end
         end
+        return nothing
     end
 
     @debug (
@@ -482,17 +495,18 @@ function compute_local_clusters(
 
     local_clusters_per_block = Vector{Maybe{LocalClusters}}(undef, n_blocks)
 
-    progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(1:n_blocks; rng, policy = :serial) do block_index, rng
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(counter) ($(percent(counter, n_blocks)))   ")
+    parallel_loop_with_rng(
+        1:n_blocks;
+        rng,
+        name = "compute_local_clusters",
+        progress = DebugProgress(n_blocks),
+    ) do block_index, rng
         block_name = name_per_block[block_index]
 
         block_cell_indices = findall(block_index_per_cell .== block_index)
         n_block_cells = length(block_cell_indices)
         if n_block_cells == 0
             local_clusters_per_block[block_index] = nothing
-            counter = atomic_add!(progress_counter, 1)
             @debug "- Block: $(block_name) ($(percent(counter + 1, n_blocks))) Empty"
             return nothing
         end
@@ -525,25 +539,29 @@ function compute_local_clusters(
             cluster_sizes = [n_block_cells]
 
         else
-            kmeans_result = kmeans_with_sizes(
-                fraction_per_used_module_per_block_cell,
-                n_block_clusters;
-                min_cluster_size = min_cells_in_metacell,
-                max_cluster_size = mean_metacell_cells_per_block[block_index] * 2,
-                kmeans_rounds,
-                block_name,
-                rng,
-            )
+            kmeans_result = flame_timed("kmeans_with_sizes") do
+                return kmeans_with_sizes(
+                    fraction_per_used_module_per_block_cell,
+                    n_block_clusters;
+                    min_cluster_size = min_cells_in_metacell,
+                    max_cluster_size = mean_metacell_cells_per_block[block_index] * 2,
+                    kmeans_rounds,
+                    block_name,
+                    rng,
+                )
+            end
 
             cluster_index_per_block_cell = assignments(kmeans_result)
             cluster_sizes = counts(kmeans_result)
         end
 
-        return local_clusters_per_block[block_index] = LocalClusters(;
+        local_clusters_per_block[block_index] = LocalClusters(;
             block_cell_indices,
             cluster_index_per_block_cell,
             is_too_small_per_cluster = cluster_sizes .< min_cells_in_metacell,
         )
+
+        return nothing
     end
 
     return local_clusters_per_block
@@ -638,15 +656,17 @@ function sharpen_block_without_migration(
     else
         mean_cells_in_metacell = length(block_cell_indices) / n_block_metacells
 
-        kmeans_result = kmeans_with_sizes(
-            fraction_per_used_module_per_block_cell,
-            n_block_metacells;
-            min_cluster_size = min_cells_in_metacell,
-            max_cluster_size = 2 * mean_cells_in_metacell,
-            kmeans_rounds,
-            block_name,
-            rng,
-        )
+        kmeans_result = flame_timed("kmeans_with_sizes") do
+            return kmeans_with_sizes(
+                fraction_per_used_module_per_block_cell,
+                n_block_metacells;
+                min_cluster_size = min_cells_in_metacell,
+                max_cluster_size = 2 * mean_cells_in_metacell,
+                kmeans_rounds,
+                block_name,
+                rng,
+            )
+        end
 
         cluster_index_per_block_cell = assignments(kmeans_result)
         cluster_sizes = counts(kmeans_result)
@@ -740,7 +760,9 @@ function kmeans_with_sizes(
                 @assert length(cluster_sizes) == k
                 #@debug "TODOX KMEANS $(block_name) - A OLD: $(initial_k) K: $(k) small: $(todox_n_too_small) large: $(todox_n_too_large)"
             else
-                kmeans_result = kmeans_in_rounds(values_of_points, k; centers, rounds = kmeans_rounds, rng)
+                kmeans_result = flame_timed("kmeans_in_rounds") do
+                    return kmeans_in_rounds(values_of_points, k; centers, rounds = kmeans_rounds, rng)
+                end
                 cluster_sizes = counts(kmeans_result)
                 @assert length(cluster_sizes) == k
                 #todox_n_too_small = sum(cluster_sizes .< min_cluster_size)
@@ -782,7 +804,9 @@ function kmeans_with_sizes(
             for split_cluster_index in indices_of_split_clusters
                 indices_of_points_in_split_cluster = findall(clusters_of_points .== split_cluster_index)
                 Random.seed!(rng, 123456)
-                split_result = kmeans(values_of_points[:, indices_of_points_in_split_cluster], 2; rng)
+                split_result = flame_timed("kmeans") do
+                    return kmeans(values_of_points[:, indices_of_points_in_split_cluster], 2; rng)
+                end
                 centers[:, split_cluster_index] .= split_result.centers[:, 1]
                 push!(new_centers, split_result.centers[:, 2])
                 k += 1
@@ -821,7 +845,9 @@ function kmeans_with_sizes(
             centers = kmeans_result.centers[:, 1:k .!= smallest_cluster_index]
             k -= 1
 
-            merged_kmeans_result = kmeans_in_rounds(values_of_points, k; centers, rounds = kmeans_rounds, rng)
+            merged_kmeans_result = flame_timed("kmeans_in_rounds") do
+                return kmeans_in_rounds(values_of_points, k; centers, rounds = kmeans_rounds, rng)
+            end
             cluster_sizes = counts(merged_kmeans_result)
             @assert length(cluster_sizes) == k
             #n_too_small = sum(cluster_sizes .< min_cluster_size)
@@ -913,8 +939,7 @@ TODOX
     UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
     total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
 
-    progress_counter = Atomic{Int}(0)
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks; progress = DebugProgress(n_blocks)) do block_index
         block_name = name_per_block[block_index]
 
         indices_of_block_metacells = findall(block_index_per_metacell .== block_index)
@@ -980,8 +1005,8 @@ TODOX
             radius_per_metacell[metacell_index] = quantile(distance_per_metacell_cell, metacell_radius_quantile)
         end
 
-        counter = atomic_add!(progress_counter, 1)
         @debug "- Block: $(block_name) ($(percent(counter + 1, n_blocks))) mean: $(mean(radius_per_metacell[indices_of_block_metacells]))"
+        return nothing
     end
 
     @debug "Mean metacell radius: $(mean(radius_per_metacell))"

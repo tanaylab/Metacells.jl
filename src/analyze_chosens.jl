@@ -78,17 +78,14 @@ The total UMIs of each chosen each metacell.
     total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
     total_UMIs_per_metacell_per_chosen = Matrix{UInt32}(undef, n_metacells, n_chosen)
 
-    progress_counter = Atomic{Int}(0)
-    @threads :greedy for chosen_index in 1:n_chosen
+    parallel_loop_wo_rng(1:n_chosen; progress = DebugProgress(n_chosen)) do chosen_index
         is_member_per_gene = is_member_per_gene_per_chosen[:, chosen_index]
         chosen_UMIs_per_gene_per_metacell = UMIs_per_gene_per_metacell[is_member_per_gene, :]
         total_chosen_UMIs_per_metacell = vec(sum(chosen_UMIs_per_gene_per_metacell; dims = 1))
         @assert_vector(total_chosen_UMIs_per_metacell, n_metacells)
         total_UMIs_per_metacell_per_chosen[:, chosen_index] .= total_chosen_UMIs_per_metacell
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_chosen))) ...")
+        return nothing
     end
-    println("")
 
     set_matrix!(daf, "metacell", "chosen", "total_UMIs", bestify(total_UMIs_per_metacell_per_chosen); overwrite)
     return nothing
@@ -185,8 +182,7 @@ TODOX
 
     variance_over_mean_per_chosen_per_metacell = Matrix{Float32}(undef, n_chosen, n_metacells)
 
-    progress_counter = Atomic{Int}(0)
-    @threads :greedy for metacell_index in 1:n_metacells
+    parallel_loop_wo_rng(1:n_metacells; progress = DebugProgress(n_metacells)) do metacell_index
         metacell_name = name_per_metacell[metacell_index]
         indices_of_metacell_cells = daf["/ cell & metacell = $(metacell_name) : index"].array
         n_metacell_cells = length(indices_of_metacell_cells)
@@ -234,10 +230,8 @@ TODOX
             variance_over_mean_per_chosen_per_metacell[chosen_index, metacell_index] = variance_over_mean
         end
 
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_metacells))) ...")
+        return nothing
     end
-    println("")
 
     set_matrix!(daf, "chosen", "metacell", "variance_over_mean", variance_over_mean_per_chosen_per_metacell; overwrite)
     return nothing

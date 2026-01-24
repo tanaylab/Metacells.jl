@@ -153,8 +153,9 @@ $(CONTRACT)
     log_fraction_per_metacell_per_skeleton = daf["/ metacell / gene & is_skeleton : log_linear_fraction"].array
     n_skeletons = size(log_fraction_per_metacell_per_skeleton, 2)
 
-    correlation_per_skeleton_per_ordered_strong_gene =
-        cor(log_fraction_per_metacell_per_skeleton, log_fraction_per_metacell_per_ordered_strong_gene)
+    correlation_per_skeleton_per_ordered_strong_gene = flame_timed("cor") do
+        return cor(log_fraction_per_metacell_per_skeleton, log_fraction_per_metacell_per_ordered_strong_gene)
+    end
     correlation_per_skeleton_per_ordered_strong_gene[isnan.(correlation_per_skeleton_per_ordered_strong_gene)] .= 0.0
     @assert_matrix(correlation_per_skeleton_per_ordered_strong_gene, n_skeletons, n_strong_genes)
 

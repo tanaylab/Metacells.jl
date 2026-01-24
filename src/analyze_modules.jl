@@ -108,7 +108,7 @@ $(CONTRACT)
     module_per_gene_per_block = get_matrix(daf, "gene", "block", "module").array
     is_strong_per_module_per_block = zeros(Bool, n_modules, n_blocks)
 
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         compute_block_modules_is_strong!(
             daf;
@@ -122,6 +122,7 @@ $(CONTRACT)
             is_found_per_module_per_block,
             is_strong_per_module_per_block,
         )
+        return nothing
     end
 
     set_matrix!(daf, "module", "block", "is_strong", bestify(is_strong_per_module_per_block); overwrite)
@@ -277,7 +278,7 @@ function do_compute_blocks_module_n_genes(
 
     n_genes_per_module_per_block = zeros(UInt32, n_modules, n_blocks)
 
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         module_per_gene = daf["/ gene / block = $(block_name) : module"].array
         for module_index in 1:n_modules
@@ -288,6 +289,7 @@ function do_compute_blocks_module_n_genes(
             end
             n_genes_per_module_per_block[module_index, block_index] = sum(module_genes_mask; init = 0)
         end
+        return nothing
     end
 
     set_matrix!(daf, "module", "block", name, bestify(n_genes_per_module_per_block); overwrite)
@@ -341,8 +343,7 @@ TODOX
     mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
 
-    progress_counter = Atomic{Int}(0)  # TODOX Refactor this everywhere
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks; progress = DebugProgress(n_blocks)) do block_index
         block_name = name_per_block[block_index]
         indices_of_neighborhood_cells =
             daf["/ cell & metacell ?? => block => is_in_neighborhood ;= $(block_name) : index"].array
@@ -367,8 +368,7 @@ TODOX
                     std(linear_fraction_per_neighborhood_cell)
             end
         end
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_blocks))) ...")
+        return nothing
     end
 
     set_matrix!(
@@ -431,7 +431,7 @@ TODOX
     UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
     total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
 
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         linear_fraction_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
         block_name = name_per_block[block_index]
         indices_of_neighborhood_metacells =
@@ -465,6 +465,7 @@ TODOX
             bestify(linear_fraction_per_module_per_metacell);
             overwrite,
         )
+        return nothing
     end
 
     return nothing
@@ -510,7 +511,7 @@ TODOX
     module_per_gene_per_block = get_matrix(daf, "gene", "block", "module").array
     is_found_per_module_per_block = get_matrix(daf, "module", "block", "is_found").array
 
-    @threads :greedy for block_index in 1:n_blocks
+    parallel_loop_wo_rng(1:n_blocks) do block_index
         block_name = name_per_block[block_index]
         linear_fraction_per_module_per_metacell = get_matrix(daf, "module", "metacell", "$(block_name)_linear_fraction")
         indices_of_neighborhood_metacells =
@@ -533,6 +534,7 @@ TODOX
             overwrite,
         )
         @debug "Block: $(block_name) neighborhood metacells: $(length(indices_of_neighborhood_metacells)) found modules: $(length(indices_of_found_modules))"
+        return nothing
     end
 
     return nothing
@@ -586,8 +588,7 @@ ignores cells with less than the target downsampled UMIs per cell, to make the e
 
     variance_over_mean_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
 
-    progress_counter = Atomic{Int}(0)
-    parallel_loop_with_rng(1:n_metacells; rng, policy = :serial) do metacell_index, rng  # TODOX
+    parallel_loop_with_rng(1:n_metacells; rng, progress = DebugProgress(n_metacells)) do metacell_index, rng  # TODOX
         metacell_name = name_per_metacell[metacell_index]
         block_index = block_index_per_metacell[metacell_index]
 
@@ -641,8 +642,6 @@ ignores cells with less than the target downsampled UMIs per cell, to make the e
             end
         end
 
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_metacells))) ...")
         return nothing
     end
 
@@ -698,8 +697,7 @@ TODOX
     UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
     total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
 
-    progress_counter = Atomic{Int}(0)
-    @threads :greedy for metacell_index in 1:n_metacells
+    parallel_loop_wo_rng(1:n_metacells; progress = DebugProgress(n_metacells)) do metacell_index
         metacell_name = name_per_metacell[metacell_index]
         block_index = block_index_per_metacell[metacell_index]
 
@@ -728,12 +726,13 @@ TODOX
             end
         end
 
-        distance_per_cell = pairwise(Euclidean(), Ref(mean_fraction_per_module), eachcol(fraction_per_module_per_cell))
+        distance_per_cell = flame_timed("pairwise.Euclidean") do
+            return pairwise(Euclidean(), Ref(mean_fraction_per_module), eachcol(fraction_per_module_per_cell))
+        end
         mean_distance_per_metacell[metacell_index] = mean(distance_per_cell)
         std_distance_per_meyacell[metacell_index] = std(distance_per_cell)
 
-        counter = atomic_add!(progress_counter, 1)
-        print("\r$(progress_counter[]) ($(percent(counter + 1, n_metacells))) ...")
+        return nothing
     end
 
     set_vector!(daf, "metacell", "mean_modules_distance", bestify(mean_distance_per_metacell); overwrite)
