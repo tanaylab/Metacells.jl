@@ -1,4 +1,4 @@
-"""
+""".
 Group genes in each environment to modules, each associated with some anchor gene.
 """
 module ComputeModules
@@ -831,7 +831,6 @@ end
     data = [
         gene_is_lateral_vector(RequiredInput),
         cell_gene_UMIs_matrix(RequiredInput),
-        cell_total_UMIs_vector(RequiredInput),
         cell_metacell_vector(RequiredInput),
         metacell_block_vector(RequiredInput),
         block_block_is_in_neighborhood_matrix(RequiredInput),
@@ -853,7 +852,6 @@ end
     min_orphan_correlation::AbstractFloat = 0.6,
     min_strong_UMIs::Integer = 8,
     min_strong_cells::Integer = 12,
-    smart_laterals::Bool = false,
     kmeans_rounds::Integer = function_default(kmeans_in_rounds, :rounds),
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
@@ -869,6 +867,18 @@ end
     name_per_block = axis_vector(daf, "block")
     name_per_gene = axis_vector(daf, "gene")
 
+    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
+    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
+    is_skeleton_per_gene = get_vector(daf, "gene", "is_skeleton").array
+    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_neighborhood_marker_per_gene_per_block = get_matrix(daf, "gene", "block", "is_neighborhood_marker").array
+    is_correlated_with_skeletons_in_neighborhood_per_gene_per_block =
+        get_matrix(daf, "gene", "block", "is_correlated_with_skeleton_in_neighborhood").array
+    is_neighborhood_distinct_per_gene_per_block = get_matrix(daf, "gene", "block", "is_neighborhood_distinct").array
+    block_index_per_metacell = daf["/ metacell : block => index"].array
+    block_index_per_cell = daf["/ cell : metacell ?? 0 => block => index"].array
+    log_fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "log_linear_fraction").array
+
     genes_indices_of_anchor_index_per_block = Vector{Dict{Int, Vector{Int}}}(undef, n_blocks)
 
     module_status_per_gene_per_block = fill("", n_genes, n_blocks)
@@ -878,6 +888,7 @@ end
         @views module_status_per_gene = module_status_per_gene_per_block[:, block_index]
         return genes_indices_of_anchor_index_per_block[block_index] = compute_block_modules_k!(
             daf;
+            block_index,
             block_name,
             max_clusters,
             max_cluster_laterals_fraction,
@@ -886,9 +897,18 @@ end
             min_strong_UMIs,
             min_strong_cells,
             kmeans_rounds,
-            smart_laterals,
             rng,
             module_status_per_gene,
+            UMIs_per_cell_per_gene,
+            is_lateral_per_gene,
+            is_skeleton_per_gene,
+            is_in_neighborhood_per_other_block_per_base_block,
+            is_neighborhood_marker_per_gene_per_block,
+            is_correlated_with_skeletons_in_neighborhood_per_gene_per_block,
+            is_neighborhood_distinct_per_gene_per_block,
+            block_index_per_metacell,
+            log_fraction_per_metacell_per_gene,
+            block_index_per_cell,
         )
     end
 
@@ -930,6 +950,7 @@ end
 
 function compute_block_modules_k!(
     daf::DafWriter;
+    block_index::Integer,
     block_name::AbstractString,
     max_clusters::Integer,
     max_cluster_laterals_fraction::Maybe{AbstractFloat},
@@ -937,392 +958,379 @@ function compute_block_modules_k!(
     min_orphan_correlation::AbstractFloat,
     min_strong_UMIs::Integer,
     min_strong_cells::Integer,
-    smart_laterals::Bool,
     kmeans_rounds::Integer,
     rng::AbstractRNG,
     module_status_per_gene::AbstractVector{<:AbstractString},
+    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    is_lateral_per_gene::Union{AbstractVector{Bool}, BitVector},
+    is_skeleton_per_gene::Union{AbstractVector{Bool}, BitVector},
+    is_in_neighborhood_per_other_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    is_neighborhood_marker_per_gene_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    is_correlated_with_skeletons_in_neighborhood_per_gene_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    is_neighborhood_distinct_per_gene_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    block_index_per_metacell::AbstractVector{<:Integer},
+    log_fraction_per_metacell_per_gene::AbstractMatrix{<:AbstractFloat},
+    block_index_per_cell::AbstractVector{<:Integer},
 )::Dict{Int, Vector{Int}}
-    n_full_genes = axis_length(daf, "gene")
-    name_per_full_gene = axis_vector(daf, "gene")
+    n_genes = axis_length(daf, "gene")
+    name_per_gene = axis_vector(daf, "gene")
 
-    if smart_laterals
-        lateral_cluster_per_full_gene = zeros(UInt32, n_full_genes)
-        center_per_metacell_per_lateral_cluster = adapter(  # NOJET
-            daf;
-            name = "cluster_lateral_genes",
-            input_axes = [
-                "block" => "=",
-                "metacell" => "/ metacell & block => is_in_neighborhood ;= $(block_name)",
-                "gene" => "/ gene & is_lateral & is_neighborhood_marker ; block = $(block_name)",
-            ],
-            input_data = [("metacell", "gene", "log_linear_fraction") => "=", ("gene", "full_index") => "index"],
-            output_axes = [],
-            output_data = [],
-        ) do adapted
-            n_lateral_marker_genes = axis_length(adapted, "gene")
-            index_per_lateral_marker_gene = get_vector(adapted, "gene", "full_index").array
+    lateral_cluster_per_gene = zeros(UInt32, n_genes)
 
-            log_fraction_per_metacell_per_lateral_marker_gene =
-                get_matrix(adapted, "metacell", "gene", "log_linear_fraction").array
-            mean_log_fraction_per_lateral_marker_gene =
-                vec(mean(log_fraction_per_metacell_per_lateral_marker_gene; dims = 1))
-            @assert_vector(mean_log_fraction_per_lateral_marker_gene, n_lateral_marker_genes)
+    local center_per_neighborhood_metacell_per_lateral_cluster
+    local is_in_neighborhood_per_other_block
+    local indices_of_neighborhood_metacells
 
-            std_log_fraction_per_lateral_marker_gene = vec(
-                std(
-                    log_fraction_per_metacell_per_lateral_marker_gene;
-                    mean = transpose(mean_log_fraction_per_lateral_marker_gene),
-                    dims = 1,
-                ),
-            )
-            @assert_vector(std_log_fraction_per_lateral_marker_gene, n_lateral_marker_genes)
+    flame_timed("lateral_clusters") do
+        @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
+        indices_of_neighborhood_metacells = findall(is_in_neighborhood_per_other_block[block_index_per_metacell])
 
-            normalized_log_fraction_per_metacell_per_lateral_marker_gene =
-                (
-                    log_fraction_per_metacell_per_lateral_marker_gene .-
-                    transpose(mean_log_fraction_per_lateral_marker_gene)
-                ) ./ transpose(std_log_fraction_per_lateral_marker_gene)
+        @views is_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene_per_block[:, block_index]
+        is_lateral_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene .& is_lateral_per_gene
+        indices_of_lateral_neighborhood_markers = findall(is_lateral_neighborhood_marker_per_gene)
+        n_lateral_neighborhood_marker_genes = length(indices_of_lateral_neighborhood_markers)
 
-            kmeans_results = flame_timed("kmeans_in_rounds") do
-                return kmeans_in_rounds(
-                    normalized_log_fraction_per_metacell_per_lateral_marker_gene,
-                    max_clusters;
-                    rounds = kmeans_rounds,
-                    rng,
-                )
-            end
+        @views log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene =
+            log_fraction_per_metacell_per_gene[indices_of_neighborhood_metacells, indices_of_lateral_neighborhood_markers]
 
-            lateral_cluster_per_full_gene[index_per_lateral_marker_gene] .= kmeans_results.assignments
+        mean_log_fraction_per_lateral_neighborhood_marker_gene =
+            vec(mean(log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene; dims = 1))
+        @assert_vector(mean_log_fraction_per_lateral_neighborhood_marker_gene, n_lateral_neighborhood_marker_genes)
 
-            n_lateral_clusters = size(kmeans_results.centers, 2)
-            for lateral_cluster_index in 1:n_lateral_clusters
-                @debug "Block: $(block_name) lateral_cluster: $(lateral_cluster_index) genes: [ \"$(join(name_per_full_gene[index_per_lateral_marker_gene[kmeans_results.assignments .== lateral_cluster_index]], "\", \""))\" ]"
-            end
-
-            return kmeans_results.centers
-        end
-    end
-
-    if smart_laterals || max_cluster_laterals_fraction === nothing
-        lateral_filter = "&! is_lateral"
-    else
-        lateral_filter = ""
-    end
-
-    return adapter(  # NOJET
-        daf;
-        name = "compute_gene_modules",
-        input_axes = [
-            "block" => "=",
-            "cell" => "/ cell & metacell?? => block => is_in_neighborhood ;= $(block_name)",
-            "metacell" => "/ metacell & block => is_in_neighborhood ;= $(block_name)",
-            "gene" => "/ gene $(lateral_filter) & is_correlated_with_skeleton_in_neighborhood ; block = $(block_name)",
-        ],
-        input_data = [
-            ("metacell", "gene", "log_linear_fraction") => "=",
-            ("gene", "is_lateral") => "=",
-            ("gene", "is_skeleton") => "=",
-            ("gene", "is_distinct") => "/ block = $(block_name) : is_neighborhood_distinct",
-            ("gene", "full_index") => "index",
-            ("cell", "total_UMIs") => "=",
-            ("gene", "cell", "UMIs") => "=",
-        ],
-        output_axes = [],
-        output_data = [],
-    ) do adapted
-        n_local_genes = axis_length(adapted, "gene")
-
-        n_local_cells = axis_length(adapted, "cell")
-        @assert n_local_cells > min_strong_cells
-
-        name_per_local_gene = axis_vector(adapted, "gene")
-        index_per_local_gene = get_vector(adapted, "gene", "full_index").array
-
-        is_skeleton_per_local_gene = get_vector(adapted, "gene", "is_skeleton").array
-
-        log_fraction_per_metacell_per_local_gene = get_matrix(adapted, "metacell", "gene", "log_linear_fraction").array
-        mean_log_fraction_per_local_gene = vec(mean(log_fraction_per_metacell_per_local_gene; dims = 1))
-        @assert_vector(mean_log_fraction_per_local_gene, n_local_genes)
-        std_log_fraction_per_local_gene = vec(
-            std(log_fraction_per_metacell_per_local_gene; mean = transpose(mean_log_fraction_per_local_gene), dims = 1),
+        std_log_fraction_per_lateral_neighborhood_marker_gene = vec(
+            std(
+                log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene;
+                mean = transpose(mean_log_fraction_per_lateral_neighborhood_marker_gene),
+                dims = 1,
+            ),
         )
-        @assert_vector(std_log_fraction_per_local_gene, n_local_genes)
-        normalized_log_fraction_per_metacell_per_local_gene =
-            (log_fraction_per_metacell_per_local_gene .- transpose(mean_log_fraction_per_local_gene)) ./
-            transpose(std_log_fraction_per_local_gene)
+        @assert_vector(std_log_fraction_per_lateral_neighborhood_marker_gene, n_lateral_neighborhood_marker_genes)
+
+        normalized_log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene =
+            (
+                log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene .-
+                transpose(mean_log_fraction_per_lateral_neighborhood_marker_gene)
+            ) ./ transpose(std_log_fraction_per_lateral_neighborhood_marker_gene)
 
         kmeans_results = flame_timed("kmeans_in_rounds") do
             return kmeans_in_rounds(
-                normalized_log_fraction_per_metacell_per_local_gene,
+                normalized_log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene,
                 max_clusters;
                 rounds = kmeans_rounds,
                 rng,
             )
         end
-        cluster_index_per_local_gene = kmeans_results.assignments
-        center_per_metacell_per_cluster = kmeans_results.centers
-        @assert_vector(cluster_index_per_local_gene, n_local_genes)
-        module_status_per_gene[index_per_local_gene] .= "cluster(" .* string.(cluster_index_per_local_gene) .* ")"
 
-        if smart_laterals
-            is_distinct_per_local_gene = get_vector(adapted, "gene", "is_distinct").array
-            @debug "TODOX Block: $(block_name) distinct genes: $(sum(is_distinct_per_local_gene)) names: [ \"$(join(name_per_local_gene[is_distinct_per_local_gene] , "\", \""))\" ]"
-            is_lateral_per_local_gene = zeros(Bool, n_local_genes)
-            flame_timed("smart_laterals") do
-                for local_gene_index in 1:n_local_genes
-                    @views normalized_log_fraction_per_metacell =
-                        normalized_log_fraction_per_metacell_per_local_gene[:, local_gene_index]
-                    cluster_index = cluster_index_per_local_gene[local_gene_index]
-                    @views cluster_log_fraction_per_metacell = center_per_metacell_per_cluster[:, cluster_index]
-                    cluster_correlation = flame_timed("cor") do
-                        return cor(normalized_log_fraction_per_metacell, cluster_log_fraction_per_metacell)
-                    end
-                    correlation_per_lateral_cluster = flame_timed("cor") do
-                        return vec(cor(normalized_log_fraction_per_metacell, center_per_metacell_per_lateral_cluster))
-                    end
-                    lateral_cluster_index = argmax(correlation_per_lateral_cluster)
-                    lateral_correlation = correlation_per_lateral_cluster[lateral_cluster_index]
-                    qualifier = ""
-                    if is_distinct_per_local_gene[lateral_cluster_index]
-                        qualifier *= " distinct"
-                    end
-                    if is_skeleton_per_local_gene[lateral_cluster_index]
-                        qualifier *= " skeleton"
-                    end
-                    if lateral_correlation > cluster_correlation
-                        if qualifier == ""
-                            is_lateral_per_local_gene[local_gene_index] = true
-                        else
-                            qualifier *= " kept"
-                        end
-                        @debug "Block $(block_name)$(qualifier) lateral-ish gene: $(name_per_local_gene[local_gene_index]) lateral_correlation: $(lateral_correlation) > cluster_correlation: $(cluster_correlation) lateral cluster: $(lateral_cluster_index)"
-                    else
-                        @debug "Block $(block_name)$(qualifier) kept gene: $(name_per_local_gene[local_gene_index]) lateral_correlation: $(lateral_correlation) <= cluster_correlation: $(cluster_correlation) lateral cluster: $(lateral_cluster_index)"
-                    end
-                end
-            end
-        else
-            is_lateral_per_local_gene = get_vector(adapted, "gene", "is_lateral").array
+        lateral_cluster_per_gene[indices_of_lateral_neighborhood_markers] .= kmeans_results.assignments
+
+        n_lateral_clusters = size(kmeans_results.centers, 2)
+        for lateral_cluster_index in 1:n_lateral_clusters
+            @debug "Block: $(block_name) lateral_cluster: $(lateral_cluster_index) genes: [ \"$(join(name_per_gene[indices_of_lateral_neighborhood_markers[kmeans_results.assignments .== lateral_cluster_index]], "\", \""))\" ]"
         end
 
-        module_status_per_gene[index_per_local_gene[is_lateral_per_local_gene]] .*= ",lateral_gene"
+        center_per_neighborhood_metacell_per_lateral_cluster = kmeans_results.centers
+    end
 
-        n_clusters = size(center_per_metacell_per_cluster, 2)
+    local center_per_neighborhood_metacell_per_cluster
+    local cluster_index_per_local_gene
+    local indices_of_local_genes
+    local indices_of_neighborhood_cells
+    local is_skeleton_per_local_gene
+    local is_skeleton_per_local_gene
+    local n_local_genes
+    local n_neighborhood_cells
+    local normalized_log_fraction_per_neighborhood_metacell_per_local_gene
+
+    flame_timed("local_clusters") do
+        indices_of_neighborhood_cells =
+            findall((block_index_per_cell .> 0) .& getindex.(Ref(is_in_neighborhood_per_other_block), max.(block_index_per_cell, 1)))
+        n_neighborhood_cells = length(indices_of_neighborhood_cells)
+        @assert n_neighborhood_cells > min_strong_cells
+
+        @views is_correlated_with_skeletons_in_neighborhood_per_gene =
+            is_correlated_with_skeletons_in_neighborhood_per_gene_per_block[:, block_index]
+        is_local_per_gene = is_correlated_with_skeletons_in_neighborhood_per_gene .& .!is_lateral_per_gene
+        indices_of_local_genes = findall(is_local_per_gene)
+        n_local_genes = length(indices_of_local_genes)
+
+        is_skeleton_per_local_gene = is_skeleton_per_gene[indices_of_local_genes]
+
+        log_fraction_per_neighborhood_metacell_per_local_gene =
+            log_fraction_per_metacell_per_gene[indices_of_neighborhood_metacells, indices_of_local_genes]
+
+        mean_log_fraction_per_local_gene = vec(mean(log_fraction_per_neighborhood_metacell_per_local_gene; dims = 1))
+        @assert_vector(mean_log_fraction_per_local_gene, n_local_genes)
+
+        std_log_fraction_per_local_gene = vec(
+            std(log_fraction_per_neighborhood_metacell_per_local_gene; mean = transpose(mean_log_fraction_per_local_gene), dims = 1),
+        )
+        @assert_vector(std_log_fraction_per_local_gene, n_local_genes)
+
+        normalized_log_fraction_per_neighborhood_metacell_per_local_gene =
+            (log_fraction_per_neighborhood_metacell_per_local_gene .- transpose(mean_log_fraction_per_local_gene)) ./
+            transpose(std_log_fraction_per_local_gene)
+
+        kmeans_results = flame_timed("kmeans_in_rounds") do
+            return kmeans_in_rounds(
+                normalized_log_fraction_per_neighborhood_metacell_per_local_gene,
+                max_clusters;
+                rounds = kmeans_rounds,
+                rng,
+            )
+        end
+
+        cluster_index_per_local_gene = kmeans_results.assignments
+        @assert_vector(cluster_index_per_local_gene, n_local_genes)
+
+        center_per_neighborhood_metacell_per_cluster = kmeans_results.centers
+        module_status_per_gene[indices_of_local_genes] .= "cluster(" .* string.(cluster_index_per_local_gene) .* ")"
+    end
+
+    local is_lateral_ish_per_local_gene
+
+    flame_timed("identify_lateral_ish_genes") do
+        is_lateral_ish_per_local_gene = zeros(Bool, n_local_genes)
+
+        is_neighborhood_distinct_per_local_gene = is_neighborhood_marker_per_gene_per_block[indices_of_local_genes, block_index]
+        @debug "TODOX Block: $(block_name) distinct genes: $(sum(is_neighborhood_distinct_per_local_gene)) names: [ \"$(join(name_per_gene[indices_of_local_genes[is_neighborhood_distinct_per_local_gene]] , "\", \""))\" ]"
+
+        for local_gene_position in 1:n_local_genes
+            @views normalized_log_fraction_per_neighborhood_metacell =
+                normalized_log_fraction_per_neighborhood_metacell_per_local_gene[:, local_gene_position]
+            cluster_index = cluster_index_per_local_gene[local_gene_position]
+            @views cluster_log_fraction_per_neighborhood_metacell = center_per_neighborhood_metacell_per_cluster[:, cluster_index]
+            cluster_correlation = flame_timed("cor") do
+                return cor(normalized_log_fraction_per_neighborhood_metacell, cluster_log_fraction_per_neighborhood_metacell)
+            end
+            correlation_per_lateral_cluster = flame_timed("cor") do
+                return vec(cor(normalized_log_fraction_per_neighborhood_metacell, center_per_neighborhood_metacell_per_lateral_cluster))
+            end
+            lateral_cluster_index = argmax(correlation_per_lateral_cluster)
+            lateral_correlation = correlation_per_lateral_cluster[lateral_cluster_index]
+            qualifier = ""
+            if is_neighborhood_distinct_per_local_gene[local_gene_position]
+                qualifier *= " distinct"
+            end
+            if is_skeleton_per_local_gene[local_gene_position]
+                qualifier *= " skeleton"
+            end
+            if lateral_correlation > cluster_correlation
+                if qualifier == ""
+                    is_lateral_ish_per_local_gene[local_gene_position] = true
+                else
+                    qualifier *= " kept"
+                end
+                @debug "Block $(block_name)$(qualifier) lateral-ish gene: $(name_per_gene[indices_of_local_genes[local_gene_position]]) lateral_correlation: $(lateral_correlation) > cluster_correlation: $(cluster_correlation) lateral cluster: $(lateral_cluster_index)"
+            else
+                @debug "Block $(block_name)$(qualifier) kept gene: $(name_per_gene[indices_of_local_genes[local_gene_position]]) lateral_correlation: $(lateral_correlation) <= cluster_correlation: $(cluster_correlation) lateral cluster: $(lateral_cluster_index)"
+            end
+        end
+
+        module_status_per_gene[indices_of_local_genes[is_lateral_ish_per_local_gene]] .*= ",lateral_ish"
+    end
+
+    local anchor_local_position_per_cluster
+    local cluster_index_of_anchor_local_position
+
+    flame_timed("correlated_pertinent_gene_modules") do
+        n_clusters = size(center_per_neighborhood_metacell_per_cluster, 2)
         @debug "TODOX Block: $(block_name) raw clusters: $(n_clusters)"
         @assert 0 < n_clusters <= max_clusters
 
-        anchor_local_index_per_cluster = fill(UInt32(0), n_clusters)
-        cluster_index_of_anchor_local_index = Dict{UInt32, UInt32}()
+        anchor_local_position_per_cluster = fill(UInt32(0), n_clusters)
+        cluster_index_of_anchor_local_position = Dict{UInt32, UInt32}()
 
-        flame_timed("finalize_gene_modules") do
-            for cluster_index in 1:n_clusters
-                @views cluster_center_per_metacell = center_per_metacell_per_cluster[:, cluster_index]
-                is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
-                n_cluster_genes = sum(is_in_cluster_per_local_gene)
-                @assert n_cluster_genes > 0
-                is_lateral_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_lateral_per_local_gene
-                n_lateral_cluster_genes = sum(is_lateral_in_cluster_per_local_gene)
+        for cluster_index in 1:n_clusters
+            @views cluster_center_per_neighborhood_metacell = center_per_neighborhood_metacell_per_cluster[:, cluster_index]
+            is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
+            n_cluster_genes = sum(is_in_cluster_per_local_gene)
+            @assert n_cluster_genes > 0
+            is_lateral_ish_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_lateral_ish_per_local_gene
+            n_lateral_cluster_genes = sum(is_lateral_ish_in_cluster_per_local_gene)
 
-                if smart_laterals || max_cluster_laterals_fraction === nothing
-                    @assert smart_laterals || n_lateral_cluster_genes == 0
-                elseif n_lateral_cluster_genes > max_cluster_laterals_fraction * n_cluster_genes
-                    cluster_index_per_local_gene[is_in_cluster_per_local_gene] .= -1
-                    module_status_per_gene[index_per_local_gene[is_in_cluster_per_local_gene]] .*= ",lateral_cluster"
+            cluster_index_per_local_gene[is_lateral_ish_in_cluster_per_local_gene] .= -1
+            is_pertinent_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& .!is_lateral_ish_per_local_gene
 
-                    @debug "TODOX Block: $(block_name) lateral cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes))) > $(max_cluster_laterals_fraction)"
-                    continue
-                end
+            is_skeleton_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_skeleton_per_local_gene
+            local_positions_of_skeletons_in_cluster = findall(is_skeleton_in_cluster_per_local_gene)
+            n_cluster_skeletons = length(local_positions_of_skeletons_in_cluster)
 
-                cluster_index_per_local_gene[is_lateral_in_cluster_per_local_gene] .= -1
-                is_not_lateral_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& .!is_lateral_per_local_gene
+            if n_cluster_skeletons == 0
+                cluster_index_per_local_gene[is_pertinent_in_cluster_per_local_gene] .= 0
+                module_status_per_gene[indices_of_local_genes[is_pertinent_in_cluster_per_local_gene]] .*= ",orphan_cluster"
 
-                is_skeleton_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_skeleton_per_local_gene
-                local_indices_of_skeletons_in_cluster = findall(is_skeleton_in_cluster_per_local_gene)
-                n_cluster_skeletons = length(local_indices_of_skeletons_in_cluster)
+                @debug "TODOX Block: $(block_name) orphan cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes)))"
+                continue
+            end
 
-                if n_cluster_skeletons == 0
-                    cluster_index_per_local_gene[is_not_lateral_in_cluster_per_local_gene] .= 0
-                    module_status_per_gene[index_per_local_gene[is_not_lateral_in_cluster_per_local_gene]] .*= ",orphan_cluster"
+            normalized_log_fraction_per_neighborhood_metacell_per_pertinent_local_gene =
+                normalized_log_fraction_per_neighborhood_metacell_per_local_gene[:, is_pertinent_in_cluster_per_local_gene]
+            correlation_between_center_and_pertinent_local_genes = flame_timed("cor") do
+                return vec(cor(cluster_center_per_neighborhood_metacell, normalized_log_fraction_per_neighborhood_metacell_per_pertinent_local_gene))
+            end
+            @assert_vector(
+                correlation_between_center_and_pertinent_local_genes,
+                sum(is_pertinent_in_cluster_per_local_gene)
+            )
 
-                    @debug "TODOX Block: $(block_name) orphan cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes)))"
-                    continue
-                end
+            is_correlated_pertinent_in_cluster_per_local_gene = zeros(Bool, n_local_genes)
+            is_correlated_pertinent_in_cluster_per_local_gene[is_pertinent_in_cluster_per_local_gene] .=
+                correlation_between_center_and_pertinent_local_genes .>= min_member_correlation
 
-                normalized_log_fraction_per_metacell_per_not_lateral =
-                    normalized_log_fraction_per_metacell_per_local_gene[:, is_not_lateral_in_cluster_per_local_gene]
-                correlation_between_center_and_not_lateral_local_genes = flame_timed("cor") do
-                    return vec(cor(cluster_center_per_metacell, normalized_log_fraction_per_metacell_per_not_lateral))
-                end
-                @assert_vector(
-                    correlation_between_center_and_not_lateral_local_genes,
-                    sum(is_not_lateral_in_cluster_per_local_gene)
-                )
+            is_uncorrelated_pertinent_in_cluster_per_local_gene =
+                is_pertinent_in_cluster_per_local_gene .& .!is_correlated_pertinent_in_cluster_per_local_gene
+            cluster_index_per_local_gene[is_uncorrelated_pertinent_in_cluster_per_local_gene] .= 0
 
-                is_correlated_not_lateral_in_cluster_per_local_gene = zeros(Bool, n_local_genes)
-                is_correlated_not_lateral_in_cluster_per_local_gene[is_not_lateral_in_cluster_per_local_gene] .=
-                    correlation_between_center_and_not_lateral_local_genes .>= min_member_correlation
+            n_correlated_pertinent_local_genes = sum(is_correlated_pertinent_in_cluster_per_local_gene)
+            n_uncorrelated_pertinent_cluster_genes = sum(is_uncorrelated_pertinent_in_cluster_per_local_gene)
 
-                is_uncorrelated_not_lateral_in_cluster_per_local_gene =
-                    is_not_lateral_in_cluster_per_local_gene .& .!is_correlated_not_lateral_in_cluster_per_local_gene
-                cluster_index_per_local_gene[is_uncorrelated_not_lateral_in_cluster_per_local_gene] .= 0
-
-                n_correlated_cluster_genes = sum(is_correlated_not_lateral_in_cluster_per_local_gene)
-                n_uncorrelated_cluster_genes = sum(is_uncorrelated_not_lateral_in_cluster_per_local_gene)
-
-                @assert n_correlated_cluster_genes == sum(cluster_index_per_local_gene .== cluster_index)
-                if n_correlated_cluster_genes == 0
-                    module_status_per_gene[index_per_local_gene[is_uncorrelated_not_lateral_in_cluster_per_local_gene]] .*= ",uncorrelated_gene,uncorrelated_cluster"
-                    if n_uncorrelated_cluster_genes == 0
-                        reason = "all-lateral"
-                    else
-                        reason = "all-uncorrelated"
-                    end
-                    @debug "TODOX Block: $(block_name) $(reason) cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes))) uncorrelated: $(n_uncorrelated_cluster_genes) ($(percent(n_uncorrelated_cluster_genes, n_cluster_genes))) correlated: $(n_correlated_cluster_genes) ($(percent(n_correlated_cluster_genes, n_cluster_genes)))"
-                    #@debug "TODOX Block: $(block_name) $(reason) $(reason) cluster: $(cluster_index) gene names: [ \"$(join(name_per_local_gene[is_in_cluster_per_local_gene] , "\", \""))\" ]"
-                    continue
-                end
-
-                module_status_per_gene[index_per_local_gene[is_uncorrelated_not_lateral_in_cluster_per_local_gene]] .*= ",uncorrelated_gene"
-
-                if n_cluster_skeletons == 1
-                    anchor_local_index = local_indices_of_skeletons_in_cluster[1]
-
+            @assert n_correlated_pertinent_local_genes == sum(cluster_index_per_local_gene .== cluster_index)
+            if n_correlated_pertinent_local_genes == 0
+                module_status_per_gene[indices_of_local_genes[is_uncorrelated_pertinent_in_cluster_per_local_gene]] .*= ",uncorrelated_gene,uncorrelated_cluster"
+                if n_uncorrelated_pertinent_cluster_genes == 0
+                    reason = "all-lateral"
                 else
-                    normalized_log_fraction_per_metacell_per_skeleton =
-                        @views normalized_log_fraction_per_metacell_per_local_gene[
-                            :,
-                            local_indices_of_skeletons_in_cluster,
-                        ]
-                    distance_from_center_per_skeleton = flame_timed("colwise.Euclidean") do
-                        return colwise(
-                            Euclidean(),
-                            cluster_center_per_metacell,
-                            normalized_log_fraction_per_metacell_per_skeleton,
-                        )
-                    end
-                    anchor_local_index =
-                        local_indices_of_skeletons_in_cluster[argmin(distance_from_center_per_skeleton)]
+                    reason = "all-uncorrelated"
                 end
-
-                module_status_per_gene[index_per_local_gene[is_correlated_not_lateral_in_cluster_per_local_gene]] .*= ",anchor($(name_per_local_gene[anchor_local_index]))"
-
-                anchor_local_index_per_cluster[cluster_index] = anchor_local_index
-                cluster_index_of_anchor_local_index[anchor_local_index] = cluster_index
-
-                @debug "TODOX Block: $(block_name) anchor: $(name_per_local_gene[anchor_local_index]) cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes))) uncorrelated: $(n_uncorrelated_cluster_genes) ($(percent(n_uncorrelated_cluster_genes, n_cluster_genes))) correlated: $(n_correlated_cluster_genes) ($(percent(n_correlated_cluster_genes, n_cluster_genes)))"
+                @debug "TODOX Block: $(block_name) $(reason) cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes))) uncorrelated pertinent: $(n_uncorrelated_pertinent_cluster_genes) ($(percent(n_uncorrelated_pertinent_cluster_genes, n_cluster_genes))) correlated pertinent: $(n_correlated_pertinent_local_genes) ($(percent(n_correlated_pertinent_local_genes, n_cluster_genes)))"
+                #@debug "TODOX Block: $(block_name) $(reason) $(reason) cluster: $(cluster_index) gene names: [ \"$(join(name_per_gene[indices_of_local_genes[is_in_cluster_per_local_gene]] , "\", \""))\" ]"
+                continue
             end
+
+            module_status_per_gene[indices_of_local_genes[is_uncorrelated_pertinent_in_cluster_per_local_gene]] .*= ",uncorrelated_gene"
+
+            if n_cluster_skeletons == 1
+                anchor_local_position = local_positions_of_skeletons_in_cluster[1]
+
+            else
+                normalized_log_fraction_per_neighborhood_metacell_per_skeleton =
+                    @views normalized_log_fraction_per_neighborhood_metacell_per_local_gene[
+                        :,
+                        local_positions_of_skeletons_in_cluster,
+                    ]
+                distance_from_center_per_skeleton = flame_timed("colwise.Euclidean") do
+                    return colwise(
+                        Euclidean(),
+                        cluster_center_per_neighborhood_metacell,
+                        normalized_log_fraction_per_neighborhood_metacell_per_skeleton,
+                    )
+                end
+                anchor_local_position =
+                    local_positions_of_skeletons_in_cluster[argmin(distance_from_center_per_skeleton)]
+            end
+
+            module_status_per_gene[indices_of_local_genes[is_correlated_pertinent_in_cluster_per_local_gene]] .*= ",anchor($(name_per_gene[indices_of_local_genes[anchor_local_position]]))"
+
+            anchor_local_position_per_cluster[cluster_index] = anchor_local_position
+            cluster_index_of_anchor_local_position[anchor_local_position] = cluster_index
+
+            @debug "TODOX Block: $(block_name) anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes))) uncorrelated pertinent: $(n_uncorrelated_pertinent_cluster_genes) ($(percent(n_uncorrelated_pertinent_cluster_genes, n_cluster_genes))) correlated pertinent: $(n_correlated_pertinent_local_genes) ($(percent(n_correlated_pertinent_local_genes, n_cluster_genes)))"
         end
 
-        @assert length(cluster_index_of_anchor_local_index) > 0
+        @assert length(cluster_index_of_anchor_local_position) > 0
+    end
 
-        local UMIs_per_local_cell_per_local_gene;
-        local total_UMIs_per_local_cell;
+    flame_timed("migrate_between_gene_modules") do
+        @views UMIs_per_neighborhood_cell_per_gene = UMIs_per_cell_per_gene[indices_of_neighborhood_cells, :]
 
-        flame_timed("read_cell_gene_UMIs_todox") do
-            flame_timed("todox_matrix") do
-                return UMIs_per_local_cell_per_local_gene = get_matrix(adapted, "cell", "gene", "UMIs").array
-            end
-            flame_timed("todox_vector") do
-                return total_UMIs_per_local_cell = get_vector(adapted, "cell", "total_UMIs").array
-            end
-        end
+        while true
+            @debug "TODOX Block $(block_name) MIGRATE..."
+            local_positions_of_anchors = collect(keys(cluster_index_of_anchor_local_position))
+            cluster_indices_of_anchors = [
+                cluster_index_of_anchor_local_position[anchor_local_position] for
+                anchor_local_position in local_positions_of_anchors
+            ]
+            @views center_per_neighborhood_metacell_per_anchor = center_per_neighborhood_metacell_per_cluster[:, cluster_indices_of_anchors]
 
-        flame_timed("migrate_between_gene_modules") do
-            while true
-                @debug "TODOX Block $(block_name) MIGRATE..."
-                local_indices_of_anchors = collect(keys(cluster_index_of_anchor_local_index))
-                cluster_indices_of_anchors = [
-                    cluster_index_of_anchor_local_index[anchor_local_index] for
-                    anchor_local_index in local_indices_of_anchors
-                ]
-                @views center_per_metacell_per_anchor = center_per_metacell_per_cluster[:, cluster_indices_of_anchors]
-
-                for local_gene_index in 1:n_local_genes
-                    if cluster_index_per_local_gene[local_gene_index] == 0
-                        @views normalized_log_fraction_per_metacell =
-                            normalized_log_fraction_per_metacell_per_local_gene[:, local_gene_index]
-                        correlation_per_anchor = flame_timed("cor") do
-                            return vec(cor(normalized_log_fraction_per_metacell, center_per_metacell_per_anchor))
-                        end
-                        @assert_vector(correlation_per_anchor, length(local_indices_of_anchors))
-                        anchor_position = argmax(correlation_per_anchor)
-                        correlation = correlation_per_anchor[anchor_position]
-                        anchor_local_index = local_indices_of_anchors[anchor_position]
-                        cluster_index = cluster_index_of_anchor_local_index[anchor_local_index]
-                        if correlation >= min_orphan_correlation
-                            cluster_index_per_local_gene[local_gene_index] = cluster_index
-                            module_status_per_gene[index_per_local_gene[local_gene_index]] *= ",joined($(name_per_local_gene[anchor_local_index]))"
-                            @debug "TODOX Block $(block_name) gene: $(name_per_local_gene[local_gene_index]) is migrated to: $(name_per_local_gene[anchor_local_index]) cluster: $(cluster_index) correlation: $(correlation) status: $(module_status_per_gene[index_per_local_gene[local_gene_index]])"
-                        else
-                            @debug "TODOX Block $(block_name) gene: $(name_per_local_gene[local_gene_index]) not migrated to: $(name_per_local_gene[anchor_local_index]) cluster: $(cluster_index) correlation: $(correlation) status: $(module_status_per_gene[index_per_local_gene[local_gene_index]])"
-                        end
+            for local_gene_index in 1:n_local_genes
+                if cluster_index_per_local_gene[local_gene_index] == 0
+                    @views normalized_log_fraction_per_neighborhood_metacell =
+                        normalized_log_fraction_per_neighborhood_metacell_per_local_gene[:, local_gene_index]
+                    correlation_per_anchor = flame_timed("cor") do
+                        return vec(cor(normalized_log_fraction_per_neighborhood_metacell, center_per_neighborhood_metacell_per_anchor))
+                    end
+                    @assert_vector(correlation_per_anchor, length(local_positions_of_anchors))
+                    anchor_position = argmax(correlation_per_anchor)
+                    correlation = correlation_per_anchor[anchor_position]
+                    anchor_local_position = local_positions_of_anchors[anchor_position]
+                    cluster_index = cluster_index_of_anchor_local_position[anchor_local_position]
+                    if correlation >= min_orphan_correlation
+                        cluster_index_per_local_gene[local_gene_index] = cluster_index
+                        module_status_per_gene[indices_of_local_genes[local_gene_index]] *= ",joined($(name_per_gene[indices_of_local_genes[anchor_local_position]]))"
+                        @debug "TODOX Block $(block_name) gene: $(name_per_gene[indices_of_local_genes[local_gene_index]]) is migrated to: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) correlation: $(correlation) status: $(module_status_per_gene[indices_of_local_genes[local_gene_index]])"
+                    else
+                        @debug "TODOX Block $(block_name) gene: $(name_per_gene[indices_of_local_genes[local_gene_index]]) not migrated to: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) correlation: $(correlation) status: $(module_status_per_gene[indices_of_local_genes[local_gene_index]])"
                     end
                 end
-
-                if length(cluster_index_of_anchor_local_index) == 1
-                    break
-                end
-
-                @debug "TODOX Block $(block_name) WEAK..."
-                weakest_cluster_index = nothing
-                weakest_cluster_strong_UMIs = nothing
-                for (anchor_local_index, cluster_index) in cluster_index_of_anchor_local_index
-                    is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
-                    @assert any(is_in_cluster_per_local_gene)
-                    @views UMIs_per_local_cell_per_cluster_local_gene =
-                        UMIs_per_local_cell_per_local_gene[:, is_in_cluster_per_local_gene]
-                    cluster_UMIs_per_local_cell = vec(sum(UMIs_per_local_cell_per_cluster_local_gene; dims = 2))
-                    cluster_strong_UMIs =
-                        quantile(cluster_UMIs_per_local_cell, 1 - (min_strong_cells - 1) / (n_local_cells - 1))
-                    @debug "TODOX Block $(block_name) anchor: $(name_per_local_gene[anchor_local_index]) cluster: $(cluster_index) strong UMIs: $(cluster_strong_UMIs)"
-                    if weakest_cluster_strong_UMIs === nothing || cluster_strong_UMIs < weakest_cluster_strong_UMIs
-                        weakest_cluster_index = cluster_index
-                        weakest_cluster_strong_UMIs = cluster_strong_UMIs
-                    end
-                end
-
-                @assert weakest_cluster_index !== nothing
-                anchor_local_index = anchor_local_index_per_cluster[weakest_cluster_index]
-
-                if weakest_cluster_strong_UMIs >= min_strong_UMIs
-                    @debug "TODOX Block $(block_name) strong anchor: $(name_per_local_gene[anchor_local_index]) cluster: $(weakest_cluster_index) strong UMIs: $(weakest_cluster_strong_UMIs)"
-                    break
-                end
-
-                @debug "TODOX Block $(block_name) weak anchor: $(name_per_local_gene[anchor_local_index]) cluster: $(weakest_cluster_index) strong UMIs: $(weakest_cluster_strong_UMIs)"
-                is_in_weakest_cluster_per_local_gene = cluster_index_per_local_gene .== weakest_cluster_index
-                module_status_per_gene[index_per_local_gene[is_in_weakest_cluster_per_local_gene]] .*= ",weak_cluster"
-                cluster_index_per_local_gene[is_in_weakest_cluster_per_local_gene] .= 0
-                anchor_local_index_per_cluster[weakest_cluster_index] = 0
-                delete!(cluster_index_of_anchor_local_index, anchor_local_index)
             end
-        end
 
+            if length(cluster_index_of_anchor_local_position) == 1
+                break
+            end
+
+            @debug "TODOX Block $(block_name) WEAK..."
+            weakest_cluster_index = nothing
+            weakest_cluster_strong_UMIs = nothing
+            for (anchor_local_position, cluster_index) in cluster_index_of_anchor_local_position
+                is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
+                @assert any(is_in_cluster_per_local_gene)
+                @views UMIs_per_neighborhood_cell_per_cluster_local_gene =
+                    UMIs_per_neighborhood_cell_per_gene[:, indices_of_local_genes[is_in_cluster_per_local_gene]]
+                cluster_UMIs_per_neighborhood_cell = vec(sum(UMIs_per_neighborhood_cell_per_cluster_local_gene; dims = 2))
+                cluster_strong_UMIs =
+                    quantile(cluster_UMIs_per_neighborhood_cell, 1 - (min_strong_cells - 1) / (n_neighborhood_cells - 1))
+                @debug "TODOX Block $(block_name) anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) strong UMIs: $(cluster_strong_UMIs)"
+                if weakest_cluster_strong_UMIs === nothing || cluster_strong_UMIs < weakest_cluster_strong_UMIs
+                    weakest_cluster_index = cluster_index
+                    weakest_cluster_strong_UMIs = cluster_strong_UMIs
+                    end
+            end
+
+            @assert weakest_cluster_index !== nothing
+            anchor_local_position = anchor_local_position_per_cluster[weakest_cluster_index]
+
+            if weakest_cluster_strong_UMIs >= min_strong_UMIs
+                @debug "TODOX Block $(block_name) strong anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(weakest_cluster_index) strong UMIs: $(weakest_cluster_strong_UMIs)"
+                break
+            end
+
+            @debug "TODOX Block $(block_name) weak anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(weakest_cluster_index) strong UMIs: $(weakest_cluster_strong_UMIs)"
+            is_in_weakest_cluster_per_local_gene = cluster_index_per_local_gene .== weakest_cluster_index
+            module_status_per_gene[indices_of_local_genes[is_in_weakest_cluster_per_local_gene]] .*= ",weak_cluster"
+            cluster_index_per_local_gene[is_in_weakest_cluster_per_local_gene] .= 0
+            anchor_local_position_per_cluster[weakest_cluster_index] = 0
+            delete!(cluster_index_of_anchor_local_position, anchor_local_position)
+        end
+    end
+
+    local genes_indices_of_anchor_index
+    flame_timed("collect_gene_modules") do
         genes_indices_of_anchor_index = Dict{Int, Vector{Int}}()
 
-        for (anchor_local_index, cluster_index) in cluster_index_of_anchor_local_index
-            anchor_index = index_per_local_gene[anchor_local_index]
+        for (anchor_local_position, cluster_index) in cluster_index_of_anchor_local_position
+            anchor_index = indices_of_local_genes[anchor_local_position]
             is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
-            indices_of_cluster_genes = index_per_local_gene[is_in_cluster_per_local_gene]
+            indices_of_cluster_genes = indices_of_local_genes[is_in_cluster_per_local_gene]
             genes_indices_of_anchor_index[anchor_index] = indices_of_cluster_genes
         end
 
-        @debug "TODOX Block: $(block_name) final clusters: $(length(cluster_index_of_anchor_local_index)) anchors: [ $(join(name_per_local_gene[sort!(collect(keys(cluster_index_of_anchor_local_index)))], ", ")) ]"
-        return genes_indices_of_anchor_index
+        @debug "TODOX Block: $(block_name) final clusters: $(length(cluster_index_of_anchor_local_position)) anchors: [ $(join(sort(name_per_gene[indices_of_local_genes[collect(keys(cluster_index_of_anchor_local_position))]]), ", ")) ]"
     end
+
+    return genes_indices_of_anchor_index
 end
 
 function find_anchor_k(;
     normalized_log_fraction_per_metacell_per_local_gene::AbstractMatrix{<:AbstractFloat},
     cluster_center_per_metacell::AbstractVector{<:AbstractFloat},
-    local_indices_of_skeletons_in_cluster::Union{AbstractVector{Bool}, BitVector},
+    local_positions_of_skeletons_in_cluster::Union{AbstractVector{Bool}, BitVector},
 )::Integer
     normalized_log_fraction_per_metacell_per_skeleton =
-        @views normalized_log_fraction_per_metacell_per_local_gene[:, local_indices_of_skeletons_in_cluster]
+        @views normalized_log_fraction_per_metacell_per_local_gene[:, local_positions_of_skeletons_in_cluster]
     distance_from_center_per_skeleton = flame_timed("colwise.Euclidean") do
         return colwise(Euclidean(), cluster_center_per_metacell, normalized_log_fraction_per_metacell_per_skeleton)
     end
-    return local_indices_of_skeletons_in_cluster[argmin(distance_from_center_per_skeleton)]
+    return local_positions_of_skeletons_in_cluster[argmin(distance_from_center_per_skeleton)]
 end
 
 end  # module

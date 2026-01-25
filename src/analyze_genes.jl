@@ -134,54 +134,53 @@ $(CONTRACT)
 
     n_genes = axis_length(daf, "gene")
 
-    maximal_fraction_per_gene = daf["/ metacell / gene : linear_fraction %> Max"].array
+    fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "linear_fraction").array
+    maximal_fraction_per_gene = vec(maximum(fraction_per_metacell_per_gene; dims = 1))
+    @assert_vector(maximal_fraction_per_gene, n_genes)
+
     is_strong_per_gene = maximal_fraction_per_gene .>= min_gene_max_fraction
-    index_per_strong_gene = findall(is_strong_per_gene)
-    n_strong_genes = length(index_per_strong_gene)
+    indices_of_strong_genes = findall(is_strong_per_gene)
+    n_strong_genes = length(indices_of_strong_genes)
 
-    average_fraction_per_gene = daf["/ metacell / gene : linear_fraction %> Mean"].array
-    average_fraction_per_strong_gene = average_fraction_per_gene[index_per_strong_gene]
+    log_fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "log_linear_fraction").array
+    @views log_fraction_per_metacell_per_strong_gene = log_fraction_per_metacell_per_gene[:, indices_of_strong_genes]
 
-    position_per_ordered_strong_gene = sortperm(average_fraction_per_strong_gene)
-    index_per_ordered_strong_gene = index_per_strong_gene[position_per_ordered_strong_gene]
-    average_fraction_per_ordered_strong_gene = average_fraction_per_strong_gene[position_per_ordered_strong_gene]
-
-    log_fraction_per_metacell_per_gene = daf["/ metacell / gene : log_linear_fraction"].array
-    @views log_fraction_per_metacell_per_ordered_strong_gene =
-        log_fraction_per_metacell_per_gene[:, index_per_ordered_strong_gene]
-
-    log_fraction_per_metacell_per_skeleton = daf["/ metacell / gene & is_skeleton : log_linear_fraction"].array
+    is_skeleton_per_gene = get_vector(daf, "gene", "is_skeleton").array
+    @views log_fraction_per_metacell_per_skeleton = log_fraction_per_metacell_per_gene[:, is_skeleton_per_gene]
     n_skeletons = size(log_fraction_per_metacell_per_skeleton, 2)
 
-    correlation_per_skeleton_per_ordered_strong_gene = flame_timed("cor") do
-        return cor(log_fraction_per_metacell_per_skeleton, log_fraction_per_metacell_per_ordered_strong_gene)
+    correlation_per_skeleton_per_strong_gene = flame_timed("cor") do
+        return cor(log_fraction_per_metacell_per_skeleton, log_fraction_per_metacell_per_strong_gene)
     end
-    correlation_per_skeleton_per_ordered_strong_gene[isnan.(correlation_per_skeleton_per_ordered_strong_gene)] .= 0.0
-    @assert_matrix(correlation_per_skeleton_per_ordered_strong_gene, n_skeletons, n_strong_genes)
+    correlation_per_skeleton_per_strong_gene[isnan.(correlation_per_skeleton_per_strong_gene)] .= 0.0
+    @assert_matrix(correlation_per_skeleton_per_strong_gene, n_skeletons, n_strong_genes)
 
-    max_correlation_per_ordered_strong_gene = vec(maximum(correlation_per_skeleton_per_ordered_strong_gene; dims = 1))
-    @assert_vector(max_correlation_per_ordered_strong_gene, n_strong_genes)
+    max_correlation_per_strong_gene = vec(maximum(correlation_per_skeleton_per_strong_gene; dims = 1))
+    @assert_vector(max_correlation_per_strong_gene, n_strong_genes)
 
-    quantile_correlation_per_ordered_strong_gene = rolling_quantile(
-        max_correlation_per_ordered_strong_gene,
+    quantile_correlation_per_strong_gene = rolling_quantile(
+        max_correlation_per_strong_gene,
         genes_correlation_window,
         min_gene_correlation_quantile,
     )
-    is_quantile_correlation_per_ordered_strong_gene =
-        max_correlation_per_ordered_strong_gene .>= quantile_correlation_per_ordered_strong_gene
-    is_strong_correlation_per_ordered_strong_gene = max_correlation_per_ordered_strong_gene .>= min_gene_correlation
+    is_quantile_correlation_per_strong_gene =
+        max_correlation_per_strong_gene .>= quantile_correlation_per_strong_gene
+    is_strong_correlation_per_strong_gene = max_correlation_per_strong_gene .>= min_gene_correlation
 
     is_correlated_with_skeleton_per_gene = zeros(Bool, n_genes)
-    is_correlated_with_skeleton_per_gene[index_per_ordered_strong_gene[is_quantile_correlation_per_ordered_strong_gene]] .=
+    is_correlated_with_skeleton_per_gene[indices_of_strong_genes[is_quantile_correlation_per_strong_gene]] .=
         true
-    is_correlated_with_skeleton_per_gene[index_per_ordered_strong_gene[is_strong_correlation_per_ordered_strong_gene]] .=
+    is_correlated_with_skeleton_per_gene[indices_of_strong_genes[is_strong_correlation_per_strong_gene]] .=
         true
 
-    min_log_fraction_per_metacell_per_gene = daf["/ metacell / gene : log_linear_fraction %> Min"].array
-    max_log_fraction_per_metacell_per_gene = daf["/ metacell / gene : log_linear_fraction %> Max"].array
-    range_fold_log_fraction_per_metacell_per_gene =
-        max_log_fraction_per_metacell_per_gene .- min_log_fraction_per_metacell_per_gene
-    is_range_fold_per_gene = range_fold_log_fraction_per_metacell_per_gene .>= min_gene_range_fold
+    min_log_fraction_per_gene = vec(minimum(log_fraction_per_metacell_per_gene; dims = 1))
+    @assert_vector(min_log_fraction_per_gene, n_genes)
+
+    max_log_fraction_per_gene = vec(maximum(log_fraction_per_metacell_per_gene; dims = 1))
+    @assert_vector(max_log_fraction_per_gene, n_genes)
+
+    range_fold_log_fraction_per_gene = max_log_fraction_per_gene .- min_log_fraction_per_gene
+    is_range_fold_per_gene = range_fold_log_fraction_per_gene .>= min_gene_range_fold
     is_correlated_with_skeleton_per_gene .&= is_range_fold_per_gene
 
     @debug "Correlated with skeleton genes: $(sum(is_correlated_with_skeleton_per_gene)) out of strong genes: $(n_strong_genes)"

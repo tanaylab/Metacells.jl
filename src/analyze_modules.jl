@@ -430,12 +430,14 @@ TODOX
 
     UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
     total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
+    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    block_index_per_metacell = daf["/ metacell : block => index"].array
 
     parallel_loop_wo_rng(1:n_blocks) do block_index
         linear_fraction_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
         block_name = name_per_block[block_index]
-        indices_of_neighborhood_metacells =
-            daf["/ metacell & block => is_in_neighborhood ;= $(block_name) : index"].array
+        @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
+        indices_of_neighborhood_metacells = findall(is_in_neighborhood_per_other_block[block_index_per_metacell])
         n_neighborhood_metacells = length(indices_of_neighborhood_metacells)
         @views module_per_gene = module_per_gene_per_block[:, block_index]
         n_found_modules = 0
