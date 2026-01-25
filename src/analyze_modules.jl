@@ -690,6 +690,7 @@ TODOX
 
     block_index_per_metacell = daf["/ metacell : block => index"].array
     module_per_gene_per_block = daf["/ gene / block : module"].array
+    metacell_index_per_cell = daf["/ cell : metacell ?? 0 => index"].array
 
     mean_distance_per_metacell = zeros(Float32, n_metacells)
     std_distance_per_meyacell = zeros(Float32, n_metacells)
@@ -701,7 +702,7 @@ TODOX
         metacell_name = name_per_metacell[metacell_index]
         block_index = block_index_per_metacell[metacell_index]
 
-        indices_of_metacell_cells = daf["/ cell & metacell = $(metacell_name) : index"].array
+        indices_of_metacell_cells = findall(metacell_index_per_cell .== metacell_index)
         n_metacell_cells = length(indices_of_metacell_cells)
         @assert n_metacell_cells > 0
         total_UMIs_per_metacell_cell = total_UMIs_per_cell[indices_of_metacell_cells]
