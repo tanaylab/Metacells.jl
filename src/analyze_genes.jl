@@ -158,20 +158,14 @@ $(CONTRACT)
     max_correlation_per_strong_gene = vec(maximum(correlation_per_skeleton_per_strong_gene; dims = 1))
     @assert_vector(max_correlation_per_strong_gene, n_strong_genes)
 
-    quantile_correlation_per_strong_gene = rolling_quantile(
-        max_correlation_per_strong_gene,
-        genes_correlation_window,
-        min_gene_correlation_quantile,
-    )
-    is_quantile_correlation_per_strong_gene =
-        max_correlation_per_strong_gene .>= quantile_correlation_per_strong_gene
+    quantile_correlation_per_strong_gene =
+        rolling_quantile(max_correlation_per_strong_gene, genes_correlation_window, min_gene_correlation_quantile)
+    is_quantile_correlation_per_strong_gene = max_correlation_per_strong_gene .>= quantile_correlation_per_strong_gene
     is_strong_correlation_per_strong_gene = max_correlation_per_strong_gene .>= min_gene_correlation
 
     is_correlated_with_skeleton_per_gene = zeros(Bool, n_genes)
-    is_correlated_with_skeleton_per_gene[indices_of_strong_genes[is_quantile_correlation_per_strong_gene]] .=
-        true
-    is_correlated_with_skeleton_per_gene[indices_of_strong_genes[is_strong_correlation_per_strong_gene]] .=
-        true
+    is_correlated_with_skeleton_per_gene[indices_of_strong_genes[is_quantile_correlation_per_strong_gene]] .= true
+    is_correlated_with_skeleton_per_gene[indices_of_strong_genes[is_strong_correlation_per_strong_gene]] .= true
 
     min_log_fraction_per_gene = vec(minimum(log_fraction_per_metacell_per_gene; dims = 1))
     @assert_vector(min_log_fraction_per_gene, n_genes)
