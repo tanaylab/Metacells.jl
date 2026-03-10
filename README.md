@@ -45,6 +45,27 @@ installing any other Python package.
 
 TODO: To install the R wrappers...
 
+## Environment Variables
+
+This uses `TanayLabUtilities` and `DataAxesFormats` so all their environment variables apply here. In addition:
+
+`METACELLS_GMARA_CACHE` - where to cache fetched `Gmara` lists. By default is `$HOME/.cache/gmara`.
+
+`METACELLS_GMARA_TIMEOUT` - timeout in seconds for accessing the `Gmara` repository.
+
+## Debug Logging
+
+This uses `TanayLabUtilities` and `DataAxesFormats` so all their debug logging apply here. In addition, the following
+groups will generate log messages:
+
+`mcs_results` - will generate terse log messages of the results of high-level functions (e.g., number of blocks for
+`compute_metacells_blocks`).
+
+`mcs_ops` - will generate a detailed debug log message when high-level functions are called (e.g.,
+`compute_metacells_blocks`).
+
+`mcs_details` - will generate detailed progress log messages (and progress bars). This will generate a lot of messages.
+
 ## License (MIT)
 
 Copyright © 2024 Weizmann Institute of Science

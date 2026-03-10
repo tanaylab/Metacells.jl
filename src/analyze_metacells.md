@@ -7,48 +7,36 @@ Metacells.AnalyzeMetacells
 ## Counts
 
 ```@docs
-Metacells.AnalyzeMetacells.compute_metacells_n_cells!
+Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!
 ```
 
 ## UMIs
 
 ```@docs
-Metacells.AnalyzeMetacells.compute_metacells_genes_UMIs!
-Metacells.AnalyzeMetacells.compute_metacells_total_UMIs!
-```
-
-## Linear Fractions
-
-```@docs
-Metacells.AnalyzeMetacells.compute_metacells_genes_linear_fractions!
-Metacells.AnalyzeMetacells.compute_metacells_genes_log_linear_fractions!
-```
-
-## Geomean Fractions
-
-```@docs
-Metacells.AnalyzeMetacells.compute_metacells_genes_geomean_fractions!
-Metacells.AnalyzeMetacells.compute_metacells_genes_log_geomean_fractions!
+Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!
+Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!
+Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!
+Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
 ```
 
 ## Types
 
 ```@docs
-Metacells.AnalyzeMetacells.compute_cells_types_by_metacells!
-Metacells.AnalyzeMetacells.compute_metacells_types_by_cells!
+Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!
+Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!
 ```
 
 ## Distances
 
 ```@docs
-Metacells.AnalyzeMetacells.compute_metacells_euclidean_distances!
-Metacells.AnalyzeMetacells.compute_metacells_max_skeleton_fold_distances!
+Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!
 ```
 
 ## Correlations
 
 ```@docs
-Metacells.AnalyzeMetacells.compute_metacells_regulators_correlations!
+Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
 ```
 
 ## Index

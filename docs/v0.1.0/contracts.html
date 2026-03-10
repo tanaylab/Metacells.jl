@@ -1,0 +1,3322 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Contracts · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="Contracts · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Contracts · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Contracts · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li>
+<a class="tocitem" href="index.html">Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Genes">
+<span>Genes
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Cells">
+<span>Cells
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Metacells">
+<span>Metacells
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Blocks">
+<span>Blocks
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Type-Annotations">
+<span>Type Annotations
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Gene-Modules">
+<span>Gene Modules
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Projection">
+<span>Projection
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Quality-Control">
+<span>Quality Control
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="analyze_cells.html">Analyze Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_metacells.html">Analyze Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_blocks.html">Compute Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="project_cells.html">Project Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="contracts.html">Contracts
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="contracts.html">Contracts
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="Contracts">
+<a class="docs-heading-anchor" href="#Contracts">Contracts
+</a>
+<a id="Contracts-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Contracts" title="Permalink">
+</a>
+</h1>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts">
+<a class="docstring-binding" href="#Metacells.Contracts">
+<code>Metacells.Contracts
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+</summary>
+<section>
+<div>
+<p>Functions for defining a 
+<code>Contract
+</code> for a metacells 
+<code>Daf
+</code> data set 
+<code>@computation
+</code>. This also serves as a vocabulary describing the data we keep when doing metacells based analysis, which is a solid basis for understanding what is going on. As Fred Brooks said: &quot;Show me your flowcharts and conceal your tables, and I shall continue to be mystified. Show me your tables, and I won’t usually need your flowcharts; they’ll be obvious.&quot;.
+</p>
+<p>We often look at the log base 2 of the gene expression level. We use a regularization factor of 1e-5 to avoid a log of zero. This means the minimal log value is -16.6 and the maximal value for a well-behaved gene (~0.1% of the total UMIs of the cell) is -10. We typically look at the range -16 &quot;basically no expression&quot; to -10 &quot;respectably high expression&quot;.
+</p>
+<p>In the descriptions below, &quot;fold factor&quot; refers to the log base 2 of the ratio between expression levels. That is, we look at an interesting fold factor of ~6 between &quot;basically no expression&quot; and &quot;respectably high expression&quot;. A fold factor (difference in logs) of ~3 (that is, ~8x expression level) is typically taken to be &quot;significant&quot; for a single gene between cells by the metacell algorithm. However lower fold factors may be significant, especially as the number of UMIs used to estimate the expression levels are larger (e.g., between expression levels of metacells). As a quick and useful heuristic, we don&#39;t consider fold factors between metacell genes to be meaningful unless the sum of the gene UMIs in both compared metacells is too low (below 40).
+</p>
+<p>Naming convention is 
+<code>vector_of_something_per_axis
+</code> for vectors (e.g., 
+<code>vector_of_metacell_per_cell
+</code>) and 
+<code>matrix_of_something_per_axis_per_axis
+</code> for matrices (e.g., 
+<code>vector_of_UMIs_per_gene_per_cell
+</code>). For square symmetric matrices, we use 
+<code>matrix_of_something_between_axis
+</code> (e.g., 
+<code>matrix_of_euclidean_skeleton_fold_distance_between_metacells
+</code>). We also allow for 
+<code>tensor_of_something_per_axis_per_axis_per_axis
+</code> - these are simply a set of matrices, one for each entry of the first axis, whose names are 
+<code>entry_something
+</code>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Genes">
+<a class="docs-heading-anchor" href="#Genes">Genes
+</a>
+<a id="Genes-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Genes" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.gene_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.gene_axis">
+<code>Metacells.Contracts.gene_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">gene_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of sequenced genes. By convention we use gene symbols as the namespace of the genes, but this may be different depending on the data set.
+</p>
+<p>This axis is typically created when importing data.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_mitochondrial_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_mitochondrial_per_gene">
+<code>Metacells.Contracts.vector_of_is_mitochondrial_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_mitochondrial_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of mitochondrial genes. These genes are typically excluded from the analysis as they are (mostly) unrelated to the biological behaviors of interest, and also have such a large and variable expression level that including them would skew the denominator when estimating linear gene expression level fractions.
+</p>
+<p>This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in Gmara.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_ribosomal_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_ribosomal_per_gene">
+<code>Metacells.Contracts.vector_of_is_ribosomal_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_ribosomal_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of mitochondrial genes. These genes are typically excluded from the analysis, as they aren&#39;t always unrelated to the biological behaviors of interest, they have such a large and variable expression level that including them would skew the denominator when estimating linear gene expression level fractions.
+</p>
+<p>This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in Gmara.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_excluded_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_excluded_per_gene">
+<code>Metacells.Contracts.vector_of_is_excluded_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_excluded_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are excluded from consideration. These genes are either unrelated to the biological behaviors of interest and/or have such a large and variable expression level that including them would skew the denominator when estimating linear genes expression level fractions.
+</p>
+<p>This vector is created in a supervised way based on biological and technical considerations.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_lateral_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_lateral_per_gene">
+<code>Metacells.Contracts.vector_of_is_lateral_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_lateral_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are lateral to the biological behaviors of interest. These genes may satisfy all criteria for being in a group of cooperating genes, but the biological behavior they participate in isn&#39;t relevant to the behaviors of interest - for example, genes related to cell cycle or stress. Such genes make it harder to focus on the biological behaviors of interest. They are therefore masked out during some phases of the analysis. However, unlike excluded genes, we still track their expression level and take it into account (e.g., when removing outlier cells from metacells).
+</p>
+<p>This vector is created in a supervised way based on biological considerations. TODO: Add lists in Gmara (cell cycle, stress, etc.) so this can be initialized by them.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_marker_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_marker_per_gene">
+<code>Metacells.Contracts.vector_of_is_marker_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_marker_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states. These genes have a significant expression level at some cell state, as well as a significant range of expression across all cell states, so can be used to distinguish between cell states. Non-marker genes are by definition not useful for such analysis, but marker genes aren&#39;t necessarily useful due to other considerations (e.g., they may be lateral genes).
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!">
+<code>compute_vector_of_is_marker_per_gene!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_marker_rank_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_marker_rank_per_gene">
+<code>Metacells.Contracts.vector_of_marker_rank_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_marker_rank_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The relative ranks of the marker genes. The more the gene distinguishes between different cell states, the better (lower) rank it has. That is, 1 is the &quot;most&quot; marker gene. Non-marker genes are given an extremely high rank (that maximal the data type allows).
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_marker_rank_per_gene!">
+<code>compute_vector_of_marker_rank_per_gene!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_transcription_factor_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_transcription_factor_per_gene">
+<code>Metacells.Contracts.vector_of_is_transcription_factor_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_transcription_factor_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that bind to DNA from 
+<code>Gmara
+</code>. Most such genes aren&#39;t meaningful regulator of cell behavior.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_transcription_factor_per_gene!">
+<code>fetch_gmara_vector_of_is_transcription_factor_per_gene!
+</code>
+</a>.
+</p>
+<div class="admonition is-info" id="Note-ba3e2f8b363bc244">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-ba3e2f8b363bc244" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>Regardless of the name, these are all the genes that bind to DNA, regardless of their role in actual transcription. See 
+<a href="contracts.html#Metacells.Contracts.vector_of_is_regulator_per_gene">
+<code>vector_of_is_regulator_per_gene
+</code>
+</a>.
+</p>
+</div>
+</div>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_regulator_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_regulator_per_gene">
+<code>Metacells.Contracts.vector_of_is_regulator_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_regulator_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that regulate the expression level of other genes. These genes are expected to be at the core of the gene programs that describe the cell behaviors manifold.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_regulator_per_gene!">
+<code>fetch_gmara_vector_of_is_regulator_per_gene!
+</code>
+</a>.
+</p>
+<div class="admonition is-info" id="Note-82cbd7e3f75ef469">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-82cbd7e3f75ef469" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>These are 
+<strong>not
+</strong> all the genes that bind to DNA. See 
+<a href="contracts.html#Metacells.Contracts.vector_of_is_transcription_factor_per_gene">
+<code>vector_of_is_transcription_factor_per_gene
+</code>
+</a>.
+</p>
+</div>
+</div>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_skeleton_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_skeleton_per_gene">
+<code>Metacells.Contracts.vector_of_is_skeleton_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_skeleton_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are used to predict the values of the rest of the genes. We assume that knowing the expression level of the skeleton genes is sufficient to reasonably estimate the expression level of the rest of the rest of the (non-excluded) genes. Specifically, if two metacells have &quot;very close&quot; expression level of all the skeleton genes, we assume that these metacells are &quot;very similar&quot; (will be in the same block), without looking at the rest of the genes.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!">
+<code>compute_vector_of_is_skeleton_per_gene!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_forbidden_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_forbidden_per_gene">
+<code>Metacells.Contracts.vector_of_is_forbidden_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_forbidden_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that are forbidden from being used as skeleton genes.
+</p>
+<p>This vector is created in a supervised way based on biological and technical considerations. If not set, no gene is forbidden.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene">
+<code>Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_correlated_with_skeleton_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of (marker) genes that have significant correlation with any of the skeleton genes. What is interesting are marker genes which do not have such correlation; these are potential candidates for looking for missing skeleton genes.
+</p>
+<p>This vector is populated by 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_correlated_with_skeleton_per_gene!">
+<code>compute_vector_of_is_correlated_with_skeleton_per_gene!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Cells">
+<a class="docs-heading-anchor" href="#Cells">Cells
+</a>
+<a id="Cells-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Cells" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.cell_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.cell_axis">
+<code>Metacells.Contracts.cell_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">cell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of sequenced single cells. There&#39;s no convention for cell names, as long as they are unique. Typically some sort of barcode is used, possibly combined with a batch and/or plate and/or experiment identification. In the latter case it is recommended that 
+<code>batch
+</code> and/or 
+<code>plate
+</code> and/or 
+<code>experiment
+</code> would also be created as explicit axes, to allow associating metadata with them instead of repeating it for each cell.
+</p>
+<p>This axis is typically created when importing data.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Cells-UMIs">
+<a class="docs-heading-anchor" href="#Cells-UMIs">Cells UMIs
+</a>
+<a id="Cells-UMIs-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Cells-UMIs" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_UMIs_per_gene_per_cell(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of UMIs collected for each gene for each cell. This is the measurement everything else is built on. This is some sampling of the ground truth of the number of RNA molecules of each gene in each cell. This suffers from randomness (only a small subset of the molecules are actually counted), and biases (some molecules are favored over others, depending on the specific technology and protocol used). More fundamentally, the total number of RNA molecules varies (sometimes wildly) between different cells.
+</p>
+<p>The UMIs count is therefore very sparse and very noisy. The challenge of scRNA-seq analysis is to extract meaningful patterns (cooperating gene programs) that describe the cell behaviors based on this data.
+</p>
+<p>To analyze this data, we are forced to normalize the UMIs counts to a fraction of the total. This is mostly meaningless in the single-cell level because we have so few UMIs per each cell (x,000 or x0,000 UMIs out of the x00,000 RNA molecules) and low-expressing (but still important) genes may have one or at most few UMIs.
+</p>
+<p>Therefore fractions are only (well, mostly) computed for collection of cells. Metacells are defined as the smallest such collections that can be used to give meaningful fraction estimates (therefore maximizing sensitivity for capturing all cell behaviors). This is in contrast with classical methods that look at very large collections (cell &quot;types&quot;).
+</p>
+<p>Using fractions is sensitive to the choice of the denominator; a gene (or gene program) with very high expression would artificially reduce the fraction of the rest of the genes. We therefore exclude known troublesome genes from the denominator (e.g., mitochondrial and ribosomal genes). And when comparing fractions between different data sets, one must 
+<em>always
+</em> renormalize the fractions to the common genes set.
+</p>
+<p>Ideally, we could somehow create an estimate of the concentration of each RNA molecule as this is in absolute units so is directly comparable across analysis methods and data sets. However, in addition to being dependent on the unknown total number of molecules in each cell, this also depends on the unknown and cell volume.
+</p>
+<p>This data is obtained from scRNA-seq experiments.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_mitochondrial_UMIs_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_mitochondrial_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_mitochondrial_UMIs_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_mitochondrial_UMIs_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of all the mitochondrial genes in each cell.
+</p>
+<p>TODO: Implement 
+<code>compute_vector_of_mitochondrial_UMIs_per_cell
+</code> based on 
+<code>vector_of_is_mitochondrial_per_gene
+</code>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_ribosomal_UMIs_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_ribosomal_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_ribosomal_UMIs_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_ribosomal_UMIs_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of all the ribosomal genes in each cell.
+</p>
+<p>TODO: Implement 
+<code>compute_vector_of_mitochondrial_UMIs_per_cell
+</code> based on 
+<code>vector_of_is_ribosomal_per_gene
+</code>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_excluded_UMIs_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_excluded_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_excluded_UMIs_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_excluded_UMIs_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of all the excluded genes in each cell.
+</p>
+<p>TODO: Implement 
+<code>compute_vector_of_excluded_UMIs_per_cell
+</code> based on 
+<code>vector_of_is_excluded_per_gene
+</code>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_total_UMIs_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_total_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_total_UMIs_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>This vector is populated by 
+<a href="analyze_cells.html#Metacells.AnalyzeCells.compute_vector_of_total_UMIs_per_cell!">
+<code>compute_vector_of_total_UMIs_per_cell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Cells-masks">
+<a class="docs-heading-anchor" href="#Cells-masks">Cells masks
+</a>
+<a id="Cells-masks-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Cells-masks" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_excluded_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_excluded_per_cell">
+<code>Metacells.Contracts.vector_of_is_excluded_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_excluded_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of cells that are excluded from consideration. This can be due to any number of reasons - doublets, too low a number of UMIs, to high a percentage of excluded gene UMIs, etc. Excluded cells are not grouped into metacells etc., so they are ignored in all properties that sum UMIs per group (e.g., 
+<code>total_UMIs
+</code> per metacell).
+</p>
+<p>This vector is created in a supervised way based on biological and technical considerations.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Metacells">
+<a class="docs-heading-anchor" href="#Metacells">Metacells
+</a>
+<a id="Metacells-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacells" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.metacell_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.metacell_axis">
+<code>Metacells.Contracts.metacell_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of metacells, which are minimal-sized groups of cells for robust fraction estimates. Each metacell is considered to be a robustly estimated point in the multi-dimensional manifold of cell states. Metacells may be very similar or very different from each other depending on how well a region of the manifold was sampled; that is, highly sampled cell states would have a large number of higher quality metacells that are more similar (dare one say, even &quot;identical&quot;) to each other, while sparsely sampled cell states would have a smaller number of lower quality metacells that are more different from one another. At the threshold of the sensitivity of the algorithm, very rare cell states would be discarded as outliers, or not even appear in the data in the first place.
+</p>
+<p>This axis is typically created when importing data prepared by the Python metacells package, or by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_metacell_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_metacell_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_metacell_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The unique metacell each cell belongs to. All the cells in the same metacell are assumed to have &quot;the same&quot; (relevant) biological state. This is the empty string if the cell does not belong to any metacell (is excluded or outlier).
+</p>
+<p>This vector can be populated by any metacells-like algorithm (the original R metacells (1) algorithm, the Python metacells (2) algorithm, other similar algorithms).
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_cells_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_cells_per_metacell">
+<code>Metacells.Contracts.vector_of_n_cells_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_cells_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells in each metacell.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!">
+<code>compute_vector_of_n_cells_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_UMIs_per_gene_per_metacell(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!">
+<code>compute_matrix_of_UMIs_per_gene_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_total_UMIs_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_total_UMIs_per_metacell">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">metacell_total_UMIs_vector(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of all the non-excluded genes in each metacell. This is used as the denominator for 
+<code>linear_fraction
+</code>.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!">
+<code>compute_vector_of_total_UMIs_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Metacells-Fractions">
+<a class="docs-heading-anchor" href="#Metacells-Fractions">Metacells Fractions
+</a>
+<a id="Metacells-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacells-Fractions" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_linear_fraction_per_gene_per_metacell(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs. This is the &quot;best&quot; estimate assuming unbiased multinomial sampling. However, this is sensitive to a few cells with very high expression levels (&quot;bursty&quot; genes), as these impact the denominator.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!">
+<code>compute_matrix_of_linear_fraction_per_gene_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_log_linear_fraction_per_gene_per_metacell(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs. This adds some gene fraction regularization to deal with zero fractions. Using the log makes it easier to visualize, and the difference between log values (the &quot;fold factor&quot;, log base 2 of the ratio between the expression levels) is a good measure of difference between gene expression levels.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!">
+<code>compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Metacells-Distances">
+<a class="docs-heading-anchor" href="#Metacells-Distances">Metacells Distances
+</a>
+<a id="Metacells-Distances-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacells-Distances" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
+<code>Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_euclidean_skeleton_fold_distance_between_metacells(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The Euclidean distance between the log of the fraction of the skeleton genes between the metacells. This is a symmetric matrix with zeros in the diagonal.
+</p>
+<p>This matrix is computed by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
+<code>compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
+<code>Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_max_skeleton_fold_distance_between_metacells(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The maximal significant fold factor between the fraction of skeleton genes between the metacells. This uses heuristics to require the fold factor be based on a sufficient number of UMIs to be robust. This is a symmetric matrix with zeros in the diagonal.
+</p>
+<p>This matrix may be populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!">
+<code>compute_matrix_of_max_skeleton_fold_distance_between_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Metacells-Correlations">
+<a class="docs-heading-anchor" href="#Metacells-Correlations">Metacells Correlations
+</a>
+<a id="Metacells-Correlations-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacells-Correlations" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_correlation_between_cells_and_punctuated_metacells_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between cells and their metacells (minus the correlated cell) of each gene expression levels. This is zero for excluded genes. This reflects the quality of the grouping of cells into metacells, and verifying that all relevant genes are properly described by the metacell model.
+</p>
+<p>This vector may be populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!">
+<code>compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Blocks">
+<a class="docs-heading-anchor" href="#Blocks">Blocks
+</a>
+<a id="Blocks-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.block_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.block_axis">
+<code>Metacells.Contracts.block_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of blocks, which are distinct groups of metacells with &quot;very close&quot; cell state. The metacells in each block all have &quot;very close&quot; estimates of the fractions of the skeleton genes. Using blocks instead of metacells allows us to more uniformly sample the overall manifold, where each block corresponds to a (coarse) cell state. Highly sampled cell states would have blocks with larger number of higher-quality metacells, while sparsely sampled cell states would have blocks with fewer lower-quality metacells.
+</p>
+<p>This axis is typically created by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_metacells_blocks!">
+<code>compute_metacells_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_block_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_block_per_metacell">
+<code>Metacells.Contracts.vector_of_block_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_block_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The unique block each metacell belongs to.
+</p>
+<p>This vector is populated by 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_metacells_blocks!">
+<code>compute_metacells_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_base_block_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_base_block_per_metacell">
+<code>Metacells.Contracts.vector_of_base_block_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_base_block_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The unique base block each sharpened metacell belongs to. This refers to the blocks of the base metacells, not to the new blocks computed for the sharpened metacells (if any).
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_metacells_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_metacells_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_metacells_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of metacells in each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!">
+<code>compute_vector_of_n_metacells_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_cells_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_cells_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_cells_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells in each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_cells_per_block!">
+<code>compute_vector_of_n_cells_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Blocks-UMIs">
+<a class="docs-heading-anchor" href="#Blocks-UMIs">Blocks UMIs
+</a>
+<a id="Blocks-UMIs-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-UMIs" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_UMIs_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_UMIs_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_UMIs_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of each gene in each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_UMIs_per_gene_per_block!">
+<code>compute_matrix_of_UMIs_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_total_UMIs_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_total_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_total_UMIs_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of UMIs of all the non-excluded genes in each block. This is used as the denominator for 
+<code>linear_fraction
+</code>.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_total_UMIs_per_block!">
+<code>compute_vector_of_total_UMIs_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Blocks-Fractions">
+<a class="docs-heading-anchor" href="#Blocks-Fractions">Blocks Fractions
+</a>
+<a id="Blocks-Fractions-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-Fractions" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_linear_fraction_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!">
+<code>compute_matrix_of_linear_fraction_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_log_linear_fraction_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The log base 2 of the linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block. This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_log_linear_fraction_per_gene_per_block!">
+<code>compute_matrix_of_log_linear_fraction_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Blocks-Distances">
+<a class="docs-heading-anchor" href="#Blocks-Distances">Blocks Distances
+</a>
+<a id="Blocks-Distances-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-Distances" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
+<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The mean Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a symmetric matrix, and the diagonal is 0.
+</p>
+<p>This matrix may be computed by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
+<code>compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Blocks-Confusion">
+<a class="docs-heading-anchor" href="#Blocks-Confusion">Blocks Confusion
+</a>
+<a id="Blocks-Confusion-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-Confusion" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell">
+<code>Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_block_closest_by_pertinent_markers_per_cell(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The block each cell is closest to considering only the non-lateral marker genes. Distance is in fold factors (difference in log base 2 of the gene expression level). This adds some gene fraction regularization to deal with zero fractions.
+</p>
+<p>This matrix may be computed by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_block_closest_by_pertinent_markers_per_cell!">
+<code>compute_vector_of_block_closest_by_pertinent_markers_per_cell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block">
+<code>Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells which are included in each (column) block and are closest to each (row) block.
+</p>
+<p>This matrix may be computed by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!">
+<code>compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Blocks-Neighborhoods">
+<a class="docs-heading-anchor" href="#Blocks-Neighborhoods">Blocks Neighborhoods
+</a>
+<a id="Blocks-Neighborhoods-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-Neighborhoods" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block">
+<code>Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_in_neighborhood_per_block_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>For each (column) block, whether each (row) block is in its neighborhood. This is 
+<strong>not
+</strong> a symmetric matrix. Neighborhoods consist of a small number of &quot;close&quot; blocks. Each such small (neighborhood) region of the manifold allows us to investigate the local gradients of the coarse (block) cell states.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_neighborhood_per_block_per_block!">
+<code>compute_matrix_of_is_in_neighborhood_per_block_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_neighborhood_blocks_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of (rows) blocks in each (column) block&#39;s neighborhood.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_blocks_per_block!">
+<code>compute_vector_of_n_neighborhood_blocks_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_neighborhood_metacells_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of metacells in each block&#39;s neighborhood.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_metacells_per_block!">
+<code>compute_vector_of_n_neighborhood_metacells_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_neighborhood_cells_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_neighborhood_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_neighborhood_cells_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of cells in the metacells in the each block&#39;s neighborhood.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_cells_per_block!">
+<code>compute_vector_of_n_neighborhood_cells_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_total_neighborhood_UMIs_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_total_neighborhood_UMIs_per_block!">
+<code>compute_vector_of_total_neighborhood_UMIs_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_neighborhood_marker_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states in each block&#39;s neighborhood. Such genes do not necessarily distinguish the neighborhood from the rest of the population - see 
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
+<code>matrix_of_is_neighborhood_distinct_per_gene_per_block
+</code>
+</a>.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_marker_per_gene_per_block!">
+<code>compute_matrix_of_is_neighborhood_marker_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_neighborhood_distinct_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states of each block&#39;s neighborhood and the rest of the manifold.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
+<code>compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Neighborhoods-Correlations">
+<a class="docs-heading-anchor" href="#Neighborhoods-Correlations">Neighborhoods Correlations
+</a>
+<a id="Neighborhoods-Correlations-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Neighborhoods-Correlations" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>Whether each gene has strong correlation with the skeleton genes in each block&#39;s neighborhood. If relevant genes are not correlated with any skeleton gene, the list of skeleton (or, more likely, regulator) genes may be incomplete and need to be fixed.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!">
+<code>compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each block&#39;s neighborhood. This is zero for excluded genes. This reflects the overall quality of the neighborhood model.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!">
+<code>compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Type-Annotations">
+<a class="docs-heading-anchor" href="#Type-Annotations">Type Annotations
+</a>
+<a id="Type-Annotations-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Type-Annotations" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.type_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.type_axis">
+<code>Metacells.Contracts.type_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">type_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>The axis of types, which are distinct named biological cell states. Types are convenient labels manually assigned to large groups of cells, metacells, blocks, etc. Types are not associated with an exact biological cell state, but rather with a set of related biological cell states, possibly along a gradient of such states. The resolution of the type labels therefore depends on the data set and the type of analysis.
+</p>
+<p>This axis is typically created manually, or when importing data.
+</p>
+<div class="admonition is-info" id="Note-99f41e72a38a4bc">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-99f41e72a38a4bc" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>There are often multiple simultaneous type assignments for the same entities during the analysis process. For example, we may have per-cell types imported from single-cell analysis of a data set and a different set of types from metacell analysis of the same data. By convention, &quot;the&quot; type property is called 
+<code>type
+</code> and alternative properties are called 
+<code>type.something
+</code> (e.g., 
+<code>type.imported
+</code>, 
+<code>type.by_metacells
+</code>). All the functions that deal with type look at and/or set &quot;the&quot; 
+<code>type
+</code> property; specify an 
+<code>adapter
+</code> to redirect them to an alternative type property.
+</p>
+</div>
+</div>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_color_per_type">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_color_per_type">
+<code>Metacells.Contracts.vector_of_color_per_type
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_color_per_type(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A unique color for each type for visualizations.
+</p>
+<p>This vector is created in a supervised way based on biological considerations and conventions (e.g., red blood cells are often given some red color). It is also possible to use 
+<code>Chameleon
+</code> to automatically assign colors to cell types based on some gene expression levels.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_type_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_type_per_cell">
+<code>Metacells.Contracts.vector_of_type_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_type_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each cell belongs to.
+</p>
+<p>When importing an analyzed single-cell data set, it typically comes with per-cell type annotation. When performing metacell based analysis for a data set, then type annotation is done at the metacell level. In this case, the per-cell type vector can be populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!">
+<code>compute_vector_of_type_per_cell_by_metacells!
+</code>
+</a>. If the type annotation is done at the block level, the per-cell type vector can be populated by [
+<code>compute_vector_of_type_per_cell_by_blocks!
+</code>](@ref
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_type_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_type_per_metacell">
+<code>Metacells.Contracts.vector_of_type_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_type_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each metacell belongs to.
+</p>
+<p>Type annotation for metacells is typically a supervised process based on biological and technical considerations. When importing an analyzed single-cell data set, it typically comes with per-cell type annotation. This allows populating (or merely initializing) the per-metacell type vector by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!">
+<code>compute_vector_of_type_per_metacell_by_cells!
+</code>
+</a>. If manually annotating the types of blocks instead, it is also possible to populate the per-metacell type vector based on the blocks by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_metacell_by_blocks!">
+<code>compute_vector_of_type_per_metacell_by_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_type_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_type_per_block">
+<code>Metacells.Contracts.vector_of_type_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_type_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The type each block belongs to.
+</p>
+<p>Type annotation for blocks can be done in a supervised process (instead of annotating the individual metacells). Alternatively, is can be populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_block_by_metacells!">
+<code>compute_vector_of_type_per_block_by_metacells!
+</code>
+</a> based on the metacell types in each block, or by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_block_by_cells!">
+<code>compute_vector_of_type_per_block_by_cells!
+</code>
+</a> based on the cell types in each block,
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Gene-Modules">
+<a class="docs-heading-anchor" href="#Gene-Modules">Gene Modules
+</a>
+<a id="Gene-Modules-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Gene-Modules" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.module_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.module_axis">
+<code>Metacells.Contracts.module_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">module_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold. Each module is based on a single anchor skeleton gene, and may contain additional skeleton, regulator and/or marker genes. The set and composition of modules varies between blocks across the manifold. For convenient, the names of the modules are the names of their anchors followed by a 
+<code>.MOD
+</code> suffix (to clarify this is the name of a module and not of a gene).
+</p>
+<p>This axis is typically created by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_anchor_per_module">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_anchor_per_module">
+<code>Metacells.Contracts.vector_of_anchor_per_module
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_anchor_per_module(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The skeleton anchor gene each module is based on. Even though the &quot;same&quot; module in different blocks is based on the same anchor gene, the rest of the composition of the module may vary wildly, even between neighboring blocks.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_found_per_module_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_found_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_is_found_per_module_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_found_per_module_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of the modules that were found for each block. Due to 
+<code>Daf
+</code> limitations, the modules axis must cover all the modules of all the blocks. This mask specifies which of the modules were actually found for each of the blocks.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_module_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_module_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_module_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_module_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The module each gene belongs to in each block. Most genes do not belong to any module and therefore have an empty string as the value.
+</p>
+<p>This matrix is populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_module_status_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_module_status_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_module_status_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_module_status_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>What happened to each gene when computing modules in each block. This is a textual description that is helpful in debugging.
+</p>
+<p>This matrix is (optionally) populated by 
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>compute_blocks_modules!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_modules_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_modules_per_block">
+<code>Metacells.Contracts.vector_of_n_modules_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_modules_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of found modules in each block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_vector_of_n_modules_per_block!">
+<code>compute_vector_of_n_modules_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_n_genes_per_module_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_n_genes_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_n_genes_per_module_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_n_genes_per_module_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of genes in each module in each block. This is zero for the gene modules which were not found in the block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_matrix_of_n_genes_per_module_per_block!">
+<code>compute_matrix_of_n_genes_per_module_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
+<code>Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">tensor_of_linear_fraction_per_block_per_module_per_metacell(
+    expectation::ContractExpectation
+)::Pair{TensorKey, DataSpecification}
+</code>
+</pre>
+<p>The linear fraction of the UMIs of each block&#39;s found module genes out of the total UMIs in each metacell. We actually only compute this for metacells in the neighborhood of the block, as each block&#39;s modules are not expected to apply outside this neighborhood. The rest of the entries are zero. Still, this is a tensor with a lot of data, and even with sparse representation, it has non-trivial storage overhead. It is needed for projecting query cells onto an atlas.
+</p>
+<p>
+<code>compute_linear_fraction_of_modules_in_metacells!
+</code>
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
+<code>compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The mean of the linear fraction of each module in the cells of the neighborhood of each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!">
+<code>compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The standard deviation of the linear fraction of each module in the cells of the neighborhood of each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!">
+<code>compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
+<code>Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_mean_euclidean_modules_cells_distance_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>In each metacell, the mean of the euclidean distances of between its cells and the metacell&#39;s linear fraction of the modules of the metacell&#39;s block&#39;s neighborhood.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
+<code>compute_stats_of_euclidean_modules_cells_distance_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell">
+<code>Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_std_euclidean_modules_cells_distance_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>In each metacell, the standard deviation of the euclidean distance of between its cells and the metacell&#39;s linear fraction of the modules of the metacell&#39;s block&#39;s neighborhood.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
+<code>compute_stats_of_euclidean_modules_cells_distance_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Projection">
+<a class="docs-heading-anchor" href="#Projection">Projection
+</a>
+<a id="Projection-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Projection" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_projected_metacell_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_projected_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_projected_metacell_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_projected_metacell_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The projected atlas metacell for each cell. This is our &quot;best match&quot; of the cell. It does 
+<strong>not
+</strong> mean that it is necessarily a 
+<em>good
+</em> match. If you project blood cells on an atlas containing only neuron metacells, there will still be a &quot;best match&quot; (&quot;least bad match&quot; would be a better term).
+</p>
+<p>This vector is populated by 
+<a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
+<code>compute_cells_projection
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_projected_block_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_projected_block_per_cell">
+<code>Metacells.Contracts.vector_of_projected_block_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_projected_block_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The atlas block of the projected metacell for each query cell.
+</p>
+<p>This vector is populated by 
+<a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
+<code>compute_cells_projection
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<code>Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_projected_modules_z_score_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The z score of the distance between each query cell and its projected atlas metacell modules. If this is low, then it is likely that the cell is actually a good match for the metacell.
+</p>
+<p>This vector is populated by 
+<a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
+<code>compute_cells_projection
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_correlation_between_cells_and_projected_metacells_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between query cells and their projected atlas metacells of each gene expression levels. This is zero for excluded genes. This reflects the overall quality of the projection of the query cells to the atlas, and verifying that all relevant genes are properly described by the atlas metacell model.
+</p>
+<p>This vector may be populated by 
+<a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!">
+<code>compute_vector_of_correlation_between_cells_and_projected_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between query cells and their projected atlas metacells of each gene&#39;s expression levels in each atlas block&#39;s neighborhood. This is zero for excluded genes. This reflects the quality of the projection of the query cells to the atlas in each region of the manifold.
+</p>
+<p>This matrix is populated by 
+<a href="project_cells.html#Metacells.ProjectCells.compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!">
+<code>compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.projected_block_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.projected_block_axis">
+<code>Metacells.Contracts.projected_block_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">projected_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>A copy of the atlas 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the query. This is needed to store per-atlas-block quality control data.
+</p>
+<p>This axis is typically created by 
+<a href="project_cells.html#Metacells.ProjectCells.compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!">
+<code>compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Quality-Control">
+<a class="docs-heading-anchor" href="#Quality-Control">Quality Control
+</a>
+<a id="Quality-Control-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Quality-Control" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block. This is intended for use for computing 
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
+<code>matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+</code>
+</a>.
+</p>
+<p>This is sparse, we actually only compute it for the non-lateral neighborhood markers.
+</p>
+<p>This matrix may be populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!">
+<code>compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their metacells of each base neighborhood.
+</p>
+<p>We use this as a poor man&#39;s cross validation; we use the set of cells in the base neighborhoods. We measure the correlation between the expression of these genes in the base and alternative metacells. The absolute correlation values are of less interest than the difference between different genes, and the difference between the alternative metacells. Ideally &quot;relevant&quot; genes would have high correlations while &quot;irrelevant&quot; genes would not, and &quot;improved&quot; metacells would have higher correlation than the base metacells.
+</p>
+<p>These matrices can be populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+</code>
+</pre>
+<p>The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood. This is zero for excluded genes. This allows comparing the correlation between alternative and base metacells in different locations of the manifold.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.base_block_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.base_block_axis">
+<code>Metacells.Contracts.base_block_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>A copy of the base 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative. This is needed to store per-base-block quality control data. Such data is more directly comparable between the alternative metacells and the base ones.
+</p>
+<p>This axis is typically created by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h2>
+<ul>
+<li>
+<a href="contracts.html#Metacells.Contracts">
+<code>Metacells.Contracts
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.base_block_axis">
+<code>Metacells.Contracts.base_block_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>Metacells.Contracts.block_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_axis">
+<code>Metacells.Contracts.cell_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_axis">
+<code>Metacells.Contracts.gene_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block">
+<code>Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
+<code>Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_found_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_is_found_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block">
+<code>Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
+<code>Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
+<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_module_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_module_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_module_status_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_module_status_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_n_genes_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_n_genes_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_axis">
+<code>Metacells.Contracts.metacell_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.module_axis">
+<code>Metacells.Contracts.module_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.projected_block_axis">
+<code>Metacells.Contracts.projected_block_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
+<code>Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.type_axis">
+<code>Metacells.Contracts.type_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_anchor_per_module">
+<code>Metacells.Contracts.vector_of_anchor_per_module
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_base_block_per_metacell">
+<code>Metacells.Contracts.vector_of_base_block_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell">
+<code>Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_block_per_metacell">
+<code>Metacells.Contracts.vector_of_block_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_color_per_type">
+<code>Metacells.Contracts.vector_of_color_per_type
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_excluded_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_excluded_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene">
+<code>Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_excluded_per_cell">
+<code>Metacells.Contracts.vector_of_is_excluded_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_excluded_per_gene">
+<code>Metacells.Contracts.vector_of_is_excluded_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_forbidden_per_gene">
+<code>Metacells.Contracts.vector_of_is_forbidden_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_lateral_per_gene">
+<code>Metacells.Contracts.vector_of_is_lateral_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_marker_per_gene">
+<code>Metacells.Contracts.vector_of_is_marker_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_mitochondrial_per_gene">
+<code>Metacells.Contracts.vector_of_is_mitochondrial_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_regulator_per_gene">
+<code>Metacells.Contracts.vector_of_is_regulator_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_ribosomal_per_gene">
+<code>Metacells.Contracts.vector_of_is_ribosomal_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_skeleton_per_gene">
+<code>Metacells.Contracts.vector_of_is_skeleton_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_transcription_factor_per_gene">
+<code>Metacells.Contracts.vector_of_is_transcription_factor_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_marker_rank_per_gene">
+<code>Metacells.Contracts.vector_of_marker_rank_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
+<code>Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_metacell_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_mitochondrial_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_mitochondrial_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_cells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_cells_per_metacell">
+<code>Metacells.Contracts.vector_of_n_cells_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_metacells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_modules_per_block">
+<code>Metacells.Contracts.vector_of_n_modules_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_neighborhood_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_block_per_cell">
+<code>Metacells.Contracts.vector_of_projected_block_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_projected_metacell_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<code>Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_ribosomal_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_ribosomal_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell">
+<code>Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_metacell">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_block">
+<code>Metacells.Contracts.vector_of_type_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_cell">
+<code>Metacells.Contracts.vector_of_type_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_metacell">
+<code>Metacells.Contracts.vector_of_type_per_metacell
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-prevpage" href="gmara.html">« Gmara
+</a>
+<a class="docs-footer-nextpage" href="analyze_cells.html">Analyze Cells »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.16.1. Using Julia version 1.11.8.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

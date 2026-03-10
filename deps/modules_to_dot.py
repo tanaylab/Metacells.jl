@@ -13,8 +13,9 @@ for module_path in glob("src/*.jl"):
 
             if line.startswith("module "):
                 module_name = line[7:]
-                deps_of[module_name] = set()
-                paths[module_name] = module_path.split("/")[1][:-3]
+                if " " not in module_name:
+                    deps_of[module_name] = set()
+                    paths[module_name] = module_path.split("/")[1][:-3]
                 continue
 
             parts = line.split(" ..")

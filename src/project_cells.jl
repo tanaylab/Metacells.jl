@@ -3,15 +3,9 @@ Project cells on an atlas with modules.
 """
 module ProjectCells
 
-export compute_blocks_cells_pertinent_markers_distances!
-export compute_blocks_cells_pertinent_markers_significance!
-export compute_blocks_cells_skeleton_distances!
-export compute_cell_closest_blocks_by_pertinent_markers!
-export compute_cell_closest_blocks_by_skeletons!
-export compute_cell_most_correlated_blocks_by_markers!
-export compute_cell_most_correlated_blocks_by_skeletons!
-export provisional_cells_projection!
-export final_cells_projection!
+export compute_cells_projection!
+export compute_vector_of_correlation_between_cells_and_projected_metacells!
+export compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!
 
 using Base.Threads
 using DataAxesFormats
@@ -21,537 +15,935 @@ using StatsBase
 using TanayLabUtilities
 
 using ..Contracts
+using ..Defaults
 
-#TODOX import Base.Threads.Mutex
-
-"""
-TODOX
-"""
-@logged @computation Contract(;
-    axes = [metacell_axis(OptionalInput), block_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        gene_is_marker_vector(RequiredInput),
-        gene_is_lateral_vector(RequiredInput),
-        metacell_gene_log_linear_fraction_matrix(OptionalInput),
-        block_gene_linear_fraction_matrix(RequiredInput),
-    ],
-) Contract(;
-    axes = [cell_axis(RequiredInput), block_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        cell_total_UMIs_vector(RequiredInput),
-        cell_gene_UMIs_matrix(RequiredInput),
-        block_cell_pertinent_markers_eucildean_distance_matrix(GuaranteedOutput),
-        block_cell_pertinent_markers_correlation_matrix(GuaranteedOutput),
-    ],
-) function compute_blocks_cells_pertinent_markers_distances!(
-    blocks_daf::DafReader,
-    cells_daf::DafWriter;
-    gene_UMIs_regularization::Real = 1 / 7,
-    overwrite::Bool = false,
-)::Nothing
-    todox_distances(;
-        blocks_daf,
-        cells_daf,
-        gene_UMIs_regularization,
-        prefix = "pertinent_",
-        which = "marker",
-        overwrite,
-    )
-    return nothing
-end
-
-function todox_distances(;
-    blocks_daf::DafReader,
-    cells_daf::DafWriter,
-    gene_UMIs_regularization::Real,
-    which::AbstractString,
-    prefix::AbstractString,
-    overwrite::Bool,
-)::Nothing
-    @assert axis_vector(cells_daf, "block") == axis_vector(blocks_daf, "block")
-
-    n_blocks = axis_length(blocks_daf, "block")
-    n_cells = axis_length(cells_daf, "cell")
-    n_cells_genes = axis_length(cells_daf, "gene")
-
-    name_per_which = blocks_daf["/ gene & is_$(which) &! is_lateral : name"].array
-    cells_gene_index_per_which = axis_indices(cells_daf, "gene", name_per_which)
-    is_block_which_per_cells_gene = zeros(Bool, n_cells_genes)
-    is_block_which_per_cells_gene[cells_gene_index_per_which] .= true
-
-    total_UMIs_per_cell = get_vector(cells_daf, "cell", "total_UMIs").array
-    UMIs_per_cell_per_gene = get_matrix(cells_daf, "cell", "gene", "UMIs").array
-    @views UMIs_per_cell_per_which = UMIs_per_cell_per_gene[:, cells_gene_index_per_which]
-    @debug "TODOX prepare..."
-    UMIs_per_which_per_cell = densify(flip(UMIs_per_cell_per_which))
-
-    @debug "TODOX log_fraction_per_which_per_cell..."
-    log_fraction_per_which_per_cell = log2.(1e-4 .+ UMIs_per_which_per_cell ./ transpose(total_UMIs_per_cell))  # TODOX
-    log_fraction_per_which_per_block =
-        log2.(1e-4 .+ densify(blocks_daf["/ gene & is_$(which) &! is_lateral / block : linear_fraction"].array))
-
-    @debug "TODOX distances..."
-    distances_between_cells_and_blocks = parallel_pairwise(
-        Euclidean(),
-        log_fraction_per_which_per_cell,
-        log_fraction_per_which_per_block;
-        dims = 2,
-        progress = DebugProgress(n_blocks; desc = "distances_between_cells_and_blocks"),
-    )
-    set_matrix!(cells_daf, "cell", "block", "$(prefix)$(which)s_euclidean_distance", distances_between_cells_and_blocks)
-
-    @debug "TODOX correlations..."
-    correlations_between_cells_and_blocks = flame_timed("cor") do
-        return cor(log_fraction_per_which_per_cell, log_fraction_per_which_per_block)
-    end
-    set_matrix!(cells_daf, "cell", "block", "$(prefix)$(which)s_correlation", correlations_between_cells_and_blocks)
-
-    return nothing
-end
+# Needed because of JET:
+import Metacells.Contracts.block_axis
+import Metacells.Contracts.cell_axis
+import Metacells.Contracts.gene_axis
+import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
+import Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
+import Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
+import Metacells.Contracts.matrix_of_is_found_per_module_per_block
+import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
+import Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
+import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
+import Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
+import Metacells.Contracts.matrix_of_module_per_gene_per_block
+import Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
+import Metacells.Contracts.metacell_axis
+import Metacells.Contracts.module_axis
+import Metacells.Contracts.projected_block_axis
+import Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell
+import Metacells.Contracts.vector_of_block_per_metacell
+import Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
+import Metacells.Contracts.vector_of_is_excluded_per_cell
+import Metacells.Contracts.vector_of_is_excluded_per_gene
+import Metacells.Contracts.vector_of_is_lateral_per_gene
+import Metacells.Contracts.vector_of_is_marker_per_gene
+import Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+import Metacells.Contracts.vector_of_projected_block_per_cell
+import Metacells.Contracts.vector_of_projected_metacell_per_cell
+import Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
+import Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
+import Metacells.Contracts.vector_of_total_UMIs_per_cell
+import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 
 """
-TODOX
-"""
-@logged @computation Contract(;
-    axes = [metacell_axis(OptionalInput), block_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        gene_is_skeleton_vector(RequiredInput),
-        gene_is_lateral_vector(RequiredInput),
-        metacell_gene_log_linear_fraction_matrix(OptionalInput),
-        block_gene_linear_fraction_matrix(RequiredInput),
-    ],
-) Contract(;
-    axes = [cell_axis(RequiredInput), gene_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        cell_total_UMIs_vector(RequiredInput),
-        cell_gene_UMIs_matrix(RequiredInput),
-        block_cell_skeleton_euclidean_distance_matrix(GuaranteedOutput),
-        block_cell_skeleton_correlation_matrix(GuaranteedOutput),
-    ],
-) function compute_blocks_cells_skeleton_distances!(
-    blocks_daf::DafReader,
-    cells_daf::DafWriter;
-    gene_UMIs_regularization::Real = 1 / 7,
-    overwrite::Bool = false,
-)::Nothing
-    todox_distances(; blocks_daf, cells_daf, gene_UMIs_regularization, prefix = "", which = "skeleton", overwrite)
-    return nothing
-end
+    compute_cells_projection(;
+        query_daf::DafWriter,
+        atlas_daf::DafReader,
+        gene_fraction_regularization::Real = $(DEFAULT.gene_fraction_regularization),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
 
-"""
-TODOX
-"""
-@logged @computation Contract(;
-    axes = [cell_axis(RequiredInput), block_axis(RequiredInput)],
-    data = [
-        block_cell_pertinent_markers_eucildean_distance_matrix(RequiredInput),
-        block_mean_pertinent_markers_distance_vector(GuaranteedOutput),
-        block_std_pertinent_markers_distance_vector(GuaranteedOutput),
-    ],
-) function compute_blocks_cells_pertinent_markers_significance!(daf::DafReader; overwrite::Bool = false)::Nothing
-    n_blocks = axis_length(daf, "block")
+Compute and set [`vector_of_projected_block_per_cell`] and [`vector_of_projected_modules_z_score_per_cell`](@ref). To pick
+the best metacell in the `atlas_daf` for each cell of the `query_daf`, we:
 
-    distance_per_cell_per_block = get_matrix(daf, "cell", "block", "pertinent_markers_euclidean_distance").array
+- Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral marker
+  genes.
+- Then, for each cell, consider the expression level of the found modules of the provisional block's neighborhood. We use
+  this to pick a metacell in the neighborhood which has the closest Euclidean distance.
+- This metacell might belong to a different block. If so, we repeat the process using that block's neighborhood modules.
+- If the resulting best match metacell is in the same (new) block, we accept it.
+- Otherwise, we just look for the closest metacell in the original block (using that block's modules) and settle for that.
 
-    mean_distance_per_block = vec(mean(distance_per_cell_per_block; dims = 1))
-    @assert_vector(mean_distance_per_block, n_blocks)
-    set_vector!(daf, "block", "mean_pertinent_markers_distance", mean_distance_per_block)
+Distances are computed on the log (base 2) of the gene expression using the `gene_fraction_regularization` to handle
+zero fractions. We also compute the z-score (final distance between the cell and projected metacell, minus the mean
+distance of the cells in the metacell, divided by their standard deviation). If this is too large, then the query cell
+isn't a good match for anything in the atlas.
 
-    std_distance_per_block = vec(std(distance_per_cell_per_block; dims = 1))
-    @assert_vector(std_distance_per_block, n_blocks)
-    set_vector!(daf, "block", "std_pertinent_markers_distance", std_distance_per_block)
+# Query
 
-    return nothing
-end
+$(CONTRACT1)
 
+# Atlas
+
+$(CONTRACT2)
 """
-TODOX
-"""
-@logged @computation Contract(;
-    axes = [block_axis(RequiredInput), cell_axis(RequiredInput)],
-    data = [
-        block_cell_skeleton_euclidean_distance_matrix(RequiredInput),
-        cell_closest_by_skeletons_block_vector(GuaranteedOutput),
-    ],
-) function compute_cell_closest_blocks_by_skeletons!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    todox_nearest(daf, "skeletons_euclidean_distance", "closest_by_skeletons", overwrite)
-    return nothing
-end
-
-function todox_nearest(daf::DafWriter, by::AbstractString, property::AbstractString, overwrite::Bool)::Nothing
-    n_cells = axis_length(daf, "cell")
-    name_per_block = axis_vector(daf, "block")
-    distances_between_blocks_and_cells = get_matrix(daf, "block", "cell", by).array
-    nearest_block_index_per_cell = vec(argmin(distances_between_blocks_and_cells; dims = 1))
-    @assert_vector(nearest_block_index_per_cell, n_cells)
-    nearest_block_name_per_cell = name_per_block[first.(Tuple.(nearest_block_index_per_cell))]
-    set_vector!(daf, "cell", "block.$(property)", nearest_block_name_per_cell; overwrite)
-    return nothing
-end
-
-"""
-TODOX
-"""
-@logged @computation Contract(;
-    axes = [block_axis(RequiredInput), cell_axis(RequiredInput)],
-    data = [
-        block_cell_pertinent_markers_eucildean_distance_matrix(RequiredInput),
-        cell_closest_by_pertinent_markers_block_vector(GuaranteedOutput),
-    ],
-) function compute_cell_closest_blocks_by_pertinent_markers!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    todox_nearest(daf, "pertinent_markers_euclidean_distance", "closest_by_pertinent_markers", overwrite)
-    return nothing
-end
-
-"""
-TODOX
-"""
-@logged @computation Contract(;
-    axes = [block_axis(RequiredInput), cell_axis(RequiredInput)],
-    data = [
-        block_cell_skeleton_correlation_matrix(RequiredInput),
-        cell_most_correlated_by_skeletons_block_vector(GuaranteedOutput),
-    ],
-) function compute_cell_most_correlated_blocks_by_skeletons!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    todox_nearest(daf, "skeletons_correlation", "most_correlated_by_skeletons", overwrite)
-    return nothing
-end
-
-"""
-TODOX
-"""
-@logged @computation Contract(;
-    axes = [block_axis(RequiredInput), cell_axis(RequiredInput)],
-    data = [
-        block_cell_pertinent_markers_correlation_matrix(RequiredInput),
-        cell_most_correlated_by_pertinent_markers_block_vector(GuaranteedOutput),
-    ],
-) function compute_cell_most_correlated_blocks_by_markers!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    todox_nearest(daf, "pertinent_markers_correlation", "most_correlated_by_pertinent_markers", overwrite)
-    return nothing
-end
-
-@logged @computation Contract(;
-    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        gene_is_marker_vector(RequiredInput),
-        gene_is_lateral_vector(RequiredInput),
-        block_gene_linear_fraction_matrix(RequiredInput),
-        block_mean_pertinent_markers_distance_vector(RequiredInput),
-        block_std_pertinent_markers_distance_vector(RequiredInput),
-    ],
-) Contract(;
+@logged :mcs_ops @computation Contract(;
+    name = "query_daf",
     axes = [cell_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
-        cell_total_UMIs_vector(RequiredInput),
-        cell_gene_UMIs_matrix(RequiredInput),
-        cell_provisional_block_vector(GuaranteedOutput),
-        cell_provisional_block_pertinent_markers_z_score(GuaranteedOutput),
+        vector_of_is_excluded_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        vector_of_projected_metacell_per_cell(CreatedOutput),
+        vector_of_projected_modules_z_score_per_cell(CreatedOutput),
+        vector_of_projected_block_per_cell(CreatedOutput),
     ],
-) function provisional_cells_projection!(
-    modules_daf::DafReader,
-    cells_daf::DafWriter;
-    gene_cell_fraction_regularization::AbstractFloat = 1e-4,  # TODOX coherent regularization
-    overwrite::Bool = false,
-)::Nothing
-    n_metacells = axis_length(modules_daf, "metacell")
-    name_per_metacell = axis_vector(modules_daf, "metacell")
-
-    n_blocks = axis_length(modules_daf, "block")
-    name_per_block = axis_vector(modules_daf, "block")
-
-    mean_pertinent_markers_distance_per_block =
-        get_vector(modules_daf, "block", "mean_pertinent_markers_distance").array
-    std_pertinent_markers_distance_per_block = get_vector(modules_daf, "block", "std_pertinent_markers_distance").array
-
-    linear_fraction_per_pertinent_marker_per_block =
-        modules_daf["/ gene & is_marker &! is_lateral / block : linear_fraction"].array
-    log_linear_fraction_per_pertinent_marker_per_block =
-        log2.(gene_cell_fraction_regularization .+ linear_fraction_per_pertinent_marker_per_block)
-
-    name_per_pertinent_marker = modules_daf["/ gene & is_marker &! is_lateral"]
-    index_per_pertinent_marker = axis_indices(cells_daf, "gene", name_per_pertinent_marker)
-
-    n_cells = axis_length(cells_daf, "cell")
-
-    total_UMIs_per_cell = get_vector(cells_daf, "cell", "total_UMIs").array
-    UMIs_per_cell_per_gene = get_matrix(cells_daf, "cell", "gene", "UMIs").array
-
-    provisional_block_per_cell = Vector{AbstractString}(undef, n_cells)
-    z_score_per_cell = Vector{Float32}(undef, n_cells)
-
-    parallel_loop_wo_rng(1:n_cells; progress = DebugProgress(n_cells)) do cell_index
-        UMIs_per_pertinent_marker = densify(UMIs_per_cell_per_gene[cell_index, index_per_pertinent_marker])
-        log_linear_fraction_per_pertinent_marker =
-            log2.(gene_cell_fraction_regularization .+ UMIs_per_pertinent_marker ./ total_UMIs_per_cell[cell_index])
-
-        distances_to_blocks = flame_timed("pairwise.Euclidean") do
-            return vec(
-                pairwise(
-                    Euclidean(),
-                    Ref(log_linear_fraction_per_pertinent_marker),
-                    eachcol(log_linear_fraction_per_pertinent_marker_per_block),
-                ),
-            )
-        end
-        @assert_vector(distances_to_blocks, n_blocks)
-
-        provisional_block_index = argmin(distances_to_blocks)
-        provisional_block_per_cell[cell_index] = name_per_block[provisional_block_index]
-
-        minimal_distance = distances_to_blocks[provisional_block_index]
-        mean_pertinent_markers_distance = mean_pertinent_markers_distance_per_block[provisional_block_index]
-        std_pertinent_markers_distance = std_pertinent_markers_distance_per_block[provisional_block_index]
-        z_score_per_cell[cell_index] =
-            (minimal_distance - mean_pertinent_markers_distance) / std_pertinent_markers_distance
-        return nothing
-    end
-
-    set_vector!(cells_daf, "cell", "block.provisional", provisional_block_per_cell; overwrite)
-    set_vector!(cells_daf, "cell", "provisional_block_pertinent_markers_z_score", z_score_per_cell; overwrite)
-
-    return nothing
-end
-
-@logged @computation Contract(;
+) Contract(;
+    name = "atlas_daf",
     axes = [
-        gene_axis(RequiredInput),
         metacell_axis(RequiredInput),
         block_axis(RequiredInput),
+        gene_axis(RequiredInput),
         module_axis(RequiredInput),
     ],
     data = [
-        metacell_block_vector(RequiredInput),
-        block_block_is_in_neighborhood_matrix(RequiredInput),
-        block_module_is_strong_matrix(RequiredInput),
-        block_gene_module_matrix(RequiredInput),
-        block_metacell_module_linear_fraction_tensor(RequiredInput),
-        metacell_mean_modules_distance_vector(RequiredInput),
-        metacell_std_modules_distance_vector(RequiredInput),
-        block_module_neighborhood_std_linear_fraction_matrix(RequiredInput),  # TODOX: Normalized only
-        block_module_neighborhood_mean_linear_fraction_matrix(RequiredInput),  # TODOX: Normalized only
+        vector_of_is_marker_per_gene(RequiredInput),
+        vector_of_is_lateral_per_gene(RequiredInput),
+        matrix_of_is_found_per_module_per_block(RequiredInput),
+        matrix_of_module_per_gene_per_block(RequiredInput),
+        matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
+        matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
+        tensor_of_linear_fraction_per_block_per_module_per_metacell(RequiredInput),
+        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
+        matrix_of_linear_fraction_per_gene_per_block(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_mean_euclidean_modules_cells_distance_per_metacell(RequiredInput),
+        vector_of_std_euclidean_modules_cells_distance_per_metacell(RequiredInput),
     ],
-) Contract(;
-    axes = [cell_axis(RequiredInput), gene_axis(RequiredInput)],
-    data = [
-        cell_total_UMIs_vector(RequiredInput),
-        cell_gene_UMIs_matrix(RequiredInput),
-        cell_provisional_block_vector(RequiredInput),
-        cell_provisional_block_pertinent_markers_z_score(RequiredInput),
-        cell_projected_block_vector(GuaranteedOutput),
-        cell_projected_metacell_vector(GuaranteedOutput),
-        cell_projected_metacell_modules_z_score_vector(GuaranteedOutput),
-    ],
-) function final_cells_projection!(
-    modules_daf::DafReader,
-    cells_daf::DafWriter;
-    normalize_fractions::Bool = false,
+) function compute_cells_projection!(;
+    query_daf::DafWriter,
+    atlas_daf::DafReader,
+    gene_fraction_regularization::Real = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
 )::Nothing
-    n_cells = axis_length(cells_daf, "cell")
-    provisional_block_per_cell = get_vector(cells_daf, "cell", "block.provisional").array
-    provisional_markers_z_score_per_cell =
-        get_vector(cells_daf, "cell", "provisional_block_pertinent_markers_z_score").array
+    query_gene_index_per_atlas_pertinent_marker, query_gene_index_per_atlas_gene =
+        map_query_atlas_genes(; query_daf, atlas_daf)
 
-    UMIs_per_cell_per_gene = get_matrix(cells_daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(cells_daf, "cell", "total_UMIs").array
+    UMIs_per_query_cell_per_query_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
 
-    n_blocks = axis_length(modules_daf, "block")
-    name_per_block = axis_vector(modules_daf, "block")
-    name_per_module = axis_vector(modules_daf, "module")
-    name_per_metacell = axis_vector(modules_daf, "metacell")
+    provisional_block_index_per_query_cell = compute_provisional_projection_per_query_cell!(;
+        query_daf,
+        atlas_daf,
+        gene_fraction_regularization,
+        UMIs_per_query_cell_per_query_gene,
+        total_UMIs_per_query_cell,
+        query_gene_index_per_atlas_pertinent_marker,
+    )
 
-    module_index_per_gene_per_block = modules_daf["/ gene / block : module ?? 0 => index"].array
-    is_strong_per_module_per_block = get_matrix(modules_daf, "module", "block", "is_strong").array
+    compute_final_projection_per_query_cell(;
+        query_daf,
+        atlas_daf,
+        query_gene_index_per_atlas_gene,
+        UMIs_per_query_cell_per_query_gene,
+        total_UMIs_per_query_cell,
+        provisional_block_index_per_query_cell,
+        overwrite,
+    )
 
-    provisional_block_index_per_cell = axis_indices(modules_daf, "block", provisional_block_per_cell)
+    return nothing
+end
 
-    projected_block_per_cell = copy_array(provisional_block_per_cell; eltype = AbstractString)
+function map_query_atlas_genes(;
+    query_daf::DafReader,
+    atlas_daf::DafReader,
+)::Tuple{AbstractVector{<:Integer}, AbstractVector{<:Integer}}
+    atlas_genes = axis_vector(atlas_daf, "gene")
 
-    mean_linear_fraction_per_module_per_block =
-        get_matrix(modules_daf, "module", "block", "neighborhood_mean_linear_fraction").array
-    std_linear_fraction_per_module_per_block =
-        get_matrix(modules_daf, "module", "block", "neighborhood_std_linear_fraction").array
-    module_per_gene_per_block = get_matrix(modules_daf, "gene", "block", "module").array
+    is_in_module_per_atlas_gene = atlas_daf["@ block @ gene :: module != '' >- Max"].array
+    atlas_in_module_genes = atlas_genes[is_in_module_per_atlas_gene]
+    axis_indices(query_daf, "gene", atlas_in_module_genes)
 
-    mean_modules_distance_per_metacell = get_vector(modules_daf, "metacell", "mean_modules_distance").array
-    std_modules_distance_per_metacell = get_vector(modules_daf, "metacell", "std_modules_distance").array
+    is_pertinent_marker_per_atlas_gene =
+        get_vector(atlas_daf, "gene", "is_marker").array .& .! get_vector(atlas_daf, "gene", "is_lateral").array
+    atlas_pertinent_marker_genes = atlas_genes[is_pertinent_marker_per_atlas_gene]
 
-    projected_block_per_cell = fill("", n_cells)
-    projected_metacell_per_cell = fill("", n_cells)
-    modules_z_score_per_cell = zeros(Float32, n_cells)
+    query_gene_index_per_atlas_pertinent_marker = axis_indices(query_daf, "gene", atlas_pertinent_marker_genes)
+    query_gene_index_per_atlas_gene = axis_indices(query_daf, "gene", atlas_genes; allow_missing = true)
 
-    next_indices_of_cells_per_block =
-        [findall(provisional_block_index_per_cell .== block_index) for block_index in 1:n_blocks]
+    return query_gene_index_per_atlas_pertinent_marker, query_gene_index_per_atlas_gene
+end
+
+function compute_provisional_projection_per_query_cell!(;
+    query_daf::DafWriter,
+    atlas_daf::DafReader,
+    gene_fraction_regularization::AbstractFloat,
+    UMIs_per_query_cell_per_query_gene::AbstractMatrix{<:Integer},
+    total_UMIs_per_query_cell::AbstractVector{<:Integer},
+    query_gene_index_per_atlas_pertinent_marker::AbstractVector{<:Integer},
+)::AbstractVector{<:Integer}
+    n_blocks = axis_length(atlas_daf, "block")
+
+    is_excluded_per_query_cell = get_vector(query_daf, "cell", "is_excluded").array
+
+    linear_fraction_per_block_per_pertinent_marker =
+        atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
+    log_linear_fraction_per_pertinent_marker_per_block =
+        log2.(flip(linear_fraction_per_block_per_pertinent_marker) .+ gene_fraction_regularization)
+
+    n_query_cells = axis_length(query_daf, "cell")
+
+    provisional_block_index_per_query_cell = Vector{UInt32}(undef, n_query_cells)
+
+    parallel_loop_wo_rng(
+        1:n_query_cells;
+        name = "provisional_projection_per_cell",
+        progress = DebugProgress(n_query_cells; group = :mcs_details, desc = "provisional_projection_per_cell"),
+    ) do query_cell_index
+        if is_excluded_per_query_cell[query_cell_index]
+            provisional_block_index_per_query_cell[query_cell_index] = 0
+        else
+            @views UMIs_per_pertinent_marker =
+                UMIs_per_query_cell_per_query_gene[query_cell_index, query_gene_index_per_atlas_pertinent_marker]
+
+            log_linear_fraction_per_pertinent_marker = log2.(
+                densify(UMIs_per_pertinent_marker) ./ total_UMIs_per_query_cell[query_cell_index] .+
+                gene_fraction_regularization,
+            )
+
+            distances_to_blocks = flame_timed("pairwise.Euclidean") do
+                return vec(
+                    pairwise(
+                        Euclidean(),
+                        Ref(log_linear_fraction_per_pertinent_marker),
+                        eachcol(log_linear_fraction_per_pertinent_marker_per_block),
+                    ),
+                )
+            end
+            @assert_vector(distances_to_blocks, n_blocks)
+
+            provisional_block_index_per_query_cell[query_cell_index] = argmin(distances_to_blocks)
+        end
+        return nothing
+    end
+
+    return provisional_block_index_per_query_cell
+end
+
+function compute_final_projection_per_query_cell(;
+    query_daf::DafWriter,
+    atlas_daf::DafReader,
+    query_gene_index_per_atlas_gene::AbstractVector{<:Integer},
+    UMIs_per_query_cell_per_query_gene::AbstractMatrix{<:Integer},
+    total_UMIs_per_query_cell::AbstractVector{<:Integer},
+    provisional_block_index_per_query_cell::AbstractVector{<:Integer},
+    overwrite::Bool,
+)::Nothing
+    n_query_cells = axis_length(query_daf, "cell")
+
+    n_blocks = axis_length(atlas_daf, "block")
+    name_per_block = axis_vector(atlas_daf, "block")
+    name_per_metacell = axis_vector(atlas_daf, "metacell")
+
+    module_index_per_atlas_gene_per_block = atlas_daf["@ gene @ block :: module ?? 0 : index"].array
+    is_found_per_module_per_block = get_matrix(atlas_daf, "module", "block", "is_found").array
+
+    is_in_neighborhood_per_other_block_per_base_block =
+        get_matrix(atlas_daf, "block", "block", "is_in_neighborhood").array
+    block_index_per_metacell = atlas_daf["@ metacell : block : index"].array
+
+    mean_linear_fraction_in_neighborhood_cells_per_module_per_block =
+        get_matrix(atlas_daf, "module", "block", "mean_linear_fraction_in_neighborhood_cells").array
+    std_linear_fraction_in_neighborhood_cells_per_module_per_block =
+        get_matrix(atlas_daf, "module", "block", "std_linear_fraction_in_neighborhood_cells").array
+
+    mean_euclidean_modules_cells_distance_per_metacell =
+        get_vector(atlas_daf, "metacell", "mean_euclidean_modules_cells_distance").array
+    std_euclidean_modules_cells_distance_per_metacell =
+        get_vector(atlas_daf, "metacell", "std_euclidean_modules_cells_distance").array
+
+    projected_metacell_per_query_cell = Vector{AbstractString}(undef, n_query_cells)
+    projected_metacell_per_query_cell .= ""
+    projected_modules_z_score_per_query_cell = zeros(Float32, n_query_cells)
+
+    next_indices_of_undetermined_query_cells_per_block =
+        [findall(provisional_block_index_per_query_cell .== block_index) for block_index in 1:n_blocks]
 
     spin_lock = SpinLock()
 
-    determined_counter = Atomic{Int}(0)
+    n_determined_query_cells = Atomic{Int}(0)
 
     for phase in 1:3
-        indices_of_cells_per_block = next_indices_of_cells_per_block
-        next_indices_of_cells_per_block = [Int32[] for _ in 1:n_blocks]
+        phase_name = "final_projection_per_cell.phase_$(phase)"
+        flame_timed(phase_name) do
+            indices_of_undetermined_query_cells_per_block = next_indices_of_undetermined_query_cells_per_block
+            next_indices_of_undetermined_query_cells_per_block = [Int32[] for _ in 1:n_blocks]
+            @debug "Determined: $(n_determined_query_cells[]) $(percent(n_determined_query_cells[], n_query_cells)) Phase $(phase)..." _group =
+                :todox
 
-        @debug "TODOX Determined: $(determined_counter[]) $(percent(determined_counter[], n_cells)) Phase $(phase)..."
-        parallel_loop_wo_rng(1:n_blocks) do block_index
-            block_name = name_per_block[block_index]
+            parallel_loop_wo_rng(
+                1:n_blocks;
+                name = "final_projection_per_cell.loop",
+                progress = DebugProgress(n_blocks; group = :mcs_details, desc = phase_name),
+            ) do block_index
+                block_name = name_per_block[block_index]
 
-            indices_of_block_cells = indices_of_cells_per_block[block_index]
-            n_block_cells = length(indices_of_block_cells)
-            if n_block_cells > 0
-                if 1 <= phase <= 2
-                    indices_of_candidate_metacells =
-                        modules_daf["/ metacell & block => is_in_neighborhood ;= $(block_name) : index"].array
-                    n_candidate_metacells = length(indices_of_candidate_metacells)
-                    block_index_per_candidate_metacell =
-                        modules_daf["/ metacell & block => is_in_neighborhood ;= $(block_name) : block => index"].array
-                elseif phase == 3
-                    indices_of_candidate_metacells = modules_daf["/ metacell & block = $(block_name) : index"].array
-                    n_candidate_metacells = length(indices_of_candidate_metacells)
-                    block_index_per_candidate_metacell = nothing
-                else
-                    @assert false
-                end
+                indices_of_undetermined_query_cells = indices_of_undetermined_query_cells_per_block[block_index]
+                n_undetermined_query_cells = length(indices_of_undetermined_query_cells)
+                if n_undetermined_query_cells > 0
+                    @views is_in_neighborhood_per_other_block =
+                        is_in_neighborhood_per_other_block_per_base_block[:, block_index]
+                    if 1 <= phase <= 2
+                        indices_of_candidate_metacells =
+                            findall(is_in_neighborhood_per_other_block[block_index_per_metacell])
+                        block_index_per_candidate_metacell = block_index_per_metacell[indices_of_candidate_metacells]
+                    elseif phase == 3
+                        indices_of_candidate_metacells = findall(block_index_per_metacell .== block_index)
+                        block_index_per_candidate_metacell = nothing
+                    else
+                        @assert false
+                    end
 
-                @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
-                @views is_strong_per_module = is_strong_per_module_per_block[:, block_index]
-                indices_of_strong_modules = findall(is_strong_per_module)
-                n_strong_modules = length(indices_of_strong_modules)
-                @assert n_strong_modules > 0
+                    @views module_index_per_atlas_gene = module_index_per_atlas_gene_per_block[:, block_index]
+                    @views is_found_per_module = is_found_per_module_per_block[:, block_index]
+                    indices_of_found_modules = findall(is_found_per_module)
+                    n_found_modules = length(indices_of_found_modules)
+                    @assert n_found_modules > 0
 
-                linear_fraction_per_module_per_metacell =
-                    get_matrix(modules_daf, "module", "metacell", "$(block_name)_linear_fraction").array
-                linear_fraction_per_strong_module_per_candidate_metacell =
-                    linear_fraction_per_module_per_metacell[indices_of_strong_modules, indices_of_candidate_metacells]
+                    linear_fraction_per_module_per_metacell =
+                        get_matrix(atlas_daf, "module", "metacell", "$(block_name)_linear_fraction").array
 
-                @views module_per_gene = module_per_gene_per_block[:, block_index]
-                total_UMIs_per_block_cell = total_UMIs_per_cell[indices_of_block_cells]
-                linear_fraction_per_strong_module_per_block_cell =
-                    Matrix{Float32}(undef, n_strong_modules, n_block_cells)
+                    linear_fraction_per_found_module_per_candidate_metacell = linear_fraction_per_module_per_metacell[
+                        indices_of_found_modules,
+                        indices_of_candidate_metacells,
+                    ]
 
-                for (strong_module_position, strong_module_index) in enumerate(indices_of_strong_modules)
-                    strong_module_name = name_per_module[strong_module_index]
-                    indices_of_strong_module_genes = findall(module_per_gene .== strong_module_name)
-                    n_strong_module_genes = length(indices_of_strong_module_genes)
-                    @assert n_strong_module_genes > 0
-                    strong_module_UMIs_per_block_cell = vec(
-                        sum(UMIs_per_cell_per_gene[indices_of_block_cells, indices_of_strong_module_genes]; dims = 2),
-                    )
-                    @assert_vector(strong_module_UMIs_per_block_cell, n_block_cells)
-                    linear_fraction_per_strong_module_per_block_cell[strong_module_position, :] .=
-                        strong_module_UMIs_per_block_cell ./ total_UMIs_per_block_cell
-                end
+                    @views module_index_per_atlas_gene = module_index_per_atlas_gene_per_block[:, block_index]
+                    total_UMIs_per_undetermined_query_cell =
+                        total_UMIs_per_query_cell[indices_of_undetermined_query_cells]
+                    linear_fraction_per_found_module_per_undetermined_query_cell =
+                        Matrix{Float32}(undef, n_found_modules, n_undetermined_query_cells)
 
-                if normalize_fractions
-                    mean_linear_fraction_per_strong_module =
-                        mean_linear_fraction_per_module_per_block[indices_of_strong_modules, block_index]
-                    std_linear_fraction_per_strong_module =
-                        std_linear_fraction_per_module_per_block[indices_of_strong_modules, block_index]
-                    linear_fraction_per_strong_module_per_candidate_metacell .=
+                    for (found_module_position, found_module_index) in enumerate(indices_of_found_modules)
+                        indices_of_found_module_atlas_genes =
+                            findall(module_index_per_atlas_gene .== found_module_index)
+                        indices_of_found_module_query_genes =
+                            query_gene_index_per_atlas_gene[indices_of_found_module_atlas_genes]
+                        @assert !any(indices_of_found_module_atlas_genes .== 0)
+
+                        n_found_module_genes = length(indices_of_found_module_query_genes)
+                        @assert n_found_module_genes > 0
+                        found_module_UMIs_per_undetermined_query_cell = vec(
+                            sum(
+                                UMIs_per_query_cell_per_query_gene[
+                                    indices_of_undetermined_query_cells,
+                                    indices_of_found_module_query_genes,
+                                ];
+                                dims = 2,
+                            ),
+                        )
+                        @assert_vector(found_module_UMIs_per_undetermined_query_cell, n_undetermined_query_cells)
+                        linear_fraction_per_found_module_per_undetermined_query_cell[found_module_position, :] .=
+                            found_module_UMIs_per_undetermined_query_cell ./ total_UMIs_per_undetermined_query_cell
+                    end
+
+                    mean_linear_fraction_in_neighborhood_cells_per_found_module =
+                        mean_linear_fraction_in_neighborhood_cells_per_module_per_block[
+                            indices_of_found_modules,
+                            block_index,
+                        ]
+                    std_linear_fraction_in_neighborhood_cells_per_found_module =
+                        std_linear_fraction_in_neighborhood_cells_per_module_per_block[
+                            indices_of_found_modules,
+                            block_index,
+                        ]
+                    z_score_per_found_module_per_candidate_metacell =
                         (
-                            linear_fraction_per_strong_module_per_candidate_metacell .-
-                            mean_linear_fraction_per_strong_module
-                        ) ./ std_linear_fraction_per_strong_module
-                    linear_fraction_per_strong_module_per_block_cell .=
-                        (linear_fraction_per_strong_module_per_block_cell .- mean_linear_fraction_per_strong_module) ./
-                        std_linear_fraction_per_strong_module
-                end
+                            linear_fraction_per_found_module_per_candidate_metacell .-
+                            mean_linear_fraction_in_neighborhood_cells_per_found_module
+                        ) ./ std_linear_fraction_in_neighborhood_cells_per_found_module
 
-                distances_between_candidate_metacells_and_block_cells = flame_timed("pairwise.Euclidean") do
-                    return pairwise(
-                        Euclidean(),
-                        linear_fraction_per_strong_module_per_candidate_metacell,
-                        linear_fraction_per_strong_module_per_block_cell,
-                    )
-                end
+                    z_score_per_found_module_per_undetermined_query_cell =
+                        (
+                            linear_fraction_per_found_module_per_undetermined_query_cell .-
+                            mean_linear_fraction_in_neighborhood_cells_per_found_module
+                        ) ./ std_linear_fraction_in_neighborhood_cells_per_found_module
 
-                minimal_position_per_block_cell =
-                    vec(argmin(distances_between_candidate_metacells_and_block_cells; dims = 1))
-                minimal_distance_per_block_cell =
-                    distances_between_candidate_metacells_and_block_cells[minimal_position_per_block_cell]
-                position_of_nearest_candidate_metacell_per_block_cell =
-                    [position.I[1] for position in minimal_position_per_block_cell]
+                    distances_between_candidate_metacells_and_undetermined_query_cells =
+                        flame_timed("pairwise.Euclidean") do
+                            return pairwise(
+                                Euclidean(),
+                                z_score_per_found_module_per_candidate_metacell,
+                                z_score_per_found_module_per_undetermined_query_cell,
+                            )
+                        end
 
-                if block_index_per_candidate_metacell === nothing
-                    positions_of_stable_cells = 1:n_block_cells
-                else
-                    nearest_block_index_per_block_cell =
-                        block_index_per_candidate_metacell[position_of_nearest_candidate_metacell_per_block_cell]
-                    positions_of_stable_cells = findall(nearest_block_index_per_block_cell .== block_index)
+                    minimal_position_per_undetermined_query_cell =
+                        vec(argmin(distances_between_candidate_metacells_and_undetermined_query_cells; dims = 1))
+                    minimal_distance_per_undetermined_query_cell =
+                        distances_between_candidate_metacells_and_undetermined_query_cells[minimal_position_per_undetermined_query_cell]
+                    position_of_nearest_candidate_metacell_per_undetermined_query_cell =
+                        [position.I[1] for position in minimal_position_per_undetermined_query_cell]
 
-                    try
-                        lock(spin_lock)
-                        for (cell_position, nearest_block_index) in enumerate(nearest_block_index_per_block_cell)
-                            if nearest_block_index != block_index
-                                cell_index = indices_of_block_cells[cell_position]
-                                if phase == 1
-                                    push!(next_indices_of_cells_per_block[nearest_block_index], cell_index)
-                                elseif phase == 2
-                                    provisional_block_index = provisional_block_index_per_cell[cell_index]
-                                    @assert block_index != provisional_block_index
-                                    push!(next_indices_of_cells_per_block[provisional_block_index], cell_index)
-                                else
-                                    @assert false
+                    if block_index_per_candidate_metacell === nothing
+                        positions_of_stable_undetermined_query_cells = 1:n_undetermined_query_cells
+                    else
+                        nearest_block_index_per_undetermined_query_cell =
+                            block_index_per_candidate_metacell[position_of_nearest_candidate_metacell_per_undetermined_query_cell]
+                        positions_of_stable_undetermined_query_cells =
+                            findall(nearest_block_index_per_undetermined_query_cell .== block_index)
+
+                        try
+                            lock(spin_lock)
+                            for (undetermined_query_cell_position, nearest_block_index) in
+                                enumerate(nearest_block_index_per_undetermined_query_cell)
+                                if nearest_block_index != block_index
+                                    query_cell_index =
+                                        indices_of_undetermined_query_cells[undetermined_query_cell_position]
+                                    if phase == 1
+                                        push!(
+                                            next_indices_of_undetermined_query_cells_per_block[nearest_block_index],
+                                            query_cell_index,
+                                        )
+                                    elseif phase == 2
+                                        provisional_block_index =
+                                            provisional_block_index_per_query_cell[query_cell_index]
+                                        @assert block_index != provisional_block_index
+                                        push!(
+                                            next_indices_of_undetermined_query_cells_per_block[provisional_block_index],
+                                            query_cell_index,
+                                        )
+                                    else
+                                        @assert false
+                                    end
                                 end
                             end
+                        finally
+                            unlock(spin_lock)
                         end
-                    finally
-                        unlock(spin_lock)
                     end
+
+                    n_stable_query_cells = length(positions_of_stable_undetermined_query_cells)
+                    if n_stable_query_cells > 0
+                        position_of_nearest_candidate_metacell_per_stable_undetermined_query_cell =
+                            position_of_nearest_candidate_metacell_per_undetermined_query_cell[positions_of_stable_undetermined_query_cells]
+                        metacell_index_per_stable_undetermined_query_cell =
+                            indices_of_candidate_metacells[position_of_nearest_candidate_metacell_per_stable_undetermined_query_cell]
+                        metacell_per_stable_undetermined_query_cell =
+                            name_per_metacell[metacell_index_per_stable_undetermined_query_cell]
+
+                        indices_of_stable_query_cells =
+                            indices_of_undetermined_query_cells[positions_of_stable_undetermined_query_cells]
+                        projected_metacell_per_query_cell[indices_of_stable_query_cells] =
+                            metacell_per_stable_undetermined_query_cell
+
+                        projected_modules_z_score_per_query_cell[indices_of_stable_query_cells] .=
+                            (
+                                minimal_distance_per_undetermined_query_cell[positions_of_stable_undetermined_query_cells] .-
+                                mean_euclidean_modules_cells_distance_per_metacell[metacell_index_per_stable_undetermined_query_cell]
+                            ) ./
+                            (std_euclidean_modules_cells_distance_per_metacell[metacell_index_per_stable_undetermined_query_cell])
+                    end
+                    atomic_add!(n_determined_query_cells, n_stable_query_cells)
                 end
-
-                n_stable_cells = length(positions_of_stable_cells)
-                if n_stable_cells > 0
-                    metacell_index_per_stable_cell =
-                        indices_of_candidate_metacells[position_of_nearest_candidate_metacell_per_block_cell[positions_of_stable_cells]]
-                    metacell_per_stable_cell = name_per_metacell[metacell_index_per_stable_cell]
-
-                    indices_of_stable_cells = indices_of_block_cells[positions_of_stable_cells]
-                    projected_metacell_per_cell[indices_of_stable_cells] = metacell_per_stable_cell
-
-                    modules_z_score_per_cell[indices_of_stable_cells] .=
-                        (
-                            minimal_distance_per_block_cell[positions_of_stable_cells] .-
-                            mean_modules_distance_per_metacell[metacell_index_per_stable_cell]
-                        ) ./ (std_modules_distance_per_metacell[metacell_index_per_stable_cell])
-                end
-                atomic_add!(determined_counter, n_stable_cells)
+                return nothing
             end
-            return nothing
         end
     end
 
-    @assert determined_counter[] == n_cells
+    @assert n_determined_query_cells[] == n_query_cells
 
-    set_vector!(cells_daf, "cell", "metacell.projected", projected_metacell_per_cell; overwrite)
-    set_vector!(cells_daf, "cell", "projected_metacell_modules_z_score", modules_z_score_per_cell; overwrite)
+    set_vector!(query_daf, "cell", "projected_metacell", projected_metacell_per_query_cell; overwrite)
+    set_vector!(
+        query_daf,
+        "cell",
+        "projected_metacell_modules_z_score",
+        projected_modules_z_score_per_query_cell;
+        overwrite,
+    )
 
-    block_per_metacell = get_vector(modules_daf, "metacell", "block").array
-    projected_metacell_index_per_cell = axis_indices(modules_daf, "metacell", projected_metacell_per_cell)
-    projected_block_per_cell = block_per_metacell[projected_metacell_index_per_cell]
-    set_vector!(cells_daf, "cell", "block.projected", projected_block_per_cell; overwrite)
+    projected_metacell_index_per_query_cell = axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell)
+    block_per_metacell = get_vector(atlas_daf, "metacell", "block").array
+    projected_block_per_query_cell = block_per_metacell[projected_metacell_index_per_query_cell]
+    set_vector!(query_daf, "cell", "projected_block", projected_block_per_query_cell; overwrite)
 
     return nothing
 end
 
 """
-TODOX
+    function compute_vector_of_correlation_between_cells_and_projected_metacells!(;
+        atlas_daf::DafReader,
+        query_daf::DafWriter,
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set (in query) [`vector_of_correlation_between_cells_and_projected_metacells_per_gene`](@ref).
+
+# Query
+
+$(CONTRACT1)
+
+# Atlas
+
+$(CONTRACT2)
 """
-@logged @computation Contract(;
-    axes = [block_axis(RequiredInput), cell_axis(RequiredInput)],
+@logged :mcs_ops @computation Contract(;
+    name = "query_daf",
+    axes = [gene_axis(RequiredInput), cell_axis(RequiredInput)],
     data = [
-        cell_metacell_vector(RequiredInput),
-        metacell_block_vector(RequiredInput),
-        block_cell_skeleton_euclidean_distance_matrix(RequiredInput),
+        vector_of_is_excluded_per_cell(RequiredInput),
+        vector_of_is_excluded_per_gene(RequiredInput),
+        vector_of_projected_metacell_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        vector_of_correlation_between_cells_and_projected_metacells_per_gene(CreatedOutput),
     ],
-) function compute_cell_projected_blocks_correlations!(daf::DafWriter; overwrite::Bool = false)::Nothing
-    block_index_per_cell = daf["/ cell : metacell.projected ?? 0 => block => index"].array
-    correlation_between_blocks_and_cells = get_matrix(daf, "block", "cell", "correlation").array
-    self_correlation_per_cell = [
-        block_index == 0 ? 0 : correlation_between_blocks_and_cells[block_index, cell_index] for
-        (cell_index, block_index) in enumerate(block_index_per_cell)
-    ]
-    set_vector!(daf, "cell", "projected_block_correlation", self_correlation_per_cell; overwrite = true)
+) Contract(
+    name = "atlas_daf",
+    axes = [metacell_axis(RequiredInput), gene_axis(RequiredInput)],
+    data = [
+        vector_of_is_excluded_per_gene(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        vector_of_is_marker_per_gene(RequiredInput),
+        vector_of_is_lateral_per_gene(RequiredInput),
+    ],
+) function compute_vector_of_correlation_between_cells_and_projected_metacells!(;  # UNTESTED
+    query_daf::DafWriter,
+    atlas_daf::DafReader,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
+    overwrite::Bool = false,
+)::Nothing
+    n_genes_in_atlas = axis_length(atlas_daf, "gene")
+    n_genes_in_query = axis_length(query_daf, "gene")
+
+    query_included_genes = query_daf["@ gene [ ! is_excluded ]"]
+    atlas_included_genes = atlas_daf["@ gene [ ! is_excluded ]"]
+    common_included_genes = intersect(query_included_genes, atlas_included_genes)
+    n_common_included_genes = length(common_included_genes)
+
+    @debug "Common included genes: $(n_common_included_genes)" *
+           " ($(percent(n_common_included_genes, n_genes_in_atlas)) out of $(n_genes_in_atlas) atlas genes" *
+           ", $(percent(n_common_included_genes, n_genes_in_query)) out of $(n_genes_in_query) query genes)" _group =
+        :mcs_results
+
+    indices_of_common_included_atlas_genes = axis_indices(atlas_daf, "gene", common_included_genes)
+    indices_of_common_included_query_genes = axis_indices(query_daf, "gene", common_included_genes)
+
+    indices_of_included_query_cells = query_daf["@ cell [ ! is_excluded ] : index"].array
+
+    UMIs_per_query_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
+    total_UMIs_per_included_query_cell = total_UMIs_per_query_cell[indices_of_included_query_cells]
+
+    projected_metacell_per_query_cell = get_vector(query_daf, "cell", "projected_metacell").array
+    projected_metacell_per_included_query_cell = projected_metacell_per_query_cell[indices_of_included_query_cells]
+    atlas_metacell_index_per_included_query_cell =
+        axis_indices(atlas_daf, "metacell", projected_metacell_per_included_query_cell)
+
+    UMIs_per_atlas_metacell_per_gene = get_matrix(atlas_daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_atlas_metacell = get_vector(atlas_daf, "metacell", "total_UMIs").array
+    total_metacell_UMIs_per_included_query_cell =
+        total_UMIs_per_atlas_metacell[atlas_metacell_index_per_included_query_cell]
+
+    correlation_between_cells_and_projected_metacells_per_query_gene = zeros(Float32, n_genes_in_query)
+
+    parallel_loop_wo_rng(
+        1:n_common_included_genes;
+        progress = DebugProgress(
+            n_common_included_genes;
+            group = :mcs_details,
+            desc = "correlation_between_cells_and_projected_metacells",
+        ),
+    ) do common_included_gene_position
+        atlas_gene_index = indices_of_common_included_atlas_genes[common_included_gene_position]
+        query_gene_index = indices_of_common_included_query_genes[common_included_gene_position]
+
+        gene_cell_UMIs_per_included_query_cell =
+            UMIs_per_query_cell_per_gene[indices_of_included_query_cells, query_gene_index]
+        gene_cell_log_fraction_per_included_query_cell = log2.(
+            gene_cell_UMIs_per_included_query_cell ./ total_UMIs_per_included_query_cell .+
+            gene_fraction_regularization,
+        )
+
+        gene_metacell_UMIs_per_included_query_cell =
+            UMIs_per_atlas_metacell_per_gene[atlas_metacell_index_per_included_query_cell, atlas_gene_index]
+        gene_metacell_log_fraction_per_included_query_cell = log2.(
+            gene_metacell_UMIs_per_included_query_cell ./ total_metacell_UMIs_per_included_query_cell .+
+            gene_fraction_regularization,
+        )
+
+        correlation = flame_timed("cor") do
+            return cor(gene_cell_log_fraction_per_included_query_cell, gene_metacell_log_fraction_per_included_query_cell)
+        end
+        if isnan(correlation)
+            correlation = 0.0
+        end
+        correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = correlation
+
+        return nothing
+    end
+
+    set_vector!(
+        query_daf,
+        "gene",
+        "correlation_between_cells_and_projected_metacells",
+        bestify(correlation_between_cells_and_projected_metacells_per_query_gene);
+        overwrite,
+    )
+
+    atlas_pertinent_markers = atlas_daf["@ gene [ is_marker & ! is_lateral ]"].array
+    common_pertinent_markers = intersect(atlas_pertinent_markers, common_included_genes)
+    index_in_query_per_common_pertinent_marker = axis_indices(query_daf, "gene", common_pertinent_markers)
+
+    if query_daf isa DataAxesFormats.Contracts.ContractDaf
+        query_daf = query_daf.daf
+    end
+    if atlas_daf isa DataAxesFormats.Contracts.ContractDaf
+        atlas_daf = atlas_daf.daf
+    end
+    if query_daf === atlas_daf
+        qualifier = "self"
+    else
+        qualifier = "common"
+    end
+    @debug (
+        "Mean correlation of $(qualifier) pertinent marker genes between cells and their projected metacells: " *
+        "$(mean(correlation_between_cells_and_projected_metacells_per_query_gene[index_in_query_per_common_pertinent_marker]))"  # NOLINT
+    ) _group = :mcs_results
+
+    return nothing
+end
+
+"""
+    compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!(
+        query_daf::DafWriter,
+        atlas_daf::DafReader,
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        min_neighborhood_query_cells::Integer = $(DEFAULT.min_neighborhood_query_cells),
+        overwrite::Bool = false,
+    )::Nothing
+
+Compute and set [`matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block`](@ref).
+If there are less than `min_neighborhood_query_cells`, we set this to zero. This will create [`projected_block_axis`](@ref)
+in the `query_daf` if necessary.
+
+# Query
+
+$(CONTRACT1)
+
+# Atlas
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(
+    name = "query_daf",
+    axes = [gene_axis(RequiredInput), cell_axis(RequiredInput), projected_block_axis(GuaranteedOutput)],
+    data = [
+        vector_of_is_excluded_per_cell(RequiredInput),
+        vector_of_is_excluded_per_gene(RequiredInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        vector_of_projected_metacell_per_cell(RequiredInput),
+        vector_of_projected_block_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block(
+            CreatedOutput,
+        ),
+    ],
+) Contract(
+    name = "atlas_daf",
+    axes = [block_axis(RequiredInput), metacell_axis(RequiredInput), gene_axis(RequiredInput)],
+    data = [
+        vector_of_is_excluded_per_gene(RequiredInput),
+        vector_of_is_lateral_per_gene(RequiredInput),
+        vector_of_is_marker_per_gene(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
+        matrix_of_is_neighborhood_marker_per_gene_per_block(OptionalInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+    ],
+) function compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!(;
+    query_daf::DafWriter,
+    atlas_daf::DafReader,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
+    min_neighborhood_query_cells::Integer = 30,
+    overwrite::Bool = false,
+    bin::Maybe{Integer} = nothing,
+)::Nothing
+    @assert 0 <= gene_fraction_regularization <= 1
+    @assert min_neighborhood_query_cells > 1
+
+    if has_axis(query_daf, "projected_block")
+        @assert axis_vector(atlas_daf, "block") == axis_vector(query_daf, "projected_block")
+    else
+        copy_axis!(source = atlas_daf, destination = query_daf, axis = "block", rename = "projected_block"; overwrite)
+    end
+
+    n_atlas_blocks = axis_length(atlas_daf, "block")
+    n_genes_in_atlas = axis_length(atlas_daf, "gene")
+    n_genes_in_query = axis_length(query_daf, "gene")
+
+    name_per_atlas_block = axis_vector(atlas_daf, "block")
+    query_included_genes = query_daf["@ gene [ ! is_excluded ]"]
+    atlas_included_genes = atlas_daf["@ gene [ ! is_excluded ]"]
+    common_included_genes = intersect(query_included_genes, atlas_included_genes)
+    n_common_included_genes = length(common_included_genes)
+
+    @debug "Common included genes: $(n_common_included_genes)" *
+           " ($(percent(n_common_included_genes, n_genes_in_atlas)) out of $(n_genes_in_atlas) atlas genes" *
+           ", $(percent(n_common_included_genes, n_genes_in_query)) out of $(n_genes_in_query) query genes)" _group =
+        :mcs_results
+
+    indices_of_common_included_atlas_genes = axis_indices(atlas_daf, "gene", common_included_genes)
+    indices_of_common_included_query_genes = axis_indices(query_daf, "gene", common_included_genes)
+
+    indices_of_included_query_cells = query_daf["@ cell [ ! is_excluded ] : index"].array
+
+    UMIs_per_query_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
+
+    projected_metacell_per_query_cell = get_vector(query_daf, "cell", "projected_metacell").array
+    atlas_metacell_index_per_query_cell =
+        axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell; allow_missing = true)
+
+    projected_block_per_query_cell = get_vector(query_daf, "cell", "projected_block").array
+    atlas_block_index_per_query_cell =
+        axis_indices(atlas_daf, "block", projected_block_per_query_cell; allow_missing = true)
+
+    UMIs_per_atlas_metacell_per_gene = get_matrix(atlas_daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_atlas_metacell = get_vector(atlas_daf, "metacell", "total_UMIs").array
+
+    is_lateral_per_atlas_gene = get_vector(atlas_daf, "gene", "is_lateral").array
+    is_lateral_per_common_included_gene = is_lateral_per_atlas_gene[indices_of_common_included_atlas_genes]
+
+    is_marker_per_atlas_gene = get_vector(atlas_daf, "gene", "is_marker").array
+    is_marker_per_common_included_gene = is_marker_per_atlas_gene[indices_of_common_included_atlas_genes]
+    is_pertinent_marker_per_common_included_gene =
+        is_marker_per_common_included_gene .& .! is_lateral_per_common_included_gene
+
+    is_in_neighborhood_per_other_block_per_base_block =
+        get_matrix(atlas_daf, "block", "block", "is_in_neighborhood").array
+    is_neighborhood_marker_per_atlas_gene_per_atlas_block =
+        get_matrix(atlas_daf, "gene", "block", "is_neighborhood_marker"; default = nothing)
+    if is_neighborhood_marker_per_atlas_gene_per_atlas_block !== nothing
+        is_neighborhood_marker_per_atlas_gene_per_atlas_block =
+            is_neighborhood_marker_per_atlas_gene_per_atlas_block.array
+    end
+
+    correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block =
+        zeros(Float32, n_genes_in_query, n_atlas_blocks)
+
+    mean_pertinent_marker_genes_correlation_per_atlas_block = nothing
+
+    mean_neighborhood_pertinent_markers_correlation_per_atlas_block = nothing
+
+    is_in_bin_per_common_included_gene = nothing
+    is_in_bin_pertinent_marker_per_common_included_gene = nothing
+    is_out_bin_pertinent_marker_per_common_included_gene = nothing
+
+    in_bin_mean_pertinent_markers_correlation_per_atlas_block = nothing
+    out_bin_mean_pertinent_markers_correlation_per_atlas_block = nothing
+
+    in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block = nothing
+    out_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block = nothing
+
+    if bin === nothing
+        mean_pertinent_marker_genes_correlation_per_atlas_block = zeros(Float32, n_atlas_blocks)
+        if is_neighborhood_marker_per_atlas_gene_per_atlas_block !== nothing
+            mean_neighborhood_pertinent_markers_correlation_per_atlas_block = zeros(Float32, n_atlas_blocks)
+        end
+
+    else
+        if atlas_daf isa DataAxesFormats.Contracts.ContractDaf
+            daf = atlas_daf.daf
+        else
+            daf = atlas_daf
+        end
+        is_in_bin_per_atlas_gene = get_vector(daf, "gene", "bin").array .== bin
+        is_in_bin_per_common_included_gene = is_in_bin_per_atlas_gene[indices_of_common_included_atlas_genes]
+        @assert any(is_in_bin_per_common_included_gene)
+        @assert !all(is_in_bin_per_common_included_gene)
+
+        is_in_bin_pertinent_marker_per_common_included_gene =
+            is_pertinent_marker_per_common_included_gene .& is_in_bin_per_common_included_gene
+        is_out_bin_pertinent_marker_per_common_included_gene =
+            is_pertinent_marker_per_common_included_gene .& .!is_in_bin_per_common_included_gene
+        @assert any(is_in_bin_pertinent_marker_per_common_included_gene)
+        @assert any(is_out_bin_pertinent_marker_per_common_included_gene)
+
+        in_bin_mean_pertinent_markers_correlation_per_atlas_block = zeros(Float32, n_atlas_blocks)
+        out_bin_mean_pertinent_markers_correlation_per_atlas_block = zeros(Float32, n_atlas_blocks)
+        if is_neighborhood_marker_per_atlas_gene_per_atlas_block !== nothing
+            in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block = zeros(Float32, n_atlas_blocks)
+            out_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block = zeros(Float32, n_atlas_blocks)
+        end
+    end
+
+    progress = DebugProgress(
+        n_atlas_blocks * n_common_included_genes;
+        group = :mcs_details,
+        desc = "correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block",
+    )
+
+    for atlas_block_index in 1:n_atlas_blocks
+        @views is_in_neighborhood_per_other_block =
+            is_in_neighborhood_per_other_block_per_base_block[:, atlas_block_index]
+        indices_of_neighborhood_query_cells = findall(
+            (atlas_block_index_per_query_cell .> 0) .&
+            getindex.(Ref(is_in_neighborhood_per_other_block), max.(atlas_block_index_per_query_cell, 1)),
+        )
+
+        n_neighborhood_query_cells = length(indices_of_neighborhood_query_cells)
+        if n_neighborhood_query_cells < min_neighborhood_query_cells
+            if n_neighborhood_query_cells > 0
+                @warn "Ignoring too few query cells: $(n_neighborhood_query_cells) for the neighborhood of the atlas block: $(name_per_atlas_block[atlas_block_index])"
+            end
+            next!(progress; step = n_common_included_genes)  # NOJET
+
+        else
+            atlas_metacell_index_per_neighborhood_query_cell =
+                atlas_metacell_index_per_query_cell[indices_of_neighborhood_query_cells]
+
+            total_UMIs_per_neighborhood_query_cell = total_UMIs_per_query_cell[indices_of_neighborhood_query_cells]
+            total_atlas_metacell_UMIs_per_neighborhood_query_cell =
+                total_UMIs_per_atlas_metacell[atlas_metacell_index_per_neighborhood_query_cell]
+
+            parallel_loop_wo_rng(1:n_common_included_genes; progress) do common_included_gene_position
+                atlas_gene_index = indices_of_common_included_atlas_genes[common_included_gene_position]
+                query_gene_index = indices_of_common_included_query_genes[common_included_gene_position]
+
+                cell_UMIs_per_neighborhood_query_cell =
+                    UMIs_per_query_cell_per_gene[indices_of_neighborhood_query_cells, query_gene_index]
+                projected_metacell_UMIs_per_neighborhood_query_cell =
+                    UMIs_per_atlas_metacell_per_gene[atlas_metacell_index_per_neighborhood_query_cell, atlas_gene_index]
+
+                cell_log_fraction_per_neighborhood_query_cell = log2.(
+                    cell_UMIs_per_neighborhood_query_cell ./ total_UMIs_per_neighborhood_query_cell .+
+                    gene_fraction_regularization,
+                )
+
+                projected_metacell_log_fraction_per_neighborhood_query_cell = log2.(
+                    (
+                        projected_metacell_UMIs_per_neighborhood_query_cell ./
+                        total_atlas_metacell_UMIs_per_neighborhood_query_cell
+                    ) .+ gene_fraction_regularization,
+                )
+
+                correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
+                    query_gene_index,
+                    atlas_block_index,
+                ] = zero_cor_between_vectors(
+                    cell_log_fraction_per_neighborhood_query_cell,
+                    projected_metacell_log_fraction_per_neighborhood_query_cell,
+                )
+
+                return nothing
+            end
+
+            if mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing &&
+               in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing
+                is_neighborhood_pertinent_marker_per_common_included_gene = nothing
+                is_in_bin_neighborhood_pertinent_marker_per_common_included_gene = nothing
+                is_out_bin_neighborhood_pertinent_marker_per_common_included_gene = nothing
+            else
+                is_neighborhood_marker_per_common_included_gene = is_neighborhood_marker_per_atlas_gene_per_atlas_block[
+                    indices_of_common_included_atlas_genes,
+                    atlas_block_index,
+                ]
+                is_neighborhood_pertinent_marker_per_common_included_gene =
+                    is_neighborhood_marker_per_common_included_gene .& .! is_lateral_per_common_included_gene
+                @assert any(is_neighborhood_pertinent_marker_per_common_included_gene)
+
+                if in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing
+                    is_in_bin_neighborhood_pertinent_marker_per_common_included_gene = nothing
+                    is_out_bin_neighborhood_pertinent_marker_per_common_included_gene = nothing
+                else
+                    is_in_bin_neighborhood_pertinent_marker_per_common_included_gene =
+                        is_neighborhood_pertinent_marker_per_common_included_gene .& is_in_bin_per_common_included_gene
+                    is_out_bin_neighborhood_pertinent_marker_per_common_included_gene =
+                        is_neighborhood_pertinent_marker_per_common_included_gene .& is_in_bin_per_common_included_gene
+                    @assert any(is_in_bin_neighborhood_pertinent_marker_per_common_included_gene)
+                    @assert any(is_out_bin_neighborhood_pertinent_marker_per_common_included_gene)
+                end
+            end
+
+            for (mean_per_atlas_block, is_in_mask_per_common_included_genes) in (
+                (mean_pertinent_marker_genes_correlation_per_atlas_block, is_pertinent_marker_per_common_included_gene),
+                (
+                    mean_neighborhood_pertinent_markers_correlation_per_atlas_block,
+                    is_neighborhood_pertinent_marker_per_common_included_gene,
+                ),
+                (
+                    in_bin_mean_pertinent_markers_correlation_per_atlas_block,
+                    is_in_bin_pertinent_marker_per_common_included_gene,
+                ),
+                (
+                    out_bin_mean_pertinent_markers_correlation_per_atlas_block,
+                    is_out_bin_pertinent_marker_per_common_included_gene,
+                ),
+                (
+                    in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block,
+                    is_in_bin_neighborhood_pertinent_marker_per_common_included_gene,
+                ),
+                (
+                    out_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block,
+                    is_out_bin_neighborhood_pertinent_marker_per_common_included_gene,
+                ),
+            )
+                if mean_per_atlas_block !== nothing
+                    @assert is_in_mask_per_common_included_genes !== nothing
+                    @assert any(is_in_mask_per_common_included_genes)
+                    indices_of_common_included_query_genes_in_mask =
+                        indices_of_common_included_query_genes[is_in_mask_per_common_included_genes]
+                    mean_per_atlas_block[atlas_block_index] = mean(  # NOLINT
+                        correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
+                            indices_of_common_included_query_genes_in_mask,
+                            atlas_block_index,
+                        ],
+                    )
+                end
+            end
+        end
+    end
+
+    set_matrix!(
+        query_daf,
+        "gene",
+        "projected_block",
+        "correlation_between_neighborhood_cells_and_projected_metacells",
+        bestify(correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block);
+        overwrite,
+    )
+
+    if query_daf isa DataAxesFormats.Contracts.ContractDaf
+        query_daf = query_daf.daf
+    end
+    if atlas_daf isa DataAxesFormats.Contracts.ContractDaf
+        atlas_daf = atlas_daf.daf
+    end
+    if query_daf === atlas_daf
+        first_qualifier = "self"
+        projected_qualifier = " self"
+    else
+        first_qualifier = "common"
+        if bin === nothing
+            projected_qualifier = ""
+        else
+            projected_qualifier = " cross"
+        end
+    end
+
+    for (mean_per_atlas_block, second_qualifier) in (
+        (mean_pertinent_marker_genes_correlation_per_atlas_block, ""),
+        (mean_neighborhood_pertinent_markers_correlation_per_atlas_block, " neighborhood"),
+        (in_bin_mean_pertinent_markers_correlation_per_atlas_block, " bin"),
+        (out_bin_mean_pertinent_markers_correlation_per_atlas_block, " !bin"),
+        (in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block, " bin neighborhood"),
+        (out_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block, " !bin neighborhood"),
+    )
+        if mean_per_atlas_block !== nothing
+            @debug (
+                "Mean correlation of $(first_qualifier)$(second_qualifier) pertinent marker genes between neighborhood cells and their$(projected_qualifier) projected metacells: " *
+                "$(mean(mean_per_atlas_block[mean_per_atlas_block .!= 0]))"  # NOLINT
+            ) _group = :mcs_results
+        end
+    end
+
     return nothing
 end
 

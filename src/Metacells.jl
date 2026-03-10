@@ -40,15 +40,6 @@ include("analyze_blocks.jl")
 include("compute_modules.jl")
 @reexport using .ComputeModules
 
-include("compute_chosens.jl")
-@reexport using .ComputeChosens
-
-include("analyze_chosens.jl")
-@reexport using .AnalyzeChosens
-
-include("analyze_explanations.jl")
-@reexport using .AnalyzeExplanations
-
 include("sharpen_metacells.jl")
 @reexport using .SharpenMetacells
 

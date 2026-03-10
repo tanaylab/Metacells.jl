@@ -2,7 +2,7 @@
 
 ```@docs
 Metacells.AnalyzeCells
-Metacells.AnalyzeCells.compute_cells_total_UMIs!
+Metacells.AnalyzeCells.compute_vector_of_total_UMIs_per_cell!
 ```
 
 ## Index

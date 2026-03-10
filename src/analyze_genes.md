@@ -2,12 +2,13 @@
 
 ```@docs
 Metacells.AnalyzeGenes
-Metacells.AnalyzeGenes.identify_marker_genes!
-Metacells.AnalyzeGenes.rank_marker_genes!
-Metacells.AnalyzeGenes.rank_markers
-Metacells.AnalyzeGenes.fetch_regulators!
-Metacells.AnalyzeGenes.identify_skeleton_genes!
-Metacells.AnalyzeGenes.fetch_transcription_factor!
+Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_regulator_per_gene!
+Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_transcription_factor_per_gene!
+Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!
+Metacells.AnalyzeGenes.compute_vector_of_marker_rank_per_gene!
+Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!
+Metacells.AnalyzeGenes.compute_vector_of_is_correlated_with_skeleton_per_gene!
+Metacells.AnalyzeGenes.rank_variables
 ```
 
 ## Index

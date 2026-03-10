@@ -24,10 +24,10 @@ using TanayLabUtilities
 """
     normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
 
-Normalize the a gene name in some namespace. In most namespaces, this means removing the `.[0-9]` version suffix from
-the name, and converting the name to upper case. To lookup a name in a list or a namespace, you need to normalize the
-query gene name accordingly. The UCSC namespace is an exception in that it is all-lower-case and the `.[0-9]` suffix
-seems to be an inherent part of the identifier.
+Normalize a gene name in some namespace. In most namespaces, this means removing the `.[0-9]` version suffix from the
+name, and converting the name to upper case. To lookup a name in a list or a namespace, you need to normalize the query
+gene name accordingly. The UCSC namespace is an exception in that it is all-lower-case and the `.[0-9]` suffix seems to
+be an inherent part of the identifier.
 """
 function normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
     if namespace == "UCSC"
@@ -99,7 +99,7 @@ list. As usual in Gmara, this includes everything that may be used as name, e.g.
 transcripts and proteins; for Symbol it includes approved and alises; etc. If the `list` is `nothing`, this just returns
 the set of known gene names in the `namespace`.
 """
-@documented function gmara_genes(;
+@logged :mcs_ops @documented function gmara_genes(;
     species::AbstractString,
     namespace::AbstractString = "GeneSymbol",
     list::Maybe{AbstractString} = nothing,
@@ -290,38 +290,40 @@ end
         species::AbstractString,
         namespace::AbstractString,
         [list::Maybe{AbstractString} = $(DEFAULT.list),
-        gene_names::AbstractString = $(DEFAULT.gene_names),
+        gene_name_property::AbstractString = $(DEFAULT.gene_name_property),
         property::Maybe{AbstractString} = $(DEFAULT.property),
         cache_dir = CACHE_DIR,
         timeout::Real = TIMEOUT,
         overwrite::Bool = $(DEFAULT.overwrite)]
-    )::Nothing
+    )::Integer
 
 Set a gene property mask in `daf` based on some `version` of a Gmara `list` of some `namespace` for some `species`. We
-match the `gene_names` (by default, just the unique names in the gene axis) with the list names and set the result mask
-as a per-gene `property` (by default, ``is_``_list_). If `list` is `nothing`, this just marks the gene names that exist
-in the namespace. If `overwrite`, this will overwrite an existing property of the.array same name.
+match the `gene_name_property` (by default, just the unique `name` in the gene axis) with the list names and set the
+result mask as a per-gene `property` (by default, ``is_``_list_). If `list` is `nothing`, this just marks the gene names
+that exist in the namespace. If `overwrite`, this will overwrite an existing property of the.array same name.
+
+Returns the number of genes that are set in the mask.
 """
-@documented function set_gmara_genes_mask!(
+@logged :mcs_ops @documented function set_gmara_genes_mask!(
     daf::DafWriter;
     species::AbstractString,
     namespace::AbstractString = function_default(gmara_genes, :namespace),
     list::Maybe{AbstractString} = function_default(gmara_genes, :list),
     version::AbstractString = function_default(gmara_genes, :version),
-    gene_names::AbstractString = "name",
+    gene_name_property::AbstractString = "name",
     property::Maybe{AbstractString} = nothing,
     cache_dir = CACHE_DIR,
     timeout::Real = TIMEOUT,
     overwrite::Bool = false,
-)::Nothing
+)::Integer
     if property === nothing
         property = "is_$(list)"
     end
-    gene_names = get_vector(daf, "gene", gene_names).array
+    gene_names = get_vector(daf, "gene", gene_name_property).array
     gmara_names = gmara_genes(; species, namespace, list, version, cache_dir, timeout)
-    gene_mask = [normalize_gene_name(gene_name; namespace) in gmara_names for gene_name in gene_names]
-    set_vector!(daf, "gene", property, gene_mask; overwrite)
-    return nothing
+    is_in_list_per_gene = [normalize_gene_name(gene_name; namespace) in gmara_names for gene_name in gene_names]
+    set_vector!(daf, "gene", property, is_in_list_per_gene; overwrite)
+    return sum(is_in_list_per_gene)
 end
 
 end  # module

@@ -1,0 +1,1169 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Analyze Metacells · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="Analyze Metacells · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Analyze Metacells · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Analyze Metacells · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li>
+<a class="tocitem" href="index.html">Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li>
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_cells.html">Analyze Cells
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="analyze_metacells.html">Analyze Metacells
+</a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Counts">
+<span>Counts
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#UMIs">
+<span>UMIs
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Types">
+<span>Types
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Distances">
+<span>Distances
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Correlations">
+<span>Correlations
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="compute_blocks.html">Compute Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="project_cells.html">Project Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="analyze_metacells.html">Analyze Metacells
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="analyze_metacells.html">Analyze Metacells
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="Analyze-Metacells">
+<a class="docs-heading-anchor" href="#Analyze-Metacells">Analyze Metacells
+</a>
+<a id="Analyze-Metacells-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Analyze-Metacells" title="Permalink">
+</a>
+</h1>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells">
+<code>Metacells.AnalyzeMetacells
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+</summary>
+<section>
+<div>
+<p>Do simple metacells analysis.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Counts">
+<a class="docs-heading-anchor" href="#Counts">Counts
+</a>
+<a id="Counts-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Counts" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_n_cells_per_metacell!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_n_cells_per_metacell">
+<code>vector_of_n_cells_per_metacell
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of cells in each metacell.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="UMIs">
+<a class="docs-heading-anchor" href="#UMIs">UMIs
+</a>
+<a id="UMIs-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#UMIs" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_matrix_of_UMIs_per_gene_per_metacell!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell">
+<code>matrix_of_UMIs_per_gene_per_metacell
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_total_UMIs_per_metacell!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_metacell">
+<code>vector_of_total_UMIs_per_metacell
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_excluded
+</strong>::Bool (required): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_matrix_of_linear_fraction_per_gene_per_metacell!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell">
+<code>matrix_of_linear_fraction_per_gene_per_metacell
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_excluded
+</strong>::Bool (required): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (created): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_matrix_of_log_linear_fraction_per_gene_per_metacell!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell">
+<code>matrix_of_log_linear_fraction_per_gene_per_metacell
+</code>
+</a>. This adds the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (created): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Types">
+<a class="docs-heading-anchor" href="#Types">Types
+</a>
+<a id="Types-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Types" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_type_per_cell_by_metacells!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_cell">
+<code>vector_of_type_per_cell
+</code>
+</a> by using the type of the metacell each cell belongs to. Cells that do not belong to any metacells (including excluded cells) are given an empty type. This method is used when metacells are annotated with types (which is typically a supervised process).
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ type
+</strong>::AbstractString (required): The type each metacell belongs to.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ type
+</strong>::AbstractString (created): The type each cell belongs to.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_type_per_metacell_by_cells!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_metacell">
+<code>vector_of_type_per_metacell
+</code>
+</a> by using the type of the cells grouped into each metacell. The most frequent (&quot;mode&quot;) of the type is used for each metacell. This method is used when cells are annotated with types (typically when importing single-cell data with type annotations).
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>cell @ type
+</strong>::AbstractString (required): The type each cell belongs to.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ type
+</strong>::AbstractString (created): The type each metacell belongs to.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Distances">
+<a class="docs-heading-anchor" href="#Distances">Distances
+</a>
+<a id="Distances-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Distances" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
+<code>matrix_of_euclidean_skeleton_fold_distance_between_metacells
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, metacell @ euclidean
+<em>skeleton
+</em>fold_distance
+</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_matrix_of_max_skeleton_fold_distance_between_metacells!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    min_significant_gene_UMIs::Integer = ```40```,
+    fold_confidence::AbstractFloat = ```0.9```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
+<code>matrix_of_max_skeleton_fold_distance_between_metacells
+</code>
+</a>. For computing this fold factor, we add the 
+<code>gene_fraction_regularization
+</code> to deal with zero fractions. We ignore &quot;insignificant&quot; genes whose total UMIs in the compared metacells isn&#39;t at least 
+<code>min_significant_gene_UMIs
+</code>. We also we reduce the distance using the 
+<code>fold_confidence
+</code> based on the number of UMIs used to estimate the expression in the metacells. That is, when we have a high fold factor, we are pretty certain the metacells truly have a significant difference in the expression of the skeleton gene.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, metacell @ max
+<em>skeleton
+</em>fold_distance
+</strong>::Union{Float32, Float64} (created): The maximal significant fold factor between the fraction of skeleton genes between the metacells.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Correlations">
+<a class="docs-heading-anchor" href="#Correlations">Correlations
+</a>
+<a id="Correlations-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Correlations" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = (DEFAULT.gene_fraction_regularization),
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene">
+<code>vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_excluded
+</strong>::Bool (required): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ correlation
+<em>between
+</em>cells
+<em>and
+</em>punctuated_metacells
+</strong>::Union{Float32, Float64} (created): The correlation between cells and their metacells (minus the correlated cell) gene expression levels.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h2>
+<ul>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells">
+<code>Metacells.AnalyzeMetacells
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-prevpage" href="analyze_cells.html">« Analyze Cells
+</a>
+<a class="docs-footer-nextpage" href="compute_blocks.html">Compute Blocks »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.16.1. Using Julia version 1.11.8.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

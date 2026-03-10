@@ -20,10 +20,10 @@ The expected flow is as follows:
 """
 module AnnDataFormat
 
+export CopyAnnData
 export import_cells_h5ad!
 export import_metacells_h5ad!
 export reconstruct_type_axis!
-export CopyAnnData
 
 using CSV
 using DataAxesFormats
@@ -152,7 +152,7 @@ Per-cell:
     It is common to manually call `reconstruct_axis!` on the result to create additional axes (e.g., if the cells were
     collected from a set of batches and some properties are actually per-batch).
 """
-@documented @logged function import_cells_h5ad!(
+@logged :mcs_ops @documented function import_cells_h5ad!(
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = nothing,
@@ -278,7 +278,7 @@ Per-metacell-per-metacell:
 
     It is common to manually call `reconstruct_type!` on the result to create a type axis.
 """
-@documented @logged function import_metacells_h5ad!(
+@logged :mcs_ops @documented function import_metacells_h5ad!(
     daf::DafWriter;
     cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,
@@ -363,7 +363,7 @@ end
 
 """
     reconstruct_type!(
-        daf::DafWriter,
+        daf::DafWriter;
         base_axis::AbstractString = $(DEFAULT.base_axis),
         type_property::AbstractString = $(DEFAULT.type_property),
         type_axis::AbstractString = $(DEFAULT.type_axis),
@@ -372,7 +372,6 @@ end
         implicit_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.implicit_properties),
         skipped_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.skipped_properties),
         properties_defaults::Maybe{Dict} = $(DEFAULT.properties_defaults),
-        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Create a type axis after importing data containing type annotations. By default this will look for a type per metacell,
@@ -399,7 +398,7 @@ aren't actually used in the data, you will have to specify a default value for a
     this to capture these into the `Daf` repository. This will enable all types (:-) of downstream processing, coloring
     graphs, etc.
 """
-@documented @logged function reconstruct_type_axis!(
+@logged :mcs_ops @documented function reconstruct_type_axis!(
     daf::DafWriter;
     base_axis::AbstractString = "metacell",
     type_property::AbstractString = "type",
@@ -415,7 +414,7 @@ aren't actually used in the data, you will have to specify a default value for a
         names = data_frame[:, type_property]
         colors = data_frame[:, "color"]
         add_axis!(daf, type_axis, names)
-        @info "set $(type_axis) vector: color"
+        @debug "set $(type_axis) vector: color" _group = :mcs_details
         set_vector!(daf, type_axis, "color", colors)
         delete_vector!(daf, "metacell", "color"; must_exist = false)
         delete_vector!(daf, "cell", "color"; must_exist = false)
@@ -466,13 +465,8 @@ function import_mask_matrix(
     end
 
     mask_matrix::SparseMatrixCSC{Bool} = hcat(mask_vectors...)  # NOJET
-    @info "reconstruct gene-$(type_axis) matrix: is_$(prefix)"
+    @debug "reconstruct gene-$(type_axis) matrix: is_$(prefix)" _group = :mcs_details
     set_matrix!(daf, "gene", type_axis, "is_$(prefix)", bestify(mask_matrix); relayout = true, overwrite = true)  # NOJET
-
-    # TODOX for type_name in type_names
-    # TODOX mask_name = "$(prefix)_gene_of_$(type_name)"
-    # TODOX delete_vector!(daf, "gene", mask_name; must_exist = false)
-    # TODOX end
 
     return nothing
 end
@@ -480,9 +474,9 @@ end
 function import_scalars_data(daf::DafWriter, source::DafReader; overwrite::Bool, insist::Bool)::Nothing
     for scalar_name in scalars_set(source)
         if scalar_name == "__name__"
-            @info "skip scalar: $(scalar_name)"
+            @debug "skip scalar: $(scalar_name)" _group = :mcs_details
         else
-            @info "copy scalar: $(scalar_name)"
+            @debug "copy scalar: $(scalar_name)" _group = :mcs_details
             copy_scalar!(; destination = daf, source, name = scalar_name, overwrite, insist)
         end
     end
@@ -536,14 +530,14 @@ function import_vectors_data(
         end
 
         if data === nothing
-            @info "skip $(axis) vector: $(vector_name)"
+            @debug "skip $(axis) vector: $(vector_name)" _group = :mcs_details
             continue
         end
 
         rename, empty = data
 
         if !overwrite && !insist && has_vector(daf, axis, rename)
-            @info "skip existing $(axis) vector: $(vector_name)"
+            @debug "skip existing $(axis) vector: $(vector_name)" _group = :mcs_details
             continue
         end
 
@@ -560,9 +554,9 @@ function import_vectors_data(
         end
 
         if rename == vector_name
-            @info "copy $(axis) vector: $(vector_name)"
+            @debug "copy $(axis) vector: $(vector_name)" _group = :mcs_details
         else
-            @info "copy $(axis) vector: $(vector_name) to: $(rename)"
+            @debug "copy $(axis) vector: $(vector_name) to: $(rename)" _group = :mcs_details
         end
 
         copy_vector!(;  # NOJET
@@ -611,7 +605,7 @@ function import_matrices_data(
         end
 
         if data === nothing
-            @info "skip $(rows_axis)-$(columns_axis) matrix: $(matrix_name)"
+            @debug "skip $(rows_axis)-$(columns_axis) matrix: $(matrix_name)" _group = :mcs_details
             continue
         end
 
@@ -620,7 +614,8 @@ function import_matrices_data(
         relayout = !has_matrix(source, columns_axis, rows_axis, matrix_name; relayout = false)
 
         if !overwrite && !insist && has_matrix(daf, rows_axis, columns_axis, rename; relayout)
-            @info "skip existing $(rows_axis)-$(columns_axis) matrix: $(matrix_name) ($(relayout ? "" : "!")relayout)"
+            @debug "skip existing $(rows_axis)-$(columns_axis) matrix: $(matrix_name) ($(relayout ? "" : "!")relayout)" _group =
+                :mcs_details
             continue
         end
 
@@ -631,9 +626,11 @@ function import_matrices_data(
         end
 
         if rename == matrix_name
-            @info "copy $(rows_axis)-$(columns_axis) matrix: $(matrix_name) ($(relayout ? "" : "!")relayout)"
+            @debug "copy $(rows_axis)-$(columns_axis) matrix: $(matrix_name) ($(relayout ? "" : "!")relayout)" _group =
+                :mcs_details
         else
-            @info "copy $(rows_axis)-$(columns_axis) matrix: $(matrix_name) to: $(rename) ($(relayout ? "" : "!")relayout)"
+            @debug "copy $(rows_axis)-$(columns_axis) matrix: $(matrix_name) to: $(rename) ($(relayout ? "" : "!")relayout)" _group =
+                :mcs_details
         end
 
         copy_matrix!(;  # NOJET
@@ -657,9 +654,9 @@ function import_matrices_data(
 end
 
 function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; overwrite::Bool, insist::Bool)::Nothing
-    @debug "readh5ad $(cells_h5ad) {"
-    cells_adata = readh5ad(cells_h5ad)
-    @debug "readh5ad $(cells_h5ad) }"
+    cells_adata = flame_timed("readh5ad") do
+        return readh5ad(cells_h5ad)
+    end
 
     if axis_length(daf, "cell") == size(cells_adata, 1)
         cell_indices = nothing
@@ -694,7 +691,7 @@ function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; ove
         end
 
         if !overwrite && !insist && has_vector(daf, "cell", rename)
-            @info "skip cell vector: $(vector)"
+            @debug "skip cell vector: $(vector)" _group = :mcs_details
             continue
         end
 
@@ -704,7 +701,7 @@ function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; ove
             data = full_data
         end
 
-        @info "copy cell vector: $(vector) to: $(rename)"
+        @debug "copy cell vector: $(vector) to: $(rename)" _group = :mcs_details
         set_vector!(daf, "cell", rename, data; overwrite)
     end
 end

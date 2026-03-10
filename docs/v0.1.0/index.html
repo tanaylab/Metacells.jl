@@ -1,0 +1,1220 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Metacells · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="Metacells · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Metacells · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Metacells · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li class="is-active">
+<a class="tocitem" href="index.html">Metacells
+</a>
+<ul class="internal">
+<li class="toplevel">
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li>
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_cells.html">Analyze Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_metacells.html">Analyze Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_blocks.html">Compute Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="project_cells.html">Project Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="index.html">Metacells
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="index.html">Metacells
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="Metacells">
+<a class="docs-heading-anchor" href="#Metacells">Metacells
+</a>
+<a id="Metacells-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacells" title="Permalink">
+</a>
+</h1>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Metacells">
+<a class="docstring-binding" href="#Metacells.Metacells">
+<code>Metacells.Metacells
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+</summary>
+<section>
+<div>
+<p>The 
+<code>Metacells.jl
+</code> package provides computational services for the 
+<a href="https://github.com/tanaylab/metacells">metacells
+</a> package, using 
+<a href="https://github.com/tanaylab/DataAxesFormats.jl">Daf
+</a> to hold the data. In the future, we&#39;ll ideally migrate all of the 
+<code>metacells
+</code>package computations to this package, converting the Python package to a thin wrapper, and provide a similar thin R wrapper to provide metacell analysis from R as well. For now,
+<code>Metacells.jl
+</code>only provides a subset of the features of the Python
+<code>metacells
+</code>package, which requires users to convert data from
+<code>AnnData
+</code>(for the old features) to 
+<code>Daf
+</code> (to the new features).
+</p>
+</div>
+</section>
+</details>
+</article>
+<h1 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h1>
+<ul>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks">
+<code>Metacells.AnalyzeBlocks
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_cells.html#Metacells.AnalyzeCells">
+<code>Metacells.AnalyzeCells
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes">
+<code>Metacells.AnalyzeGenes
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells">
+<code>Metacells.AnalyzeMetacells
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules">
+<code>Metacells.AnalyzeModules
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat">
+<code>Metacells.AnnDataFormat
+</code>
+</a>
+</li>
+<li>
+<a href="compute_blocks.html#Metacells.ComputeBlocks">
+<code>Metacells.ComputeBlocks
+</code>
+</a>
+</li>
+<li>
+<a href="compute_modules.html#Metacells.ComputeModules">
+<code>Metacells.ComputeModules
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts">
+<code>Metacells.Contracts
+</code>
+</a>
+</li>
+<li>
+<a href="defaults.html#Metacells.Defaults">
+<code>Metacells.Defaults
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara">
+<code>Metacells.Gmara
+</code>
+</a>
+</li>
+<li>
+<a href="index.html#Metacells.Metacells">
+<code>Metacells.Metacells
+</code>
+</a>
+</li>
+<li>
+<a href="project_cells.html#Metacells.ProjectCells">
+<code>Metacells.ProjectCells
+</code>
+</a>
+</li>
+<li>
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells">
+<code>Metacells.SharpenMetacells
+</code>
+</a>
+</li>
+<li>
+<a href="defaults.html#Metacells.Defaults.GENE_FRACTION_REGULARIZATION_FOR_CELLS">
+<code>Metacells.Defaults.GENE_FRACTION_REGULARIZATION_FOR_CELLS
+</code>
+</a>
+</li>
+<li>
+<a href="defaults.html#Metacells.Defaults.GENE_FRACTION_REGULARIZATION_FOR_METACELLS">
+<code>Metacells.Defaults.GENE_FRACTION_REGULARIZATION_FOR_METACELLS
+</code>
+</a>
+</li>
+<li>
+<a href="defaults.html#Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS">
+<code>Metacells.Defaults.MIN_SIGNIFICANT_GENE_UMIS
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.CACHE_DIR">
+<code>Metacells.Gmara.CACHE_DIR
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.TIMEOUT">
+<code>Metacells.Gmara.TIMEOUT
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.CopyAnnData">
+<code>Metacells.AnnDataFormat.CopyAnnData
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_UMIs_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_UMIs_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_neighborhood_per_block_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_in_neighborhood_per_block_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_marker_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_marker_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_log_linear_fraction_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_log_linear_fraction_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_block_closest_by_pertinent_markers_per_cell!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_block_closest_by_pertinent_markers_per_cell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_cells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_cells_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_blocks_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_blocks_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_cells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_cells_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_metacells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_metacells_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_total_UMIs_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_total_UMIs_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_total_neighborhood_UMIs_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_total_neighborhood_UMIs_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_block_by_cells!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_type_per_block_by_cells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_block_by_metacells!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_type_per_block_by_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_cell_by_blocks!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_type_per_cell_by_blocks!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_metacell_by_blocks!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_type_per_metacell_by_blocks!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_cells.html#Metacells.AnalyzeCells.compute_vector_of_total_UMIs_per_cell!">
+<code>Metacells.AnalyzeCells.compute_vector_of_total_UMIs_per_cell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_correlated_with_skeleton_per_gene!">
+<code>Metacells.AnalyzeGenes.compute_vector_of_is_correlated_with_skeleton_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!">
+<code>Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!">
+<code>Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_marker_rank_per_gene!">
+<code>Metacells.AnalyzeGenes.compute_vector_of_marker_rank_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_regulator_per_gene!">
+<code>Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_regulator_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_transcription_factor_per_gene!">
+<code>Metacells.AnalyzeGenes.fetch_gmara_vector_of_is_transcription_factor_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.rank_variables">
+<code>Metacells.AnalyzeGenes.rank_variables
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_matrix_of_n_genes_per_module_per_block!">
+<code>Metacells.AnalyzeModules.compute_matrix_of_n_genes_per_module_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
+<code>Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!">
+<code>Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
+<code>Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_vector_of_n_modules_per_block!">
+<code>Metacells.AnalyzeModules.compute_vector_of_n_modules_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>Metacells.AnnDataFormat.import_cells_h5ad!
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>Metacells.AnnDataFormat.import_metacells_h5ad!
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.reconstruct_type_axis!">
+<code>Metacells.AnnDataFormat.reconstruct_type_axis!
+</code>
+</a>
+</li>
+<li>
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_metacells_blocks!">
+<code>Metacells.ComputeBlocks.compute_metacells_blocks!
+</code>
+</a>
+</li>
+<li>
+<a href="compute_modules.html#Metacells.ComputeModules.compute_blocks_modules!">
+<code>Metacells.ComputeModules.compute_blocks_modules!
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.base_block_axis">
+<code>Metacells.Contracts.base_block_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>Metacells.Contracts.block_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.cell_axis">
+<code>Metacells.Contracts.cell_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.gene_axis">
+<code>Metacells.Contracts.gene_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block">
+<code>Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
+<code>Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_found_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_is_found_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block">
+<code>Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
+<code>Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
+<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_module_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_module_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_module_status_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_module_status_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_n_genes_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_n_genes_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.metacell_axis">
+<code>Metacells.Contracts.metacell_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.module_axis">
+<code>Metacells.Contracts.module_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.projected_block_axis">
+<code>Metacells.Contracts.projected_block_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
+<code>Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.type_axis">
+<code>Metacells.Contracts.type_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_anchor_per_module">
+<code>Metacells.Contracts.vector_of_anchor_per_module
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_base_block_per_metacell">
+<code>Metacells.Contracts.vector_of_base_block_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell">
+<code>Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_block_per_metacell">
+<code>Metacells.Contracts.vector_of_block_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_color_per_type">
+<code>Metacells.Contracts.vector_of_color_per_type
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_excluded_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_excluded_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene">
+<code>Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_excluded_per_cell">
+<code>Metacells.Contracts.vector_of_is_excluded_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_excluded_per_gene">
+<code>Metacells.Contracts.vector_of_is_excluded_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_forbidden_per_gene">
+<code>Metacells.Contracts.vector_of_is_forbidden_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_lateral_per_gene">
+<code>Metacells.Contracts.vector_of_is_lateral_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_marker_per_gene">
+<code>Metacells.Contracts.vector_of_is_marker_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_mitochondrial_per_gene">
+<code>Metacells.Contracts.vector_of_is_mitochondrial_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_regulator_per_gene">
+<code>Metacells.Contracts.vector_of_is_regulator_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_ribosomal_per_gene">
+<code>Metacells.Contracts.vector_of_is_ribosomal_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_skeleton_per_gene">
+<code>Metacells.Contracts.vector_of_is_skeleton_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_transcription_factor_per_gene">
+<code>Metacells.Contracts.vector_of_is_transcription_factor_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_marker_rank_per_gene">
+<code>Metacells.Contracts.vector_of_marker_rank_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
+<code>Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_metacell_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_mitochondrial_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_mitochondrial_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_cells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_cells_per_metacell">
+<code>Metacells.Contracts.vector_of_n_cells_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_metacells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_modules_per_block">
+<code>Metacells.Contracts.vector_of_n_modules_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_neighborhood_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_block_per_cell">
+<code>Metacells.Contracts.vector_of_projected_block_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_projected_metacell_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<code>Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_ribosomal_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_ribosomal_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell">
+<code>Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_metacell">
+<code>Metacells.Contracts.vector_of_total_UMIs_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_block">
+<code>Metacells.Contracts.vector_of_type_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_cell">
+<code>Metacells.Contracts.vector_of_type_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_type_per_metacell">
+<code>Metacells.Contracts.vector_of_type_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.empty_gmara_cache!">
+<code>Metacells.Gmara.empty_gmara_cache!
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.gmara_genes">
+<code>Metacells.Gmara.gmara_genes
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.normalize_gene_name">
+<code>Metacells.Gmara.normalize_gene_name
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.set_gmara_genes_mask!">
+<code>Metacells.Gmara.set_gmara_genes_mask!
+</code>
+</a>
+</li>
+<li>
+<a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
+<code>Metacells.ProjectCells.compute_cells_projection!
+</code>
+</a>
+</li>
+<li>
+<a href="project_cells.html#Metacells.ProjectCells.compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!">
+<code>Metacells.ProjectCells.compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!
+</code>
+</a>
+</li>
+<li>
+<a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!">
+<code>Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>Metacells.SharpenMetacells.sharpen_metacells!
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-nextpage" href="gmara.html">Gmara »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.16.1. Using Julia version 1.11.8.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>
