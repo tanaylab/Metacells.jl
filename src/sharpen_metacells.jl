@@ -225,8 +225,6 @@ function compute_preferred_block_index_per_cell_per_block(;
         name = "compute_preferred_block_index_per_cell_per_block",
         progress = DebugProgress(n_blocks; group = :mcs_details, desc = "preferred_block_index_per_cell_per_block"),
     ) do block_index, rng
-        block_name = name_per_block[block_index]
-
         @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
         indices_of_neighborhood_cells = findall(
             (block_index_per_cell .> 0) .&

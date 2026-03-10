@@ -178,9 +178,6 @@ function fill_vector_of_is_correlated_with_skeleton_per_gene!(;
         zero_cor_between_matrices_columns(log_fraction_per_metacell_per_skeleton, log_fraction_per_metacell_per_marker)
     @assert_matrix(correlation_per_skeleton_per_marker, n_skeletons, n_markers)
 
-    raw_correlation_per_skeleton_per_marker =
-        cor(log_fraction_per_metacell_per_skeleton, log_fraction_per_metacell_per_marker)
-
     max_correlation_per_marker = vec(maximum(correlation_per_skeleton_per_marker; dims = 1))
     @assert_vector(max_correlation_per_marker, n_markers)
 

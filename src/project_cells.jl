@@ -60,13 +60,13 @@ import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 Compute and set [`vector_of_projected_block_per_cell`] and [`vector_of_projected_modules_z_score_per_cell`](@ref). To pick
 the best metacell in the `atlas_daf` for each cell of the `query_daf`, we:
 
-- Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral marker
-  genes.
-- Then, for each cell, consider the expression level of the found modules of the provisional block's neighborhood. We use
-  this to pick a metacell in the neighborhood which has the closest Euclidean distance.
-- This metacell might belong to a different block. If so, we repeat the process using that block's neighborhood modules.
-- If the resulting best match metacell is in the same (new) block, we accept it.
-- Otherwise, we just look for the closest metacell in the original block (using that block's modules) and settle for that.
+  - Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral marker
+    genes.
+  - Then, for each cell, consider the expression level of the found modules of the provisional block's neighborhood. We use
+    this to pick a metacell in the neighborhood which has the closest Euclidean distance.
+  - This metacell might belong to a different block. If so, we repeat the process using that block's neighborhood modules.
+  - If the resulting best match metacell is in the same (new) block, we accept it.
+  - Otherwise, we just look for the closest metacell in the original block (using that block's modules) and settle for that.
 
 Distances are computed on the log (base 2) of the gene expression using the `gene_fraction_regularization` to handle
 zero fractions. We also compute the z-score (final distance between the cell and projected metacell, minus the mean
@@ -273,7 +273,7 @@ function compute_final_projection_per_query_cell(;
             indices_of_undetermined_query_cells_per_block = next_indices_of_undetermined_query_cells_per_block
             next_indices_of_undetermined_query_cells_per_block = [Int32[] for _ in 1:n_blocks]
             @debug "Determined: $(n_determined_query_cells[]) $(percent(n_determined_query_cells[], n_query_cells)) Phase $(phase)..." _group =
-                :todox
+                :mcs_details
 
             parallel_loop_wo_rng(
                 1:n_blocks;
@@ -692,8 +692,6 @@ $(CONTRACT2)
     indices_of_common_included_atlas_genes = axis_indices(atlas_daf, "gene", common_included_genes)
     indices_of_common_included_query_genes = axis_indices(query_daf, "gene", common_included_genes)
 
-    indices_of_included_query_cells = query_daf["@ cell [ ! is_excluded ] : index"].array
-
     UMIs_per_query_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
     total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
 
@@ -793,7 +791,7 @@ $(CONTRACT2)
             if n_neighborhood_query_cells > 0
                 @warn "Ignoring too few query cells: $(n_neighborhood_query_cells) for the neighborhood of the atlas block: $(name_per_atlas_block[atlas_block_index])"
             end
-            next!(progress; step = n_common_included_genes)  # NOJET
+            next!(progress; step = n_common_included_genes)  # NOJET # NOLINT
 
         else
             atlas_metacell_index_per_neighborhood_query_cell =

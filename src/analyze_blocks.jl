@@ -1252,7 +1252,6 @@ $(CONTRACT2)
 
     mean_correlation_per_base_block = nothing
     is_in_bin_per_gene = nothing
-    is_out_bin_per_gene = nothing
     in_bin_mean_correlation_per_base_block = nothing
     out_bin_mean_correlation_per_base_block = nothing
 
@@ -1333,26 +1332,26 @@ $(CONTRACT2)
             is_base_neighborhood_marker_per_gene_per_base_block[:, base_block_index]
         is_base_neighborhood_pertinent_marker_per_gene = is_base_neighborhood_marker_per_gene .& .!is_lateral_per_gene
         if mean_correlation_per_base_block !== nothing
-            mean_correlation_per_base_block[base_block_index] = mean(
+            mean_correlation_per_base_block[base_block_index] = mean(  # NOLINT
                 correlation_per_gene_per_base_block[is_base_neighborhood_pertinent_marker_per_gene, base_block_index],
-            )  # NOLINT
+            )
         else
             in_bin_is_base_neighborhood_pertinent_marker_per_gene =
                 is_base_neighborhood_pertinent_marker_per_gene .& is_in_bin_per_gene
             out_bin_is_base_neighborhood_pertinent_marker_per_gene =
                 is_base_neighborhood_pertinent_marker_per_gene .& .!is_in_bin_per_gene
-            in_bin_mean_correlation_per_base_block[base_block_index] = mean(  # NOJET
+            in_bin_mean_correlation_per_base_block[base_block_index] = mean(  # NOJET # NOLINT
                 correlation_per_gene_per_base_block[
                     in_bin_is_base_neighborhood_pertinent_marker_per_gene,
                     base_block_index,
                 ],
-            )  # NOLINT
-            out_bin_mean_correlation_per_base_block[base_block_index] = mean(  # NOJET
+            )
+            out_bin_mean_correlation_per_base_block[base_block_index] = mean(  # NOJET # NOLINT
                 correlation_per_gene_per_base_block[
                     out_bin_is_base_neighborhood_pertinent_marker_per_gene,
                     base_block_index,
                 ],
-            )  # NOLINT
+            )
         end
     end
 
@@ -1600,7 +1599,6 @@ $(CONTRACT2)
     other_metacells_per_cell = get_vector(other_daf, "cell", "metacell").array
 
     n_base_blocks = axis_length(base_daf, "block")
-    name_per_base_block = axis_vector(base_daf, "block")
 
     if has_axis(other_daf, "base_block")
         @assert axis_vector(other_daf, "base_block") == axis_vector(base_daf, "block")

@@ -205,7 +205,33 @@
 )::Nothing
 </code>
 </pre>
-<p>TODOX
+<p>Compute and set [
+<code>vector_of_projected_block_per_cell
+</code>] and 
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<code>vector_of_projected_modules_z_score_per_cell
+</code>
+</a>. To pick the best metacell in the 
+<code>atlas_daf
+</code> for each cell of the 
+<code>query_daf
+</code>, we:
+</p>
+<ul>
+<li>Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral marker genes.
+</li>
+<li>Then, for each cell, consider the expression level of the found modules of the provisional block&#39;s neighborhood. We use this to pick a metacell in the neighborhood which has the closest Euclidean distance.
+</li>
+<li>This metacell might belong to a different block. If so, we repeat the process using that block&#39;s neighborhood modules.
+</li>
+<li>If the resulting best match metacell is in the same (new) block, we accept it.
+</li>
+<li>Otherwise, we just look for the closest metacell in the original block (using that block&#39;s modules) and settle for that.
+</li>
+</ul>
+<p>Distances are computed on the log (base 2) of the gene expression using the 
+<code>gene_fraction_regularization
+</code> to handle zero fractions. We also compute the z-score (final distance between the cell and projected metacell, minus the mean distance of the cells in the metacell, divided by their standard deviation). If this is too large, then the query cell isn&#39;t a good match for anything in the atlas.
 </p>
 <p>
 <strong>Query
@@ -784,7 +810,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.16.1. Using Julia version 1.11.8.
+</a> version 1.17.0. Using Julia version 1.11.5.
 </p>
 </section>
 <footer class="modal-card-foot">

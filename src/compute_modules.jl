@@ -142,7 +142,6 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         rng,
         progress = DebugProgress(n_blocks; group = :mcs_details, desc = "compute_blocks_modules"),
     ) do block_index, rng
-        block_name = name_per_block[block_index]
         if module_status_per_gene_per_block === nothing
             module_status_per_gene = nothing
         else
@@ -151,7 +150,6 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         genes_indices_of_anchor_index_per_block[block_index] = compute_block_modules!(
             daf;
             block_index,
-            block_name,
             max_clusters,
             min_member_correlation,
             min_orphan_correlation,
@@ -218,7 +216,6 @@ end
 function compute_block_modules!(
     daf::DafWriter;
     block_index::Integer,
-    block_name::AbstractString,
     max_clusters::Integer,
     min_member_correlation::AbstractFloat,
     min_orphan_correlation::AbstractFloat,
@@ -246,12 +243,10 @@ function compute_block_modules!(
     local z_score_per_neighborhood_metacell_per_lateral_cluster
     local is_in_neighborhood_per_other_block
     local indices_of_neighborhood_metacells
-    local n_neighborhood_metacells
 
     flame_timed("lateral_clusters") do
         @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
         indices_of_neighborhood_metacells = findall(is_in_neighborhood_per_other_block[block_index_per_metacell])
-        n_neighborhood_metacells = length(indices_of_neighborhood_metacells)
 
         @views is_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene_per_block[:, block_index]
         is_lateral_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene .& is_lateral_per_gene
@@ -294,13 +289,7 @@ function compute_block_modules!(
 
         lateral_cluster_per_gene[indices_of_lateral_neighborhood_markers] .= kmeans_results.assignments
 
-        n_lateral_clusters = size(kmeans_results.centers, 2)
-        #       for lateral_cluster_index in 1:n_lateral_clusters
-        #           @debug "Block: $(block_name) lateral_cluster: $(lateral_cluster_index) genes: [ \"$(join(name_per_gene[indices_of_lateral_neighborhood_markers[kmeans_results.assignments .== lateral_cluster_index]], "\", \""))\" ]" _group =
-        #               :todox
-        #       end
-
-        z_score_per_neighborhood_metacell_per_lateral_cluster = kmeans_results.centers
+        z_score_per_neighborhood_metacell_per_lateral_cluster = kmeans_results.centers  # NOLINT
         return nothing
     end
 
@@ -327,7 +316,7 @@ function compute_block_modules!(
         indices_of_local_genes = findall(is_local_per_gene)
         n_local_genes = length(indices_of_local_genes)
 
-        is_skeleton_per_local_gene = is_skeleton_per_gene[indices_of_local_genes]
+        is_skeleton_per_local_gene = is_skeleton_per_gene[indices_of_local_genes]  # NOLINT
 
         log_fraction_per_neighborhood_metacell_per_local_gene =
             log_fraction_per_metacell_per_gene[indices_of_neighborhood_metacells, indices_of_local_genes]
@@ -360,7 +349,7 @@ function compute_block_modules!(
         cluster_index_per_local_gene = kmeans_results.assignments
         @assert_vector(cluster_index_per_local_gene, n_local_genes)
 
-        z_score_per_neighborhood_metacell_per_cluster = kmeans_results.centers
+        z_score_per_neighborhood_metacell_per_cluster = kmeans_results.centers  # NOLINT
         if module_status_per_gene !== nothing
             module_status_per_gene[indices_of_local_genes] .= "cluster(" .* string.(cluster_index_per_local_gene) .* ")"
         end
@@ -374,8 +363,6 @@ function compute_block_modules!(
 
         is_neighborhood_distinct_per_local_gene =
             is_neighborhood_distinct_per_gene_per_block[indices_of_local_genes, block_index]
-        #       @debug "Block: $(block_name) distinct genes: $(sum(is_neighborhood_distinct_per_local_gene)) names: [ \"$(join(name_per_gene[indices_of_local_genes[is_neighborhood_distinct_per_local_gene]] , "\", \""))\" ]" _group =
-        #           :todox
 
         for local_gene_position in 1:n_local_genes
             @views z_score_per_neighborhood_metacell_of_local_gene =
@@ -406,11 +393,6 @@ function compute_block_modules!(
                 else
                     qualifier *= " kept"
                 end
-                #               @debug "Block $(block_name)$(qualifier) lateral-ish gene: $(name_per_gene[indices_of_local_genes[local_gene_position]]) lateral_correlation: $(lateral_correlation) > cluster_correlation: $(cluster_correlation) lateral cluster: $(lateral_cluster_index)" _group =
-                #                   :todox
-                #           else
-                #               @debug "Block $(block_name)$(qualifier) kept gene: $(name_per_gene[indices_of_local_genes[local_gene_position]]) lateral_correlation: $(lateral_correlation) <= cluster_correlation: $(cluster_correlation) lateral cluster: $(lateral_cluster_index)" _group =
-                #                   :todox
             end
         end
 
@@ -426,7 +408,6 @@ function compute_block_modules!(
 
     flame_timed("correlated_pertinent_gene_modules") do
         n_clusters = size(z_score_per_neighborhood_metacell_per_cluster, 2)
-        #       @debug "Block: $(block_name) raw clusters: $(n_clusters)" _group = :todox
         @assert 0 < n_clusters <= max_clusters
 
         anchor_local_position_per_cluster = fill(UInt32(0), n_clusters)
@@ -439,7 +420,6 @@ function compute_block_modules!(
             n_cluster_genes = sum(is_in_cluster_per_local_gene)
             @assert n_cluster_genes > 0
             is_lateral_ish_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_lateral_ish_per_local_gene
-            n_lateral_cluster_genes = sum(is_lateral_ish_in_cluster_per_local_gene)
 
             cluster_index_per_local_gene[is_lateral_ish_in_cluster_per_local_gene] .= -1
             is_pertinent_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& .!is_lateral_ish_per_local_gene
@@ -454,9 +434,6 @@ function compute_block_modules!(
                 if module_status_per_gene !== nothing
                     module_status_per_gene[indices_of_local_genes[is_pertinent_in_cluster_per_local_gene]] .*= ",orphan_cluster"
                 end
-
-                #               @debug "Block: $(block_name) orphan cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes)))" _group =
-                #                   :todox
                 continue
             end
 
@@ -489,8 +466,6 @@ function compute_block_modules!(
                 else
                     reason = "all-uncorrelated"
                 end
-                #               @debug "Block: $(block_name) $(reason) cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes))) uncorrelated pertinent: $(n_uncorrelated_pertinent_cluster_genes) ($(percent(n_uncorrelated_pertinent_cluster_genes, n_cluster_genes))) correlated pertinent: $(n_correlated_pertinent_local_genes) ($(percent(n_correlated_pertinent_local_genes, n_cluster_genes)))" _group =
-                #                   :todox
                 continue
             end
 
@@ -521,9 +496,6 @@ function compute_block_modules!(
 
             anchor_local_position_per_cluster[cluster_index] = anchor_local_position
             cluster_index_of_anchor_local_position[anchor_local_position] = cluster_index
-
-            #           @debug "Block: $(block_name) anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) genes: $(n_cluster_genes) lateral: $(n_lateral_cluster_genes) ($(percent(n_lateral_cluster_genes, n_cluster_genes))) uncorrelated pertinent: $(n_uncorrelated_pertinent_cluster_genes) ($(percent(n_uncorrelated_pertinent_cluster_genes, n_cluster_genes))) correlated pertinent: $(n_correlated_pertinent_local_genes) ($(percent(n_correlated_pertinent_local_genes, n_cluster_genes)))" _group =
-            #               :todox
         end
 
         @assert length(cluster_index_of_anchor_local_position) > 0
@@ -533,7 +505,6 @@ function compute_block_modules!(
         @views UMIs_per_neighborhood_cell_per_gene = UMIs_per_cell_per_gene[indices_of_neighborhood_cells, :]
 
         while true
-            #           @debug "Block $(block_name) MIGRATE..." _group = :todox
             local_positions_of_anchors = collect(keys(cluster_index_of_anchor_local_position))
             cluster_indices_of_anchors = [
                 cluster_index_of_anchor_local_position[anchor_local_position] for
@@ -559,20 +530,7 @@ function compute_block_modules!(
                         cluster_index_per_local_gene[local_gene_index] = cluster_index
                         if module_status_per_gene !== nothing
                             module_status_per_gene[indices_of_local_genes[local_gene_index]] *= ",joined($(name_per_gene[indices_of_local_genes[anchor_local_position]]))"
-                            #                           @debug "Block $(block_name) gene: $(name_per_gene[indices_of_local_genes[local_gene_index]]) is migrated to: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) correlation: $(correlation) status: $(module_status_per_gene[indices_of_local_genes[local_gene_index]])" _group =
-                            #                               :todox
-                            #                       else
-                            #                           @debug "Block $(block_name) gene: $(name_per_gene[indices_of_local_genes[local_gene_index]]) is migrated to: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) correlation: $(correlation)" _group =
-                            #                               :todox
                         end
-                        #                   else
-                        #                       if module_status_per_gene !== nothing
-                        #                           @debug "Block $(block_name) gene: $(name_per_gene[indices_of_local_genes[local_gene_index]]) not migrated to: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) correlation: $(correlation) status: $(module_status_per_gene[indices_of_local_genes[local_gene_index]])" _group =
-                        #                               :todox
-                        #                       else
-                        #                           @debug "Block $(block_name) gene: $(name_per_gene[indices_of_local_genes[local_gene_index]]) not migrated to: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) correlation: $(correlation)" _group =
-                        #                               :todox
-                        #                       end
                     end
                 end
             end
@@ -581,10 +539,9 @@ function compute_block_modules!(
                 break
             end
 
-            #           @debug "Block $(block_name) WEAK..." _group = :todox
             weakest_cluster_index = nothing
             weakest_cluster_strong_UMIs = nothing
-            for (anchor_local_position, cluster_index) in cluster_index_of_anchor_local_position
+            for (anchor_local_position, cluster_index) in cluster_index_of_anchor_local_position  # NOLINT
                 is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
                 @assert any(is_in_cluster_per_local_gene)
                 @views UMIs_per_neighborhood_cell_per_cluster_local_gene =
@@ -595,8 +552,6 @@ function compute_block_modules!(
                     cluster_UMIs_per_neighborhood_cell,
                     1 - (min_strong_cells - 1) / (n_neighborhood_cells - 1),
                 )
-                #               @debug "Block $(block_name) anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(cluster_index) strong UMIs: $(cluster_strong_UMIs)" _group =
-                #                   :todox
                 if weakest_cluster_strong_UMIs === nothing || cluster_strong_UMIs < weakest_cluster_strong_UMIs
                     weakest_cluster_index = cluster_index
                     weakest_cluster_strong_UMIs = cluster_strong_UMIs
@@ -607,13 +562,9 @@ function compute_block_modules!(
             anchor_local_position = anchor_local_position_per_cluster[weakest_cluster_index]
 
             if weakest_cluster_strong_UMIs >= min_strong_UMIs
-                #               @debug "Block $(block_name) strong anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(weakest_cluster_index) strong UMIs: $(weakest_cluster_strong_UMIs)" _group =
-                #                   :todox
                 break
             end
 
-            #           @debug "Block $(block_name) weak anchor: $(name_per_gene[indices_of_local_genes[anchor_local_position]]) cluster: $(weakest_cluster_index) strong UMIs: $(weakest_cluster_strong_UMIs)" _group =
-            #               :todox
             is_in_weakest_cluster_per_local_gene = cluster_index_per_local_gene .== weakest_cluster_index
             if module_status_per_gene !== nothing
                 module_status_per_gene[indices_of_local_genes[is_in_weakest_cluster_per_local_gene]] .*= ",weak_cluster"
@@ -634,9 +585,6 @@ function compute_block_modules!(
             indices_of_cluster_genes = indices_of_local_genes[is_in_cluster_per_local_gene]
             genes_indices_of_anchor_index[anchor_index] = indices_of_cluster_genes
         end
-
-        #       @debug "Block: $(block_name) clusters: $(length(cluster_index_of_anchor_local_position)) anchors: [ $(join(sort(name_per_gene[indices_of_local_genes[collect(keys(cluster_index_of_anchor_local_position))]]), ", ")) ]" _group =
-        #           :todox
     end
 
     return genes_indices_of_anchor_index
