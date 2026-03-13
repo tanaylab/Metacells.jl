@@ -223,7 +223,7 @@ function compute_preferred_block_index_per_cell_per_block(;
         1:n_blocks;
         rng,
         name = "compute_preferred_block_index_per_cell_per_block",
-        progress = DebugProgress(n_blocks; group = :mcs_details, desc = "preferred_block_index_per_cell_per_block"),
+        progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "preferred_block_index_per_cell_per_block"),
     ) do block_index, rng
         @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
         indices_of_neighborhood_cells = findall(
@@ -354,7 +354,7 @@ function compute_preferred_block_index_of_cells(;
     parallel_loop_wo_rng(
         1:n_cells;
         name = "compute_preferred_block_index_of_cells",
-        progress = DebugProgress(n_cells; group = :mcs_details, desc = "preferred_block_index_of_cells"),
+        progress = DebugProgress(n_cells; group = :mcs_loops, desc = "preferred_block_index_of_cells"),
     ) do cell_index
         base_block_index_of_cell = block_index_per_cell[cell_index]
         if base_block_index_of_cell == 0
@@ -432,7 +432,7 @@ function compute_local_clusters(;
         1:n_blocks;
         rng,
         name = "compute_local_clusters",
-        progress = DebugProgress(n_blocks; group = :mcs_details, desc = "local_clusters"),
+        progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "local_clusters"),
     ) do block_index, rng
         block_cell_indices = findall(block_index_per_cell .== block_index)
         n_block_cells = length(block_cell_indices)

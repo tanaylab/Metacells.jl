@@ -220,9 +220,7 @@
 </summary>
 <section>
 <div>
-<p>
-<em>group = :mcs
-</em>results Do simple blocks analysis.
+<p>Do simple blocks analysis.
 </p>
 </div>
 </section>
@@ -1350,6 +1348,12 @@
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
 </p>
 <p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -1911,6 +1915,12 @@
 </strong>::AbstractString (required): The unique block each metacell belongs to.
 </p>
 <p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
 <strong>gene @ is_lateral
 </strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
 </p>
@@ -2122,6 +2132,12 @@
 </strong>::AbstractString (required): The unique block each metacell belongs to.
 </p>
 <p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -2297,6 +2313,12 @@
 <p>
 <strong>metacell @ block
 </strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
 </p>
 <p>
 <strong>Matrices
@@ -2546,7 +2568,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.17.0. Using Julia version 1.11.5.
+</a> version 1.16.1. Using Julia version 1.11.8.
 </p>
 </section>
 <footer class="modal-card-foot">

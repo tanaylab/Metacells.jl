@@ -152,13 +152,13 @@ $(CONTRACT)
     n_genes = axis_length(daf, "gene")
     n_metacells = axis_length(daf, "metacell")
 
-    index_per_included_gene = get_query(daf, "@ gene [ ! is_excluded ] : index").array
+    indices_of_included_genes = get_query(daf, "@ gene [ ! is_excluded ] : index").array
     UMIs_per_metacell_per_included_gene = daf["@ metacell @ gene [ ! is_excluded ] :: UMIs"].array
     total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
 
     linear_fraction_per_metacell_per_gene = zeros(Float32, n_metacells, n_genes)
-    linear_fraction_per_metacell_per_gene[:, index_per_included_gene] .=
-        UMIs_per_metacell_per_included_gene ./ total_UMIs_per_metacell
+    @. linear_fraction_per_metacell_per_gene[:, indices_of_included_genes] =
+        UMIs_per_metacell_per_included_gene / total_UMIs_per_metacell
 
     set_matrix!(  # NOJET
         daf,
@@ -205,7 +205,7 @@ $(CONTRACT)
         Float32;
         overwrite,
     ) do log_fraction_per_metacell_per_gene
-        log_fraction_per_metacell_per_gene .= log2.(fraction_per_metacell_per_gene .+ gene_fraction_regularization)
+        @. log_fraction_per_metacell_per_gene = log2(fraction_per_metacell_per_gene + gene_fraction_regularization)
         return nothing
     end
     return nothing
@@ -242,7 +242,7 @@ $(CONTRACT)
         dims = 2,
         progress = DebugProgress(
             n_metacells;
-            group = :mcs_details,
+            group = :mcs_loops,
             desc = "euclidean_skeleton_fold_distance_between_metacells",
         ),
     )
@@ -324,7 +324,7 @@ $(CONTRACT)
         reverse(2:(n_metacells));
         progress = DebugProgress(
             n_metacells - 1;
-            group = :mcs_details,
+            group = :mcs_loops,
             desc = "max_skeleton_fold_distance_between_metacells",
         ),
     ) do base_metacell_index
@@ -431,14 +431,15 @@ $(CONTRACT)
     index_per_included_gene = get_query(daf, "@ gene [ ! is_excluded ] : index").array
     n_included_genes = length(index_per_included_gene)
 
-    index_per_grouped_cell = get_query(daf, "@ cell [ metacell ] : index").array
+    indices_of_grouped_cells = get_query(daf, "@ cell [ metacell ] : index").array
+    n_grouped_cells = length(indices_of_grouped_cells)
 
     UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
     UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
 
     total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
     total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
-    total_UMIs_per_grouped_cell = total_UMIs_per_cell[index_per_grouped_cell]
+    total_UMIs_per_grouped_cell = total_UMIs_per_cell[indices_of_grouped_cells]
 
     metacell_index_per_grouped_cell = daf["@ cell : metacell ?? : index"].array
 
@@ -447,32 +448,45 @@ $(CONTRACT)
 
     correlation_between_cells_and_punctuated_metacells_per_gene = Vector{Float32}(undef, n_genes)
 
+    gene_cell_log_fraction_per_grouped_cell_per_thread = [Vector{Float32}(undef, n_grouped_cells) for _ in 1:nthreads()]
+    gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread =
+        [Vector{Float32}(undef, n_grouped_cells) for _ in 1:nthreads()]
+
     parallel_loop_wo_rng(
         1:n_included_genes;
+        policy = :static,
         progress = DebugProgress(
             n_included_genes;
-            group = :mcs_details,
+            group = :mcs_loops,
             desc = "correlation_between_cells_and_punctuated_metacells_per_gene",
         ),
+        progress_chunk = 100,
     ) do included_gene_position
         gene_index = index_per_included_gene[included_gene_position]
 
-        gene_cell_UMIs_per_grouped_cell = UMIs_per_cell_per_gene[index_per_grouped_cell, gene_index]
-        gene_metacell_UMIs_per_grouped_cell = UMIs_per_metacell_per_gene[metacell_index_per_grouped_cell, gene_index]
+        gene_cell_log_fraction_per_grouped_cell = gene_cell_log_fraction_per_grouped_cell_per_thread[threadid()]
+        gene_punctuated_metacell_log_fraction_per_grouped_cell =
+            gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread[threadid()]
 
-        gene_cell_log_fraction_per_grouped_cell =
-            log2.(gene_cell_UMIs_per_grouped_cell ./ total_UMIs_per_grouped_cell .+ gene_fraction_regularization)
+        for (grouped_cell_position, cell_index) in enumerate(indices_of_grouped_cells)
+            gene_cell_UMIs = UMIs_per_cell_per_gene[cell_index, gene_index]
+            gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] =
+                log2(gene_cell_UMIs / total_UMIs_per_grouped_cell[grouped_cell_position] + gene_fraction_regularization)
+            metacell_index = metacell_index_per_grouped_cell[grouped_cell_position]
+            gene_metacell_UMIs = UMIs_per_metacell_per_gene[metacell_index, gene_index]
+            gene_punctuated_metacell_log_fraction_per_grouped_cell[grouped_cell_position] = log2(
+                (
+                    (gene_metacell_UMIs .- gene_cell_UMIs) /
+                    total_punctuated_metacell_UMIs_per_grouped_cell[grouped_cell_position]
+                ) .+ gene_fraction_regularization,
+            )
+        end
 
-        gene_punctuated_metacell_log_fraction_per_grouped_cell = log2.(
-            (
-                (gene_metacell_UMIs_per_grouped_cell .- gene_cell_UMIs_per_grouped_cell) ./
-                total_punctuated_metacell_UMIs_per_grouped_cell
-            ) .+ gene_fraction_regularization,
-        )
         correlation_between_cells_and_punctuated_metacells_per_gene[gene_index] = zero_cor_between_vectors(
             gene_cell_log_fraction_per_grouped_cell,
             gene_punctuated_metacell_log_fraction_per_grouped_cell,
         )
+
         return nothing
     end
 

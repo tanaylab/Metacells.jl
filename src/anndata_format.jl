@@ -10,15 +10,12 @@ The expected flow is as follows:
 
   - Alternatively, import just the clean cells `h5ad` into it, but that would be leaving out some of the data so is not
     recommended.
-
   - Create another `Daf` repository for the metacells, chain it to the cells repository, and import the metacells into
     it using [`import_metacells_h5ad!`](@ref). Give this the cells-with-metacells data `h5ad` - only the assignment of
     cells to metacells will be imported from it.
-
   - If you have any per-cell or per-gene computed data in the cells-with-metacells data `h5ad` (unlikely, as computed
     data typically goes into the metacells `h5ad`), import it into the chained (metacells) repository using
     [`import_cells_h5ad!`](@ref).
-
   - Create a type axis in the chained metacells `Daf` repository using [`reconstruct_type_axis!`](@ref).
 """
 module AnnDataFormat

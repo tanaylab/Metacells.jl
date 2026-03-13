@@ -140,7 +140,7 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
     parallel_loop_with_rng(
         1:n_blocks;
         rng,
-        progress = DebugProgress(n_blocks; group = :mcs_details, desc = "compute_blocks_modules"),
+        progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "compute_blocks_modules"),
     ) do block_index, rng
         if module_status_per_gene_per_block === nothing
             module_status_per_gene = nothing
@@ -378,7 +378,7 @@ function compute_block_modules!(
                 z_score_per_neighborhood_metacell_of_local_gene,
                 z_score_per_neighborhood_metacell_per_lateral_cluster,
             )
-            lateral_cluster_index = argmax(correlation_per_lateral_cluster)
+            lateral_cluster_index = argmax(correlation_per_lateral_cluster)  # NOJET
             lateral_correlation = correlation_per_lateral_cluster[lateral_cluster_index]
             qualifier = ""
             if is_neighborhood_distinct_per_local_gene[local_gene_position]

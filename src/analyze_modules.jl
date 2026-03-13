@@ -93,7 +93,7 @@ $(CONTRACT)
 
     parallel_loop_wo_rng(
         1:n_blocks;
-        progress = DebugProgress(n_blocks; group = :mcs_details, desc = "n_genes_per_module_per_block"),
+        progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "n_genes_per_module_per_block"),
     ) do block_index
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
         for module_index in 1:n_modules
@@ -151,11 +151,13 @@ $(CONTRACT)
 
     module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
 
+    # TODO: This does a lot of memory allocations in the parallel loop.
+    # Given it also sets a matrix in each iteration, there's probably not much point in optimization?
     parallel_loop_wo_rng(
         1:n_blocks;
         progress = DebugProgress(
             n_blocks;
-            group = :mcs_details,
+            group = :mcs_loops,
             desc = "linear_fraction_per_block_per_module_per_metacell",
         ),
     ) do block_index
@@ -243,11 +245,12 @@ $(CONTRACT)
     mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
 
+    # TODO: This does a lot of memory allocations in the parallel loop.
     parallel_loop_wo_rng(
         1:n_blocks;
         progress = DebugProgress(
             n_blocks;
-            group = :mcs_details,
+            group = :mcs_loops,
             desc = "stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block",
         ),
     ) do block_index
@@ -348,11 +351,12 @@ $(CONTRACT)
     UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
     total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
 
+    # TODO: This does a lot of memory allocations in the parallel loop.
     parallel_loop_wo_rng(
         1:n_metacells;
         progress = DebugProgress(
             n_metacells;
-            group = :mcs_details,
+            group = :mcs_loops,
             desc = "stats_of_euclidean_modules_cells_distance_per_metacell",
         ),
     ) do metacell_index

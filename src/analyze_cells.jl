@@ -41,7 +41,7 @@ $(CONTRACT)
 )::Nothing
     total_UMIs_per_cell = daf["@ cell @ gene [ ! is_excluded ] :: UMIs >| Sum"].array
     set_vector!(daf, "cell", "total_UMIs", total_UMIs_per_cell; overwrite)
-    @debug "Mean (included) UMIs per cell: $(mean(total_UMIs_per_cell))" _group = :mcs_details  # NOLINT
+    @debug "Mean (included) UMIs per cell: $(mean(total_UMIs_per_cell))" _group = :mcs_results  # NOLINT
     return nothing
 end
 

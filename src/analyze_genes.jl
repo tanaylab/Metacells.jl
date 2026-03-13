@@ -133,18 +133,27 @@ $(CONTRACT)
     @assert genes_correlation_window > 0
 
     n_genes = axis_length(daf, "gene")
+    n_metacells = axis_length(daf, "metacell")
 
     is_skeleton_per_gene = get_vector(daf, "gene", "is_skeleton").array
     indices_of_skeletons = findall(is_skeleton_per_gene)
+    n_skeletons = length(indices_of_skeletons)
 
     is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
     indices_of_markers = findall(is_marker_per_gene)
+    n_markers = length(indices_of_markers)
 
     log_fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "log_linear_fraction").array
     @views log_fraction_per_metacell_per_marker = log_fraction_per_metacell_per_gene[:, indices_of_markers]
     @views log_fraction_per_metacell_per_skeleton = log_fraction_per_metacell_per_gene[:, indices_of_skeletons]
 
     is_correlated_with_skeleton_per_gene = zeros(Bool, n_genes)
+    correlation_per_skeleton_per_marker = Matrix{Float32}(undef, n_skeletons, n_markers)
+    scratch_per_metacell_per_skeleton = Matrix{Float32}(undef, n_metacells, n_skeletons)
+    scratch_per_metacell_per_marker = Matrix{Float32}(undef, n_metacells, n_markers)
+    scratch_per_skeleton = Vector{Float32}(undef, n_skeletons)
+    scratch_per_marker = Vector{Float32}(undef, n_markers)
+    scratch_marker_window = Vector{Float32}(undef, genes_correlation_window)
 
     fill_vector_of_is_correlated_with_skeleton_per_gene!(;
         min_gene_correlation,
@@ -154,6 +163,12 @@ $(CONTRACT)
         log_fraction_per_metacell_per_skeleton,
         log_fraction_per_metacell_per_marker,
         is_correlated_with_skeleton_per_gene,
+        correlation_per_skeleton_per_marker,
+        scratch_per_metacell_per_skeleton,
+        scratch_per_metacell_per_marker,
+        scratch_per_skeleton,
+        scratch_per_marker,
+        scratch_marker_window,
     )
 
     set_vector!(daf, "gene", "is_correlated_with_skeleton", is_correlated_with_skeleton_per_gene; overwrite)
@@ -162,7 +177,7 @@ $(CONTRACT)
     return nothing
 end
 
-function fill_vector_of_is_correlated_with_skeleton_per_gene!(;
+function fill_vector_of_is_correlated_with_skeleton_per_gene!(;  # NOJET
     min_gene_correlation::AbstractFloat,
     min_gene_correlation_quantile::AbstractFloat,
     genes_correlation_window::Integer,
@@ -170,60 +185,114 @@ function fill_vector_of_is_correlated_with_skeleton_per_gene!(;
     log_fraction_per_metacell_per_skeleton::AbstractMatrix{<:AbstractFloat},
     log_fraction_per_metacell_per_marker::AbstractMatrix{<:AbstractFloat},
     is_correlated_with_skeleton_per_gene::AbstractVector{Bool},
+    correlation_per_skeleton_per_marker::AbstractMatrix{<:AbstractFloat},
+    scratch_per_metacell_per_skeleton::AbstractMatrix{<:AbstractFloat},
+    scratch_per_metacell_per_marker::AbstractMatrix{<:AbstractFloat},
+    scratch_per_skeleton::AbstractVector{<:AbstractFloat},
+    scratch_per_marker::AbstractVector{<:AbstractFloat},
+    scratch_marker_window::AbstractVector{<:AbstractFloat},
 )::Nothing
-    n_skeletons = size(log_fraction_per_metacell_per_skeleton, 2)
+    @assert length(scratch_marker_window) >= genes_correlation_window
+
     n_markers = size(log_fraction_per_metacell_per_marker, 2)
 
-    correlation_per_skeleton_per_marker =
-        zero_cor_between_matrices_columns(log_fraction_per_metacell_per_skeleton, log_fraction_per_metacell_per_marker)
-    @assert_matrix(correlation_per_skeleton_per_marker, n_skeletons, n_markers)
+    zero_cor_between_matrices_columns(
+        log_fraction_per_metacell_per_skeleton,
+        log_fraction_per_metacell_per_marker;
+        result = correlation_per_skeleton_per_marker,
+        left_scratch_matrix = scratch_per_metacell_per_skeleton,
+        right_scratch_matrix = scratch_per_metacell_per_marker,
+        left_scratch_row = scratch_per_skeleton,
+        right_scratch_row = scratch_per_marker,
+    )
 
     max_correlation_per_marker = vec(maximum(correlation_per_skeleton_per_marker; dims = 1))
     @assert_vector(max_correlation_per_marker, n_markers)
 
-    quantile_correlation_per_marker =
-        rolling_quantile(max_correlation_per_marker, genes_correlation_window, min_gene_correlation_quantile)
-    is_quantile_correlation_per_marker =
-        (max_correlation_per_marker .>= quantile_correlation_per_marker) .& (max_correlation_per_marker .> 0)
-    is_strong_correlation_per_marker = max_correlation_per_marker .>= min_gene_correlation
+    quantile_correlation_per_marker = scratch_per_marker
+    rolling_quantile!(;
+        results = quantile_correlation_per_marker,
+        data = max_correlation_per_marker,
+        scratch = scratch_marker_window,
+        window_size = genes_correlation_window,
+        quantile_fraction = min_gene_correlation_quantile,
+    )
 
-    is_correlated_with_skeleton_per_gene[indices_of_markers[is_quantile_correlation_per_marker]] .= true
-    is_correlated_with_skeleton_per_gene[indices_of_markers[is_strong_correlation_per_marker]] .= true
+    for (marker_position, marker_index) in enumerate(indices_of_markers)
+        max_correlation = max_correlation_per_marker[marker_position]
+        is_correlated_with_skeleton_per_gene[marker_index] =
+            ((max_correlation >= quantile_correlation_per_marker[marker_position]) & (max_correlation > 0)) |
+            (max_correlation >= min_gene_correlation)
+    end
 
     return nothing
 end
 
 # TODO: Move to `TanayLabUtilities`?
-function rolling_quantile(
+function non_allocating_quantile(;
     data::AbstractVector{T},
-    window_size::Int,
+    scratch::AbstractVector{T},
     quantile_fraction::AbstractFloat,
-)::AbstractVector{T} where {T}
-    @assert window_size > 1
-
+)::T where {T}
     n_values = length(data)
-    if n_values <= window_size
-        value = quantile(data, quantile_fraction)  # NOLINT
-        return fill(value, n_values)
+    @assert length(scratch) == n_values
+    scratch .= data
+
+    float_index = quantile_fraction * (n_values - 1)
+    k_low = clamp(floor(Int, float_index) + 1, 1, n_values)
+    k_high = clamp(k_low + 1, 1, n_values)
+
+    if k_low == k_high
+        partialsort!(scratch, k_low)
+        return scratch[k_low]
     end
 
-    results = Vector{T}(undef, n_values)
+    partialsort!(scratch, k_low)
+    low_value = scratch[k_low]
+    @views high_values = scratch[(k_low + 1):end]
+    high_value = minimum(high_values)
 
+    weight = float_index - (k_low - 1)
+    return T(low_value + weight * (high_value - low_value))
+end
+
+# TODO: Move to `TanayLabUtilities`?
+function rolling_quantile!(;
+    results::AbstractVector{T},
+    data::AbstractVector{T},
+    scratch::AbstractVector{T},
+    window_size::Int,
+    quantile_fraction::AbstractFloat,
+)::Nothing where {T}
+    @assert window_size > 1
+    @assert length(results) == length(data)
+    @assert length(scratch) >= window_size
+
+    n_values = length(data)
     window_left_of_center = div(window_size - 1, 2)
     window_right_of_center = window_size - window_left_of_center - 1
 
-    for index in 1:(n_values - window_size + 1)
-        @views window_data = data[index:(index + window_size - 1)]
-        results[window_left_of_center + index] = quantile(window_data, quantile_fraction)  # NOLINT
+    if n_values <= window_size
+        @views scratch_view = scratch[1:n_values]
+        fill!(results, non_allocating_quantile(; data, scratch = scratch_view, quantile_fraction))
+        return nothing
     end
 
-    first_median = results[window_left_of_center + 1]
-    results[1:window_left_of_center] .= first_median
+    @views scratch_view = scratch[1:window_size]
 
-    last_median = results[n_values - window_right_of_center]
-    results[(end - window_right_of_center + 1):end] .= last_median
+    for index in 1:(n_values - window_size + 1)
+        data_view = @view(data[index:(index + window_size - 1)])
+        results[window_left_of_center + index] =
+            non_allocating_quantile(; data = data_view, scratch = scratch_view, quantile_fraction)
+    end
 
-    return results
+    first_result = results[window_left_of_center + 1]
+    results[1:window_left_of_center] .= first_result
+
+    last_result = results[n_values - window_right_of_center]
+    results[(end - window_right_of_center + 1):end] .= last_result
+
+    return nothing
 end
 
 """
@@ -311,6 +380,7 @@ function rank_variables(score_per_variable_per_observation::AbstractMatrix{<:Abs
     min_rank_per_variable = vec(minimum(rank_per_variable_per_observation; dims = 2))
     @assert_vector(min_rank_per_variable, n_variables)
 
+    # TODO: This can be done in parallel.
     maximal_score_per_variable = Vector{Float32}(undef, n_variables)
     for variable_index in 1:n_variables
         @views maximal_score_per_observation = score_per_variable_per_observation[
