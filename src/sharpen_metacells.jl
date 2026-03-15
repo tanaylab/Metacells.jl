@@ -36,6 +36,8 @@ import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_block
 import Metacells.Contracts.vector_of_n_metacells_per_block
+import Metacells.Contracts.vector_of_n_modules_per_block
+import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 
 """
@@ -99,7 +101,9 @@ $(CONTRACT2)
         vector_of_n_cells_per_block(RequiredInput),
         vector_of_n_metacells_per_block(RequiredInput),
         matrix_of_module_per_gene_per_block(RequiredInput),
+        vector_of_n_modules_per_block(RequiredInput),
         matrix_of_is_found_per_module_per_block(RequiredInput),
+        vector_of_n_neighborhood_cells_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
         matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
@@ -135,7 +139,7 @@ $(CONTRACT2)
     is_found_per_module_per_block = get_matrix(base_daf, "module", "block", "is_found").array
     module_index_per_gene_per_block = base_daf["@ gene @ block :: module ?? 0 : index"].array
 
-    n_cells_per_block = get_vector(base_daf, "block", "n_cells").array
+    n_cells_per_block = copy_array(get_vector(base_daf, "block", "n_cells").array)
     n_metacells_per_block = get_vector(base_daf, "block", "n_metacells").array
     mean_metacell_cells_per_block = n_cells_per_block ./ max.(n_metacells_per_block, 1)
 
@@ -143,6 +147,7 @@ $(CONTRACT2)
     n_migrated = n_cells
 
     preferred_block_index_per_cell_per_block = compute_preferred_block_index_per_cell_per_block(;
+        base_daf,
         kmeans_rounds,
         name_per_block,
         n_cells_per_block,
@@ -163,6 +168,7 @@ $(CONTRACT2)
         compute_preferred_block_index_of_cells(; block_index_per_cell, preferred_block_index_per_cell_per_block)
 
     local_clusters_per_block = compute_local_clusters(;
+        base_daf,
         UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         min_cells_in_metacell,
@@ -198,6 +204,7 @@ $(CONTRACT2)
 end
 
 function compute_preferred_block_index_per_cell_per_block(;
+    base_daf::DafReader,
     kmeans_rounds::Integer,
     name_per_block::AbstractVector{<:AbstractString},
     n_cells_per_block::AbstractVector{<:Integer},
@@ -215,49 +222,67 @@ function compute_preferred_block_index_per_cell_per_block(;
 )::Vector{Maybe{SparseVector{<:Integer}}}
     n_cells = length(block_index_per_cell)
     n_blocks = length(name_per_block)
+    n_modules = axis_length(base_daf, "module")
+
+    n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
+    max_n_block_modules = maximum(n_modules_per_block)
+
+    n_neighborhood_cells_per_block = get_vector(base_daf, "block", "n_neighborhood_cells").array
+    max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
 
     preferred_block_index_per_cell_per_block = Vector{Maybe{SparseVector{<:Integer}}}(undef, n_blocks)
     preferred_block_index_per_cell_per_block .= nothing
 
+    z_score_per_max_module_per_max_neighborhood_cell_per_thread =
+        [Matrix{Float32}(undef, max_n_block_modules, max_n_neighborhood_cells) for _ in 1:nthreads()]
+    is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
+    is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:nthreads()]
+
     parallel_loop_with_rng(
         1:n_blocks;
         rng,
+        policy = :static,
         name = "compute_preferred_block_index_per_cell_per_block",
         progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "preferred_block_index_per_cell_per_block"),
     ) do block_index, rng
         @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
-        indices_of_neighborhood_cells = findall(
+        is_in_neighborhood_per_cell = is_in_neighborhood_per_cell_per_thread[threadid()]
+        is_in_neighborhood_per_cell .=
             (block_index_per_cell .> 0) .&
-            getindex.(Ref(is_in_neighborhood_per_other_block), max.(block_index_per_cell, 1)),
-        )
-        n_neighborhood_cells = length(indices_of_neighborhood_cells)
+            getindex.(Ref(is_in_neighborhood_per_other_block), max.(block_index_per_cell, 1))
+        indices_of_neighborhood_cells = findall(is_in_neighborhood_per_cell)
+        n_neighborhood_cells = n_neighborhood_cells_per_block[block_index]
+        @assert n_neighborhood_cells == length(indices_of_neighborhood_cells)
         @assert n_neighborhood_cells > 0
 
-        @views is_found_per_module = is_found_per_module_per_block[:, block_index]
-        indices_of_found_modules = findall(is_found_per_module)
+        is_found_per_module = is_found_per_module_per_thread[threadid()]
+        is_found_per_module .= is_found_per_module_per_block[:, block_index]
+        n_block_modules = n_modules_per_block[block_index]
+        @assert n_block_modules == sum(is_found_per_module)
 
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
 
-        fraction_per_found_module_per_neighborhood_cell = compute_fraction_per_found_module_per_region_cell(;
+        z_score_per_max_module_per_max_neighborhood_cell =
+            z_score_per_max_module_per_max_neighborhood_cell_per_thread[threadid()]
+        @views z_score_per_found_module_per_neighborhood_cell =
+            z_score_per_max_module_per_max_neighborhood_cell[1:n_block_modules, 1:n_neighborhood_cells]
+        @views mean_linear_fraction_in_neighborhood_cells_per_module =
+            mean_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
+        @views std_linear_fraction_in_neighborhood_cells_per_module =
+            std_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
+
+        compute_z_score_per_found_module_per_region_cell!(;
+            z_score_per_found_module_per_region_cell = z_score_per_found_module_per_neighborhood_cell,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            region_cell_indices = indices_of_neighborhood_cells,
-            indices_of_found_modules,
+            is_found_per_module,
+            is_in_region_per_cell = is_in_neighborhood_per_cell,
             module_index_per_gene,
+            mean_linear_fraction_in_neighborhood_cells_per_module,
+            std_linear_fraction_in_neighborhood_cells_per_module,
         )
 
         n_neighborhood_clusters = max(Int(round(n_neighborhood_cells / mean_metacell_cells_per_block[block_index])), 1)
-
-        @views mean_linear_fraction_in_neighborhood_cells_per_found_module =
-            mean_linear_fraction_in_neighborhood_cells_per_module_per_block[indices_of_found_modules, block_index]
-        @views std_linear_fraction_in_neighborhood_cells_per_found_module =
-            std_linear_fraction_in_neighborhood_cells_per_module_per_block[indices_of_found_modules, block_index]
-        z_score_per_found_module_per_neighborhood_cell =
-            (
-                fraction_per_found_module_per_neighborhood_cell .-
-                mean_linear_fraction_in_neighborhood_cells_per_found_module
-            ) ./ std_linear_fraction_in_neighborhood_cells_per_found_module
-
         kmeans_result = flame_timed("kmeans_in_rounds") do
             return kmeans_in_rounds(
                 z_score_per_found_module_per_neighborhood_cell,
@@ -364,6 +389,7 @@ function compute_preferred_block_index_of_cells(;
         preferred_block_index_per_block = preferred_block_index_per_cell_per_block[base_block_index_of_cell]
         if preferred_block_index_per_block === nothing
             new_block_index_per_cell[cell_index] = base_block_index_of_cell
+            atomic_add!(n_stationary, 1)
             return nothing
         end
 
@@ -412,6 +438,7 @@ end
 end
 
 function compute_local_clusters(;
+    base_daf::DafReader,
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     min_cells_in_metacell::Integer,
@@ -424,47 +451,70 @@ function compute_local_clusters(;
     std_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     rng::AbstractRNG,
 )::AbstractVector{Maybe{LocalClusters}}
+    n_cells = length(total_UMIs_per_cell)
     n_blocks = size(is_found_per_module_per_block, 2)
+    n_modules = axis_length(base_daf, "module")
 
     local_clusters_per_block = Vector{Maybe{LocalClusters}}(undef, n_blocks)
+
+    n_cells_per_block = [sum(block_index_per_cell .== block_index) for block_index in 1:n_blocks]
+    max_n_block_cells = maximum(n_cells_per_block)
+
+    n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
+    max_n_block_modules = maximum(n_modules_per_block)
+
+    is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:nthreads()]
+    is_in_block_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
+    z_score_per_max_module_per_max_block_cell_per_thread =
+        [Matrix{Float32}(undef, max_n_block_modules, max_n_block_cells) for _ in 1:nthreads()]
 
     parallel_loop_with_rng(
         1:n_blocks;
         rng,
+        policy = :static,
         name = "compute_local_clusters",
         progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "local_clusters"),
     ) do block_index, rng
-        block_cell_indices = findall(block_index_per_cell .== block_index)
-        n_block_cells = length(block_cell_indices)
+        is_in_block_per_cell = is_in_block_per_cell_per_thread[threadid()]
+        is_in_block_per_cell .= block_index_per_cell .== block_index
+        block_cell_indices = findall(is_in_block_per_cell)
+        n_block_cells = n_cells_per_block[block_index]
+        @assert n_block_cells == length(block_cell_indices)
+
         if n_block_cells == 0
             local_clusters_per_block[block_index] = nothing
             return nothing
         end
 
-        @views is_found_per_module = is_found_per_module_per_block[:, block_index]
-        indices_of_found_modules = findall(is_found_per_module)
+        is_found_per_module = is_found_per_module_per_thread[threadid()]
+        is_found_per_module .= is_found_per_module_per_block[:, block_index]
+        n_block_modules = n_modules_per_block[block_index]
+        @assert n_block_modules == sum(is_found_per_module)
 
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
 
-        fraction_per_found_module_per_block_cell = compute_fraction_per_found_module_per_region_cell(;
+        fraction_per_found_module_per_block_cell =
+            z_score_per_max_module_per_max_block_cell = z_score_per_max_module_per_max_block_cell_per_thread[threadid()]
+        @views z_score_per_found_module_per_block_cell =
+            z_score_per_max_module_per_max_block_cell[1:n_block_modules, 1:n_block_cells]
+        @views mean_linear_fraction_in_neighborhood_cells_per_module =
+            mean_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
+        @views std_linear_fraction_in_neighborhood_cells_per_module =
+            std_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
+
+        compute_z_score_per_found_module_per_region_cell!(;
+            z_score_per_found_module_per_region_cell = z_score_per_found_module_per_block_cell,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            region_cell_indices = block_cell_indices,
-            indices_of_found_modules,
+            is_found_per_module,
+            is_in_region_per_cell = is_in_block_per_cell,
             module_index_per_gene,
+            mean_linear_fraction_in_neighborhood_cells_per_module,
+            std_linear_fraction_in_neighborhood_cells_per_module,
         )
-
-        @views mean_linear_fraction_in_neighborhood_cells_per_found_module =
-            mean_linear_fraction_in_neighborhood_cells_per_module_per_block[indices_of_found_modules, block_index]
-        @views std_linear_fraction_in_neighborhood_cells_per_found_module =
-            std_linear_fraction_in_neighborhood_cells_per_module_per_block[indices_of_found_modules, block_index]
-        z_score_per_found_module_per_block_cell =
-            (fraction_per_found_module_per_block_cell .- mean_linear_fraction_in_neighborhood_cells_per_found_module) ./
-            std_linear_fraction_in_neighborhood_cells_per_found_module
 
         n_block_clusters = max(Int(round(n_block_cells / mean_metacell_cells_per_block[block_index])), 1)
         if n_block_clusters == 1
-            n_block_cells = length(block_cell_indices)
             cluster_index_per_block_cell = fill(1, n_block_cells)
             cluster_sizes = [n_block_cells]
 
@@ -543,39 +593,33 @@ function combine_local_clusters(;
     return (cells_of_new_metacells, block_name_per_new_metacell)
 end
 
-function compute_fraction_per_found_module_per_region_cell(;
+function compute_z_score_per_found_module_per_region_cell!(;
+    z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
-    region_cell_indices::AbstractVector{<:Integer},
-    indices_of_found_modules::AbstractVector{<:Integer},
+    is_found_per_module::BitVector,
+    is_in_region_per_cell::BitVector,
     module_index_per_gene::AbstractVector{<:Integer},
-)::Matrix{Float32}
-    n_region_cells = length(region_cell_indices)
-    total_UMIs_per_region_cell = total_UMIs_per_cell[region_cell_indices]
-
-    n_found_modules = length(indices_of_found_modules)
-    indices_of_genes_in_found_modules = findall(module_index_per_gene .> 0)
-    module_index_per_gene_in_found_module = module_index_per_gene[indices_of_genes_in_found_modules]
-
-    UMIs_per_region_cell_per_gene_in_found_module =
-        UMIs_per_cell_per_gene[region_cell_indices, indices_of_genes_in_found_modules]
-    fraction_per_region_cell_per_gene_in_found_module =
-        UMIs_per_region_cell_per_gene_in_found_module ./ total_UMIs_per_region_cell
-
-    fraction_per_region_cell_per_found_module = Matrix{Float32}(undef, n_region_cells, n_found_modules)
-    for (found_module_position, found_module_index) in enumerate(indices_of_found_modules)
-        position_in_genes_in_found_modules_per_module_gene =
-            findall(module_index_per_gene_in_found_module .== found_module_index)
-        n_module_genes = length(position_in_genes_in_found_modules_per_module_gene)
-        @assert n_module_genes > 0
-
-        @views fraction_per_region_cell_per_module_gene =
-            fraction_per_region_cell_per_gene_in_found_module[:, position_in_genes_in_found_modules_per_module_gene]
-        fraction_per_region_cell_per_found_module[:, found_module_position] =
-            vec(sum(fraction_per_region_cell_per_module_gene; dims = 2))
+    mean_linear_fraction_in_neighborhood_cells_per_module::AbstractVector{<:AbstractFloat},
+    std_linear_fraction_in_neighborhood_cells_per_module::AbstractVector{<:AbstractFloat},
+)::Nothing
+    z_score_per_found_module_per_region_cell .= 0
+    @foreach_true_index_position is_found_per_module module_index found_module_position begin
+        @foreach_true_index_position is_in_region_per_cell cell_index region_cell_position begin
+            @foreach_true_index_position (module_index_per_gene .== module_index) gene_index module_gene_position begin
+                z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] +=
+                    UMIs_per_cell_per_gene[cell_index, gene_index]
+            end
+            z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] /=
+                total_UMIs_per_cell[cell_index]
+        end
+        mean_linear_fraction_in_neighborhood_cells = mean_linear_fraction_in_neighborhood_cells_per_module[module_index]
+        std_linear_fraction_in_neighborhood_cells = std_linear_fraction_in_neighborhood_cells_per_module[module_index]
+        z_score_per_found_module_per_region_cell[found_module_position, :] .-=
+            mean_linear_fraction_in_neighborhood_cells
+        z_score_per_found_module_per_region_cell[found_module_position, :] ./= std_linear_fraction_in_neighborhood_cells
     end
-
-    return flipped(fraction_per_region_cell_per_found_module)
+    return nothing
 end
 
 function kmeans_with_sizes(

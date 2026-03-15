@@ -27,7 +27,7 @@
 </g>
 </g>
 <!-- Gmara&#45;&gt;AnalyzeGenes -->
-<g id="edge7" class="edge">
+<g id="edge6" class="edge">
 <title>Gmara&#45;&gt;AnalyzeGenes</title>
 <path fill="none" stroke="black" d="M47.31,-111.89C75.01,-103.25 121.23,-88.84 154.5,-78.46"/>
 <polygon fill="black" stroke="black" points="155.29,-81.88 163.79,-75.57 153.2,-75.2 155.29,-81.88"/>
@@ -66,7 +66,7 @@
 </g>
 </g>
 <!-- Contracts&#45;&gt;AnalyzeMetacells -->
-<g id="edge2" class="edge">
+<g id="edge3" class="edge">
 <title>Contracts&#45;&gt;AnalyzeMetacells</title>
 <path fill="none" stroke="black" d="M373.59,-165.57C394.22,-157.11 425.32,-144.36 448.84,-134.71"/>
 <polygon fill="black" stroke="black" points="450.05,-138 457.97,-130.96 447.39,-131.52 450.05,-138"/>
@@ -111,7 +111,7 @@
 </g>
 </g>
 <!-- Contracts&#45;&gt;ProjectCells -->
-<g id="edge10" class="edge">
+<g id="edge11" class="edge">
 <title>Contracts&#45;&gt;ProjectCells</title>
 <path fill="none" stroke="black" d="M383.04,-167.65C423.79,-158.63 495.23,-142.83 543.2,-132.21"/>
 <polygon fill="black" stroke="black" points="543.77,-135.67 552.78,-130.1 542.26,-128.84 543.77,-135.67"/>
@@ -132,7 +132,7 @@
 <polygon fill="black" stroke="black" points="485.04,-86.49 481.54,-76.49 478.04,-86.49 485.04,-86.49"/>
 </g>
 <!-- AnalyzeMetacells&#45;&gt;AnalyzeGenes -->
-<g id="edge6" class="edge">
+<g id="edge7" class="edge">
 <title>AnalyzeMetacells&#45;&gt;AnalyzeGenes</title>
 <path fill="none" stroke="black" d="M432.52,-110.19C382.71,-100.94 305.54,-86.6 252.67,-76.78"/>
 <polygon fill="black" stroke="black" points="253.4,-73.36 242.93,-74.97 252.12,-80.24 253.4,-73.36"/>
@@ -147,13 +147,13 @@
 </g>
 </g>
 <!-- Defaults&#45;&gt;AnalyzeMetacells -->
-<g id="edge3" class="edge">
+<g id="edge2" class="edge">
 <title>Defaults&#45;&gt;AnalyzeMetacells</title>
 <path fill="none" stroke="black" d="M527.45,-165.82C519.7,-158.3 508.32,-147.27 498.84,-138.07"/>
 <polygon fill="black" stroke="black" points="501.52,-135.8 491.9,-131.35 496.64,-140.82 501.52,-135.8"/>
 </g>
 <!-- Defaults&#45;&gt;ProjectCells -->
-<g id="edge11" class="edge">
+<g id="edge10" class="edge">
 <title>Defaults&#45;&gt;ProjectCells</title>
 <path fill="none" stroke="black" d="M546.03,-165.57C553.97,-158.02 565.48,-147.06 575.07,-137.93"/>
 <polygon fill="black" stroke="black" points="577.25,-140.69 582.08,-131.26 572.42,-135.62 577.25,-140.69"/>
