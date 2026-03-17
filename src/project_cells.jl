@@ -845,7 +845,7 @@ $(CONTRACT2)
             if n_neighborhood_query_cells > 0
                 @warn "Ignoring too few query cells: $(n_neighborhood_query_cells) for the neighborhood of the atlas block: $(name_per_atlas_block[atlas_block_index])"
             end
-            next!(progress; step = n_common_included_genes)  # NOJET # NOLINT
+            next!(progress; step = n_common_included_genes)  # NOJET
 
         else
             atlas_metacell_index_per_neighborhood_query_cell =

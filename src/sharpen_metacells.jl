@@ -493,8 +493,7 @@ function compute_local_clusters(;
 
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
 
-        fraction_per_found_module_per_block_cell =
-            z_score_per_max_module_per_max_block_cell = z_score_per_max_module_per_max_block_cell_per_thread[threadid()]
+        z_score_per_max_module_per_max_block_cell = z_score_per_max_module_per_max_block_cell_per_thread[threadid()]
         @views z_score_per_found_module_per_block_cell =
             z_score_per_max_module_per_max_block_cell[1:n_block_modules, 1:n_block_cells]
         @views mean_linear_fraction_in_neighborhood_cells_per_module =
@@ -604,20 +603,20 @@ function compute_z_score_per_found_module_per_region_cell!(;
     std_linear_fraction_in_neighborhood_cells_per_module::AbstractVector{<:AbstractFloat},
 )::Nothing
     z_score_per_found_module_per_region_cell .= 0
-    @foreach_true_index_position is_found_per_module module_index found_module_position begin
-        @foreach_true_index_position is_in_region_per_cell cell_index region_cell_position begin
-            @foreach_true_index_position (module_index_per_gene .== module_index) gene_index module_gene_position begin
-                z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] +=
-                    UMIs_per_cell_per_gene[cell_index, gene_index]
+    @foreach_true_index_position is_found_per_module module_index found_module_position begin  # NOLINT
+        @foreach_true_index_position is_in_region_per_cell cell_index region_cell_position begin  # NOLINT
+            @foreach_true_index_position (module_index_per_gene .== module_index) gene_index module_gene_position begin  # NOLINT
+                z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] +=  # NOLINT
+                    UMIs_per_cell_per_gene[cell_index, gene_index]  # NOLINT
             end
-            z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] /=
-                total_UMIs_per_cell[cell_index]
+            z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] /=  # NOLINT
+                total_UMIs_per_cell[cell_index]  # NOLINT
         end
-        mean_linear_fraction_in_neighborhood_cells = mean_linear_fraction_in_neighborhood_cells_per_module[module_index]
-        std_linear_fraction_in_neighborhood_cells = std_linear_fraction_in_neighborhood_cells_per_module[module_index]
-        z_score_per_found_module_per_region_cell[found_module_position, :] .-=
+        mean_linear_fraction_in_neighborhood_cells = mean_linear_fraction_in_neighborhood_cells_per_module[module_index]  # NOLINT
+        std_linear_fraction_in_neighborhood_cells = std_linear_fraction_in_neighborhood_cells_per_module[module_index]  # NOLINT
+        z_score_per_found_module_per_region_cell[found_module_position, :] .-=  # NOLINT
             mean_linear_fraction_in_neighborhood_cells
-        z_score_per_found_module_per_region_cell[found_module_position, :] ./= std_linear_fraction_in_neighborhood_cells
+        z_score_per_found_module_per_region_cell[found_module_position, :] ./= std_linear_fraction_in_neighborhood_cells  # NOLINT
     end
     return nothing
 end
