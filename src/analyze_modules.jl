@@ -96,8 +96,13 @@ $(CONTRACT)
         progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "n_genes_per_module_per_block"),
     ) do block_index
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
-        for module_index in 1:n_modules
-            n_genes_per_module_per_block[module_index, block_index] = sum(module_index_per_gene .== module_index)
+        @views n_genes_per_module = n_genes_per_module_per_block[:, block_index]
+        fill!(n_genes_per_module, 0)
+        for gene_index in 1:length(module_index_per_gene)
+            module_index = module_index_per_gene[gene_index]
+            if module_index > 0
+                n_genes_per_module[module_index] += 1
+            end
         end
         return nothing
     end
@@ -242,10 +247,12 @@ $(CONTRACT)
     is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
     block_index_per_cell = daf["@ cell : metacell ?? 0 : block : index"].array
 
+    n_cells, n_genes = size(UMIs_per_cell_per_gene)
     mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
+    is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
+    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:nthreads()]
 
-    # TODO: This does a lot of memory allocations in the parallel loop.
     parallel_loop_wo_rng(
         1:n_blocks;
         progress = DebugProgress(
@@ -253,32 +260,39 @@ $(CONTRACT)
             group = :mcs_loops,
             desc = "stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block",
         ),
+        policy = :static,
     ) do block_index
+        is_in_neighborhood_per_cell = is_in_neighborhood_per_cell_per_thread[threadid()]
+        is_gene_in_module = is_gene_in_module_per_thread[threadid()]
         @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
-        indices_of_neighborhood_cells = findall(
+        is_in_neighborhood_per_cell .=
             (block_index_per_cell .> 0) .&
-            getindex.(Ref(is_in_neighborhood_per_other_block), max.(block_index_per_cell, 1)),
-        )
-        n_neighborhood_cells = length(indices_of_neighborhood_cells)
+            getindex.(Ref(is_in_neighborhood_per_other_block), max.(block_index_per_cell, 1))
+        n_neighborhood_cells = count(is_in_neighborhood_per_cell)
         @assert n_neighborhood_cells > 0
 
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
         for module_index in 1:n_modules
-            indices_of_module_genes = findall(module_index_per_gene .== module_index)
-            if length(indices_of_module_genes) == 0
-                mean_linear_fraction_per_module_per_block[module_index, block_index] = 0
-                std_linear_fraction_per_module_per_block[module_index, block_index] = 0
+            @. is_gene_in_module = module_index_per_gene == module_index
+            sum_fractions = 0.0
+            sum_squared_fractions = 0.0
+            @foreach_true_index is_in_neighborhood_per_cell cell_index begin
+                module_UMIs = 0
+                @foreach_true_index is_gene_in_module gene_index begin
+                    module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]
+                end
+                fraction = module_UMIs / Float64(total_UMIs_per_cell[cell_index])
+                sum_fractions += fraction
+                sum_squared_fractions += fraction * fraction
+            end
+            mean_fraction = sum_fractions / n_neighborhood_cells
+            mean_linear_fraction_per_module_per_block[module_index, block_index] = Float32(mean_fraction)
+            std_linear_fraction_per_module_per_block[module_index, block_index] = if n_neighborhood_cells > 1
+                Float32(
+                sqrt(max((sum_squared_fractions - sum_fractions * mean_fraction) / (n_neighborhood_cells - 1), 0.0)),
+            )
             else
-                module_UMIs_per_neighborhood_cell =
-                    vec(sum(UMIs_per_cell_per_gene[indices_of_neighborhood_cells, indices_of_module_genes]; dims = 2))
-                @assert_vector(module_UMIs_per_neighborhood_cell, n_neighborhood_cells)
-
-                linear_fraction_per_neighborhood_cell =
-                    module_UMIs_per_neighborhood_cell ./ total_UMIs_per_cell[indices_of_neighborhood_cells]
-                mean_linear_fraction_per_module_per_block[module_index, block_index] =
-                    mean(linear_fraction_per_neighborhood_cell)  # NOLINT
-                std_linear_fraction_per_module_per_block[module_index, block_index] =
-                    std(linear_fraction_per_neighborhood_cell)  # NOLINT
+                0.0f0
             end
         end
         return nothing

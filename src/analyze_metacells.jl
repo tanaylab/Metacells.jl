@@ -452,6 +452,7 @@ $(CONTRACT)
     gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread =
         [Vector{Float32}(undef, n_grouped_cells) for _ in 1:nthreads()]
 
+    todox_all_zero = Atomic{Int32}(0)
     parallel_loop_wo_rng(
         1:n_included_genes;
         policy = :static,
@@ -468,17 +469,43 @@ $(CONTRACT)
         gene_punctuated_metacell_log_fraction_per_grouped_cell =
             gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread[threadid()]
 
+        all_zero_grouped_cell_UMIs = true
+        for grouped_cell_position in 1:n_grouped_cells
+            if UMIs_per_cell_per_gene[indices_of_grouped_cells[grouped_cell_position], gene_index] > 0
+                all_zero_grouped_cell_UMIs = false
+                break
+            end
+        end
+        if all_zero_grouped_cell_UMIs
+            atomic_add!(todox_all_zero, Int32(1))
+            correlation_between_cells_and_punctuated_metacells_per_gene[gene_index] = 0.0f0
+            return nothing
+        end
+
+        all_zero_grouped_punctuated_metacell_UMIs = true
+        for grouped_cell_position in 1:n_grouped_cells
+            cell_index = indices_of_grouped_cells[grouped_cell_position]
+            metacell_index = metacell_index_per_grouped_cell[grouped_cell_position]
+            if UMIs_per_metacell_per_gene[metacell_index, gene_index] > UMIs_per_cell_per_gene[cell_index, gene_index]
+                all_zero_grouped_punctuated_metacell_UMIs = false
+                break
+            end
+        end
+        if all_zero_grouped_punctuated_metacell_UMIs
+            atomic_add!(todox_all_zero, Int32(1))
+            correlation_between_cells_and_punctuated_metacells_per_gene[gene_index] = 0.0f0
+            return nothing
+        end
+
         for (grouped_cell_position, cell_index) in enumerate(indices_of_grouped_cells)
+            metacell_index = metacell_index_per_grouped_cell[grouped_cell_position]
             gene_cell_UMIs = UMIs_per_cell_per_gene[cell_index, gene_index]
+            gene_metacell_UMIs = UMIs_per_metacell_per_gene[metacell_index, gene_index]
             gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] =
                 log2(gene_cell_UMIs / total_UMIs_per_grouped_cell[grouped_cell_position] + gene_fraction_regularization)
-            metacell_index = metacell_index_per_grouped_cell[grouped_cell_position]
-            gene_metacell_UMIs = UMIs_per_metacell_per_gene[metacell_index, gene_index]
             gene_punctuated_metacell_log_fraction_per_grouped_cell[grouped_cell_position] = log2(
-                (
-                    (gene_metacell_UMIs .- gene_cell_UMIs) /
-                    total_punctuated_metacell_UMIs_per_grouped_cell[grouped_cell_position]
-                ) .+ gene_fraction_regularization,
+                (gene_metacell_UMIs - gene_cell_UMIs) / total_punctuated_metacell_UMIs_per_grouped_cell[grouped_cell_position] +
+                gene_fraction_regularization,
             )
         end
 
@@ -490,6 +517,7 @@ $(CONTRACT)
         return nothing
     end
 
+    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_included_genes) ($(percent(todox_all_zero[], n_included_genes)))" _group = :todox
     set_vector!(
         daf,
         "gene",

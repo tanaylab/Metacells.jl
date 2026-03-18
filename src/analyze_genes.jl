@@ -149,6 +149,7 @@ $(CONTRACT)
 
     is_correlated_with_skeleton_per_gene = zeros(Bool, n_genes)
     correlation_per_skeleton_per_marker = Matrix{Float32}(undef, n_skeletons, n_markers)
+    max_correlation_per_marker = Vector{Float32}(undef, n_markers)
     scratch_per_metacell_per_skeleton = Matrix{Float32}(undef, n_metacells, n_skeletons)
     scratch_per_metacell_per_marker = Matrix{Float32}(undef, n_metacells, n_markers)
     scratch_per_skeleton = Vector{Float32}(undef, n_skeletons)
@@ -164,6 +165,7 @@ $(CONTRACT)
         log_fraction_per_metacell_per_marker,
         is_correlated_with_skeleton_per_gene,
         correlation_per_skeleton_per_marker,
+        max_correlation_per_marker,
         scratch_per_metacell_per_skeleton,
         scratch_per_metacell_per_marker,
         scratch_per_skeleton,
@@ -186,6 +188,7 @@ function fill_vector_of_is_correlated_with_skeleton_per_gene!(;  # NOJET
     log_fraction_per_metacell_per_marker::AbstractMatrix{<:AbstractFloat},
     is_correlated_with_skeleton_per_gene::AbstractVector{Bool},
     correlation_per_skeleton_per_marker::AbstractMatrix{<:AbstractFloat},
+    max_correlation_per_marker::AbstractVector{<:AbstractFloat},
     scratch_per_metacell_per_skeleton::AbstractMatrix{<:AbstractFloat},
     scratch_per_metacell_per_marker::AbstractMatrix{<:AbstractFloat},
     scratch_per_skeleton::AbstractVector{<:AbstractFloat},
@@ -206,7 +209,10 @@ function fill_vector_of_is_correlated_with_skeleton_per_gene!(;  # NOJET
         right_scratch_row = scratch_per_marker,
     )
 
-    max_correlation_per_marker = vec(maximum(correlation_per_skeleton_per_marker; dims = 1))
+    for marker_position in 1:n_markers
+        max_correlation_per_marker[marker_position] =
+            maximum(@view correlation_per_skeleton_per_marker[:, marker_position])
+    end
     @assert_vector(max_correlation_per_marker, n_markers)
 
     quantile_correlation_per_marker = scratch_per_marker

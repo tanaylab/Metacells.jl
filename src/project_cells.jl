@@ -556,13 +556,16 @@ $(CONTRACT2)
     gene_metacell_log_fraction_per_included_query_cell_per_thread =
         [Vector{Float32}(undef, n_included_query_cells) for _ in 1:nthreads()]
 
+    todox_all_zero = Atomic{Int32}(0)
     parallel_loop_wo_rng(
         1:n_common_included_genes;
+        policy = :static,
         progress = DebugProgress(
             n_common_included_genes;
             group = :mcs_loops,
             desc = "correlation_between_cells_and_projected_metacells",
         ),
+        progress_chunk = 100,
     ) do common_included_gene_position
         atlas_gene_index = indices_of_common_included_atlas_genes[common_included_gene_position]
         query_gene_index = indices_of_common_included_query_genes[common_included_gene_position]
@@ -572,19 +575,43 @@ $(CONTRACT2)
         gene_metacell_log_fraction_per_included_query_cell =
             gene_metacell_log_fraction_per_included_query_cell_per_thread[threadid()]
 
+        all_zero_included_query_cell_UMIs = true
+        for included_query_cell_position in 1:n_included_query_cells
+            if UMIs_per_query_cell_per_gene[indices_of_included_query_cells[included_query_cell_position], query_gene_index] > 0
+                all_zero_included_query_cell_UMIs = false
+                break
+            end
+        end
+        if all_zero_included_query_cell_UMIs
+            atomic_add!(todox_all_zero, Int32(1))
+            correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = 0.0f0
+            return nothing
+        end
+
+        all_zero_included_atlas_metacell_UMIs = true
+        for included_query_cell_position in 1:n_included_query_cells
+            if UMIs_per_atlas_metacell_per_gene[atlas_metacell_index_per_included_query_cell[included_query_cell_position], atlas_gene_index] > 0
+                all_zero_included_atlas_metacell_UMIs = false
+                break
+            end
+        end
+        if all_zero_included_atlas_metacell_UMIs
+            atomic_add!(todox_all_zero, Int32(1))
+            correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = 0.0f0
+            return nothing
+        end
+
         for included_query_cell_position in 1:n_included_query_cells
             atlas_metacell_index = atlas_metacell_index_per_included_query_cell[included_query_cell_position]
             query_cell_index = indices_of_included_query_cells[included_query_cell_position]
-
             atlas_metacell_UMIs = UMIs_per_atlas_metacell_per_gene[atlas_metacell_index, atlas_gene_index]
             query_cell_UMIs = UMIs_per_query_cell_per_gene[query_cell_index, query_gene_index]
-
             gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position] = log2(
                 atlas_metacell_UMIs / total_UMIs_per_atlas_metacell[atlas_metacell_index] +
                 gene_fraction_regularization,
             )
             gene_cell_log_fraction_per_included_query_cell[included_query_cell_position] =
-                log2(query_cell_UMIs ./ total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization)
+                log2(query_cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization)
         end
 
         correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = zero_cor_between_vectors(
@@ -595,6 +622,7 @@ $(CONTRACT2)
         return nothing
     end
 
+    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_common_included_genes) ($(percent(todox_all_zero[], n_common_included_genes)))" _group = :todox
     set_vector!(
         query_daf,
         "gene",
@@ -831,6 +859,7 @@ $(CONTRACT2)
         end
     end
 
+    todox_all_zero = Atomic{Int32}(0)
     for atlas_block_index in 1:n_atlas_blocks
         @views is_in_neighborhood_per_other_block =
             is_in_neighborhood_per_other_block_per_base_block[:, atlas_block_index]
@@ -873,20 +902,51 @@ $(CONTRACT2)
                 @views projected_metacell_log_fraction_per_neighborhood_query_cell =
                     projected_metacell_log_fraction_per_max_neighborhood_query_cell[1:n_neighborhood_query_cells]
 
+                all_zero_neighborhood_query_cell_UMIs = true
+                for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
+                    if UMIs_per_query_cell_per_gene[indices_of_neighborhood_query_cells[neighborhood_query_cell_position], query_gene_index] > 0
+                        all_zero_neighborhood_query_cell_UMIs = false
+                        break
+                    end
+                end
+                if all_zero_neighborhood_query_cell_UMIs
+                    atomic_add!(todox_all_zero, Int32(1))
+                    correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
+                        query_gene_index,
+                        atlas_block_index,
+                    ] = 0.0f0
+                    return nothing
+                end
+
+                all_zero_neighborhood_projected_metacell_UMIs = true
+                for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
+                    if UMIs_per_atlas_metacell_per_gene[atlas_metacell_index_per_neighborhood_query_cell[neighborhood_query_cell_position], atlas_gene_index] > 0
+                        all_zero_neighborhood_projected_metacell_UMIs = false
+                        break
+                    end
+                end
+                if all_zero_neighborhood_projected_metacell_UMIs
+                    atomic_add!(todox_all_zero, Int32(1))
+                    correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
+                        query_gene_index,
+                        atlas_block_index,
+                    ] = 0.0f0
+                    return nothing
+                end
+
                 for (neighborhood_query_cell_position, query_cell_index) in
                     enumerate(indices_of_neighborhood_query_cells)
                     cell_UMIs = UMIs_per_query_cell_per_gene[query_cell_index, query_gene_index]
-                    cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
-                        log2(cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization)
                     atlas_metacell_index =
                         atlas_metacell_index_per_neighborhood_query_cell[neighborhood_query_cell_position]
                     projected_metacell_UMIs = UMIs_per_atlas_metacell_per_gene[atlas_metacell_index, atlas_gene_index]
+                    cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
+                        log2(cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization)
                     projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
                         log2(
-                            (
-                                projected_metacell_UMIs /
-                                total_atlas_metacell_UMIs_per_neighborhood_query_cell[neighborhood_query_cell_position]
-                            ) + gene_fraction_regularization,
+                            projected_metacell_UMIs /
+                            total_atlas_metacell_UMIs_per_neighborhood_query_cell[neighborhood_query_cell_position] +
+                            gene_fraction_regularization,
                         )
                 end
 
@@ -977,6 +1037,7 @@ $(CONTRACT2)
             end
         end
     end
+    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_atlas_blocks * n_common_included_genes) ($(percent(todox_all_zero[], n_atlas_blocks * n_common_included_genes)))" _group = :todox
 
     set_matrix!(
         query_daf,

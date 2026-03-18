@@ -10,7 +10,6 @@ using Clustering
 using DataAxesFormats
 using Random
 using SparseArrays
-using StatsBase
 using TanayLabUtilities
 
 using ..Contracts
@@ -233,10 +232,19 @@ function compute_preferred_block_index_per_cell_per_block(;
     preferred_block_index_per_cell_per_block = Vector{Maybe{SparseVector{<:Integer}}}(undef, n_blocks)
     preferred_block_index_per_cell_per_block .= nothing
 
+    n_genes = size(module_index_per_gene_per_block, 1)
+
     z_score_per_max_module_per_max_neighborhood_cell_per_thread =
         [Matrix{Float32}(undef, max_n_block_modules, max_n_neighborhood_cells) for _ in 1:nthreads()]
     is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
     is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:nthreads()]
+    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:nthreads()]
+    max_n_neighborhood_clusters = maximum(
+        max(Int(round(n_neighborhood_cells_per_block[b] / mean_metacell_cells_per_block[b])), 1) for b in 1:n_blocks
+    )
+    preferred_block_index_per_cluster_per_thread =
+        [Vector{Int}(undef, max_n_neighborhood_clusters) for _ in 1:nthreads()]
+    block_count_scratch_per_thread = [zeros(Int, n_blocks) for _ in 1:nthreads()]
 
     parallel_loop_with_rng(
         1:n_blocks;
@@ -270,6 +278,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             mean_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
         @views std_linear_fraction_in_neighborhood_cells_per_module =
             std_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
+        is_gene_in_module = is_gene_in_module_per_thread[threadid()]
 
         compute_z_score_per_found_module_per_region_cell!(;
             z_score_per_found_module_per_region_cell = z_score_per_found_module_per_neighborhood_cell,
@@ -278,6 +287,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             is_found_per_module,
             is_in_region_per_cell = is_in_neighborhood_per_cell,
             module_index_per_gene,
+            is_gene_in_module,
             mean_linear_fraction_in_neighborhood_cells_per_module,
             std_linear_fraction_in_neighborhood_cells_per_module,
         )
@@ -294,15 +304,19 @@ function compute_preferred_block_index_per_cell_per_block(;
         cluster_index_per_neighborhood_cell = assignments(kmeans_result)
         n_cells_per_cluster = counts(kmeans_result)
 
-        block_index_per_neighborhood_cell = block_index_per_cell[indices_of_neighborhood_cells]
+        preferred_block_index_per_cluster = preferred_block_index_per_cluster_per_thread[threadid()]
+        count_per_block = block_count_scratch_per_thread[threadid()]
 
         preferred_block_index_per_neighborhood_cell = pick_preferred_block_index_per_neighborhood_cell(;
             block_index,
             min_migration_likelihood,
             n_cells_per_block,
-            block_index_per_neighborhood_cell,
+            block_index_per_cell,
+            indices_of_neighborhood_cells,
             cluster_index_per_neighborhood_cell,
             n_cells_per_cluster,
+            preferred_block_index_per_cluster,
+            count_per_block,
         )
 
         preferred_block_index_per_cell_per_block[block_index] =
@@ -318,28 +332,48 @@ function pick_preferred_block_index_per_neighborhood_cell(;
     block_index::Integer,
     min_migration_likelihood::AbstractFloat,
     n_cells_per_block::AbstractVector{<:Integer},
-    block_index_per_neighborhood_cell::AbstractVector{<:Integer},
+    block_index_per_cell::AbstractVector{<:Integer},
+    indices_of_neighborhood_cells::AbstractVector{<:Integer},
     cluster_index_per_neighborhood_cell::AbstractVector{<:Integer},
     n_cells_per_cluster::AbstractVector{<:Integer},
+    preferred_block_index_per_cluster::AbstractVector{<:Integer},
+    count_per_block::AbstractVector{<:Integer},
 )::AbstractVector{<:Integer}
     n_block_cells = n_cells_per_block[block_index]
-
     n_clusters = length(n_cells_per_cluster)
-    preferred_block_index_per_cluster = zeros(Int, n_clusters)
+    n_neighborhood_cells = length(indices_of_neighborhood_cells)
+
+    @views preferred_block_index_per_cluster[1:n_clusters] .= 0
 
     for cluster_index in 1:n_clusters
-        is_in_cluster_per_neighborhood_cell = cluster_index_per_neighborhood_cell .== cluster_index
-        block_index_per_cluster_cell = block_index_per_neighborhood_cell[is_in_cluster_per_neighborhood_cell]
-        n_block_cells_in_cluster = sum(block_index_per_cluster_cell .== block_index)
+        fill!(count_per_block, 0)
+        n_block_cells_in_cluster = 0
+
+        for i in 1:n_neighborhood_cells
+            if cluster_index_per_neighborhood_cell[i] == cluster_index
+                block_index = block_index_per_cell[indices_of_neighborhood_cells[i]]
+                count_per_block[block_index] += 1
+                if block_index == block_index
+                    n_block_cells_in_cluster += 1
+                end
+            end
+        end
 
         if n_block_cells_in_cluster > 0
-            most_frequent_block_index = mode(block_index_per_neighborhood_cell[is_in_cluster_per_neighborhood_cell])
+            most_frequent_block_index = block_index
+            most_frequent_count = n_block_cells_in_cluster
+            for block_index in eachindex(count_per_block)
+                if count_per_block[block_index] > most_frequent_count
+                    most_frequent_count = count_per_block[block_index]
+                    most_frequent_block_index = block_index
+                end
+            end
+
             if most_frequent_block_index == block_index
                 preferred_block_index_per_cluster[cluster_index] = most_frequent_block_index
             else
-                n_most_frequent_block_cells = length(n_cells_per_block[most_frequent_block_index])
-                n_most_frequent_block_cells_in_cluster = sum(block_index_per_cluster_cell .== most_frequent_block_index)
-
+                n_most_frequent_block_cells = n_cells_per_block[most_frequent_block_index]
+                n_most_frequent_block_cells_in_cluster = most_frequent_count
                 n_cluster_cells = n_cells_per_cluster[cluster_index]
 
                 block_fraction_in_cluster = n_block_cells_in_cluster / n_cluster_cells
@@ -371,7 +405,6 @@ function compute_preferred_block_index_of_cells(;
     n_cells = length(block_index_per_cell)
 
     n_stationary = Atomic{Int}(0)
-    n_restless = Atomic{Int}(0)
     n_restless = Atomic{Int}(0)
     n_migrated = Atomic{Int}(0)
 
@@ -434,7 +467,7 @@ end
 @kwdef struct LocalClusters
     block_cell_indices::AbstractVector{<:Integer}
     cluster_index_per_block_cell::AbstractVector{<:Integer}
-    is_too_small_per_cluster::Union{AbstractVector{Bool}, BitVector}
+    is_too_small_per_cluster::BitVector
 end
 
 function compute_local_clusters(;
@@ -463,8 +496,11 @@ function compute_local_clusters(;
     n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
     max_n_block_modules = maximum(n_modules_per_block)
 
+    n_genes = size(module_index_per_gene_per_block, 1)
+
     is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:nthreads()]
     is_in_block_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
+    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:nthreads()]
     z_score_per_max_module_per_max_block_cell_per_thread =
         [Matrix{Float32}(undef, max_n_block_modules, max_n_block_cells) for _ in 1:nthreads()]
 
@@ -508,6 +544,7 @@ function compute_local_clusters(;
             is_found_per_module,
             is_in_region_per_cell = is_in_block_per_cell,
             module_index_per_gene,
+            is_gene_in_module = is_gene_in_module_per_thread[threadid()],
             mean_linear_fraction_in_neighborhood_cells_per_module,
             std_linear_fraction_in_neighborhood_cells_per_module,
         )
@@ -557,8 +594,8 @@ function combine_local_clusters(;
     for local_clusters in local_clusters_per_block
         if local_clusters !== nothing
             n_total_new_metacells += length(local_clusters.is_too_small_per_cluster)
-            for too_small_cluster_index in findall(local_clusters.is_too_small_per_cluster)
-                n_new_outlier_cells += sum(local_clusters.cluster_index_per_block_cell .== too_small_cluster_index)
+            @foreach_true_index local_clusters.is_too_small_per_cluster cluster_index begin
+                n_new_outlier_cells += sum(local_clusters.cluster_index_per_block_cell .== cluster_index)
             end
         end
     end
@@ -599,13 +636,15 @@ function compute_z_score_per_found_module_per_region_cell!(;
     is_found_per_module::BitVector,
     is_in_region_per_cell::BitVector,
     module_index_per_gene::AbstractVector{<:Integer},
+    is_gene_in_module::BitVector,
     mean_linear_fraction_in_neighborhood_cells_per_module::AbstractVector{<:AbstractFloat},
     std_linear_fraction_in_neighborhood_cells_per_module::AbstractVector{<:AbstractFloat},
 )::Nothing
     z_score_per_found_module_per_region_cell .= 0
     @foreach_true_index_position is_found_per_module module_index found_module_position begin  # NOLINT
+        @. is_gene_in_module = module_index_per_gene == module_index  # NOLINT
         @foreach_true_index_position is_in_region_per_cell cell_index region_cell_position begin  # NOLINT
-            @foreach_true_index_position (module_index_per_gene .== module_index) gene_index module_gene_position begin  # NOLINT
+            @foreach_true_index is_gene_in_module gene_index begin  # NOLINT
                 z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] +=  # NOLINT
                     UMIs_per_cell_per_gene[cell_index, gene_index]  # NOLINT
             end
@@ -687,7 +726,6 @@ function kmeans_with_sizes(
             new_centers = Vector{AbstractVector{<:AbstractFloat}}()
             for split_cluster_index in indices_of_split_clusters
                 indices_of_points_in_split_cluster = findall(clusters_of_points .== split_cluster_index)
-                Random.seed!(rng, 123456)
                 split_result = flame_timed("kmeans") do
                     return kmeans(values_of_points[:, indices_of_points_in_split_cluster], 2; rng)
                 end
