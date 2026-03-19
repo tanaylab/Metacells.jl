@@ -13,6 +13,7 @@ export rank_variables
 
 using DataAxesFormats
 using LinearAlgebra
+using LoopVectorization
 using TanayLabUtilities
 using StatsBase
 using Random
@@ -336,14 +337,26 @@ $(CONTRACT)
     is_marker_per_gene = get_vector(daf, "gene", "is_marker")
     n_markers = sum(is_marker_per_gene)
 
-    log_fraction_per_metacell_per_marker = daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array
+    log_fraction_per_metacell_per_marker = densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array)
     @assert_matrix(log_fraction_per_metacell_per_marker, n_metacells, n_markers, Columns)
 
-    median_log_fraction_per_marker = daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"].array
+    median_log_fraction_per_marker =
+        densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"].array)
     @assert_vector(median_log_fraction_per_marker, n_markers)
 
     abs_fold_per_metacell_per_marker =  # NOJET
-        abs.(log_fraction_per_metacell_per_marker .- transpose(median_log_fraction_per_marker))
+        Matrix{Float32}(undef, size(log_fraction_per_metacell_per_marker))
+    @assert LoopVectorization.check_args(
+        abs_fold_per_metacell_per_marker,
+        log_fraction_per_metacell_per_marker,
+        median_log_fraction_per_marker,
+    ) "check_args failed in compute_vector_of_marker_rank_per_gene!"
+    @turbo for j in axes(log_fraction_per_metacell_per_marker, 2)
+        for i in axes(log_fraction_per_metacell_per_marker, 1)
+            abs_fold_per_metacell_per_marker[i, j] =
+                abs(log_fraction_per_metacell_per_marker[i, j] - median_log_fraction_per_marker[j])
+        end
+    end
     abs_fold_per_marker_per_metacell = flipped(abs_fold_per_metacell_per_marker)
 
     rank_per_marker = rank_variables(abs_fold_per_marker_per_metacell)

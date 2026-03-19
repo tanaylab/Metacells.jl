@@ -11,6 +11,7 @@ using Base.Threads
 using DataAxesFormats
 using Distances
 using LinearAlgebra
+using LoopVectorization
 using ProgressMeter
 using StatsBase
 using TanayLabUtilities
@@ -182,9 +183,22 @@ function compute_provisional_projection_per_query_cell!(;
     is_excluded_per_query_cell = get_vector(query_daf, "cell", "is_excluded").array
 
     linear_fraction_per_block_per_pertinent_marker =
-        atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
-    log_linear_fraction_per_pertinent_marker_per_block =
-        log2.(flip(linear_fraction_per_block_per_pertinent_marker) .+ gene_fraction_regularization)
+        densify(atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array)
+    log_linear_fraction_per_pertinent_marker_per_block = Matrix{Float32}(
+        undef,
+        size(linear_fraction_per_block_per_pertinent_marker, 2),
+        size(linear_fraction_per_block_per_pertinent_marker, 1),
+    )
+    @assert LoopVectorization.check_args(
+        log_linear_fraction_per_pertinent_marker_per_block,
+        linear_fraction_per_block_per_pertinent_marker,
+    ) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)"
+    @turbo for j in axes(linear_fraction_per_block_per_pertinent_marker, 1)
+        for i in axes(linear_fraction_per_block_per_pertinent_marker, 2)
+            log_linear_fraction_per_pertinent_marker_per_block[i, j] =
+                log2(linear_fraction_per_block_per_pertinent_marker[j, i] + gene_fraction_regularization)
+        end
+    end
 
     n_query_cells = axis_length(query_daf, "cell")
 
@@ -209,9 +223,13 @@ function compute_provisional_projection_per_query_cell!(;
 
             log_linear_fraction_per_pertinent_marker = log_linear_fraction_per_pertinent_marker_per_thread[threadid()]
             for gene_position in 1:n_pertinent_neighborhood_markers
-                log_linear_fraction_per_pertinent_marker[gene_position] = log2(
-                    UMIs_per_pertinent_marker[gene_position] / total_query_cell_UMIs + gene_fraction_regularization,
-                )
+                log_linear_fraction_per_pertinent_marker[gene_position] =
+                    UMIs_per_pertinent_marker[gene_position] / total_query_cell_UMIs
+            end
+            @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker) "check_args failed in compute_provisional_projection_per_query_cell! (log2)"
+            @turbo for gene_position in 1:n_pertinent_neighborhood_markers
+                log_linear_fraction_per_pertinent_marker[gene_position] =
+                    log2(log_linear_fraction_per_pertinent_marker[gene_position] + gene_fraction_regularization)
             end
 
             distances_to_blocks = flame_timed("pairwise.Euclidean") do
@@ -519,6 +537,7 @@ $(CONTRACT2)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
 )::Nothing
+    gene_fraction_regularization = Float32(gene_fraction_regularization)
     n_genes_in_atlas = axis_length(atlas_daf, "gene")
     n_genes_in_query = axis_length(query_daf, "gene")
 
@@ -577,7 +596,10 @@ $(CONTRACT2)
 
         all_zero_included_query_cell_UMIs = true
         for included_query_cell_position in 1:n_included_query_cells
-            if UMIs_per_query_cell_per_gene[indices_of_included_query_cells[included_query_cell_position], query_gene_index] > 0
+            if UMIs_per_query_cell_per_gene[
+                indices_of_included_query_cells[included_query_cell_position],
+                query_gene_index,
+            ] > 0
                 all_zero_included_query_cell_UMIs = false
                 break
             end
@@ -590,7 +612,10 @@ $(CONTRACT2)
 
         all_zero_included_atlas_metacell_UMIs = true
         for included_query_cell_position in 1:n_included_query_cells
-            if UMIs_per_atlas_metacell_per_gene[atlas_metacell_index_per_included_query_cell[included_query_cell_position], atlas_gene_index] > 0
+            if UMIs_per_atlas_metacell_per_gene[
+                atlas_metacell_index_per_included_query_cell[included_query_cell_position],
+                atlas_gene_index,
+            ] > 0
                 all_zero_included_atlas_metacell_UMIs = false
                 break
             end
@@ -606,12 +631,20 @@ $(CONTRACT2)
             query_cell_index = indices_of_included_query_cells[included_query_cell_position]
             atlas_metacell_UMIs = UMIs_per_atlas_metacell_per_gene[atlas_metacell_index, atlas_gene_index]
             query_cell_UMIs = UMIs_per_query_cell_per_gene[query_cell_index, query_gene_index]
-            gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position] = log2(
-                atlas_metacell_UMIs / total_UMIs_per_atlas_metacell[atlas_metacell_index] +
-                gene_fraction_regularization,
-            )
+            gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position] =
+                atlas_metacell_UMIs / total_UMIs_per_atlas_metacell[atlas_metacell_index] + gene_fraction_regularization
             gene_cell_log_fraction_per_included_query_cell[included_query_cell_position] =
-                log2(query_cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization)
+                query_cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization
+        end
+        @assert LoopVectorization.check_args(
+            gene_metacell_log_fraction_per_included_query_cell,
+            gene_cell_log_fraction_per_included_query_cell,
+        ) "check_args failed in compute_vector_of_correlation_between_cells_and_projected_metacells!"
+        @turbo for included_query_cell_position in 1:n_included_query_cells
+            gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position] =
+                log2(gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position])
+            gene_cell_log_fraction_per_included_query_cell[included_query_cell_position] =
+                log2(gene_cell_log_fraction_per_included_query_cell[included_query_cell_position])
         end
 
         correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = zero_cor_between_vectors(
@@ -622,7 +655,8 @@ $(CONTRACT2)
         return nothing
     end
 
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_common_included_genes) ($(percent(todox_all_zero[], n_common_included_genes)))" _group = :todox
+    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_common_included_genes) ($(percent(todox_all_zero[], n_common_included_genes)))" _group =
+        :todox
     set_vector!(
         query_daf,
         "gene",
@@ -709,6 +743,7 @@ $(CONTRACT2)
     bin::Maybe{Integer} = nothing,
 )::Nothing
     @assert 0 <= gene_fraction_regularization <= 1
+    gene_fraction_regularization = Float32(gene_fraction_regularization)
     @assert min_neighborhood_query_cells > 1
 
     if has_axis(query_daf, "projected_block")
@@ -904,7 +939,10 @@ $(CONTRACT2)
 
                 all_zero_neighborhood_query_cell_UMIs = true
                 for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
-                    if UMIs_per_query_cell_per_gene[indices_of_neighborhood_query_cells[neighborhood_query_cell_position], query_gene_index] > 0
+                    if UMIs_per_query_cell_per_gene[
+                        indices_of_neighborhood_query_cells[neighborhood_query_cell_position],
+                        query_gene_index,
+                    ] > 0
                         all_zero_neighborhood_query_cell_UMIs = false
                         break
                     end
@@ -920,7 +958,10 @@ $(CONTRACT2)
 
                 all_zero_neighborhood_projected_metacell_UMIs = true
                 for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
-                    if UMIs_per_atlas_metacell_per_gene[atlas_metacell_index_per_neighborhood_query_cell[neighborhood_query_cell_position], atlas_gene_index] > 0
+                    if UMIs_per_atlas_metacell_per_gene[
+                        atlas_metacell_index_per_neighborhood_query_cell[neighborhood_query_cell_position],
+                        atlas_gene_index,
+                    ] > 0
                         all_zero_neighborhood_projected_metacell_UMIs = false
                         break
                     end
@@ -941,10 +982,21 @@ $(CONTRACT2)
                         atlas_metacell_index_per_neighborhood_query_cell[neighborhood_query_cell_position]
                     projected_metacell_UMIs = UMIs_per_atlas_metacell_per_gene[atlas_metacell_index, atlas_gene_index]
                     cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
-                        log2(cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization)
+                        cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization
+                    projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
+                        projected_metacell_UMIs
+                end
+                @assert LoopVectorization.check_args(
+                    cell_log_fraction_per_neighborhood_query_cell,
+                    projected_metacell_log_fraction_per_neighborhood_query_cell,
+                    total_atlas_metacell_UMIs_per_neighborhood_query_cell,
+                ) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!"
+                @turbo for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
+                    cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
+                        log2(cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position])
                     projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
                         log2(
-                            projected_metacell_UMIs /
+                            projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] /
                             total_atlas_metacell_UMIs_per_neighborhood_query_cell[neighborhood_query_cell_position] +
                             gene_fraction_regularization,
                         )
@@ -1037,7 +1089,8 @@ $(CONTRACT2)
             end
         end
     end
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_atlas_blocks * n_common_included_genes) ($(percent(todox_all_zero[], n_atlas_blocks * n_common_included_genes)))" _group = :todox
+    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_atlas_blocks * n_common_included_genes) ($(percent(todox_all_zero[], n_atlas_blocks * n_common_included_genes)))" _group =
+        :todox
 
     set_matrix!(
         query_daf,

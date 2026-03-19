@@ -18,6 +18,7 @@ using Base.Threads
 using DataAxesFormats
 using Distances
 using Distributions
+using LoopVectorization
 using MultipleTesting
 using TanayLabUtilities
 using Random
@@ -196,7 +197,7 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization >= 0
-    fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "linear_fraction").array
+    fraction_per_metacell_per_gene = densify(get_matrix(daf, "metacell", "gene", "linear_fraction").array)
     empty_dense_matrix!(
         daf,
         "metacell",
@@ -205,7 +206,11 @@ $(CONTRACT)
         Float32;
         overwrite,
     ) do log_fraction_per_metacell_per_gene
-        @. log_fraction_per_metacell_per_gene = log2(fraction_per_metacell_per_gene + gene_fraction_regularization)
+        @assert LoopVectorization.check_args(log_fraction_per_metacell_per_gene, fraction_per_metacell_per_gene) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_metacell!"
+        @turbo for i in eachindex(log_fraction_per_metacell_per_gene)
+            log_fraction_per_metacell_per_gene[i] =
+                log2(fraction_per_metacell_per_gene[i] + gene_fraction_regularization)
+        end
         return nothing
     end
     return nothing
@@ -290,27 +295,56 @@ $(CONTRACT)
 
     linear_fraction_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"].array
     linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
-    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
+    total_UMIs_per_metacell = densify(get_vector(daf, "metacell", "total_UMIs").array)
 
     confidence_stds = quantile(Normal(), fold_confidence)
 
     confidence_linear_fractions_per_skeleton_per_metacells =  # NOJET
-        confidence_stds .* sqrt.(linear_fraction_per_skeleton_per_metacell .* transpose(total_UMIs_per_metacell)) ./
-        transpose(total_UMIs_per_metacell)
+        Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell))
+    @assert LoopVectorization.check_args(
+        confidence_linear_fractions_per_skeleton_per_metacells,
+        linear_fraction_per_skeleton_per_metacell,
+        total_UMIs_per_metacell,
+    ) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)"
+    @turbo for j in axes(linear_fraction_per_skeleton_per_metacell, 2)
+        for i in axes(linear_fraction_per_skeleton_per_metacell, 1)
+            confidence_linear_fractions_per_skeleton_per_metacells[i, j] =
+                confidence_stds * sqrt(linear_fraction_per_skeleton_per_metacell[i, j] * total_UMIs_per_metacell[j]) /
+                total_UMIs_per_metacell[j]
+        end
+    end
 
-    low_log_linear_fraction_per_skeleton_per_metacell = # NOJET
-        log2.(
-            max.(
-                linear_fraction_per_skeleton_per_metacell .- confidence_linear_fractions_per_skeleton_per_metacells,
+    low_log_linear_fraction_per_skeleton_per_metacell =
+        Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell)) # NOJET
+    @assert LoopVectorization.check_args(
+        low_log_linear_fraction_per_skeleton_per_metacell,
+        linear_fraction_per_skeleton_per_metacell,
+        confidence_linear_fractions_per_skeleton_per_metacells,
+    ) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)"
+    @turbo for i in eachindex(low_log_linear_fraction_per_skeleton_per_metacell)
+        low_log_linear_fraction_per_skeleton_per_metacell[i] = log2(
+            max(
+                linear_fraction_per_skeleton_per_metacell[i] -
+                confidence_linear_fractions_per_skeleton_per_metacells[i],
                 0.0,
-            ) .+ gene_fraction_regularization,
+            ) + gene_fraction_regularization,
         )
+    end
 
-    high_log_linear_fraction_per_skeleton_per_metacell = # NOJET
-        log2.(
-            linear_fraction_per_skeleton_per_metacell .+ confidence_linear_fractions_per_skeleton_per_metacells .+
+    high_log_linear_fraction_per_skeleton_per_metacell =
+        Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell)) # NOJET
+    @assert LoopVectorization.check_args(
+        high_log_linear_fraction_per_skeleton_per_metacell,
+        linear_fraction_per_skeleton_per_metacell,
+        confidence_linear_fractions_per_skeleton_per_metacells,
+    ) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)"
+    @turbo for i in eachindex(high_log_linear_fraction_per_skeleton_per_metacell)
+        high_log_linear_fraction_per_skeleton_per_metacell[i] = log2(
+            linear_fraction_per_skeleton_per_metacell[i] +
+            confidence_linear_fractions_per_skeleton_per_metacells[i] +
             gene_fraction_regularization,
         )
+    end
 
     UMIs_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: UMIs"].array
     UMIs_per_skeleton_per_metacell = flip(UMIs_per_metacell_per_skeleton)
@@ -426,6 +460,7 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
 )::Nothing
+    gene_fraction_regularization = Float32(gene_fraction_regularization)
     n_genes = axis_length(daf, "gene")
 
     index_per_included_gene = get_query(daf, "@ gene [ ! is_excluded ] : index").array
@@ -501,10 +536,24 @@ $(CONTRACT)
             metacell_index = metacell_index_per_grouped_cell[grouped_cell_position]
             gene_cell_UMIs = UMIs_per_cell_per_gene[cell_index, gene_index]
             gene_metacell_UMIs = UMIs_per_metacell_per_gene[metacell_index, gene_index]
-            gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] =
-                log2(gene_cell_UMIs / total_UMIs_per_grouped_cell[grouped_cell_position] + gene_fraction_regularization)
+            gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] = gene_cell_UMIs
+            gene_punctuated_metacell_log_fraction_per_grouped_cell[grouped_cell_position] =
+                gene_metacell_UMIs - gene_cell_UMIs
+        end
+        @assert LoopVectorization.check_args(
+            gene_cell_log_fraction_per_grouped_cell,
+            total_UMIs_per_grouped_cell,
+            gene_punctuated_metacell_log_fraction_per_grouped_cell,
+            total_punctuated_metacell_UMIs_per_grouped_cell,
+        ) "check_args failed in compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!"
+        @turbo for grouped_cell_position in 1:n_grouped_cells
+            gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] = log2(
+                gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] /
+                total_UMIs_per_grouped_cell[grouped_cell_position] + gene_fraction_regularization,
+            )
             gene_punctuated_metacell_log_fraction_per_grouped_cell[grouped_cell_position] = log2(
-                (gene_metacell_UMIs - gene_cell_UMIs) / total_punctuated_metacell_UMIs_per_grouped_cell[grouped_cell_position] +
+                gene_punctuated_metacell_log_fraction_per_grouped_cell[grouped_cell_position] /
+                total_punctuated_metacell_UMIs_per_grouped_cell[grouped_cell_position] +
                 gene_fraction_regularization,
             )
         end
@@ -517,7 +566,8 @@ $(CONTRACT)
         return nothing
     end
 
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_included_genes) ($(percent(todox_all_zero[], n_included_genes)))" _group = :todox
+    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_included_genes) ($(percent(todox_all_zero[], n_included_genes)))" _group =
+        :todox
     set_vector!(
         daf,
         "gene",

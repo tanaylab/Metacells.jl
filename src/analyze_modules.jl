@@ -98,8 +98,7 @@ $(CONTRACT)
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
         @views n_genes_per_module = n_genes_per_module_per_block[:, block_index]
         fill!(n_genes_per_module, 0)
-        for gene_index in 1:length(module_index_per_gene)
-            module_index = module_index_per_gene[gene_index]
+        for module_index in module_index_per_gene
             if module_index > 0
                 n_genes_per_module[module_index] += 1
             end
@@ -276,12 +275,12 @@ $(CONTRACT)
             @. is_gene_in_module = module_index_per_gene == module_index
             sum_fractions = 0.0
             sum_squared_fractions = 0.0
-            @foreach_true_index is_in_neighborhood_per_cell cell_index begin
+            @foreach_true_index is_in_neighborhood_per_cell cell_index begin  # NOLINT
                 module_UMIs = 0
-                @foreach_true_index is_gene_in_module gene_index begin
-                    module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]
+                @foreach_true_index is_gene_in_module gene_index begin  # NOLINT
+                    module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]  # NOLINT
                 end
-                fraction = module_UMIs / Float64(total_UMIs_per_cell[cell_index])
+                fraction = module_UMIs / total_UMIs_per_cell[cell_index]  # NOLINT
                 sum_fractions += fraction
                 sum_squared_fractions += fraction * fraction
             end
@@ -289,8 +288,10 @@ $(CONTRACT)
             mean_linear_fraction_per_module_per_block[module_index, block_index] = Float32(mean_fraction)
             std_linear_fraction_per_module_per_block[module_index, block_index] = if n_neighborhood_cells > 1
                 Float32(
-                sqrt(max((sum_squared_fractions - sum_fractions * mean_fraction) / (n_neighborhood_cells - 1), 0.0)),
-            )
+                    sqrt(
+                        max((sum_squared_fractions - sum_fractions * mean_fraction) / (n_neighborhood_cells - 1), 0.0),
+                    ),
+                )
             else
                 0.0f0
             end

@@ -39,6 +39,45 @@ import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 
+struct KmeansSizesBuffers{T <: AbstractFloat}
+    kmeans_buffers::Tuple{KMeansBuffers{T}, KMeansBuffers{T}}
+    max_best_counts::Vector{Int}
+    max_centers::Matrix{T}
+    max_sorted_sizes::Vector{Int}
+    max_split_cluster_indices::Vector{Int}
+    max_split_point_indices::Vector{Int}
+    max_split_points::Matrix{T}
+    max_split_assignments::Vector{Int}
+end
+
+function KmeansSizesBuffers{T}(; n_dims::Integer, max_k::Integer, n_points::Integer) where {T <: AbstractFloat}
+    return KmeansSizesBuffers{T}(
+        (KMeansBuffers{T}(; n_dims, max_k, n_points), KMeansBuffers{T}(; n_dims, max_k, n_points)),
+        Vector{Int}(undef, max_k),            # max_best_counts
+        Matrix{T}(undef, n_dims, max_k),      # max_centers
+        Vector{Int}(undef, max_k),            # max_sorted_sizes
+        Vector{Int}(undef, max_k),            # max_split_cluster_indices
+        Vector{Int}(undef, n_points),         # max_split_point_indices
+        Matrix{T}(undef, n_dims, n_points),   # max_split_points
+        Vector{Int}(undef, n_points),         # max_split_assignments
+    )
+end
+
+struct KmeansSizesResult
+    assignments::AbstractVector{Int}
+    counts::AbstractVector{Int}
+end
+
+Clustering.assignments(r::KmeansSizesResult) = r.assignments
+Clustering.counts(r::KmeansSizesResult) = r.counts
+Clustering.nclusters(r::KmeansSizesResult) = length(r.counts)
+
+@kwdef struct LocalClusters
+    block_cell_indices::AbstractVector{<:Integer}
+    cluster_index_per_block_cell::AbstractVector{<:Integer}
+    is_too_small_per_cluster::BitVector
+end
+
 """
     function sharpen_metacells!(;
         sharp_daf::DafWriter,
@@ -145,6 +184,32 @@ $(CONTRACT2)
     block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
     n_migrated = n_cells
 
+    n_blocks = length(name_per_block)
+    n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
+    max_n_block_modules = maximum(n_modules_per_block)
+    n_neighborhood_cells_per_block = get_vector(base_daf, "block", "n_neighborhood_cells").array
+    max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
+
+    max_n_kmeans_points = max(max_n_neighborhood_cells, maximum(n_cells_per_block))
+    max_n_kmeans_clusters =
+        2 * maximum(
+            max(
+                Int(
+                    round(
+                        max(n_neighborhood_cells_per_block[b], n_cells_per_block[b]) / mean_metacell_cells_per_block[b],
+                    ),
+                ),
+                1,
+            ) for b in 1:n_blocks
+        )
+    kmeans_sizes_max_buffers_per_thread = [
+        KmeansSizesBuffers{Float32}(;
+            n_dims = max_n_block_modules,
+            max_k = max_n_kmeans_clusters,
+            n_points = max_n_kmeans_points,
+        ) for _ in 1:nthreads()
+    ]
+
     preferred_block_index_per_cell_per_block = compute_preferred_block_index_per_cell_per_block(;
         base_daf,
         kmeans_rounds,
@@ -160,11 +225,34 @@ $(CONTRACT2)
         mean_linear_fraction_in_neighborhood_cells_per_module_per_block,
         std_linear_fraction_in_neighborhood_cells_per_module_per_block,
         min_migration_likelihood,
+        kmeans_sizes_max_buffers_per_thread,
         rng,
     )
 
     block_index_per_cell, n_migrated =
         compute_preferred_block_index_of_cells(; block_index_per_cell, preferred_block_index_per_cell_per_block)
+
+    # Post-migration blocks can have more cells than pre-migration; reallocate buffers if needed.
+    post_migration_n_cells_per_block = [sum(block_index_per_cell .== b) for b in 1:n_blocks]
+    post_max_n_kmeans_points = maximum(post_migration_n_cells_per_block)
+    post_max_n_kmeans_clusters =
+        2 * maximum(
+            max(Int(round(post_migration_n_cells_per_block[b] / mean_metacell_cells_per_block[b])), 1) for
+            b in 1:n_blocks
+        )
+    if post_max_n_kmeans_points > max_n_kmeans_points || post_max_n_kmeans_clusters > max_n_kmeans_clusters
+        @warn "TODOX post_max_n_kmeans_points: $(post_max_n_kmeans_points) ? max_n_kmeans_points: $(max_n_kmeans_points)"
+        @warn "TODOX post_max_n_kmeans_clusters: $(post_max_n_kmeans_clusters) ? max_n_kmeans_clusters: $(max_n_kmeans_clusters)"
+        max_n_kmeans_points = max(max_n_kmeans_points, post_max_n_kmeans_points)
+        max_n_kmeans_clusters = max(max_n_kmeans_clusters, post_max_n_kmeans_clusters)
+        kmeans_sizes_max_buffers_per_thread = [
+            KmeansSizesBuffers{Float32}(;
+                n_dims = max_n_block_modules,
+                max_k = max_n_kmeans_clusters,
+                n_points = max_n_kmeans_points,
+            ) for _ in 1:nthreads()
+        ]
+    end
 
     local_clusters_per_block = compute_local_clusters(;
         base_daf,
@@ -178,6 +266,7 @@ $(CONTRACT2)
         mean_metacell_cells_per_block,
         mean_linear_fraction_in_neighborhood_cells_per_module_per_block,
         std_linear_fraction_in_neighborhood_cells_per_module_per_block,
+        kmeans_sizes_max_buffers_per_thread,
         rng,
     )
 
@@ -217,6 +306,7 @@ function compute_preferred_block_index_per_cell_per_block(;
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     mean_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     std_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    kmeans_sizes_max_buffers_per_thread::AbstractVector{<:KmeansSizesBuffers},
     rng::AbstractRNG,
 )::Vector{Maybe{SparseVector{<:Integer}}}
     n_cells = length(block_index_per_cell)
@@ -297,6 +387,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             return kmeans_in_rounds(
                 z_score_per_found_module_per_neighborhood_cell,
                 n_neighborhood_clusters;
+                buffers = kmeans_sizes_max_buffers_per_thread[threadid()].kmeans_buffers,
                 rounds = kmeans_rounds,
                 rng,
             )
@@ -464,12 +555,6 @@ function compute_preferred_block_index_of_cells(;
     return (new_block_index_per_cell, n_migrated[])
 end
 
-@kwdef struct LocalClusters
-    block_cell_indices::AbstractVector{<:Integer}
-    cluster_index_per_block_cell::AbstractVector{<:Integer}
-    is_too_small_per_cluster::BitVector
-end
-
 function compute_local_clusters(;
     base_daf::DafReader,
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
@@ -482,6 +567,7 @@ function compute_local_clusters(;
     mean_metacell_cells_per_block::AbstractVector{<:AbstractFloat},
     mean_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     std_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    kmeans_sizes_max_buffers_per_thread::AbstractVector{<:KmeansSizesBuffers},
     rng::AbstractRNG,
 )::AbstractVector{Maybe{LocalClusters}}
     n_cells = length(total_UMIs_per_cell)
@@ -503,6 +589,8 @@ function compute_local_clusters(;
     is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:nthreads()]
     z_score_per_max_module_per_max_block_cell_per_thread =
         [Matrix{Float32}(undef, max_n_block_modules, max_n_block_cells) for _ in 1:nthreads()]
+    cluster_index_per_block_cell_per_block =
+        [Vector{Int}(undef, n_cells_per_block[block_index]) for block_index in 1:n_blocks]
 
     parallel_loop_with_rng(
         1:n_blocks;
@@ -550,26 +638,30 @@ function compute_local_clusters(;
         )
 
         n_block_clusters = max(Int(round(n_block_cells / mean_metacell_cells_per_block[block_index])), 1)
-        if n_block_clusters == 1
-            cluster_index_per_block_cell = fill(1, n_block_cells)
-            cluster_sizes = [n_block_cells]
+        cluster_index_per_block_cell = cluster_index_per_block_cell_per_block[block_index]
+        sizes_buffers = kmeans_sizes_max_buffers_per_thread[threadid()]
 
+        if n_block_clusters == 1
+            fill!(cluster_index_per_block_cell, 1)
+            sizes_buffers.max_best_counts[1] = n_block_cells
+            cluster_sizes = @view(sizes_buffers.max_best_counts[1:1])
         else
             kmeans_result = flame_timed("kmeans_with_sizes") do
                 return kmeans_with_sizes(
                     z_score_per_found_module_per_block_cell,
                     n_block_clusters;
+                    max_k = 2 * n_block_clusters,
                     min_cluster_size = min_cells_in_metacell,
                     max_cluster_size = mean_metacell_cells_per_block[block_index] * 2,
                     kmeans_rounds,
+                    sizes_buffers,
+                    best_assignments = cluster_index_per_block_cell,
                     rng,
                 )
             end
 
-            cluster_index_per_block_cell = assignments(kmeans_result)
             cluster_sizes = counts(kmeans_result)
         end
-
         local_clusters_per_block[block_index] = LocalClusters(;
             block_cell_indices,
             cluster_index_per_block_cell,
@@ -594,8 +686,8 @@ function combine_local_clusters(;
     for local_clusters in local_clusters_per_block
         if local_clusters !== nothing
             n_total_new_metacells += length(local_clusters.is_too_small_per_cluster)
-            @foreach_true_index local_clusters.is_too_small_per_cluster cluster_index begin
-                n_new_outlier_cells += sum(local_clusters.cluster_index_per_block_cell .== cluster_index)
+            @foreach_true_index local_clusters.is_too_small_per_cluster cluster_index begin  # NOLINT
+                n_new_outlier_cells += sum(local_clusters.cluster_index_per_block_cell .== cluster_index)  # NOLINT
             end
         end
     end
@@ -663,13 +755,16 @@ end
 function kmeans_with_sizes(
     values_of_points::AbstractMatrix{<:AbstractFloat},
     initial_k::Integer;
+    max_k::Integer,
     min_cluster_size::Real,
     max_cluster_size::Real,
     kmeans_rounds::Integer,
+    sizes_buffers::KmeansSizesBuffers,
+    best_assignments::AbstractVector{Int},
     rng::AbstractRNG,
-)::KmeansResult
+)::KmeansSizesResult
     kmeans_result = nothing
-    max_k = size(values_of_points, 2)
+    n_dims, n_points = size(values_of_points)
     k = min(initial_k, max_k)
     centers = nothing
     cluster_sizes = nothing
@@ -682,6 +777,15 @@ function kmeans_with_sizes(
     best_k = nothing
     best_n_too_small = nothing
 
+    buffers = sizes_buffers.kmeans_buffers
+    best_counts = sizes_buffers.max_best_counts
+    centers_buffer = sizes_buffers.max_centers
+    max_sorted_sizes = sizes_buffers.max_sorted_sizes
+    max_split_cluster_indices = sizes_buffers.max_split_cluster_indices
+    max_split_point_indices = sizes_buffers.max_split_point_indices
+    max_split_points = sizes_buffers.max_split_points
+    max_split_assignments = sizes_buffers.max_split_assignments
+
     while do_next_phase
         do_next_phase = false
 
@@ -692,7 +796,7 @@ function kmeans_with_sizes(
                 @assert length(cluster_sizes) == k
             else
                 kmeans_result = flame_timed("kmeans_in_rounds") do
-                    return kmeans_in_rounds(values_of_points, k; centers, rounds = kmeans_rounds, rng)
+                    return kmeans_in_rounds(values_of_points, k; centers, buffers, rounds = kmeans_rounds, rng)
                 end
                 cluster_sizes = counts(kmeans_result)
                 @assert length(cluster_sizes) == k
@@ -700,8 +804,10 @@ function kmeans_with_sizes(
 
             if k < initial_k
                 need_split = min(initial_k - k, k)
-                descending_sizes = sort(cluster_sizes; rev = true) # TODO: Would quantile be more efficient?
-                effective_max_cluster_size = min(max_cluster_size, descending_sizes[need_split] - 1)
+                sorted_sizes = @view(max_sorted_sizes[1:k])
+                copyto!(sorted_sizes, cluster_sizes)
+                partialsort!(sorted_sizes, need_split; rev = true)  # NOJET
+                effective_max_cluster_size = min(max_cluster_size, sorted_sizes[need_split] - 1)
             else
                 effective_max_cluster_size = max_cluster_size
             end
@@ -712,28 +818,65 @@ function kmeans_with_sizes(
                 break
             end
 
-            n_large_clusters = sum(cluster_sizes .> effective_max_cluster_size)
+            n_large_clusters = 0
+            @inbounds for i in 1:k
+                if cluster_sizes[i] > effective_max_cluster_size
+                    n_large_clusters += 1
+                end
+            end
             n_split_clusters = max(1, div(n_large_clusters + 1, 2))
-            indices_of_split_clusters = partialsortperm(cluster_sizes, 1:n_split_clusters; rev = true)
 
-            clusters_of_points = assignments(kmeans_result)  # NOJET
-            centers = kmeans_result.centers
+            # Find the n_split_clusters largest clusters by insertion into split_cluster_indices
+            split_cluster_indices = @view(max_split_cluster_indices[1:n_split_clusters])
+            fill!(split_cluster_indices, 0)
+            @inbounds for i in 1:k
+                s = cluster_sizes[i]
+                j = n_split_clusters
+                while j >= 1 && (split_cluster_indices[j] == 0 || s > cluster_sizes[split_cluster_indices[j]])
+                    if j < n_split_clusters
+                        split_cluster_indices[j + 1] = split_cluster_indices[j]
+                    end
+                    split_cluster_indices[j] = i
+                    j -= 1
+                end
+            end
 
             if k == max_k
                 break
             end
 
-            new_centers = Vector{AbstractVector{<:AbstractFloat}}()
-            for split_cluster_index in indices_of_split_clusters
-                indices_of_points_in_split_cluster = findall(clusters_of_points .== split_cluster_index)
-                split_result = flame_timed("kmeans") do
-                    return kmeans(values_of_points[:, indices_of_points_in_split_cluster], 2; rng)
+            # Copy assignments and centers before reusing buffers for split
+            copyto!(@view(max_split_assignments[1:n_points]), assignments(kmeans_result))  # NOJET
+            clusters_of_points = @view(max_split_assignments[1:n_points])
+            copyto!(@view(centers_buffer[1:n_dims, 1:k]), kmeans_result.centers)
+            for si in 1:n_split_clusters
+                split_cluster_index = split_cluster_indices[si]
+                n_split_points = 0
+                @inbounds for j in 1:n_points
+                    if clusters_of_points[j] == split_cluster_index
+                        n_split_points += 1
+                        max_split_point_indices[n_split_points] = j
+                    end
                 end
-                centers[:, split_cluster_index] .= split_result.centers[:, 1]
-                push!(new_centers, split_result.centers[:, 2])
+                split_point_indices = @view(max_split_point_indices[1:n_split_points])
+                @inbounds for j in 1:n_split_points
+                    for i in 1:n_dims
+                        max_split_points[i, j] = values_of_points[i, split_point_indices[j]]
+                    end
+                end
+                split_points = @view(max_split_points[1:n_dims, 1:n_split_points])
+                split_buf = KMeansBuffers(buffers[1]; n_dims, k = 2, n_points = n_split_points)
+                split_result = flame_timed("kmeans") do
+                    return kmeans_in_buffers(split_points, 2; buffers = split_buf, rng)
+                end
+                centers_buffer[1:n_dims, split_cluster_index] .= split_result.centers[:, 1]
                 k += 1
+                centers_buffer[1:n_dims, k] .= split_result.centers[:, 2]
+                if k == max_k
+                    break
+                end
             end
-            centers = hcat(centers, new_centers...)
+            centers = @view(centers_buffer[1:n_dims, 1:k])
         end
 
         n_too_small = 0
@@ -756,17 +899,26 @@ function kmeans_with_sizes(
                 best_kmeans_result = kmeans_result
                 best_k = k
                 best_n_too_small = n_too_small
+                copyto!(best_assignments, assignments(kmeans_result))  # NOJET
+                copyto!(@view(best_counts[1:k]), counts(kmeans_result))  # NOJET
             end
 
             if n_too_small == 0
                 break
             end
 
-            centers = kmeans_result.centers[:, 1:k .!= smallest_cluster_index]
+            j = 0
+            for i in 1:k
+                if i != smallest_cluster_index
+                    j += 1
+                    centers_buffer[1:n_dims, j] .= kmeans_result.centers[:, i]
+                end
+            end
             k -= 1
+            centers = @view(centers_buffer[1:n_dims, 1:k])
 
             merged_kmeans_result = flame_timed("kmeans_in_rounds") do
-                return kmeans_in_rounds(values_of_points, k; centers, rounds = kmeans_rounds, rng)
+                return kmeans_in_rounds(values_of_points, k; centers, buffers, rounds = kmeans_rounds, rng)
             end
             cluster_sizes = counts(merged_kmeans_result)
             @assert length(cluster_sizes) == k
@@ -785,6 +937,8 @@ function kmeans_with_sizes(
                 best_kmeans_result = merged_kmeans_result
                 best_k = k
                 best_n_too_small = n_too_small
+                copyto!(best_assignments, assignments(merged_kmeans_result))
+                copyto!(@view(best_counts[1:k]), counts(merged_kmeans_result))
             end
 
             if k < initial_k || largest_cluster_size > max_cluster_size
@@ -804,7 +958,7 @@ function kmeans_with_sizes(
     end
 
     @assert best_kmeans_result !== nothing
-    return best_kmeans_result
+    return KmeansSizesResult(best_assignments, @view(best_counts[1:best_k]))
 end
 
 end  # module
