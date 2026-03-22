@@ -197,7 +197,7 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization >= 0
-    fraction_per_metacell_per_gene = densify(get_matrix(daf, "metacell", "gene", "linear_fraction").array)
+    fraction_per_metacell_per_gene = mutable_array(densify(get_matrix(daf, "metacell", "gene", "linear_fraction").array))
     empty_dense_matrix!(
         daf,
         "metacell",
@@ -206,7 +206,8 @@ $(CONTRACT)
         Float32;
         overwrite,
     ) do log_fraction_per_metacell_per_gene
-        @assert LoopVectorization.check_args(log_fraction_per_metacell_per_gene, fraction_per_metacell_per_gene) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_metacell!"
+        @assert LoopVectorization.check_args(log_fraction_per_metacell_per_gene) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_metacell!\nfor log_fraction_per_metacell_per_gene: $(brief(log_fraction_per_metacell_per_gene))"
+        @assert LoopVectorization.check_args(fraction_per_metacell_per_gene) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_metacell!\nfor fraction_per_metacell_per_gene: $(brief(fraction_per_metacell_per_gene))"
         @turbo for i in eachindex(log_fraction_per_metacell_per_gene)
             log_fraction_per_metacell_per_gene[i] =
                 log2(fraction_per_metacell_per_gene[i] + gene_fraction_regularization)
@@ -294,18 +295,16 @@ $(CONTRACT)
     @assert 0 < fold_confidence < 1
 
     linear_fraction_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"].array
-    linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
-    total_UMIs_per_metacell = densify(get_vector(daf, "metacell", "total_UMIs").array)
+    linear_fraction_per_skeleton_per_metacell = Matrix(flip(linear_fraction_per_metacell_per_skeleton))
+    total_UMIs_per_metacell = mutable_array(densify(get_vector(daf, "metacell", "total_UMIs").array))
 
     confidence_stds = quantile(Normal(), fold_confidence)
 
     confidence_linear_fractions_per_skeleton_per_metacells =  # NOJET
         Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell))
-    @assert LoopVectorization.check_args(
-        confidence_linear_fractions_per_skeleton_per_metacells,
-        linear_fraction_per_skeleton_per_metacell,
-        total_UMIs_per_metacell,
-    ) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)"
+    @assert LoopVectorization.check_args(confidence_linear_fractions_per_skeleton_per_metacells) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)\nfor confidence_linear_fractions_per_skeleton_per_metacells: $(brief(confidence_linear_fractions_per_skeleton_per_metacells))"
+    @assert LoopVectorization.check_args(linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)\nfor linear_fraction_per_skeleton_per_metacell: $(brief(linear_fraction_per_skeleton_per_metacell))"
+    @assert LoopVectorization.check_args(total_UMIs_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)\nfor total_UMIs_per_metacell: $(brief(total_UMIs_per_metacell))"
     @turbo for j in axes(linear_fraction_per_skeleton_per_metacell, 2)
         for i in axes(linear_fraction_per_skeleton_per_metacell, 1)
             confidence_linear_fractions_per_skeleton_per_metacells[i, j] =
@@ -316,11 +315,9 @@ $(CONTRACT)
 
     low_log_linear_fraction_per_skeleton_per_metacell =
         Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell)) # NOJET
-    @assert LoopVectorization.check_args(
-        low_log_linear_fraction_per_skeleton_per_metacell,
-        linear_fraction_per_skeleton_per_metacell,
-        confidence_linear_fractions_per_skeleton_per_metacells,
-    ) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)"
+    @assert LoopVectorization.check_args(low_log_linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)\nfor low_log_linear_fraction_per_skeleton_per_metacell: $(brief(low_log_linear_fraction_per_skeleton_per_metacell))"
+    @assert LoopVectorization.check_args(linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)\nfor linear_fraction_per_skeleton_per_metacell: $(brief(linear_fraction_per_skeleton_per_metacell))"
+    @assert LoopVectorization.check_args(confidence_linear_fractions_per_skeleton_per_metacells) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)\nfor confidence_linear_fractions_per_skeleton_per_metacells: $(brief(confidence_linear_fractions_per_skeleton_per_metacells))"
     @turbo for i in eachindex(low_log_linear_fraction_per_skeleton_per_metacell)
         low_log_linear_fraction_per_skeleton_per_metacell[i] = log2(
             max(
@@ -333,11 +330,9 @@ $(CONTRACT)
 
     high_log_linear_fraction_per_skeleton_per_metacell =
         Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell)) # NOJET
-    @assert LoopVectorization.check_args(
-        high_log_linear_fraction_per_skeleton_per_metacell,
-        linear_fraction_per_skeleton_per_metacell,
-        confidence_linear_fractions_per_skeleton_per_metacells,
-    ) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)"
+    @assert LoopVectorization.check_args(high_log_linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)\nfor high_log_linear_fraction_per_skeleton_per_metacell: $(brief(high_log_linear_fraction_per_skeleton_per_metacell))"
+    @assert LoopVectorization.check_args(linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)\nfor linear_fraction_per_skeleton_per_metacell: $(brief(linear_fraction_per_skeleton_per_metacell))"
+    @assert LoopVectorization.check_args(confidence_linear_fractions_per_skeleton_per_metacells) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)\nfor confidence_linear_fractions_per_skeleton_per_metacells: $(brief(confidence_linear_fractions_per_skeleton_per_metacells))"
     @turbo for i in eachindex(high_log_linear_fraction_per_skeleton_per_metacell)
         high_log_linear_fraction_per_skeleton_per_metacell[i] = log2(
             linear_fraction_per_skeleton_per_metacell[i] +
@@ -540,12 +535,10 @@ $(CONTRACT)
             gene_punctuated_metacell_log_fraction_per_grouped_cell[grouped_cell_position] =
                 gene_metacell_UMIs - gene_cell_UMIs
         end
-        @assert LoopVectorization.check_args(
-            gene_cell_log_fraction_per_grouped_cell,
-            total_UMIs_per_grouped_cell,
-            gene_punctuated_metacell_log_fraction_per_grouped_cell,
-            total_punctuated_metacell_UMIs_per_grouped_cell,
-        ) "check_args failed in compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!"
+        @assert LoopVectorization.check_args(gene_cell_log_fraction_per_grouped_cell) "check_args failed in compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!\nfor gene_cell_log_fraction_per_grouped_cell: $(brief(gene_cell_log_fraction_per_grouped_cell))"
+        @assert LoopVectorization.check_args(total_UMIs_per_grouped_cell) "check_args failed in compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!\nfor total_UMIs_per_grouped_cell: $(brief(total_UMIs_per_grouped_cell))"
+        @assert LoopVectorization.check_args(gene_punctuated_metacell_log_fraction_per_grouped_cell) "check_args failed in compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!\nfor gene_punctuated_metacell_log_fraction_per_grouped_cell: $(brief(gene_punctuated_metacell_log_fraction_per_grouped_cell))"
+        @assert LoopVectorization.check_args(total_punctuated_metacell_UMIs_per_grouped_cell) "check_args failed in compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!\nfor total_punctuated_metacell_UMIs_per_grouped_cell: $(brief(total_punctuated_metacell_UMIs_per_grouped_cell))"
         @turbo for grouped_cell_position in 1:n_grouped_cells
             gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] = log2(
                 gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] /

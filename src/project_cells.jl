@@ -182,21 +182,26 @@ function compute_provisional_projection_per_query_cell!(;
 
     is_excluded_per_query_cell = get_vector(query_daf, "cell", "is_excluded").array
 
+    linear_fraction_per_block_per_pertinent_marker = atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
     linear_fraction_per_block_per_pertinent_marker =
-        densify(atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array)
+    flame_timed("linear_fraction_per_block_per_pertinent_marker") do
+        return mutable_array(densify(linear_fraction_per_block_per_pertinent_marker))
+    end
+
     log_linear_fraction_per_pertinent_marker_per_block = Matrix{Float32}(
         undef,
         size(linear_fraction_per_block_per_pertinent_marker, 2),
         size(linear_fraction_per_block_per_pertinent_marker, 1),
     )
-    @assert LoopVectorization.check_args(
-        log_linear_fraction_per_pertinent_marker_per_block,
-        linear_fraction_per_block_per_pertinent_marker,
-    ) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)"
-    @turbo for j in axes(linear_fraction_per_block_per_pertinent_marker, 1)
-        for i in axes(linear_fraction_per_block_per_pertinent_marker, 2)
-            log_linear_fraction_per_pertinent_marker_per_block[i, j] =
-                log2(linear_fraction_per_block_per_pertinent_marker[j, i] + gene_fraction_regularization)
+
+    flame_timed("log_linear_fraction_per_pertinent_marker_per_block") do
+        @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker_per_block) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)\nfor log_linear_fraction_per_pertinent_marker_per_block: $(brief(log_linear_fraction_per_pertinent_marker_per_block))"
+        @assert LoopVectorization.check_args(linear_fraction_per_block_per_pertinent_marker) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)\nfor linear_fraction_per_block_per_pertinent_marker: $(brief(linear_fraction_per_block_per_pertinent_marker))"
+        @turbo for j in axes(linear_fraction_per_block_per_pertinent_marker, 1)
+            for i in axes(linear_fraction_per_block_per_pertinent_marker, 2)
+                log_linear_fraction_per_pertinent_marker_per_block[i, j] =
+                    log2(linear_fraction_per_block_per_pertinent_marker[j, i] + gene_fraction_regularization)
+            end
         end
     end
 
@@ -226,7 +231,7 @@ function compute_provisional_projection_per_query_cell!(;
                 log_linear_fraction_per_pertinent_marker[gene_position] =
                     UMIs_per_pertinent_marker[gene_position] / total_query_cell_UMIs
             end
-            @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker) "check_args failed in compute_provisional_projection_per_query_cell! (log2)"
+            @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker) "check_args failed in compute_provisional_projection_per_query_cell! (log2)\nfor log_linear_fraction_per_pertinent_marker: $(brief(log_linear_fraction_per_pertinent_marker))"
             @turbo for gene_position in 1:n_pertinent_neighborhood_markers
                 log_linear_fraction_per_pertinent_marker[gene_position] =
                     log2(log_linear_fraction_per_pertinent_marker[gene_position] + gene_fraction_regularization)
@@ -636,10 +641,8 @@ $(CONTRACT2)
             gene_cell_log_fraction_per_included_query_cell[included_query_cell_position] =
                 query_cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization
         end
-        @assert LoopVectorization.check_args(
-            gene_metacell_log_fraction_per_included_query_cell,
-            gene_cell_log_fraction_per_included_query_cell,
-        ) "check_args failed in compute_vector_of_correlation_between_cells_and_projected_metacells!"
+        @assert LoopVectorization.check_args(gene_metacell_log_fraction_per_included_query_cell) "check_args failed in compute_vector_of_correlation_between_cells_and_projected_metacells!\nfor gene_metacell_log_fraction_per_included_query_cell: $(brief(gene_metacell_log_fraction_per_included_query_cell))"
+        @assert LoopVectorization.check_args(gene_cell_log_fraction_per_included_query_cell) "check_args failed in compute_vector_of_correlation_between_cells_and_projected_metacells!\nfor gene_cell_log_fraction_per_included_query_cell: $(brief(gene_cell_log_fraction_per_included_query_cell))"
         @turbo for included_query_cell_position in 1:n_included_query_cells
             gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position] =
                 log2(gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position])
@@ -986,11 +989,9 @@ $(CONTRACT2)
                     projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
                         projected_metacell_UMIs
                 end
-                @assert LoopVectorization.check_args(
-                    cell_log_fraction_per_neighborhood_query_cell,
-                    projected_metacell_log_fraction_per_neighborhood_query_cell,
-                    total_atlas_metacell_UMIs_per_neighborhood_query_cell,
-                ) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!"
+                @assert LoopVectorization.check_args(cell_log_fraction_per_neighborhood_query_cell) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!\nfor cell_log_fraction_per_neighborhood_query_cell: $(brief(cell_log_fraction_per_neighborhood_query_cell))"
+                @assert LoopVectorization.check_args(projected_metacell_log_fraction_per_neighborhood_query_cell) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!\nfor projected_metacell_log_fraction_per_neighborhood_query_cell: $(brief(projected_metacell_log_fraction_per_neighborhood_query_cell))"
+                @assert LoopVectorization.check_args(total_atlas_metacell_UMIs_per_neighborhood_query_cell) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!\nfor total_atlas_metacell_UMIs_per_neighborhood_query_cell: $(brief(total_atlas_metacell_UMIs_per_neighborhood_query_cell))"
                 @turbo for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
                     cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
                         log2(cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position])

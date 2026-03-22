@@ -337,20 +337,18 @@ $(CONTRACT)
     is_marker_per_gene = get_vector(daf, "gene", "is_marker")
     n_markers = sum(is_marker_per_gene)
 
-    log_fraction_per_metacell_per_marker = densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array)
+    log_fraction_per_metacell_per_marker = mutable_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array))
     @assert_matrix(log_fraction_per_metacell_per_marker, n_metacells, n_markers, Columns)
 
     median_log_fraction_per_marker =
-        densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"].array)
+        mutable_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"].array))
     @assert_vector(median_log_fraction_per_marker, n_markers)
 
     abs_fold_per_metacell_per_marker =  # NOJET
         Matrix{Float32}(undef, size(log_fraction_per_metacell_per_marker))
-    @assert LoopVectorization.check_args(
-        abs_fold_per_metacell_per_marker,
-        log_fraction_per_metacell_per_marker,
-        median_log_fraction_per_marker,
-    ) "check_args failed in compute_vector_of_marker_rank_per_gene!"
+    @assert LoopVectorization.check_args(abs_fold_per_metacell_per_marker) "check_args failed in compute_vector_of_marker_rank_per_gene!\nfor abs_fold_per_metacell_per_marker: $(brief(abs_fold_per_metacell_per_marker))"
+    @assert LoopVectorization.check_args(log_fraction_per_metacell_per_marker) "check_args failed in compute_vector_of_marker_rank_per_gene!\nfor log_fraction_per_metacell_per_marker: $(brief(log_fraction_per_metacell_per_marker))"
+    @assert LoopVectorization.check_args(median_log_fraction_per_marker) "check_args failed in compute_vector_of_marker_rank_per_gene!\nfor median_log_fraction_per_marker: $(brief(median_log_fraction_per_marker))"
     @turbo for j in axes(log_fraction_per_metacell_per_marker, 2)
         for i in axes(log_fraction_per_metacell_per_marker, 1)
             abs_fold_per_metacell_per_marker[i, j] =

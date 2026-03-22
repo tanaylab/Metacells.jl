@@ -335,6 +335,8 @@ function compute_preferred_block_index_per_cell_per_block(;
     preferred_block_index_per_cluster_per_thread =
         [Vector{Int}(undef, max_n_neighborhood_clusters) for _ in 1:nthreads()]
     block_count_scratch_per_thread = [zeros(Int, n_blocks) for _ in 1:nthreads()]
+    preferred_block_index_per_max_neighborhood_cell_per_thread =
+        [Vector{Int}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
 
     parallel_loop_with_rng(
         1:n_blocks;
@@ -370,6 +372,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             std_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
         is_gene_in_module = is_gene_in_module_per_thread[threadid()]
 
+
         compute_z_score_per_found_module_per_region_cell!(;
             z_score_per_found_module_per_region_cell = z_score_per_found_module_per_neighborhood_cell,
             UMIs_per_cell_per_gene,
@@ -398,6 +401,9 @@ function compute_preferred_block_index_per_cell_per_block(;
         preferred_block_index_per_cluster = preferred_block_index_per_cluster_per_thread[threadid()]
         count_per_block = block_count_scratch_per_thread[threadid()]
 
+        preferred_block_index_per_max_neighborhood_cell =
+            preferred_block_index_per_max_neighborhood_cell_per_thread[threadid()]
+
         preferred_block_index_per_neighborhood_cell = pick_preferred_block_index_per_neighborhood_cell(;
             block_index,
             min_migration_likelihood,
@@ -408,10 +414,11 @@ function compute_preferred_block_index_per_cell_per_block(;
             n_cells_per_cluster,
             preferred_block_index_per_cluster,
             count_per_block,
+            preferred_block_index_per_max_neighborhood_cell,
         )
 
         preferred_block_index_per_cell_per_block[block_index] =
-            SparseVector(n_cells, indices_of_neighborhood_cells, preferred_block_index_per_neighborhood_cell)
+            SparseVector(n_cells, indices_of_neighborhood_cells, Vector(preferred_block_index_per_neighborhood_cell))
 
         return nothing
     end
@@ -429,6 +436,7 @@ function pick_preferred_block_index_per_neighborhood_cell(;
     n_cells_per_cluster::AbstractVector{<:Integer},
     preferred_block_index_per_cluster::AbstractVector{<:Integer},
     count_per_block::AbstractVector{<:Integer},
+    preferred_block_index_per_max_neighborhood_cell::AbstractVector{<:Integer},
 )::AbstractVector{<:Integer}
     n_block_cells = n_cells_per_block[block_index]
     n_clusters = length(n_cells_per_cluster)
@@ -485,7 +493,12 @@ function pick_preferred_block_index_per_neighborhood_cell(;
         end
     end
 
-    preferred_block_index_per_neighborhood_cell = preferred_block_index_per_cluster[cluster_index_per_neighborhood_cell]
+    @views preferred_block_index_per_neighborhood_cell =
+        preferred_block_index_per_max_neighborhood_cell[1:n_neighborhood_cells]
+    for neighborhood_cell_position in eachindex(preferred_block_index_per_neighborhood_cell)
+        preferred_block_index_per_neighborhood_cell[neighborhood_cell_position] =
+            preferred_block_index_per_cluster[cluster_index_per_neighborhood_cell[neighborhood_cell_position]]
+    end
     return preferred_block_index_per_neighborhood_cell
 end
 
@@ -884,8 +897,8 @@ function kmeans_with_sizes(
             @assert length(cluster_sizes) == k
             smallest_cluster_index = argmin(cluster_sizes)
 
-            n_too_small = sum(cluster_sizes .< min_cluster_size)
-            n_too_large = sum(cluster_sizes .> max_cluster_size)
+            n_too_small = count(size -> size < min_cluster_size, cluster_sizes)
+            n_too_large = count(size -> size > max_cluster_size, cluster_sizes)
             if n_too_large == 0 && (
                 best_kmeans_result === nothing ||
                 (best_k >= initial_k && n_too_small < best_n_too_small) ||
