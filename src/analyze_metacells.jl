@@ -197,7 +197,8 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization >= 0
-    fraction_per_metacell_per_gene = mutable_array(densify(get_matrix(daf, "metacell", "gene", "linear_fraction").array))
+    fraction_per_metacell_per_gene =
+        mutable_array(densify(get_matrix(daf, "metacell", "gene", "linear_fraction").array))
     empty_dense_matrix!(
         daf,
         "metacell",
@@ -208,9 +209,18 @@ $(CONTRACT)
     ) do log_fraction_per_metacell_per_gene
         @assert LoopVectorization.check_args(log_fraction_per_metacell_per_gene) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_metacell!\nfor log_fraction_per_metacell_per_gene: $(brief(log_fraction_per_metacell_per_gene))"
         @assert LoopVectorization.check_args(fraction_per_metacell_per_gene) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_metacell!\nfor fraction_per_metacell_per_gene: $(brief(fraction_per_metacell_per_gene))"
-        @turbo for i in eachindex(log_fraction_per_metacell_per_gene)
-            log_fraction_per_metacell_per_gene[i] =
-                log2(fraction_per_metacell_per_gene[i] + gene_fraction_regularization)
+        n_metacells, n_genes = size(log_fraction_per_metacell_per_gene)
+        parallel_loop_wo_rng(  # NOJET
+            1:n_genes;
+            name = "log_linear_fraction_per_gene_per_metacell",
+            progress = DebugProgress(n_genes; group = :mcs_loops, desc = "log_linear_fraction_per_gene_per_metacell"),
+            progress_chunk = 100,
+        ) do gene_index
+            @turbo for metacell_index in 1:n_metacells
+                log_fraction_per_metacell_per_gene[metacell_index, gene_index] =
+                    log2(fraction_per_metacell_per_gene[metacell_index, gene_index] + gene_fraction_regularization)
+            end
+            return nothing
         end
         return nothing
     end
@@ -305,12 +315,24 @@ $(CONTRACT)
     @assert LoopVectorization.check_args(confidence_linear_fractions_per_skeleton_per_metacells) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)\nfor confidence_linear_fractions_per_skeleton_per_metacells: $(brief(confidence_linear_fractions_per_skeleton_per_metacells))"
     @assert LoopVectorization.check_args(linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)\nfor linear_fraction_per_skeleton_per_metacell: $(brief(linear_fraction_per_skeleton_per_metacell))"
     @assert LoopVectorization.check_args(total_UMIs_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (confidence)\nfor total_UMIs_per_metacell: $(brief(total_UMIs_per_metacell))"
-    @turbo for j in axes(linear_fraction_per_skeleton_per_metacell, 2)
-        for i in axes(linear_fraction_per_skeleton_per_metacell, 1)
-            confidence_linear_fractions_per_skeleton_per_metacells[i, j] =
-                confidence_stds * sqrt(linear_fraction_per_skeleton_per_metacell[i, j] * total_UMIs_per_metacell[j]) /
-                total_UMIs_per_metacell[j]
+    n_skeletons, n_metacells = size(linear_fraction_per_skeleton_per_metacell)
+    parallel_loop_wo_rng(
+        1:n_metacells;
+        name = "confidence_linear_fractions_per_skeleton_per_metacell",
+        progress = DebugProgress(
+            n_metacells;
+            group = :mcs_loops,
+            desc = "confidence_linear_fractions_per_skeleton_per_metacell",
+        ),
+    ) do metacell_index
+        @turbo for skeleton_index in 1:n_skeletons
+            confidence_linear_fractions_per_skeleton_per_metacells[skeleton_index, metacell_index] =
+                confidence_stds * sqrt(
+                    linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] *
+                    total_UMIs_per_metacell[metacell_index],
+                ) / total_UMIs_per_metacell[metacell_index]
         end
+        return nothing
     end
 
     low_log_linear_fraction_per_skeleton_per_metacell =
@@ -318,14 +340,25 @@ $(CONTRACT)
     @assert LoopVectorization.check_args(low_log_linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)\nfor low_log_linear_fraction_per_skeleton_per_metacell: $(brief(low_log_linear_fraction_per_skeleton_per_metacell))"
     @assert LoopVectorization.check_args(linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)\nfor linear_fraction_per_skeleton_per_metacell: $(brief(linear_fraction_per_skeleton_per_metacell))"
     @assert LoopVectorization.check_args(confidence_linear_fractions_per_skeleton_per_metacells) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (low)\nfor confidence_linear_fractions_per_skeleton_per_metacells: $(brief(confidence_linear_fractions_per_skeleton_per_metacells))"
-    @turbo for i in eachindex(low_log_linear_fraction_per_skeleton_per_metacell)
-        low_log_linear_fraction_per_skeleton_per_metacell[i] = log2(
-            max(
-                linear_fraction_per_skeleton_per_metacell[i] -
-                confidence_linear_fractions_per_skeleton_per_metacells[i],
-                0.0,
-            ) + gene_fraction_regularization,
-        )
+    parallel_loop_wo_rng(
+        1:n_metacells;
+        name = "low_log_linear_fraction_per_skeleton_per_metacell",
+        progress = DebugProgress(
+            n_metacells;
+            group = :mcs_loops,
+            desc = "low_log_linear_fraction_per_skeleton_per_metacell",
+        ),
+    ) do metacell_index
+        @turbo for skeleton_index in 1:n_skeletons
+            low_log_linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] = log2(
+                max(
+                    linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] -
+                    confidence_linear_fractions_per_skeleton_per_metacells[skeleton_index, metacell_index],
+                    0.0,
+                ) + gene_fraction_regularization,
+            )
+        end
+        return nothing
     end
 
     high_log_linear_fraction_per_skeleton_per_metacell =
@@ -333,12 +366,23 @@ $(CONTRACT)
     @assert LoopVectorization.check_args(high_log_linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)\nfor high_log_linear_fraction_per_skeleton_per_metacell: $(brief(high_log_linear_fraction_per_skeleton_per_metacell))"
     @assert LoopVectorization.check_args(linear_fraction_per_skeleton_per_metacell) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)\nfor linear_fraction_per_skeleton_per_metacell: $(brief(linear_fraction_per_skeleton_per_metacell))"
     @assert LoopVectorization.check_args(confidence_linear_fractions_per_skeleton_per_metacells) "check_args failed in compute_matrix_of_max_skeleton_fold_distance_between_metacells! (high)\nfor confidence_linear_fractions_per_skeleton_per_metacells: $(brief(confidence_linear_fractions_per_skeleton_per_metacells))"
-    @turbo for i in eachindex(high_log_linear_fraction_per_skeleton_per_metacell)
-        high_log_linear_fraction_per_skeleton_per_metacell[i] = log2(
-            linear_fraction_per_skeleton_per_metacell[i] +
-            confidence_linear_fractions_per_skeleton_per_metacells[i] +
-            gene_fraction_regularization,
-        )
+    parallel_loop_wo_rng(
+        1:n_metacells;
+        name = "high_log_linear_fraction_per_skeleton_per_metacell",
+        progress = DebugProgress(
+            n_metacells;
+            group = :mcs_loops,
+            desc = "high_log_linear_fraction_per_skeleton_per_metacell",
+        ),
+    ) do metacell_index
+        @turbo for skeleton_index in 1:n_skeletons
+            high_log_linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] = log2(
+                linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] +
+                confidence_linear_fractions_per_skeleton_per_metacells[skeleton_index, metacell_index] +
+                gene_fraction_regularization,
+            )
+        end
+        return nothing
     end
 
     UMIs_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: UMIs"].array

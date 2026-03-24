@@ -372,7 +372,6 @@ function compute_preferred_block_index_per_cell_per_block(;
             std_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
         is_gene_in_module = is_gene_in_module_per_thread[threadid()]
 
-
         compute_z_score_per_found_module_per_region_cell!(;
             z_score_per_found_module_per_region_cell = z_score_per_found_module_per_neighborhood_cell,
             UMIs_per_cell_per_gene,
@@ -517,6 +516,7 @@ function compute_preferred_block_index_of_cells(;
         1:n_cells;
         name = "compute_preferred_block_index_of_cells",
         progress = DebugProgress(n_cells; group = :mcs_loops, desc = "preferred_block_index_of_cells"),
+        progress_chunk = 100,
     ) do cell_index
         base_block_index_of_cell = block_index_per_cell[cell_index]
         if base_block_index_of_cell == 0

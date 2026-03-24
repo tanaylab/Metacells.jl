@@ -182,9 +182,9 @@ function compute_provisional_projection_per_query_cell!(;
 
     is_excluded_per_query_cell = get_vector(query_daf, "cell", "is_excluded").array
 
-    linear_fraction_per_block_per_pertinent_marker = atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
     linear_fraction_per_block_per_pertinent_marker =
-    flame_timed("linear_fraction_per_block_per_pertinent_marker") do
+        atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
+    linear_fraction_per_block_per_pertinent_marker = flame_timed("linear_fraction_per_block_per_pertinent_marker") do
         return mutable_array(densify(linear_fraction_per_block_per_pertinent_marker))
     end
 
@@ -194,15 +194,26 @@ function compute_provisional_projection_per_query_cell!(;
         size(linear_fraction_per_block_per_pertinent_marker, 1),
     )
 
-    flame_timed("log_linear_fraction_per_pertinent_marker_per_block") do
-        @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker_per_block) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)\nfor log_linear_fraction_per_pertinent_marker_per_block: $(brief(log_linear_fraction_per_pertinent_marker_per_block))"
-        @assert LoopVectorization.check_args(linear_fraction_per_block_per_pertinent_marker) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)\nfor linear_fraction_per_block_per_pertinent_marker: $(brief(linear_fraction_per_block_per_pertinent_marker))"
-        @turbo for j in axes(linear_fraction_per_block_per_pertinent_marker, 1)
-            for i in axes(linear_fraction_per_block_per_pertinent_marker, 2)
-                log_linear_fraction_per_pertinent_marker_per_block[i, j] =
-                    log2(linear_fraction_per_block_per_pertinent_marker[j, i] + gene_fraction_regularization)
-            end
+    @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker_per_block) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)\nfor log_linear_fraction_per_pertinent_marker_per_block: $(brief(log_linear_fraction_per_pertinent_marker_per_block))"
+    @assert LoopVectorization.check_args(linear_fraction_per_block_per_pertinent_marker) "check_args failed in compute_provisional_projection_per_query_cell! (log_linear_fraction)\nfor linear_fraction_per_block_per_pertinent_marker: $(brief(linear_fraction_per_block_per_pertinent_marker))"
+    n_pertinent_markers = size(linear_fraction_per_block_per_pertinent_marker, 2)
+    n_blocks = size(linear_fraction_per_block_per_pertinent_marker, 1)
+    parallel_loop_wo_rng(
+        1:n_blocks;
+        name = "log_linear_fraction_per_pertinent_marker_per_block",
+        progress = DebugProgress(
+            n_blocks;
+            group = :mcs_loops,
+            desc = "log_linear_fraction_per_pertinent_marker_per_block",
+        ),
+    ) do block_index
+        @turbo for pertinent_marker_position in 1:n_pertinent_markers
+            log_linear_fraction_per_pertinent_marker_per_block[pertinent_marker_position, block_index] = log2(
+                linear_fraction_per_block_per_pertinent_marker[block_index, pertinent_marker_position] +
+                gene_fraction_regularization,
+            )
         end
+        return nothing
     end
 
     n_query_cells = axis_length(query_daf, "cell")
@@ -218,6 +229,7 @@ function compute_provisional_projection_per_query_cell!(;
         name = "provisional_projection_per_cell",
         policy = :static,
         progress = DebugProgress(n_query_cells; group = :mcs_loops, desc = "provisional_projection_per_cell"),
+        progress_chunk = 100,
     ) do query_cell_index
         if is_excluded_per_query_cell[query_cell_index]
             provisional_block_index_per_query_cell[query_cell_index] = 0
@@ -295,7 +307,7 @@ function compute_final_projection_per_query_cell(;
     next_indices_of_undetermined_query_cells_per_block =
         [findall(provisional_block_index_per_query_cell .== block_index) for block_index in 1:n_blocks]
 
-    spin_lock = SpinLock()
+    spin_lock_per_block = [SpinLock() for _ in 1:n_blocks]
 
     n_determined_query_cells = Atomic{Int}(0)
 
@@ -420,33 +432,28 @@ function compute_final_projection_per_query_cell(;
                         positions_of_stable_undetermined_query_cells =
                             findall(nearest_block_index_per_undetermined_query_cell .== block_index)
 
-                        try
-                            lock(spin_lock)
-                            for (undetermined_query_cell_position, nearest_block_index) in
-                                enumerate(nearest_block_index_per_undetermined_query_cell)
-                                if nearest_block_index != block_index
-                                    query_cell_index =
-                                        indices_of_undetermined_query_cells[undetermined_query_cell_position]
-                                    if phase == 1
-                                        push!(
-                                            next_indices_of_undetermined_query_cells_per_block[nearest_block_index],
-                                            query_cell_index,
-                                        )
-                                    elseif phase == 2
-                                        provisional_block_index =
-                                            provisional_block_index_per_query_cell[query_cell_index]
-                                        @assert block_index != provisional_block_index
-                                        push!(
-                                            next_indices_of_undetermined_query_cells_per_block[provisional_block_index],
-                                            query_cell_index,
-                                        )
-                                    else
-                                        @assert false
-                                    end
+                        for (undetermined_query_cell_position, nearest_block_index) in
+                            enumerate(nearest_block_index_per_undetermined_query_cell)
+                            if nearest_block_index != block_index
+                                query_cell_index = indices_of_undetermined_query_cells[undetermined_query_cell_position]
+                                if phase == 1
+                                    target_block_index = nearest_block_index
+                                elseif phase == 2
+                                    target_block_index = provisional_block_index_per_query_cell[query_cell_index]
+                                    @assert block_index != target_block_index
+                                else
+                                    @assert false
+                                end
+                                try
+                                    lock(spin_lock_per_block[target_block_index])
+                                    push!(
+                                        next_indices_of_undetermined_query_cells_per_block[target_block_index],
+                                        query_cell_index,
+                                    )
+                                finally
+                                    unlock(spin_lock_per_block[target_block_index])
                                 end
                             end
-                        finally
-                            unlock(spin_lock)
                         end
                     end
 

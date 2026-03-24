@@ -337,7 +337,8 @@ $(CONTRACT)
     is_marker_per_gene = get_vector(daf, "gene", "is_marker")
     n_markers = sum(is_marker_per_gene)
 
-    log_fraction_per_metacell_per_marker = mutable_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array))
+    log_fraction_per_metacell_per_marker =
+        mutable_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array))
     @assert_matrix(log_fraction_per_metacell_per_marker, n_metacells, n_markers, Columns)
 
     median_log_fraction_per_marker =
@@ -349,15 +350,23 @@ $(CONTRACT)
     @assert LoopVectorization.check_args(abs_fold_per_metacell_per_marker) "check_args failed in compute_vector_of_marker_rank_per_gene!\nfor abs_fold_per_metacell_per_marker: $(brief(abs_fold_per_metacell_per_marker))"
     @assert LoopVectorization.check_args(log_fraction_per_metacell_per_marker) "check_args failed in compute_vector_of_marker_rank_per_gene!\nfor log_fraction_per_metacell_per_marker: $(brief(log_fraction_per_metacell_per_marker))"
     @assert LoopVectorization.check_args(median_log_fraction_per_marker) "check_args failed in compute_vector_of_marker_rank_per_gene!\nfor median_log_fraction_per_marker: $(brief(median_log_fraction_per_marker))"
-    @turbo for j in axes(log_fraction_per_metacell_per_marker, 2)
-        for i in axes(log_fraction_per_metacell_per_marker, 1)
-            abs_fold_per_metacell_per_marker[i, j] =
-                abs(log_fraction_per_metacell_per_marker[i, j] - median_log_fraction_per_marker[j])
+    n_metacells, n_markers = size(log_fraction_per_metacell_per_marker)
+    parallel_loop_wo_rng(
+        1:n_markers;
+        name = "abs_fold_per_metacell_per_marker",
+        progress = DebugProgress(n_markers; group = :mcs_loops, desc = "abs_fold_per_metacell_per_marker"),
+    ) do marker_index
+        @turbo for metacell_index in 1:n_metacells
+            abs_fold_per_metacell_per_marker[metacell_index, marker_index] = abs(
+                log_fraction_per_metacell_per_marker[metacell_index, marker_index] -
+                median_log_fraction_per_marker[marker_index],
+            )
         end
+        return nothing
     end
     abs_fold_per_marker_per_metacell = flipped(abs_fold_per_metacell_per_marker)
 
-    rank_per_marker = rank_variables(abs_fold_per_marker_per_metacell)
+    rank_per_marker = rank_variables(abs_fold_per_marker_per_metacell)  # NOJET
 
     marker_rank_per_gene = fill(typemax(UInt32), n_genes)
     marker_rank_per_gene[is_marker_per_gene] .= rank_per_marker
@@ -386,26 +395,34 @@ function rank_variables(score_per_variable_per_observation::AbstractMatrix{<:Abs
     @assert_matrix(score_per_variable_per_observation, Columns)
     n_variables, n_observations = size(score_per_variable_per_observation)
 
-    @views rank_per_variable_per_observation = hcat(
-        [
-            invperm(sortperm(vec(score_per_variable_per_observation[:, observation_index]); rev = true)) for
-            observation_index in 1:n_observations
-        ]...,
-    )
+    rank_per_variable_per_observation = Matrix{Int}(undef, n_variables, n_observations)
+    parallel_loop_wo_rng(
+        1:n_observations;
+        name = "rank_per_variable_per_observation",
+        progress = DebugProgress(n_observations; group = :mcs_loops, desc = "rank_per_variable_per_observation"),
+    ) do observation_index
+        @views rank_per_variable_per_observation[:, observation_index] .=
+            invperm(sortperm(vec(score_per_variable_per_observation[:, observation_index]); rev = true))
+        return nothing
+    end
     @assert_matrix(rank_per_variable_per_observation, n_variables, n_observations, Columns)
 
-    min_rank_per_variable = vec(minimum(rank_per_variable_per_observation; dims = 2))
-    @assert_vector(min_rank_per_variable, n_variables)
-
-    # TODO: This can be done in parallel.
+    min_rank_per_variable = Vector{Int}(undef, n_variables)
     maximal_score_per_variable = Vector{Float32}(undef, n_variables)
-    for variable_index in 1:n_variables
+    parallel_loop_wo_rng(
+        1:n_variables;
+        name = "min_rank_and_maximal_score_per_variable",
+        progress = DebugProgress(n_variables; group = :mcs_loops, desc = "min_rank_and_maximal_score_per_variable"),
+    ) do variable_index
+        @views min_rank_per_variable[variable_index] = minimum(rank_per_variable_per_observation[variable_index, :])
         @views maximal_score_per_observation = score_per_variable_per_observation[
             variable_index,
             rank_per_variable_per_observation[variable_index, :] .== min_rank_per_variable[variable_index],
         ]
         maximal_score_per_variable[variable_index] = mean(maximal_score_per_observation)  # NOLINT
+        return nothing
     end
+    @assert_vector(min_rank_per_variable, n_variables)
 
     priority_per_variable = collect(zip(min_rank_per_variable, -maximal_score_per_variable))
     rank_per_variable = invperm(sortperm(priority_per_variable))

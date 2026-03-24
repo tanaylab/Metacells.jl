@@ -361,7 +361,7 @@ $(CONTRACT)
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
 
     mean_distance_per_metacell = zeros(Float32, n_metacells)
-    std_distance_per_meyacell = zeros(Float32, n_metacells)
+    std_distance_per_metacell = zeros(Float32, n_metacells)
 
     UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
     total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
@@ -406,7 +406,7 @@ $(CONTRACT)
             return pairwise(Euclidean(), Ref(mean_fraction_per_module), eachcol(fraction_per_module_per_cell))
         end
         mean_distance_per_metacell[metacell_index] = mean(distance_per_cell)  # NOLINT
-        std_distance_per_meyacell[metacell_index] = std(distance_per_cell)  # NOLINT
+        std_distance_per_metacell[metacell_index] = std(distance_per_cell)  # NOLINT
 
         return nothing
     end
@@ -418,7 +418,7 @@ $(CONTRACT)
         bestify(mean_distance_per_metacell);
         overwrite,
     )
-    set_vector!(daf, "metacell", "std_euclidean_modules_cells_distance", bestify(std_distance_per_meyacell); overwrite)
+    set_vector!(daf, "metacell", "std_euclidean_modules_cells_distance", bestify(std_distance_per_metacell); overwrite)
     return nothing
 end
 

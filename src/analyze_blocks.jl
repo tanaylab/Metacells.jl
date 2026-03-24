@@ -262,8 +262,17 @@ $(CONTRACT)
     ) do log_fraction_per_gene_per_block
         @assert LoopVectorization.check_args(log_fraction_per_gene_per_block) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_block!\nfor log_fraction_per_gene_per_block: $(brief(log_fraction_per_gene_per_block))"
         @assert LoopVectorization.check_args(fraction_per_gene_per_block) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_block!\nfor fraction_per_gene_per_block: $(brief(fraction_per_gene_per_block))"
-        @turbo for i in eachindex(log_fraction_per_gene_per_block)
-            log_fraction_per_gene_per_block[i] = log2(fraction_per_gene_per_block[i] + gene_fraction_regularization)
+        n_genes, n_blocks = size(log_fraction_per_gene_per_block)
+        parallel_loop_wo_rng(
+            1:n_blocks;
+            name = "log_linear_fraction_per_gene_per_block",
+            progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "log_linear_fraction_per_gene_per_block"),
+        ) do block_index
+            @turbo for gene_index in 1:n_genes
+                log_fraction_per_gene_per_block[gene_index, block_index] =
+                    log2(fraction_per_gene_per_block[gene_index, block_index] + gene_fraction_regularization)
+            end
+            return nothing
         end
         return nothing
     end
@@ -379,12 +388,24 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
     @assert LoopVectorization.check_args(dense_UMIs_per_pertinent_marker_per_cell) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor dense_UMIs_per_pertinent_marker_per_cell: $(brief(dense_UMIs_per_pertinent_marker_per_cell))"
     @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker_per_cell) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor log_linear_fraction_per_pertinent_marker_per_cell: $(brief(log_linear_fraction_per_pertinent_marker_per_cell))"
     @assert LoopVectorization.check_args(total_UMIs_per_cell) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor total_UMIs_per_cell: $(brief(total_UMIs_per_cell))"
-    @turbo for j in axes(dense_UMIs_per_pertinent_marker_per_cell, 2)
-        for i in axes(dense_UMIs_per_pertinent_marker_per_cell, 1)
-            log_linear_fraction_per_pertinent_marker_per_cell[i, j] = log2(
-                dense_UMIs_per_pertinent_marker_per_cell[i, j] / total_UMIs_per_cell[j] + gene_fraction_regularization,
+    n_pertinent_markers, n_cells = size(dense_UMIs_per_pertinent_marker_per_cell)
+    parallel_loop_wo_rng(
+        1:n_cells;
+        name = "log_linear_fraction_per_pertinent_marker_per_cell",
+        progress = DebugProgress(
+            n_cells;
+            group = :mcs_loops,
+            desc = "log_linear_fraction_per_pertinent_marker_per_cell",
+        ),
+        progress_chunk = 100,
+    ) do cell_index
+        @turbo for pertinent_marker_position in 1:n_pertinent_markers
+            log_linear_fraction_per_pertinent_marker_per_cell[pertinent_marker_position, cell_index] = log2(
+                dense_UMIs_per_pertinent_marker_per_cell[pertinent_marker_position, cell_index] /
+                total_UMIs_per_cell[cell_index] + gene_fraction_regularization,
             )
         end
+        return nothing
     end
 
     linear_fraction_per_block_per_pertinent_marker =
@@ -394,9 +415,23 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
         Matrix{Float32}(undef, size(linear_fraction_per_pertinent_marker_per_block))
     @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker_per_block) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor log_linear_fraction_per_pertinent_marker_per_block: $(brief(log_linear_fraction_per_pertinent_marker_per_block))"
     @assert LoopVectorization.check_args(linear_fraction_per_pertinent_marker_per_block) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor linear_fraction_per_pertinent_marker_per_block: $(brief(linear_fraction_per_pertinent_marker_per_block))"
-    @turbo for i in eachindex(log_linear_fraction_per_pertinent_marker_per_block)
-        log_linear_fraction_per_pertinent_marker_per_block[i] =
-            log2(linear_fraction_per_pertinent_marker_per_block[i] + gene_fraction_regularization)
+    n_pertinent_markers_for_blocks, n_blocks_for_markers = size(log_linear_fraction_per_pertinent_marker_per_block)
+    parallel_loop_wo_rng(
+        1:n_blocks_for_markers;
+        name = "log_linear_fraction_per_pertinent_marker_per_block",
+        progress = DebugProgress(
+            n_blocks_for_markers;
+            group = :mcs_loops,
+            desc = "log_linear_fraction_per_pertinent_marker_per_block",
+        ),
+    ) do block_index
+        @turbo for pertinent_marker_position in 1:n_pertinent_markers_for_blocks
+            log_linear_fraction_per_pertinent_marker_per_block[pertinent_marker_position, block_index] = log2(
+                linear_fraction_per_pertinent_marker_per_block[pertinent_marker_position, block_index] +
+                gene_fraction_regularization,
+            )
+        end
+        return nothing
     end
 
     distances_between_blocks_and_cells = parallel_pairwise(  # NOJET
@@ -404,13 +439,25 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
         log_linear_fraction_per_pertinent_marker_per_block,
         log_linear_fraction_per_pertinent_marker_per_cell,
         dims = 2,
-        progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "distances_between_blocks_and_cells"),
+        progress = DebugProgress(n_cells; group = :mcs_loops, desc = "distances_between_blocks_and_cells"),
+        progress_chunk = 100,
     )
 
     name_per_block = axis_vector(daf, "block")
-    closest_block_name_per_cell =
-        name_per_block[first.(Tuple.(vec(argmin(distances_between_blocks_and_cells; dims = 1))))]
-    @assert_vector(closest_block_name_per_cell, n_cells)
+    closest_block_index_per_cell = Vector{Int32}(undef, n_cells)
+    closest_block_name_per_cell = Vector{AbstractString}(undef, n_cells)
+    parallel_loop_wo_rng(
+        1:n_cells;
+        name = "closest_block_index_per_cell",
+        progress = DebugProgress(n_cells; group = :mcs_loops, desc = "closest_block_index_per_cell"),
+        progress_chunk = 100,
+    ) do cell_index
+        @views distance_per_block = distances_between_blocks_and_cells[:, cell_index]
+        closest_block_index = argmin(distance_per_block)
+        @views closest_block_index_per_cell[cell_index] = closest_block_index
+        closest_block_name_per_cell[cell_index] = name_per_block[closest_block_index]
+        return nothing
+    end
 
     set_vector!(daf, "cell", "block.closest_by_pertinent_markers", closest_block_name_per_cell; overwrite)
 
