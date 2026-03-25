@@ -43,6 +43,8 @@ def is_disabled(path, line):
         return False
 
     line = int(line) - 1
+    if line >= len(read_lines[path]):
+        return True  # macro-expanded line beyond file end; skip
     unused_lines[path][line] = ""
     return "NOJET" in read_lines[path][line]
 

@@ -1029,6 +1029,39 @@
 </section>
 </details>
 </article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!(
+    daf::DafWriter;
+    metacells_subset::Union{QueryString, BitVector, AbstractVector{Bool}},
+    matrix_name::AbstractString,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Correlate the marker genes in an arbitrary 
+<code>metacells_subset
+</code>. This subset can be either an explicit mask or a query that masks the 
+<code>metacell
+</code> axis. The result is stored in a per-gene-per-gene 
+<code>matrix_name
+</code>.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -1047,6 +1080,12 @@
 <li>
 <a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!">
 <code>Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!
 </code>
 </a>
 </li>
@@ -1157,7 +1196,7 @@
 <hr/>
 <p>This document was generated with 
 <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
-</a> version 1.17.0. Using Julia version 1.11.5.
+</a> version 1.17.0. Using Julia version 1.12.5.
 </p>
 </section>
 <footer class="modal-card-foot">

@@ -37,6 +37,7 @@ Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_
 
 ```@docs
 Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
+Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!
 ```
 
 ## Index

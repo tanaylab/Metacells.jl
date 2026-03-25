@@ -3,11 +3,12 @@ Do simple metacells analysis.
 """
 module AnalyzeMetacells
 
+export compute_matrix_of_UMIs_per_gene_per_metacell!
+export compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!
 export compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
 export compute_matrix_of_linear_fraction_per_gene_per_metacell!
 export compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
 export compute_matrix_of_max_skeleton_fold_distance_between_metacells!
-export compute_matrix_of_UMIs_per_gene_per_metacell!
 export compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
 export compute_vector_of_n_cells_per_metacell!
 export compute_vector_of_total_UMIs_per_metacell!
@@ -27,6 +28,7 @@ using StatsBase
 using ..Defaults
 using ..Contracts
 
+import Base.Threads.maxthreadid
 import Random.default_rng
 
 # Needed because of JET:
@@ -522,9 +524,10 @@ $(CONTRACT)
 
     correlation_between_cells_and_punctuated_metacells_per_gene = Vector{Float32}(undef, n_genes)
 
-    gene_cell_log_fraction_per_grouped_cell_per_thread = [Vector{Float32}(undef, n_grouped_cells) for _ in 1:nthreads()]
+    gene_cell_log_fraction_per_grouped_cell_per_thread =
+        [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
     gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread =
-        [Vector{Float32}(undef, n_grouped_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
 
     todox_all_zero = Atomic{Int32}(0)
     parallel_loop_wo_rng(
@@ -676,6 +679,72 @@ $(CONTRACT)
 )::Nothing
     type_per_metacell = daf["@ cell : type / metacell =@ >> Mode"].array
     set_vector!(daf, "metacell", "type", type_per_metacell; overwrite)
+    return nothing
+end
+
+"""
+    compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!(
+        daf::DafWriter;
+        metacells_subset::Union{QueryString, BitVector, AbstractVector{Bool}},
+        matrix_name::AbstractString,
+        overwrite::Bool = false,
+    )::Nothing
+
+Correlate the marker genes in an arbitrary `metacells_subset`. This subset can be either an explicit mask or a query
+that masks the `metacell` axis. The result is stored in a per-gene-per-gene `matrix_name`.
+"""
+@logged :mc_ops @computation Contract(;
+    is_relaxed = true,
+    axes = [metacell_axis(RequiredInput), gene_axis(RequiredInput)],
+    data = [
+        vector_of_is_marker_per_gene(RequiredInput),
+        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
+    ],
+) function compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!(
+    daf::DafWriter;
+    metacells_subset::Union{QueryString, BitVector, AbstractVector{Bool}},
+    matrix_name::AbstractString,
+    overwrite::Bool = false,
+)::Nothing
+    if metacells_subset isa QueryString
+        @assert is_axis_query(metacells_subset)
+        @assert query_axis_name(metacells_subset) == "metacell"
+        metacells_subset = get_query(daf, metacells_subset)
+    end
+    indices_of_subset_metacells = findall(metacells_subset)
+    n_subset_metacells = length(indices_of_subset_metacells)
+
+    linear_fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "linear_fraction").array
+    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
+    indices_of_markers = findall(is_marker_per_gene)
+    n_marker_genes = length(indices_of_markers)
+
+    linear_fraction_per_subset_metacell_per_marker_gene = Matrix{Float32}(undef, n_subset_metacells, n_marker_genes)
+    parallel_loop_wo_rng(
+        1:n_marker_genes;
+        progress = DebugProgress(
+            n_marker_genes,
+            group = :mcs_loops,
+            desc = "linear_fraction_per_subset_metacell_per_marker_gene",
+        ),
+    ) do marker_gene_position
+        marker_gene_index = indices_of_markers[marker_gene_position]
+        @views linear_fraction_per_subset_metacell =
+            linear_fraction_per_subset_metacell_per_marker_gene[:, marker_gene_position]
+        return linear_fraction_per_subset_metacell .=
+            linear_fraction_per_metacell_per_gene[indices_of_subset_metacells, marker_gene_index]
+    end
+
+    correlation_between_marker_genes =
+        zero_cor_between_matrix_columns(linear_fraction_per_subset_metacell_per_marker_gene)
+    correlation_between_genes = embed_dense_matrix_in_sparse_matrix(
+        correlation_between_marker_genes;
+        rows_indices = indices_of_markers,
+        n_rows = n_marker_genes,
+        columns_indices = indices_of_markers,
+        n_columns = n_marker_genes,
+    )
+    set_matrix!(daf, "gene", "gene", matrix_name, correlation_between_genes; overwrite)
     return nothing
 end
 

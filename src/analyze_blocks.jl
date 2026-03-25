@@ -41,6 +41,7 @@ using ..AnalyzeGenes
 using ..Defaults
 using ..Contracts
 
+import Base.Threads.maxthreadid
 import ..AnalyzeGenes.fill_vector_of_is_correlated_with_skeleton_per_gene!
 
 # Needed because of JET:
@@ -377,7 +378,6 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
 )::Nothing
-    n_blocks = axis_length(daf, "block")
     n_cells = axis_length(daf, "cell")
 
     total_UMIs_per_cell = mutable_array(densify(get_vector(daf, "cell", "total_UMIs").array))
@@ -583,8 +583,8 @@ $(CONTRACT)
     confusion_fraction_per_block_per_block .+= transpose(confusion_fraction_per_block_per_block)
 
     is_in_neighborhood_per_other_block_per_base_block = zeros(Bool, n_blocks, n_blocks)
-    priority_per_other_block_per_thread = [Vector{Tuple{Float32, Float32}}(undef, n_blocks) for _ in 1:nthreads()]
-    ordered_block_indices_per_thread = [Vector{Int}(undef, n_blocks) for _ in 1:nthreads()]
+    priority_per_other_block_per_thread = [Vector{Tuple{Float32, Float32}}(undef, n_blocks) for _ in 1:maxthreadid()]
+    ordered_block_indices_per_thread = [Vector{Int}(undef, n_blocks) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_blocks;
@@ -953,7 +953,7 @@ $(CONTRACT)
 
     n_metacells = length(block_index_per_metacell)
     is_neighborhood_distinct_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
-    is_in_neighborhood_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:nthreads()]
+    is_in_neighborhood_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_blocks;
@@ -1068,24 +1068,24 @@ Compute and set [`matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene
     n_neighborhood_metacells_per_block = get_vector(daf, "block", "n_neighborhood_metacells").array
     max_n_neighborhood_metacells = maximum(n_neighborhood_metacells_per_block)
 
-    is_in_neighborhood_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:nthreads()]
-    tmp_per_marker_per_thread = Matrix{Float32}(undef, n_markers, nthreads())
+    is_in_neighborhood_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:maxthreadid()]
+    tmp_per_marker_per_thread = Matrix{Float32}(undef, n_markers, maxthreadid())
     correlation_per_skeleton_per_marker_per_thread =
-        [Matrix{Float32}(undef, n_skeletons, n_markers) for _ in 1:nthreads()]
+        [Matrix{Float32}(undef, n_skeletons, n_markers) for _ in 1:maxthreadid()]
     scratch_per_max_metacell_per_skeleton_per_thread =
-        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_skeletons) for _ in 1:nthreads()]
+        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_skeletons) for _ in 1:maxthreadid()]
     scratch_per_max_metacell_per_marker_per_thread =
-        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_markers) for _ in 1:nthreads()]
-    scratch_per_skeleton_per_thread = [Vector{Float32}(undef, n_skeletons) for _ in 1:nthreads()]
-    scratch_per_marker_per_thread = [Vector{Float32}(undef, n_markers) for _ in 1:nthreads()]
-    scratch_markers_window_per_thread = [Vector{Float32}(undef, genes_correlation_window) for _ in 1:nthreads()]
+        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_markers) for _ in 1:maxthreadid()]
+    scratch_per_skeleton_per_thread = [Vector{Float32}(undef, n_skeletons) for _ in 1:maxthreadid()]
+    scratch_per_marker_per_thread = [Vector{Float32}(undef, n_markers) for _ in 1:maxthreadid()]
+    scratch_markers_window_per_thread = [Vector{Float32}(undef, genes_correlation_window) for _ in 1:maxthreadid()]
 
     log_fraction_per_max_neighborhood_metacell_per_skeleton_per_thread =
-        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_skeletons) for _ in 1:nthreads()]
+        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_skeletons) for _ in 1:maxthreadid()]
     log_fraction_per_max_neighborhood_metacell_per_marker_per_thread =
-        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_markers) for _ in 1:nthreads()]
+        [Matrix{Float32}(undef, max_n_neighborhood_metacells, n_markers) for _ in 1:maxthreadid()]
     indices_of_neighborhood_metacells_per_thread =
-        [Vector{Int}(undef, max_n_neighborhood_metacells) for _ in 1:nthreads()]
+        [Vector{Int}(undef, max_n_neighborhood_metacells) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_blocks;
@@ -1257,9 +1257,9 @@ $(CONTRACT)
     max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
 
     cell_log_fraction_per_max_neighborhood_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
     punctuated_metacell_log_fraction_per_max_neighborhood_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
     is_in_neighborhood_per_cell = BitVector(undef, n_cells)
 
     metacell_index_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
@@ -1552,9 +1552,9 @@ $(CONTRACT2)
     indices_of_max_neighborhood_cells = Vector{Int}(undef, max_n_neighborhood_cells)
 
     cell_log_fraction_per_max_neighborhood_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
     punctuated_metacell_log_fraction_per_max_neighborhood_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
 
     progress = DebugProgress(
         n_base_blocks * n_included_genes;
@@ -2045,11 +2045,11 @@ $(CONTRACT2)
     indices_of_max_base_neighborhood_cells = Vector{Int}(undef, max_n_neighborhood_cells)
 
     cell_log_fraction_per_max_neighborhood_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
     other_metacell_log_fraction_per_other_max_neighborhood_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
     correlation_per_max_correlated_gene_per_thread =
-        [Vector{Float32}(undef, n_max_correlated_genes) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, n_max_correlated_genes) for _ in 1:maxthreadid()]
 
     progress = DebugProgress(
         total_correlated_genes,

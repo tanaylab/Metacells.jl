@@ -19,6 +19,8 @@ using TanayLabUtilities
 using ..Contracts
 using ..Defaults
 
+import Base.Threads.maxthreadid
+
 # Needed because of JET:
 import Metacells.Contracts.block_axis
 import Metacells.Contracts.cell_axis
@@ -222,7 +224,7 @@ function compute_provisional_projection_per_query_cell!(;
 
     n_pertinent_neighborhood_markers = length(query_gene_index_per_atlas_pertinent_marker)
     log_linear_fraction_per_pertinent_marker_per_thread =
-        [Vector{Float32}(undef, n_pertinent_neighborhood_markers) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, n_pertinent_neighborhood_markers) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_query_cells;
@@ -583,9 +585,9 @@ $(CONTRACT2)
     correlation_between_cells_and_projected_metacells_per_query_gene = zeros(Float32, n_genes_in_query)
 
     gene_cell_log_fraction_per_included_query_cell_per_thread =
-        [Vector{Float32}(undef, n_included_query_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, n_included_query_cells) for _ in 1:maxthreadid()]
     gene_metacell_log_fraction_per_included_query_cell_per_thread =
-        [Vector{Float32}(undef, n_included_query_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, n_included_query_cells) for _ in 1:maxthreadid()]
 
     todox_all_zero = Atomic{Int32}(0)
     parallel_loop_wo_rng(
@@ -881,9 +883,9 @@ $(CONTRACT2)
     end
 
     cell_log_fraction_per_max_neighborhood_query_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
     projected_metacell_log_fraction_per_max_neighborhood_query_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
 
     if mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing &&
        in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing
@@ -892,15 +894,15 @@ $(CONTRACT2)
         is_out_bin_neighborhood_pertinent_marker_per_common_included_gene_per_thread = nothing
     else
         is_neighborhood_pertinent_marker_per_common_included_gene_per_thread =
-            [BitVector(undef, n_common_included_genes) for _ in 1:nthreads()]
+            [BitVector(undef, n_common_included_genes) for _ in 1:maxthreadid()]
         if in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing
             is_in_bin_neighborhood_pertinent_marker_per_common_included_gene_per_thread = nothing
             is_out_bin_neighborhood_pertinent_marker_per_common_included_gene_per_thread = nothing
         else
             is_in_bin_neighborhood_pertinent_marker_per_common_included_gene_per_thread =
-                [BitVector(undef, n_common_included_genes) for _ in 1:nthreads()]
+                [BitVector(undef, n_common_included_genes) for _ in 1:maxthreadid()]
             is_out_bin_neighborhood_pertinent_marker_per_common_included_gene_per_thread =
-                [BitVector(undef, n_common_included_genes) for _ in 1:nthreads()]
+                [BitVector(undef, n_common_included_genes) for _ in 1:maxthreadid()]
         end
     end
 

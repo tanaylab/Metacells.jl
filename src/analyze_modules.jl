@@ -20,6 +20,7 @@ using ..AnalyzeMetacells
 using ..Contracts
 using ..Defaults
 
+import Base.Threads.maxthreadid
 import Random.default_rng
 
 # Needed because of JET:
@@ -249,8 +250,8 @@ $(CONTRACT)
     n_cells, n_genes = size(UMIs_per_cell_per_gene)
     mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
-    is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
-    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:nthreads()]
+    is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
+    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_blocks;

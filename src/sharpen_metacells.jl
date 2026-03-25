@@ -14,6 +14,7 @@ using TanayLabUtilities
 
 using ..Contracts
 
+import Base.Threads.maxthreadid
 import Random.default_rng
 
 # Needed because of JET:
@@ -207,7 +208,7 @@ $(CONTRACT2)
             n_dims = max_n_block_modules,
             max_k = max_n_kmeans_clusters,
             n_points = max_n_kmeans_points,
-        ) for _ in 1:nthreads()
+        ) for _ in 1:maxthreadid()
     ]
 
     preferred_block_index_per_cell_per_block = compute_preferred_block_index_per_cell_per_block(;
@@ -250,7 +251,7 @@ $(CONTRACT2)
                 n_dims = max_n_block_modules,
                 max_k = max_n_kmeans_clusters,
                 n_points = max_n_kmeans_points,
-            ) for _ in 1:nthreads()
+            ) for _ in 1:maxthreadid()
         ]
     end
 
@@ -325,18 +326,18 @@ function compute_preferred_block_index_per_cell_per_block(;
     n_genes = size(module_index_per_gene_per_block, 1)
 
     z_score_per_max_module_per_max_neighborhood_cell_per_thread =
-        [Matrix{Float32}(undef, max_n_block_modules, max_n_neighborhood_cells) for _ in 1:nthreads()]
-    is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
-    is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:nthreads()]
-    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:nthreads()]
+        [Matrix{Float32}(undef, max_n_block_modules, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
+    is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
+    is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:maxthreadid()]
+    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
     max_n_neighborhood_clusters = maximum(
         max(Int(round(n_neighborhood_cells_per_block[b] / mean_metacell_cells_per_block[b])), 1) for b in 1:n_blocks
     )
     preferred_block_index_per_cluster_per_thread =
-        [Vector{Int}(undef, max_n_neighborhood_clusters) for _ in 1:nthreads()]
-    block_count_scratch_per_thread = [zeros(Int, n_blocks) for _ in 1:nthreads()]
+        [Vector{Int}(undef, max_n_neighborhood_clusters) for _ in 1:maxthreadid()]
+    block_count_scratch_per_thread = [zeros(Int, n_blocks) for _ in 1:maxthreadid()]
     preferred_block_index_per_max_neighborhood_cell_per_thread =
-        [Vector{Int}(undef, max_n_neighborhood_cells) for _ in 1:nthreads()]
+        [Vector{Int}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
 
     parallel_loop_with_rng(
         1:n_blocks;
@@ -597,11 +598,11 @@ function compute_local_clusters(;
 
     n_genes = size(module_index_per_gene_per_block, 1)
 
-    is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:nthreads()]
-    is_in_block_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:nthreads()]
-    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:nthreads()]
+    is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:maxthreadid()]
+    is_in_block_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
+    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
     z_score_per_max_module_per_max_block_cell_per_thread =
-        [Matrix{Float32}(undef, max_n_block_modules, max_n_block_cells) for _ in 1:nthreads()]
+        [Matrix{Float32}(undef, max_n_block_modules, max_n_block_cells) for _ in 1:maxthreadid()]
     cluster_index_per_block_cell_per_block =
         [Vector{Int}(undef, n_cells_per_block[block_index]) for block_index in 1:n_blocks]
 

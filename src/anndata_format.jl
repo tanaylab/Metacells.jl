@@ -658,7 +658,7 @@ end
 
 function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; overwrite::Bool, insist::Bool)::Nothing
     cells_adata = flame_timed("readh5ad") do
-        return readh5ad(cells_h5ad)
+        return readh5ad(cells_h5ad)  # NOJET
     end
 
     if axis_length(daf, "cell") == size(cells_adata, 1)

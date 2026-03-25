@@ -183,7 +183,7 @@ function ensure_is_downloaded(
         return false
     end
     if response.status != 200
-        error("Error GET $(url): HTTP status $(response.status)")  # untested
+        error("Error GET $(url): HTTP status $(response.status)")  # UNTESTED
     end
 
     response_headers = Dict(response.headers)
@@ -191,8 +191,8 @@ function ensure_is_downloaded(
     # TODO: Seems that LFS files are never served zipped.
     # Strange, you would think it would be a priotity for them.
     if get(response_headers, "Content-Encoding", nothing) == "gzip"
-        open(cache_data_path, "w") do file  # untested
-            return write(file, response.body)
+        open(cache_data_path, "w") do file  # UNTESTED
+            return write(file, response.body)  # UNTESTED
         end
     else
         GZip.open(cache_data_path, "w") do file
@@ -207,8 +207,8 @@ function ensure_is_downloaded(
             print(file, etag)
             return nothing
         end
-    elseif ispath(cache_etag_path)  # untested
-        rm(cache_etag_path)  # untested
+    elseif ispath(cache_etag_path)  # UNTESTED
+        rm(cache_etag_path)  # UNTESTED
     end
 
     return true
@@ -233,7 +233,7 @@ function write_set_to_file(
     end
 
     GZip.open(cache_dir * "/" * version * "/" * path * ".jl_set.gz", "w") do file
-        return serialize(file, set)
+        return serialize(file, set)  # NOJET
     end
 
     return set
@@ -266,20 +266,20 @@ function lock_file(path::AbstractString; timeout::Real)::Base.Filesystem.File
         try
             return Base.Filesystem.open(lock_path, Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL)  # NOJET
         catch exception
-            if exception isa Base.IOError  # untested
-                if timeout > 0  # untested
-                    elapsed_time = time() - start_time  # untested
-                    @assert elapsed_time < timeout "Waiting for more than $(timeout) seconds for $(lock_path)"  # untested
+            if exception isa Base.IOError  # UNTESTED
+                if timeout > 0  # UNTESTED
+                    elapsed_time = time() - start_time  # UNTESTED
+                    @assert elapsed_time < timeout "Waiting for more than $(timeout) seconds for $(lock_path)"  # UNTESTED
                 end
-                sleep(1)  # untested
+                sleep(1)  # UNTESTED
             else
-                rethrow()  # untested
+                rethrow()  # UNTESTED
             end
         end
     end
 end
 
-function unlock_file(file::Base.Filesystem.File, path::AbstractString)::Nothing
+function unlock_file(file::Base.Filesystem.File, path::AbstractString)::Nothing  # UNTESTED
     close(file)
     return rm(path * ".lock")
 end
