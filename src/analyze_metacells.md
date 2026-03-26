@@ -40,6 +40,13 @@ Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punct
 Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!
 ```
 
+## UMAP
+
+```@docs
+Metacells.AnalyzeMetacells.compute_metacells_2d_umap!
+Metacells.AnalyzeMetacells.compute_metacells_3d_umap!
+```
+
 ## Index
 
 ```@index

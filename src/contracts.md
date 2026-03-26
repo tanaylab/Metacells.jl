@@ -73,6 +73,16 @@ Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
 Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
 ```
 
+### Metacells UMAP
+
+```@docs
+Metacells.Contracts.vector_of_umap_x_per_metacell
+Metacells.Contracts.vector_of_umap_y_per_metacell
+Metacells.Contracts.vector_of_umap_u_per_metacell
+Metacells.Contracts.vector_of_umap_v_per_metacell
+Metacells.Contracts.vector_of_umap_w_per_metacell
+```
+
 ## Blocks
 
 ```@docs
@@ -127,6 +137,16 @@ Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
 ```@docs
 Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
+```
+
+### Blocks UMAP
+
+```@docs
+Metacells.Contracts.vector_of_umap_x_per_block
+Metacells.Contracts.vector_of_umap_y_per_block
+Metacells.Contracts.vector_of_umap_u_per_block
+Metacells.Contracts.vector_of_umap_v_per_block
+Metacells.Contracts.vector_of_umap_w_per_block
 ```
 
 ## Type Annotations

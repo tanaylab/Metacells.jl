@@ -103,6 +103,12 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="#UMAP">
+<span>UMAP
+</span>
+</a>
+</li>
+<li>
 <a class="tocitem" href="#Index">
 <span>Index
 </span>
@@ -1062,6 +1068,168 @@
 </section>
 </details>
 </article>
+<h2 id="UMAP">
+<a class="docs-heading-anchor" href="#UMAP">UMAP
+</a>
+<a id="UMAP-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#UMAP" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_metacells_2d_umap!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_metacells_2d_umap!">
+<code>Metacells.AnalyzeMetacells.compute_metacells_2d_umap!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_2d_umap!(
+    daf::DafWriter;
+    min_dist::AbstractFloat = ```0.5```,
+    n_neighbors::Integer = ```15```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_x_per_metacell">
+<code>vector_of_umap_x_per_metacell
+</code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_y_per_metacell">
+<code>vector_of_umap_y_per_metacell
+</code>
+</a> by computing a 2D UMAP projection from the Euclidean skeleton fold distance between metacells.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, metacell @ euclidean
+<em>skeleton
+</em>fold_distance
+</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ umap_x
+</strong>::Union{Float32, Float64} (created): The X coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_y
+</strong>::Union{Float32, Float64} (created): The Y coordinate of each metacell in a 2D UMAP projection.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_metacells_3d_umap!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_metacells_3d_umap!">
+<code>Metacells.AnalyzeMetacells.compute_metacells_3d_umap!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_metacells_3d_umap!(
+    daf::DafWriter;
+    min_dist::AbstractFloat = ```0.5```,
+    n_neighbors::Integer = ```15```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_u_per_metacell">
+<code>vector_of_umap_u_per_metacell
+</code>
+</a>, 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_v_per_metacell">
+<code>vector_of_umap_v_per_metacell
+</code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_w_per_metacell">
+<code>vector_of_umap_w_per_metacell
+</code>
+</a> by computing a 3D UMAP projection from the Euclidean skeleton fold distance between metacells.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, metacell @ euclidean
+<em>skeleton
+</em>fold_distance
+</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ umap_u
+</strong>::Union{Float32, Float64} (created): The U coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_v
+</strong>::Union{Float32, Float64} (created): The V coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_w
+</strong>::Union{Float32, Float64} (created): The W coordinate of each metacell in a 3D UMAP projection.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -1110,6 +1278,18 @@
 <li>
 <a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!">
 <code>Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_2d_umap!">
+<code>Metacells.AnalyzeMetacells.compute_metacells_2d_umap!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_3d_umap!">
+<code>Metacells.AnalyzeMetacells.compute_metacells_3d_umap!
 </code>
 </a>
 </li>

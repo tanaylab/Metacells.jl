@@ -97,6 +97,16 @@ export vector_of_total_UMIs_per_metacell
 export vector_of_type_per_block
 export vector_of_type_per_cell
 export vector_of_type_per_metacell
+export vector_of_umap_u_per_block
+export vector_of_umap_u_per_metacell
+export vector_of_umap_v_per_block
+export vector_of_umap_v_per_metacell
+export vector_of_umap_w_per_block
+export vector_of_umap_w_per_metacell
+export vector_of_umap_x_per_block
+export vector_of_umap_x_per_metacell
+export vector_of_umap_y_per_block
+export vector_of_umap_y_per_metacell
 
 using DataAxesFormats
 
@@ -635,6 +645,78 @@ function vector_of_correlation_between_cells_and_punctuated_metacells_per_gene(
     )
 end
 
+### Metacells UMAP
+
+"""
+    vector_of_umap_x_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The X coordinate of each metacell in a 2D UMAP projection.
+
+This vector is populated by [`compute_metacells_2d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_2d_umap!).
+"""
+function vector_of_umap_x_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "umap_x") =>
+        (expectation, StorageFloat, "The X coordinate of each metacell in a 2D UMAP projection.")
+end
+
+"""
+    vector_of_umap_y_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The Y coordinate of each metacell in a 2D UMAP projection.
+
+This vector is populated by [`compute_metacells_2d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_2d_umap!).
+"""
+function vector_of_umap_y_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "umap_y") =>
+        (expectation, StorageFloat, "The Y coordinate of each metacell in a 2D UMAP projection.")
+end
+
+"""
+    vector_of_umap_u_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The U coordinate of each metacell in a 3D UMAP projection.
+
+This vector is populated by [`compute_metacells_3d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_3d_umap!).
+"""
+function vector_of_umap_u_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "umap_u") =>
+        (expectation, StorageFloat, "The U coordinate of each metacell in a 3D UMAP projection.")
+end
+
+"""
+    vector_of_umap_v_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The V coordinate of each metacell in a 3D UMAP projection.
+
+This vector is populated by [`compute_metacells_3d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_3d_umap!).
+"""
+function vector_of_umap_v_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "umap_v") =>
+        (expectation, StorageFloat, "The V coordinate of each metacell in a 3D UMAP projection.")
+end
+
+"""
+    vector_of_umap_w_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The W coordinate of each metacell in a 3D UMAP projection.
+
+This vector is populated by [`compute_metacells_3d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_3d_umap!).
+"""
+function vector_of_umap_w_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "umap_w") =>
+        (expectation, StorageFloat, "The W coordinate of each metacell in a 3D UMAP projection.")
+end
+
 ## Blocks
 
 """
@@ -1019,6 +1101,83 @@ function matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacel
         StorageFloat,
         "The correlation between cells and their metacells (minus the correlated cell) gene expression levels in each block's neighborhood.",
     )
+end
+
+### Blocks UMAP
+
+"""
+    vector_of_umap_x_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The X coordinate of each block in a 2D UMAP projection, computed as the mean of the X coordinates of the metacells in
+the block.
+
+This vector is populated by [`compute_blocks_2d_umap_by_metacells!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!).
+"""
+function vector_of_umap_x_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("block", "umap_x") => (expectation, StorageFloat, "The X coordinate of each block in a 2D UMAP projection.")
+end
+
+"""
+    vector_of_umap_y_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The Y coordinate of each block in a 2D UMAP projection, computed as the mean of the Y coordinates of the metacells in
+the block.
+
+This vector is populated by [`compute_blocks_2d_umap_by_metacells!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!).
+"""
+function vector_of_umap_y_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("block", "umap_y") => (expectation, StorageFloat, "The Y coordinate of each block in a 2D UMAP projection.")
+end
+
+"""
+    vector_of_umap_u_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The U coordinate of each block in a 3D UMAP projection, computed as the mean of the U coordinates of the metacells in
+the block.
+
+This vector is populated by [`compute_blocks_3d_umap_by_metacells!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!).
+"""
+function vector_of_umap_u_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("block", "umap_u") => (expectation, StorageFloat, "The U coordinate of each block in a 3D UMAP projection.")
+end
+
+"""
+    vector_of_umap_v_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The V coordinate of each block in a 3D UMAP projection, computed as the mean of the V coordinates of the metacells in
+the block.
+
+This vector is populated by [`compute_blocks_3d_umap_by_metacells!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!).
+"""
+function vector_of_umap_v_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("block", "umap_v") => (expectation, StorageFloat, "The V coordinate of each block in a 3D UMAP projection.")
+end
+
+"""
+    vector_of_umap_w_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The W coordinate of each block in a 3D UMAP projection, computed as the mean of the W coordinates of the metacells in
+the block.
+
+This vector is populated by [`compute_blocks_3d_umap_by_metacells!`](@ref
+Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!).
+"""
+function vector_of_umap_w_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("block", "umap_w") => (expectation, StorageFloat, "The W coordinate of each block in a 3D UMAP projection.")
 end
 
 ## Type Annotations

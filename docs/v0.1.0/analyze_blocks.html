@@ -123,6 +123,12 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="#UMAP">
+<span>UMAP
+</span>
+</a>
+</li>
+<li>
 <a class="tocitem" href="#Index">
 <span>Index
 </span>
@@ -2350,6 +2356,188 @@
 </section>
 </details>
 </article>
+<h2 id="UMAP">
+<a class="docs-heading-anchor" href="#UMAP">UMAP
+</a>
+<a id="UMAP-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#UMAP" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_2d_umap_by_metacells!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_x_per_block">
+<code>vector_of_umap_x_per_block
+</code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_y_per_block">
+<code>vector_of_umap_y_per_block
+</code>
+</a> by taking the mean of the 2D UMAP coordinates of the metacells in each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ umap_x
+</strong>::Union{Float32, Float64} (required): The X coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_y
+</strong>::Union{Float32, Float64} (required): The Y coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>block @ umap_x
+</strong>::Union{Float32, Float64} (created): The X coordinate of each block in a 2D UMAP projection.
+</p>
+<p>
+<strong>block @ umap_y
+</strong>::Union{Float32, Float64} (created): The Y coordinate of each block in a 2D UMAP projection.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_blocks_3d_umap_by_metacells!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_u_per_block">
+<code>vector_of_umap_u_per_block
+</code>
+</a>, 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_v_per_block">
+<code>vector_of_umap_v_per_block
+</code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_w_per_block">
+<code>vector_of_umap_w_per_block
+</code>
+</a> by taking the mean of the 3D UMAP coordinates of the metacells in each block.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ umap_u
+</strong>::Union{Float32, Float64} (required): The U coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_v
+</strong>::Union{Float32, Float64} (required): The V coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_w
+</strong>::Union{Float32, Float64} (required): The W coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>block @ umap_u
+</strong>::Union{Float32, Float64} (created): The U coordinate of each block in a 3D UMAP projection.
+</p>
+<p>
+<strong>block @ umap_v
+</strong>::Union{Float32, Float64} (created): The V coordinate of each block in a 3D UMAP projection.
+</p>
+<p>
+<strong>block @ umap_w
+</strong>::Union{Float32, Float64} (created): The W coordinate of each block in a 3D UMAP projection.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -2362,6 +2550,18 @@
 <li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks">
 <code>Metacells.AnalyzeBlocks
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!">
+<code>Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!
 </code>
 </a>
 </li>

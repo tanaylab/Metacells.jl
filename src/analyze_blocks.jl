@@ -24,6 +24,8 @@ export compute_vector_of_n_neighborhood_cells_per_block!
 export compute_vector_of_n_neighborhood_metacells_per_block!
 export compute_vector_of_total_neighborhood_UMIs_per_block!
 export compute_vector_of_total_UMIs_per_block!
+export compute_blocks_2d_umap_by_metacells!
+export compute_blocks_3d_umap_by_metacells!
 export compute_vector_of_type_per_block_by_cells!
 export compute_vector_of_type_per_block_by_metacells!
 export compute_vector_of_type_per_cell_by_blocks!
@@ -87,6 +89,16 @@ import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 import Metacells.Contracts.vector_of_type_per_block
 import Metacells.Contracts.vector_of_type_per_metacell
+import Metacells.Contracts.vector_of_umap_u_per_block
+import Metacells.Contracts.vector_of_umap_u_per_metacell
+import Metacells.Contracts.vector_of_umap_v_per_block
+import Metacells.Contracts.vector_of_umap_v_per_metacell
+import Metacells.Contracts.vector_of_umap_w_per_block
+import Metacells.Contracts.vector_of_umap_w_per_metacell
+import Metacells.Contracts.vector_of_umap_x_per_block
+import Metacells.Contracts.vector_of_umap_x_per_metacell
+import Metacells.Contracts.vector_of_umap_y_per_block
+import Metacells.Contracts.vector_of_umap_y_per_metacell
 
 """
     function compute_vector_of_n_metacells_per_block!(
@@ -2294,6 +2306,72 @@ $(CONTRACT)
 )::Nothing
     type_per_metacell = daf["@ metacell : block : type"].array
     set_vector!(daf, "metacell", "type", type_per_metacell; overwrite)
+    return nothing
+end
+
+"""
+    function compute_blocks_2d_umap_by_metacells!(
+        daf::DafWriter;
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_umap_x_per_block`](@ref) and [`vector_of_umap_y_per_block`](@ref) by taking the mean of
+the 2D UMAP coordinates of the metacells in each block.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_umap_x_per_metacell(RequiredInput),
+        vector_of_umap_y_per_metacell(RequiredInput),
+        vector_of_umap_x_per_block(CreatedOutput),
+        vector_of_umap_y_per_block(CreatedOutput),
+    ],
+) function compute_blocks_2d_umap_by_metacells!(  # UNTESTED
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+    umap_x_per_block = daf["@ metacell : umap_x / block =@ >> Mean"].array
+    umap_y_per_block = daf["@ metacell : umap_y / block =@ >> Mean"].array
+    set_vector!(daf, "block", "umap_x", umap_x_per_block; overwrite)
+    set_vector!(daf, "block", "umap_y", umap_y_per_block; overwrite)
+    return nothing
+end
+
+"""
+    function compute_blocks_3d_umap_by_metacells!(
+        daf::DafWriter;
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_umap_u_per_block`](@ref), [`vector_of_umap_v_per_block`](@ref) and
+[`vector_of_umap_w_per_block`](@ref) by taking the mean of the 3D UMAP coordinates of the metacells in each block.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_umap_u_per_metacell(RequiredInput),
+        vector_of_umap_v_per_metacell(RequiredInput),
+        vector_of_umap_w_per_metacell(RequiredInput),
+        vector_of_umap_u_per_block(CreatedOutput),
+        vector_of_umap_v_per_block(CreatedOutput),
+        vector_of_umap_w_per_block(CreatedOutput),
+    ],
+) function compute_blocks_3d_umap_by_metacells!(  # UNTESTED
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+    umap_u_per_block = daf["@ metacell : umap_u / block =@ >> Mean"].array
+    umap_v_per_block = daf["@ metacell : umap_v / block =@ >> Mean"].array
+    umap_w_per_block = daf["@ metacell : umap_w / block =@ >> Mean"].array
+    set_vector!(daf, "block", "umap_u", umap_u_per_block; overwrite)
+    set_vector!(daf, "block", "umap_v", umap_v_per_block; overwrite)
+    set_vector!(daf, "block", "umap_w", umap_w_per_block; overwrite)
     return nothing
 end
 

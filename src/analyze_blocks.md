@@ -64,6 +64,13 @@ Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
 ```
 
+## UMAP
+
+```@docs
+Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!
+Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!
+```
+
 ## Index
 
 ```@index

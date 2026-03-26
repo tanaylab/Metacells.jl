@@ -1202,6 +1202,164 @@
 </section>
 </details>
 </article>
+<h3 id="Metacells-UMAP">
+<a class="docs-heading-anchor" href="#Metacells-UMAP">Metacells UMAP
+</a>
+<a id="Metacells-UMAP-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacells-UMAP" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_x_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_x_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_x_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_x_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The X coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_2d_umap!">
+<code>compute_metacells_2d_umap!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_y_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_y_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_y_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_y_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The Y coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_2d_umap!">
+<code>compute_metacells_2d_umap!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_u_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_u_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_u_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_u_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The U coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_3d_umap!">
+<code>compute_metacells_3d_umap!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_v_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_v_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_v_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_v_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The V coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_3d_umap!">
+<code>compute_metacells_3d_umap!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_w_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_w_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_w_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_w_per_metacell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The W coordinate of each metacell in a 3D UMAP projection.
+</p>
+<p>This vector is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_3d_umap!">
+<code>compute_metacells_3d_umap!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Blocks">
 <a class="docs-heading-anchor" href="#Blocks">Blocks
 </a>
@@ -1887,6 +2045,164 @@
 <p>This matrix is populated by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!">
 <code>compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h3 id="Blocks-UMAP">
+<a class="docs-heading-anchor" href="#Blocks-UMAP">Blocks UMAP
+</a>
+<a id="Blocks-UMAP-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-UMAP" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_x_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_x_per_block">
+<code>Metacells.Contracts.vector_of_umap_x_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_x_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The X coordinate of each block in a 2D UMAP projection, computed as the mean of the X coordinates of the metacells in the block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!">
+<code>compute_blocks_2d_umap_by_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_y_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_y_per_block">
+<code>Metacells.Contracts.vector_of_umap_y_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_y_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The Y coordinate of each block in a 2D UMAP projection, computed as the mean of the Y coordinates of the metacells in the block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!">
+<code>compute_blocks_2d_umap_by_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_u_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_u_per_block">
+<code>Metacells.Contracts.vector_of_umap_u_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_u_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The U coordinate of each block in a 3D UMAP projection, computed as the mean of the U coordinates of the metacells in the block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!">
+<code>compute_blocks_3d_umap_by_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_v_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_v_per_block">
+<code>Metacells.Contracts.vector_of_umap_v_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_v_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The V coordinate of each block in a 3D UMAP projection, computed as the mean of the V coordinates of the metacells in the block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!">
+<code>compute_blocks_3d_umap_by_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_umap_w_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_umap_w_per_block">
+<code>Metacells.Contracts.vector_of_umap_w_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_umap_w_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The W coordinate of each block in a 3D UMAP projection, computed as the mean of the W coordinates of the metacells in the block.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!">
+<code>compute_blocks_3d_umap_by_metacells!
 </code>
 </a>.
 </p>
@@ -3254,6 +3570,66 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_type_per_metacell">
 <code>Metacells.Contracts.vector_of_type_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_u_per_block">
+<code>Metacells.Contracts.vector_of_umap_u_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_u_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_u_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_v_per_block">
+<code>Metacells.Contracts.vector_of_umap_v_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_v_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_v_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_w_per_block">
+<code>Metacells.Contracts.vector_of_umap_w_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_w_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_w_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_x_per_block">
+<code>Metacells.Contracts.vector_of_umap_x_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_x_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_x_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_y_per_block">
+<code>Metacells.Contracts.vector_of_umap_y_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_y_per_metacell">
+<code>Metacells.Contracts.vector_of_umap_y_per_metacell
 </code>
 </a>
 </li>

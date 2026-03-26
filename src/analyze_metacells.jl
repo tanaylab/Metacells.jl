@@ -9,6 +9,8 @@ export compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
 export compute_matrix_of_linear_fraction_per_gene_per_metacell!
 export compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
 export compute_matrix_of_max_skeleton_fold_distance_between_metacells!
+export compute_metacells_2d_umap!
+export compute_metacells_3d_umap!
 export compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
 export compute_vector_of_n_cells_per_metacell!
 export compute_vector_of_total_UMIs_per_metacell!
@@ -24,6 +26,7 @@ using MultipleTesting
 using TanayLabUtilities
 using Random
 using StatsBase
+using UMAP
 
 using ..Defaults
 using ..Contracts
@@ -53,6 +56,11 @@ import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 import Metacells.Contracts.vector_of_type_per_cell
 import Metacells.Contracts.vector_of_type_per_metacell
+import Metacells.Contracts.vector_of_umap_u_per_metacell
+import Metacells.Contracts.vector_of_umap_v_per_metacell
+import Metacells.Contracts.vector_of_umap_w_per_metacell
+import Metacells.Contracts.vector_of_umap_x_per_metacell
+import Metacells.Contracts.vector_of_umap_y_per_metacell
 
 """
     function compute_vector_of_n_cells_per_metacell!(
@@ -745,6 +753,75 @@ that masks the `metacell` axis. The result is stored in a per-gene-per-gene `mat
         n_columns = n_marker_genes,
     )
     set_matrix!(daf, "gene", "gene", matrix_name, correlation_between_genes; overwrite)
+    return nothing
+end
+
+"""
+    function compute_metacells_2d_umap!(
+        daf::DafWriter;
+        min_dist::AbstractFloat = $(DEFAULT.min_dist),
+        n_neighbors::Integer = $(DEFAULT.n_neighbors),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_umap_x_per_metacell`](@ref) and [`vector_of_umap_y_per_metacell`](@ref) by computing a 2D
+UMAP projection from the Euclidean skeleton fold distance between metacells.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [metacell_axis(RequiredInput)],
+    data = [
+        matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
+        vector_of_umap_x_per_metacell(CreatedOutput),
+        vector_of_umap_y_per_metacell(CreatedOutput),
+    ],
+) function compute_metacells_2d_umap!(  # UNTESTED
+    daf::DafWriter;
+    min_dist::AbstractFloat = 0.5,
+    n_neighbors::Integer = 15,
+    overwrite::Bool = false,
+)::Nothing
+    distances_between_metacells = daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"].array
+    result = UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
+    set_vector!(daf, "metacell", "umap_x", Float32[point[1] for point in result.embedding]; overwrite)
+    set_vector!(daf, "metacell", "umap_y", Float32[point[2] for point in result.embedding]; overwrite)
+    return nothing
+end
+
+"""
+    function compute_metacells_3d_umap!(
+        daf::DafWriter;
+        min_dist::AbstractFloat = $(DEFAULT.min_dist),
+        n_neighbors::Integer = $(DEFAULT.n_neighbors),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_umap_u_per_metacell`](@ref), [`vector_of_umap_v_per_metacell`](@ref) and
+[`vector_of_umap_w_per_metacell`](@ref) by computing a 3D UMAP projection from the Euclidean skeleton fold distance
+between metacells.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [metacell_axis(RequiredInput)],
+    data = [
+        matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
+        vector_of_umap_u_per_metacell(CreatedOutput),
+        vector_of_umap_v_per_metacell(CreatedOutput),
+        vector_of_umap_w_per_metacell(CreatedOutput),
+    ],
+) function compute_metacells_3d_umap!(  # UNTESTED
+    daf::DafWriter;
+    min_dist::AbstractFloat = 0.5,
+    n_neighbors::Integer = 15,
+    overwrite::Bool = false,
+)::Nothing
+    distances_between_metacells = daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"].array
+    result = UMAP.fit(distances_between_metacells, 3; metric = :precomputed, min_dist, n_neighbors)
+    set_vector!(daf, "metacell", "umap_u", Float32[point[1] for point in result.embedding]; overwrite)
+    set_vector!(daf, "metacell", "umap_v", Float32[point[2] for point in result.embedding]; overwrite)
+    set_vector!(daf, "metacell", "umap_w", Float32[point[3] for point in result.embedding]; overwrite)
     return nothing
 end
 
