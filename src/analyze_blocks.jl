@@ -6,7 +6,7 @@ module AnalyzeBlocks
 export compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!
 export compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 export compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!
-export compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+export compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 export compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!
 export compute_matrix_of_is_in_neighborhood_per_block_per_block!
 export compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
@@ -57,7 +57,7 @@ import Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
 import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
-import Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+import Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
 import Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
@@ -1276,11 +1276,9 @@ $(CONTRACT)
 
     metacell_index_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
     total_UMIs_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
-    total_metacell_UMIs_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
-    total_punctuated_metacell_UMIs_per_max_neighborhood_cell = total_metacell_UMIs_per_max_neighborhood_cell
+    total_punctuated_metacell_UMIs_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
     indices_of_max_neighborhood_cells = Vector{Int}(undef, max_n_neighborhood_cells)
 
-    todox_all_zero = Atomic{Int32}(0)
     for block_index in 1:n_blocks
         @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
         is_in_neighborhood_per_cell .=
@@ -1297,17 +1295,17 @@ $(CONTRACT)
 
         @views metacell_index_per_neighborhood_cell = metacell_index_per_max_neighborhood_cell[1:n_neighborhood_cells]
         @views total_UMIs_per_neighborhood_cell = total_UMIs_per_max_neighborhood_cell[1:n_neighborhood_cells]
-        @views total_metacell_UMIs_per_neighborhood_cell =
-            total_metacell_UMIs_per_max_neighborhood_cell[1:n_neighborhood_cells]
         @views total_punctuated_metacell_UMIs_per_neighborhood_cell =
             total_punctuated_metacell_UMIs_per_max_neighborhood_cell[1:n_neighborhood_cells]
 
-        metacell_index_per_neighborhood_cell .= getindex.(Ref(metacell_index_per_cell), indices_of_neighborhood_cells)
-        total_UMIs_per_neighborhood_cell .= getindex.(Ref(total_UMIs_per_cell), indices_of_neighborhood_cells)
-        total_metacell_UMIs_per_neighborhood_cell .=
-            getindex.(Ref(total_UMIs_per_metacell), metacell_index_per_neighborhood_cell)
-        @. total_punctuated_metacell_UMIs_per_neighborhood_cell =
-            total_metacell_UMIs_per_neighborhood_cell .- total_UMIs_per_neighborhood_cell
+        for (neighborhood_cell_position, cell_index) in enumerate(indices_of_neighborhood_cells)
+            metacell_index = metacell_index_per_cell[cell_index]
+            metacell_index_per_neighborhood_cell[neighborhood_cell_position] = metacell_index
+            cell_total_UMIs = total_UMIs_per_cell[cell_index]
+            total_UMIs_per_neighborhood_cell[neighborhood_cell_position] = cell_total_UMIs
+            total_punctuated_metacell_UMIs_per_neighborhood_cell[neighborhood_cell_position] =
+                total_UMIs_per_metacell[metacell_index] - cell_total_UMIs
+        end
 
         parallel_loop_wo_rng(
             1:n_included_genes;
@@ -1335,7 +1333,6 @@ $(CONTRACT)
                 end
             end
             if all_zero_neighborhood_cell_UMIs
-                atomic_add!(todox_all_zero, Int32(1))
                 correlation_per_gene_per_block[gene_index, block_index] = 0.0f0
                 return nothing
             end
@@ -1351,7 +1348,6 @@ $(CONTRACT)
                 end
             end
             if all_zero_neighborhood_punctuated_metacell_UMIs
-                atomic_add!(todox_all_zero, Int32(1))
                 correlation_per_gene_per_block[gene_index, block_index] = 0.0f0
                 return nothing
             end
@@ -1405,8 +1401,6 @@ $(CONTRACT)
         mean_correlation_per_block[block_index] =
             mean(correlation_per_gene_per_block[is_neighborhood_pertinent_marker_per_gene, block_index])  # NOLINT
     end
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_blocks * n_included_genes) ($(percent(todox_all_zero[], n_blocks * n_included_genes)))" _group =
-        :todox
 
     set_matrix!(
         daf,
@@ -1559,7 +1553,6 @@ $(CONTRACT2)
 
     other_metacell_index_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
     total_UMIs_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
-    total_other_metacell_UMIs_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
     total_punctuated_metacell_UMIs_per_max_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
     indices_of_max_neighborhood_cells = Vector{Int}(undef, max_n_neighborhood_cells)
 
@@ -1574,7 +1567,6 @@ $(CONTRACT2)
         desc = "correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block",
     )
 
-    todox_all_zero = Atomic{Int32}(0)
     for base_block_index in 1:n_base_blocks
         @views is_in_neighborhood_per_other_block =
             is_in_neighborhood_per_other_block_per_base_block[:, base_block_index]
@@ -1593,18 +1585,17 @@ $(CONTRACT2)
         @views other_metacell_index_per_neighborhood_cell =
             other_metacell_index_per_max_neighborhood_cell[1:n_neighborhood_cells]
         @views total_UMIs_per_neighborhood_cell = total_UMIs_per_max_neighborhood_cell[1:n_neighborhood_cells]
-        @views total_other_metacell_UMIs_per_neighborhood_cell =
-            total_other_metacell_UMIs_per_max_neighborhood_cell[1:n_neighborhood_cells]
         @views total_punctuated_metacell_UMIs_per_neighborhood_cell =
             total_punctuated_metacell_UMIs_per_max_neighborhood_cell[1:n_neighborhood_cells]
 
-        other_metacell_index_per_neighborhood_cell .=
-            getindex.(Ref(other_metacell_index_per_cell), indices_of_neighborhood_cells)
-        total_UMIs_per_neighborhood_cell .= getindex.(Ref(total_UMIs_per_cell), indices_of_neighborhood_cells)
-        total_other_metacell_UMIs_per_neighborhood_cell .=
-            getindex.(Ref(total_UMIs_per_other_metacell), other_metacell_index_per_neighborhood_cell)
-        @. total_punctuated_metacell_UMIs_per_neighborhood_cell =
-            total_other_metacell_UMIs_per_neighborhood_cell .- total_UMIs_per_neighborhood_cell
+        for (neighborhood_cell_position, cell_index) in enumerate(indices_of_neighborhood_cells)
+            other_metacell_index = other_metacell_index_per_cell[cell_index]
+            other_metacell_index_per_neighborhood_cell[neighborhood_cell_position] = other_metacell_index
+            cell_total_UMIs = total_UMIs_per_cell[cell_index]
+            total_UMIs_per_neighborhood_cell[neighborhood_cell_position] = cell_total_UMIs
+            total_punctuated_metacell_UMIs_per_neighborhood_cell[neighborhood_cell_position] =
+                total_UMIs_per_other_metacell[other_metacell_index] - cell_total_UMIs
+        end
 
         parallel_loop_wo_rng(
             1:n_included_genes;
@@ -1632,7 +1623,6 @@ $(CONTRACT2)
                 end
             end
             if all_zero_neighborhood_cell_UMIs
-                atomic_add!(todox_all_zero, Int32(1))
                 correlation_per_gene_per_base_block[gene_index, base_block_index] = 0.0f0
                 return nothing
             end
@@ -1648,7 +1638,6 @@ $(CONTRACT2)
                 end
             end
             if all_zero_neighborhood_punctuated_metacell_UMIs
-                atomic_add!(todox_all_zero, Int32(1))
                 correlation_per_gene_per_base_block[gene_index, base_block_index] = 0.0f0
                 return nothing
             end
@@ -1722,8 +1711,6 @@ $(CONTRACT2)
             out_bin_mean_correlation_per_base_block[base_block_index] = mean(correlation_per_relevant_gene)  # NOJET # NOLINT
         end
     end
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_base_blocks * n_included_genes) ($(percent(todox_all_zero[], n_base_blocks * n_included_genes)))" _group =
-        :todox
 
     set_matrix!(
         other_daf,
@@ -1943,7 +1930,7 @@ $(CONTRACT)
 end
 
 """
-    compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!(;
+    compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;
         other_daf::DafWriter,
         base_daf::DafReader;
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
@@ -1951,14 +1938,15 @@ end
     )::Nothing
 
 Compute and set
-[`matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block`](@ref). This
+[`matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref). This
 will also copy [`base_block_axis`](@ref) from the `base_daf` into the `other_daf` if needed.
 
 The `cell` and `gene` axes must be identical in both `base_daf` and `other_daf`.
 
 That is, we evaluate the quality of the `other_daf` metacells by correlating the genes in each cell in each neighborhood
-of `base_daf` with the expression of their most correlated gene in their `other_daf` metacells. This works as a poor
-man's cross-validation; not as good as real cross-validation but much less expensive to compute.
+of `base_daf` with the expression of their most correlated gene in their `other_daf` punctuated metacells (metacells
+minus the correlated cell). This works as a poor man's cross-validation; not as good as real cross-validation but much
+less expensive to compute.
 
 # Other
 
@@ -1978,8 +1966,9 @@ $(CONTRACT2)
     ],
     data = [
         vector_of_metacell_per_cell(RequiredInput),
-        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
-        matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+        matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
             CreatedOutput,
         ),
     ],
@@ -2001,7 +1990,7 @@ $(CONTRACT2)
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(RequiredInput),
     ],
-) function compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!(;
+) function compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;
     other_daf::DafWriter,
     base_daf::DafReader,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
@@ -2016,8 +2005,9 @@ $(CONTRACT2)
     n_cells = axis_length(base_daf, "cell")
     n_genes = axis_length(base_daf, "gene")
 
-    linear_fraction_per_other_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "linear_fraction").array
     other_metacell_index_per_cell = other_daf["@ cell : metacell ?? 0 : index"].array
+    total_UMIs_per_other_metacell = get_vector(other_daf, "metacell", "total_UMIs").array
+    UMIs_per_other_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "UMIs").array
 
     n_base_blocks = axis_length(base_daf, "block")
 
@@ -2055,10 +2045,13 @@ $(CONTRACT2)
     max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
     indices_of_max_correlated_genes = Vector{Int}(undef, n_max_correlated_genes)
     indices_of_max_base_neighborhood_cells = Vector{Int}(undef, max_n_neighborhood_cells)
+    other_metacell_index_per_max_base_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
+    total_UMIs_per_max_base_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
+    total_punctuated_metacell_UMIs_per_max_base_neighborhood_cell = Vector{UInt32}(undef, max_n_neighborhood_cells)
 
     cell_log_fraction_per_max_neighborhood_cell_per_thread =
         [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
-    other_metacell_log_fraction_per_other_max_neighborhood_cell_per_thread =
+    punctuated_metacell_log_fraction_per_max_neighborhood_cell_per_thread =
         [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
     correlation_per_max_correlated_gene_per_thread =
         [Vector{Float32}(undef, n_max_correlated_genes) for _ in 1:maxthreadid()]
@@ -2066,10 +2059,9 @@ $(CONTRACT2)
     progress = DebugProgress(
         total_correlated_genes,
         group = :mcs_loops,
-        desc = "correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block",
+        desc = "correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block",
     )
 
-    todox_all_zero = Atomic{Int32}(0)
     for base_block_index in 1:n_base_blocks
         @views most_correlated_gene_in_base_neighborhood_per_gene =
             most_correlated_gene_in_base_neighborhood_per_gene_per_base_block[:, base_block_index]
@@ -2095,6 +2087,22 @@ $(CONTRACT2)
         end
         @views indices_of_base_neighborhood_cells = indices_of_max_base_neighborhood_cells[1:n_base_neighborhood_cells]
 
+        @views other_metacell_index_per_base_neighborhood_cell =
+            other_metacell_index_per_max_base_neighborhood_cell[1:n_base_neighborhood_cells]
+        @views total_UMIs_per_base_neighborhood_cell =
+            total_UMIs_per_max_base_neighborhood_cell[1:n_base_neighborhood_cells]
+        @views total_punctuated_metacell_UMIs_per_base_neighborhood_cell =
+            total_punctuated_metacell_UMIs_per_max_base_neighborhood_cell[1:n_base_neighborhood_cells]
+
+        for (base_neighborhood_cell_position, cell_index) in enumerate(indices_of_base_neighborhood_cells)
+            other_metacell_index = other_metacell_index_per_cell[cell_index]
+            other_metacell_index_per_base_neighborhood_cell[base_neighborhood_cell_position] = other_metacell_index
+            cell_total_UMIs = total_UMIs_per_cell[cell_index]
+            total_UMIs_per_base_neighborhood_cell[base_neighborhood_cell_position] = cell_total_UMIs
+            total_punctuated_metacell_UMIs_per_base_neighborhood_cell[base_neighborhood_cell_position] =
+                total_UMIs_per_other_metacell[other_metacell_index] - cell_total_UMIs
+        end
+
         parallel_loop_wo_rng(
             1:n_correlated_genes;
             progress,
@@ -2105,13 +2113,13 @@ $(CONTRACT2)
 
             cell_log_fraction_per_max_neighborhood_cell =
                 cell_log_fraction_per_max_neighborhood_cell_per_thread[threadid()]
-            other_metacell_log_fraction_per_other_max_neighborhood_cell =
-                other_metacell_log_fraction_per_other_max_neighborhood_cell_per_thread[threadid()]
+            punctuated_metacell_log_fraction_per_max_neighborhood_cell =
+                punctuated_metacell_log_fraction_per_max_neighborhood_cell_per_thread[threadid()]
 
             @views cell_log_fraction_per_base_neighborhood_cell =
                 cell_log_fraction_per_max_neighborhood_cell[1:n_base_neighborhood_cells]
-            @views other_metacell_log_fraction_per_other_base_neighborhood_cell =
-                other_metacell_log_fraction_per_other_max_neighborhood_cell[1:n_base_neighborhood_cells]
+            @views punctuated_metacell_log_fraction_per_base_neighborhood_cell =
+                punctuated_metacell_log_fraction_per_max_neighborhood_cell[1:n_base_neighborhood_cells]
 
             all_zero_base_neighborhood_cell_UMIs = true
             for base_neighborhood_cell_position in 1:n_base_neighborhood_cells
@@ -2124,48 +2132,54 @@ $(CONTRACT2)
                 end
             end
             if all_zero_base_neighborhood_cell_UMIs
-                atomic_add!(todox_all_zero, Int32(1))
                 correlation_with_most_per_gene_per_base_block[gene_index, base_block_index] = 0.0f0
                 return nothing
             end
 
-            all_zero_base_neighborhood_other_metacell_fractions = true
+            all_zero_base_neighborhood_punctuated_metacell_UMIs = true
             for base_neighborhood_cell_position in 1:n_base_neighborhood_cells
                 cell_index = indices_of_base_neighborhood_cells[base_neighborhood_cell_position]
-                other_metacell_index = other_metacell_index_per_cell[cell_index]
-                if linear_fraction_per_other_metacell_per_gene[other_metacell_index, gene_index] > 0
-                    all_zero_base_neighborhood_other_metacell_fractions = false
+                other_metacell_index = other_metacell_index_per_base_neighborhood_cell[base_neighborhood_cell_position]
+                if UMIs_per_other_metacell_per_gene[other_metacell_index, gene_index] >
+                   UMIs_per_cell_per_gene[cell_index, gene_index]
+                    all_zero_base_neighborhood_punctuated_metacell_UMIs = false
                     break
                 end
             end
-            if all_zero_base_neighborhood_other_metacell_fractions
-                atomic_add!(todox_all_zero, Int32(1))
+            if all_zero_base_neighborhood_punctuated_metacell_UMIs
                 correlation_with_most_per_gene_per_base_block[gene_index, base_block_index] = 0.0f0
                 return nothing
             end
 
             for (base_neighborhood_cell_position, cell_index) in enumerate(indices_of_base_neighborhood_cells)
-                other_metacell_index = other_metacell_index_per_cell[cell_index]
+                other_metacell_index = other_metacell_index_per_base_neighborhood_cell[base_neighborhood_cell_position]
                 cell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] =
-                    UMIs_per_cell_per_gene[cell_index, gene_index] / total_UMIs_per_cell[cell_index] +
-                    gene_fraction_regularization
-                other_metacell_log_fraction_per_other_base_neighborhood_cell[base_neighborhood_cell_position] =
-                    linear_fraction_per_other_metacell_per_gene[other_metacell_index, gene_index] +
-                    gene_fraction_regularization
+                    UMIs_per_cell_per_gene[cell_index, gene_index]
+                punctuated_metacell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] =
+                    UMIs_per_other_metacell_per_gene[other_metacell_index, gene_index] -
+                    UMIs_per_cell_per_gene[cell_index, gene_index]
             end
-            @assert LoopVectorization.check_args(cell_log_fraction_per_base_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!\nfor cell_log_fraction_per_base_neighborhood_cell: $(brief(cell_log_fraction_per_base_neighborhood_cell))"
-            @assert LoopVectorization.check_args(other_metacell_log_fraction_per_other_base_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!\nfor other_metacell_log_fraction_per_other_base_neighborhood_cell: $(brief(other_metacell_log_fraction_per_other_base_neighborhood_cell))"
+            @assert LoopVectorization.check_args(cell_log_fraction_per_base_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor cell_log_fraction_per_base_neighborhood_cell: $(brief(cell_log_fraction_per_base_neighborhood_cell))"
+            @assert LoopVectorization.check_args(total_UMIs_per_base_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor total_UMIs_per_base_neighborhood_cell: $(brief(total_UMIs_per_base_neighborhood_cell))"
+            @assert LoopVectorization.check_args(punctuated_metacell_log_fraction_per_base_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor punctuated_metacell_log_fraction_per_base_neighborhood_cell: $(brief(punctuated_metacell_log_fraction_per_base_neighborhood_cell))"
+            @assert LoopVectorization.check_args(total_punctuated_metacell_UMIs_per_base_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor total_punctuated_metacell_UMIs_per_base_neighborhood_cell: $(brief(total_punctuated_metacell_UMIs_per_base_neighborhood_cell))"
             @turbo for base_neighborhood_cell_position in 1:n_base_neighborhood_cells
-                cell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] =
-                    log2(cell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position])
-                other_metacell_log_fraction_per_other_base_neighborhood_cell[base_neighborhood_cell_position] =
-                    log2(other_metacell_log_fraction_per_other_base_neighborhood_cell[base_neighborhood_cell_position])
+                cell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] = log2(
+                    cell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] /
+                    total_UMIs_per_base_neighborhood_cell[base_neighborhood_cell_position] +
+                    gene_fraction_regularization,
+                )
+                punctuated_metacell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] = log2(
+                    punctuated_metacell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] /
+                    total_punctuated_metacell_UMIs_per_base_neighborhood_cell[base_neighborhood_cell_position] +
+                    gene_fraction_regularization,
+                )
             end
 
             return correlation_with_most_per_gene_per_base_block[gene_index, base_block_index] =
                 zero_cor_between_vectors(
                     cell_log_fraction_per_base_neighborhood_cell,
-                    other_metacell_log_fraction_per_other_base_neighborhood_cell,
+                    punctuated_metacell_log_fraction_per_base_neighborhood_cell,
                 )
         end
 
@@ -2177,20 +2191,18 @@ $(CONTRACT2)
         @assert mean_correlation_with_most > 0
         mean_correlation_with_most_per_base_block[base_block_index] = mean_correlation_with_most
     end
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(total_correlated_genes) ($(percent(todox_all_zero[], total_correlated_genes)))" _group =
-        :todox
 
     set_matrix!(
         other_daf,
         "gene",
         "base_block",
-        "correlation_with_most_between_base_neighborhood_cells_and_metacells",
+        "correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells",
         bestify(correlation_with_most_per_gene_per_base_block);
         overwrite,
     )
 
     @debug (
-        "Mean correlation of base neighborhood pertinent marker genes with friends between base neighborhood cells and their metacells:" *
+        "Mean correlation of base neighborhood pertinent marker genes with friends between base neighborhood cells and their punctuated metacells:" *
         " $(mean(mean_correlation_with_most_per_base_block))"  # NOLINT
     ) _group = :mcs_results
 

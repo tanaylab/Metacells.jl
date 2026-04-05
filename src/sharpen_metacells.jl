@@ -242,8 +242,6 @@ $(CONTRACT2)
             b in 1:n_blocks
         )
     if post_max_n_kmeans_points > max_n_kmeans_points || post_max_n_kmeans_clusters > max_n_kmeans_clusters
-        @warn "TODOX post_max_n_kmeans_points: $(post_max_n_kmeans_points) ? max_n_kmeans_points: $(max_n_kmeans_points)"
-        @warn "TODOX post_max_n_kmeans_clusters: $(post_max_n_kmeans_clusters) ? max_n_kmeans_clusters: $(max_n_kmeans_clusters)"
         max_n_kmeans_points = max(max_n_kmeans_points, post_max_n_kmeans_points)
         max_n_kmeans_clusters = max(max_n_kmeans_clusters, post_max_n_kmeans_clusters)
         kmeans_sizes_max_buffers_per_thread = [

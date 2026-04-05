@@ -32,7 +32,7 @@ export matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
 export matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 export matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
 export matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
-export matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+export matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 export matrix_of_euclidean_skeleton_fold_distance_between_metacells
 export matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 export matrix_of_is_found_per_module_per_block
@@ -1609,7 +1609,7 @@ end
     )::Pair{MatrixKey, DataSpecification}
 
 The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block. This is
-intended for use for computing [`matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block`](@ref).
+intended for use for computing [`matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref).
 
 This is sparse, we actually only compute it for the non-lateral neighborhood markers.
 
@@ -1633,38 +1633,38 @@ A copy of the base [`block_axis`](@ref), copied into the alternative. This is ne
 control data. Such data is more directly comparable between the alternative metacells and the base ones.
 
 This axis is typically created by
-[`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!).
+[`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
 """
 function base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
     return "base_block" => (expectation, "A copy of the base [`block_axis`](@ref), copied into the alternative.")
 end
 
 """
-    matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(
+    matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
         expectation::ContractExpectation,
     )::Pair{MatrixKey, DataSpecification}
 
 The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their
-metacells of each base neighborhood.
+punctuated metacells (metacells minus the correlated cell) of each base neighborhood.
 
 We use this as a poor man's cross validation; we use the set of cells in the base neighborhoods. We measure the
-correlation between the expression of these genes in the base and alternative metacells. The absolute correlation values
-are of less interest than the difference between different genes, and the difference between the alternative metacells.
-Ideally "relevant" genes would have high correlations while "irrelevant" genes would not, and "improved" metacells would
-have higher correlation than the base metacells.
+correlation between the expression of these genes in the base and alternative punctuated metacells. The absolute
+correlation values are of less interest than the difference between different genes, and the difference between the
+alternative metacells. Ideally "relevant" genes would have high correlations while "irrelevant" genes would not, and
+"improved" metacells would have higher correlation than the base metacells.
 
 These matrices can be populated by
-[`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!).
+[`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
 """
-function matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(
+function matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
-    return ("gene", "base_block", "correlation_with_most_between_base_neighborhood_cells_and_metacells") => (
+    return ("gene", "base_block", "correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells") => (
         expectation,
         StorageFloat,
-        "The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their metacells of each base neighborhood.",
+        "The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their punctuated metacells of each base neighborhood.",
     )
 end
 

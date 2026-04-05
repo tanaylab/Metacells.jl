@@ -589,7 +589,6 @@ $(CONTRACT2)
     gene_metacell_log_fraction_per_included_query_cell_per_thread =
         [Vector{Float32}(undef, n_included_query_cells) for _ in 1:maxthreadid()]
 
-    todox_all_zero = Atomic{Int32}(0)
     parallel_loop_wo_rng(
         1:n_common_included_genes;
         policy = :static,
@@ -619,7 +618,6 @@ $(CONTRACT2)
             end
         end
         if all_zero_included_query_cell_UMIs
-            atomic_add!(todox_all_zero, Int32(1))
             correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = 0.0f0
             return nothing
         end
@@ -635,7 +633,6 @@ $(CONTRACT2)
             end
         end
         if all_zero_included_atlas_metacell_UMIs
-            atomic_add!(todox_all_zero, Int32(1))
             correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = 0.0f0
             return nothing
         end
@@ -667,8 +664,6 @@ $(CONTRACT2)
         return nothing
     end
 
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_common_included_genes) ($(percent(todox_all_zero[], n_common_included_genes)))" _group =
-        :todox
     set_vector!(
         query_daf,
         "gene",
@@ -906,7 +901,6 @@ $(CONTRACT2)
         end
     end
 
-    todox_all_zero = Atomic{Int32}(0)
     for atlas_block_index in 1:n_atlas_blocks
         @views is_in_neighborhood_per_other_block =
             is_in_neighborhood_per_other_block_per_base_block[:, atlas_block_index]
@@ -960,7 +954,6 @@ $(CONTRACT2)
                     end
                 end
                 if all_zero_neighborhood_query_cell_UMIs
-                    atomic_add!(todox_all_zero, Int32(1))
                     correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
                         query_gene_index,
                         atlas_block_index,
@@ -979,7 +972,6 @@ $(CONTRACT2)
                     end
                 end
                 if all_zero_neighborhood_projected_metacell_UMIs
-                    atomic_add!(todox_all_zero, Int32(1))
                     correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
                         query_gene_index,
                         atlas_block_index,
@@ -1099,8 +1091,6 @@ $(CONTRACT2)
             end
         end
     end
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_atlas_blocks * n_common_included_genes) ($(percent(todox_all_zero[], n_atlas_blocks * n_common_included_genes)))" _group =
-        :todox
 
     set_matrix!(
         query_daf,

@@ -2165,9 +2165,9 @@
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
-<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -2176,7 +2176,7 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!(;
+<code class="language-julia hljs">compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;
     other_daf::DafWriter,
     base_daf::DafReader;
     gene_fraction_regularization::AbstractFloat = ```0.0001```,
@@ -2185,8 +2185,8 @@
 </code>
 </pre>
 <p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
-<code>matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 </code>
 </a>. This will also copy 
 <a href="contracts.html#Metacells.Contracts.base_block_axis">
@@ -2214,7 +2214,7 @@
 <code>base_daf
 </code> with the expression of their most correlated gene in their 
 <code>other_daf
-</code> metacells. This works as a poor man&#39;s cross-validation; not as good as real cross-validation but much less expensive to compute.
+</code> punctuated metacells (metacells minus the correlated cell). This works as a poor man&#39;s cross-validation; not as good as real cross-validation but much less expensive to compute.
 </p>
 <p>
 <strong>Other
@@ -2249,12 +2249,16 @@
 </strong>::AbstractString (required): The unique metacell each cell belongs to.
 </p>
 <p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
 <p>
-<strong>gene, metacell @ linear_fraction
-</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
 </p>
 <p>
 <strong>Outputs
@@ -2273,8 +2277,10 @@
 <em>base
 </em>neighborhood
 <em>cells
-</em>and_metacells
-</strong>::Union{Float32, Float64} (created): The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their metacells of each base neighborhood.
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (created): The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their punctuated metacells of each base neighborhood.
 </p>
 <p>
 <strong>Base
@@ -2590,8 +2596,8 @@
 </a>
 </li>
 <li>
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 </code>
 </a>
 </li>

@@ -537,7 +537,6 @@ $(CONTRACT)
     gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread =
         [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
 
-    todox_all_zero = Atomic{Int32}(0)
     parallel_loop_wo_rng(
         1:n_included_genes;
         policy = :static,
@@ -562,7 +561,6 @@ $(CONTRACT)
             end
         end
         if all_zero_grouped_cell_UMIs
-            atomic_add!(todox_all_zero, Int32(1))
             correlation_between_cells_and_punctuated_metacells_per_gene[gene_index] = 0.0f0
             return nothing
         end
@@ -577,7 +575,6 @@ $(CONTRACT)
             end
         end
         if all_zero_grouped_punctuated_metacell_UMIs
-            atomic_add!(todox_all_zero, Int32(1))
             correlation_between_cells_and_punctuated_metacells_per_gene[gene_index] = 0.0f0
             return nothing
         end
@@ -614,8 +611,6 @@ $(CONTRACT)
         return nothing
     end
 
-    @debug "TODOX ALL-ZERO: $(todox_all_zero[]) OUT OF: $(n_included_genes) ($(percent(todox_all_zero[], n_included_genes)))" _group =
-        :todox
     set_vector!(
         daf,
         "gene",

@@ -2987,8 +2987,8 @@
 </code>
 </pre>
 <p>The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block. This is intended for use for computing 
-<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
-<code>matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 </code>
 </a>.
 </p>
@@ -3006,9 +3006,9 @@
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
-<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+<summary id="Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -3017,18 +3017,18 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(
+<code class="language-julia hljs">matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their metacells of each base neighborhood.
+<p>The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their punctuated metacells (metacells minus the correlated cell) of each base neighborhood.
 </p>
-<p>We use this as a poor man&#39;s cross validation; we use the set of cells in the base neighborhoods. We measure the correlation between the expression of these genes in the base and alternative metacells. The absolute correlation values are of less interest than the difference between different genes, and the difference between the alternative metacells. Ideally &quot;relevant&quot; genes would have high correlations while &quot;irrelevant&quot; genes would not, and &quot;improved&quot; metacells would have higher correlation than the base metacells.
+<p>We use this as a poor man&#39;s cross validation; we use the set of cells in the base neighborhoods. We measure the correlation between the expression of these genes in the base and alternative punctuated metacells. The absolute correlation values are of less interest than the difference between different genes, and the difference between the alternative metacells. Ideally &quot;relevant&quot; genes would have high correlations while &quot;irrelevant&quot; genes would not, and &quot;improved&quot; metacells would have higher correlation than the base metacells.
 </p>
 <p>These matrices can be populated by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
-<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 </code>
 </a>.
 </p>
@@ -3087,8 +3087,8 @@
 </a>, copied into the alternative. This is needed to store per-base-block quality control data. Such data is more directly comparable between the alternative metacells and the base ones.
 </p>
 <p>This axis is typically created by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!">
-<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block!
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 </code>
 </a>.
 </p>
@@ -3178,8 +3178,8 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block">
-<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 </code>
 </a>
 </li>
