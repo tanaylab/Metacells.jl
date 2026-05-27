@@ -3,6 +3,7 @@ Do simple gene module analysis.
 """
 module AnalyzeModules
 
+export compute_matrix_of_cells_dispersion_per_metacell_per_module!
 export compute_matrix_of_n_genes_per_module_per_block!
 export compute_stats_of_euclidean_modules_cells_distance_per_metacell!
 export compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!
@@ -27,6 +28,7 @@ import Random.default_rng
 import Metacells.Contracts.block_axis
 import Metacells.Contracts.cell_axis
 import Metacells.Contracts.gene_axis
+import Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module
 import Metacells.Contracts.matrix_of_is_found_per_module_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
 import Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
@@ -41,6 +43,7 @@ import Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_me
 import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
 import Metacells.Contracts.vector_of_metacell_per_cell
+import Metacells.Contracts.vector_of_n_cells_per_metacell
 import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
@@ -342,6 +345,7 @@ $(CONTRACT)
     data = [
         vector_of_metacell_per_cell(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
+        vector_of_n_cells_per_metacell(RequiredInput),
         matrix_of_module_per_gene_per_block(RequiredInput),
         matrix_of_UMIs_per_gene_per_cell(RequiredInput),
         vector_of_total_UMIs_per_cell(RequiredInput),
@@ -352,8 +356,8 @@ $(CONTRACT)
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
+    n_cells = axis_length(daf, "cell")
     n_metacells = axis_length(daf, "metacell")
-
     n_modules = axis_length(daf, "module")
     name_per_module = axis_vector(daf, "module")
 
@@ -366,6 +370,10 @@ $(CONTRACT)
 
     UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
     total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    n_cells_per_metacell = get_vector(daf, "metacell", "n_cells").array
+    max_n_metacell_cells = maximum(n_cells_per_metacell)
+
+    indices_of_metacell_max_cells_per_thread = [Vector{Int}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
 
     # TODO: This does a lot of memory allocations in the parallel loop.
     parallel_loop_wo_rng(
@@ -375,12 +383,21 @@ $(CONTRACT)
             group = :mcs_loops,
             desc = "stats_of_euclidean_modules_cells_distance_per_metacell",
         ),
+        policy = :static,
     ) do metacell_index
-        block_index = block_index_per_metacell[metacell_index]
+        indices_of_metacell_max_cells = indices_of_metacell_max_cells_per_thread[threadid()]
 
-        indices_of_metacell_cells = findall(metacell_index_per_cell .== metacell_index)
-        n_metacell_cells = length(indices_of_metacell_cells)
-        @assert n_metacell_cells > 0
+        n_metacell_cells = 0
+        for cell_index in 1:n_cells
+            if metacell_index_per_cell[cell_index] == metacell_index
+                n_metacell_cells += 1
+                indices_of_metacell_max_cells[n_metacell_cells] = cell_index
+            end
+        end
+        @assert n_metacell_cells == n_cells_per_metacell[metacell_index]
+        @views indices_of_metacell_cells = indices_of_metacell_max_cells[1:n_metacell_cells]
+
+        block_index = block_index_per_metacell[metacell_index]
         total_UMIs_per_metacell_cell = total_UMIs_per_cell[indices_of_metacell_cells]
         total_UMIs_of_metacell = sum(total_UMIs_per_metacell_cell)
 
@@ -420,6 +437,212 @@ $(CONTRACT)
         overwrite,
     )
     set_vector!(daf, "metacell", "std_euclidean_modules_cells_distance", bestify(std_distance_per_metacell); overwrite)
+    return nothing
+end
+
+# Compute and return the maximum (across the block's found modules) cells_dispersion - the ratio between the actual
+# standard deviation of normalized module UMIs in the given group of cells (e.g. a metacell or a candidate cluster)
+# and the standard deviation expected from pure multinomial sampling noise. Also fills the per-module values into the
+# `cells_dispersion_per_module` scratch (zero for non-found modules and for modules whose mean normalized UMIs falls
+# below `min_module_UMIs`). Returns 0 when there are fewer than two cells (the variance is undefined).
+function maximal_cells_dispersion_of_modules!(;
+    cells_dispersion_per_module::AbstractVector{<:AbstractFloat},
+    indices_of_cells::AbstractVector{<:Integer},
+    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    total_UMIs_per_cell::AbstractVector{<:Integer},
+    is_found_per_module::Union{AbstractVector{Bool}, BitVector},
+    module_index_per_gene::AbstractVector{<:Integer},
+    is_gene_in_module::BitVector,
+    total_UMIs_per_max_cells::AbstractVector{<:AbstractFloat},
+    normalized_factor_per_max_cells::AbstractVector{<:AbstractFloat},
+    normalized_UMIs_quantile::AbstractFloat,
+    min_module_UMIs::Integer,
+)::AbstractFloat
+    cells_dispersion_per_module .= 0
+    n_cells = length(indices_of_cells)
+    if n_cells < 2
+        return 0.0f0
+    end
+
+    @views total_UMIs_per_cells = total_UMIs_per_max_cells[1:n_cells]
+    @views normalized_factor_per_cells = normalized_factor_per_max_cells[1:n_cells]
+
+    normalized_factor_per_cells .= getindex.(Ref(total_UMIs_per_cell), indices_of_cells)
+    total_UMIs_per_cells .= normalized_factor_per_cells
+    normalized_total_UMIs = quantile!(total_UMIs_per_cells, normalized_UMIs_quantile)  # NOJET
+    @. normalized_factor_per_cells = normalized_total_UMIs / normalized_factor_per_cells
+
+    n_modules = length(is_found_per_module)
+    max_cells_dispersion = 0.0f0
+    for module_index in 1:n_modules
+        if !is_found_per_module[module_index]
+            continue
+        end
+
+        @. is_gene_in_module = module_index_per_gene == module_index
+
+        sum_normalized_module_UMIs = 0.0
+        sum_squared_normalized_module_UMIs = 0.0
+        for cell_position in 1:n_cells
+            cell_index = indices_of_cells[cell_position]
+            module_UMIs = 0
+            @foreach_true_index is_gene_in_module gene_index begin  # NOLINT
+                module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]  # NOLINT
+            end
+            normalized_module_UMIs = module_UMIs * normalized_factor_per_cells[cell_position]
+            sum_normalized_module_UMIs += normalized_module_UMIs
+            sum_squared_normalized_module_UMIs += normalized_module_UMIs * normalized_module_UMIs
+        end
+
+        mean_normalized_module_UMIs = sum_normalized_module_UMIs / n_cells
+        if mean_normalized_module_UMIs < min_module_UMIs
+            continue
+        end
+
+        actual_var_normalized_module_UMIs = max(
+            (sum_squared_normalized_module_UMIs - sum_normalized_module_UMIs * mean_normalized_module_UMIs) /
+            (n_cells - 1),
+            0.0,
+        )
+
+        cells_dispersion = Float32(sqrt(actual_var_normalized_module_UMIs / mean_normalized_module_UMIs))
+        cells_dispersion_per_module[module_index] = cells_dispersion
+        max_cells_dispersion = max(max_cells_dispersion, cells_dispersion)
+    end
+
+    return max_cells_dispersion
+end
+
+"""
+    compute_matrix_of_cells_dispersion_per_metacell_per_module!(
+        daf::DafWriter;
+        normalized_UMIs_quantile::AbstractFloat = $(DEFAULT.normalized_UMIs_quantile),
+        min_module_UMIs::Integer = $(DEFAULT.min_module_UMIs),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`matrix_of_cells_dispersion_per_metacell_per_module`](@ref). For each metacell and each gene module of
+the metacell's block, set the value to the ratio between the actual standard deviation of the (normalized) UMIs of the
+module in the cells of the metacell, and the expected standard deviation assuming all the noise is technical multinomial
+sampling noise.
+
+We normalize each cell total UMIs to the `normalized_UMIs_quantile` of the cells in each metacell. The expected standard
+deviation is the square root of the mean normalized UMIs of the module in the cells (this reflect pure multinomial
+sampling noise). We set the dispersion to 0 for non-found modules, and found modules whose mean normalized UMIs in the
+cells is below `min_module_UMIs`.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(
+    axes = [
+        block_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        gene_axis(RequiredInput),
+        module_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_n_cells_per_metacell(RequiredInput),
+        matrix_of_is_found_per_module_per_block(RequiredInput),
+        matrix_of_module_per_gene_per_block(RequiredInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        matrix_of_cells_dispersion_per_metacell_per_module(CreatedOutput),
+    ],
+) function compute_matrix_of_cells_dispersion_per_metacell_per_module!(
+    daf::DafWriter;
+    normalized_UMIs_quantile::AbstractFloat = 0.25,
+    min_module_UMIs::Integer = 9,
+    overwrite::Bool = false,
+)::Nothing
+    @assert 0 <= normalized_UMIs_quantile <= 1
+    @assert min_module_UMIs >= 0
+
+    n_cells = axis_length(daf, "cell")
+    n_genes = axis_length(daf, "gene")
+    n_metacells = axis_length(daf, "metacell")
+    n_modules = axis_length(daf, "module")
+
+    block_index_per_metacell = daf["@ metacell : block : index"].array
+    metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
+    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+    is_found_per_module_per_block = get_matrix(daf, "module", "block", "is_found").array
+
+    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    n_cells_per_metacell = get_vector(daf, "metacell", "n_cells").array
+    max_n_metacell_cells = maximum(n_cells_per_metacell)
+
+    max_cells_dispersion_per_per_metacell = zeros(Float32, n_metacells)
+    cells_dispersion_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
+
+    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
+    indices_of_metacell_max_cells_per_thread = [Vector{Int}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
+    total_UMIs_per_max_metacell_cell_per_thread =
+        [Vector{Float32}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
+    normalized_factor_per_max_metacell_cell_per_thread =
+        [Vector{Float32}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
+
+    parallel_loop_wo_rng(
+        1:n_metacells;
+        progress = DebugProgress(n_metacells; group = :mcs_loops, desc = "cells_dispersion_per_metacell_per_module"),
+        policy = :static,
+    ) do metacell_index
+        is_gene_in_module = is_gene_in_module_per_thread[threadid()]
+        indices_of_metacell_max_cells = indices_of_metacell_max_cells_per_thread[threadid()]
+        total_UMIs_per_max_metacell_cell = total_UMIs_per_max_metacell_cell_per_thread[threadid()]
+        normalized_factor_per_max_metacell_cell = normalized_factor_per_max_metacell_cell_per_thread[threadid()]
+
+        n_metacell_cells = 0
+        for cell_index in 1:n_cells
+            if metacell_index_per_cell[cell_index] == metacell_index
+                n_metacell_cells += 1
+                indices_of_metacell_max_cells[n_metacell_cells] = cell_index
+            end
+        end
+        @assert n_metacell_cells == n_cells_per_metacell[metacell_index]
+
+        if n_metacell_cells == 1
+            return nothing
+        end
+
+        block_index = block_index_per_metacell[metacell_index]
+
+        @views indices_of_metacell_cells = indices_of_metacell_max_cells[1:n_metacell_cells]
+        @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
+        @views is_found_per_module = is_found_per_module_per_block[:, block_index]
+        @views cells_dispersion_per_module = cells_dispersion_per_module_per_metacell[:, metacell_index]
+
+        max_cells_dispersion_per_per_metacell[metacell_index] = maximal_cells_dispersion_of_modules!(;
+            cells_dispersion_per_module,
+            indices_of_cells = indices_of_metacell_cells,
+            UMIs_per_cell_per_gene,
+            total_UMIs_per_cell,
+            is_found_per_module,
+            module_index_per_gene,
+            is_gene_in_module,
+            total_UMIs_per_max_cells = total_UMIs_per_max_metacell_cell,
+            normalized_factor_per_max_cells = normalized_factor_per_max_metacell_cell,
+            normalized_UMIs_quantile,
+            min_module_UMIs,
+        )
+        return nothing
+    end
+
+    set_matrix!(
+        daf,
+        "module",
+        "metacell",
+        "cells_dispersion",
+        bestify(cells_dispersion_per_module_per_metacell);
+        overwrite,
+    )
+    @debug (
+        "Mean max cells dispersion per metacell per found module: $(mean(max_cells_dispersion_per_per_metacell))"  # NOLINT
+    ) _group = :mcs_results
+
     return nothing
 end
 

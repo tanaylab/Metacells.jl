@@ -28,6 +28,7 @@ export base_block_axis
 export block_axis
 export cell_axis
 export gene_axis
+export matrix_of_cells_dispersion_per_metacell_per_module
 export matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
 export matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 export matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
@@ -49,6 +50,7 @@ export matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_module_per_gene_per_block
 export matrix_of_module_status_per_gene_per_block
 export matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+export matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 export matrix_of_n_genes_per_module_per_block
 export matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_UMIs_per_gene_per_block
@@ -66,6 +68,7 @@ export vector_of_color_per_type
 export vector_of_correlation_between_cells_and_projected_metacells_per_gene
 export vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
 export vector_of_excluded_UMIs_per_cell
+export vector_of_is_base_outlier_per_cell
 export vector_of_is_correlated_with_skeleton_per_gene
 export vector_of_is_excluded_per_cell
 export vector_of_is_excluded_per_gene
@@ -88,6 +91,9 @@ export vector_of_n_modules_per_block
 export vector_of_n_neighborhood_blocks_per_block
 export vector_of_n_neighborhood_cells_per_block
 export vector_of_n_neighborhood_metacells_per_block
+export vector_of_projected_block_per_cell
+export vector_of_projected_metacell_per_cell
+export vector_of_projected_modules_z_score_per_cell
 export vector_of_ribosomal_UMIs_per_cell
 export vector_of_std_euclidean_modules_cells_distance_per_metacell
 export vector_of_total_neighborhood_UMIs_per_block
@@ -449,6 +455,22 @@ function vector_of_is_excluded_per_cell(expectation::ContractExpectation)::Pair{
         (expectation, Bool, "A mask of cells that are totally excluded from the analysis.")
 end
 
+"""
+    vector_of_is_base_outlier_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+A mask of cells that were not assigned to any metacell at the original (round-0) input. These cells are permanently
+excluded from any subsequent metacell-based analysis (in contrast to cells that lose their metacell during a sharpening
+round, which are eligible to be re-assigned in the next round).
+
+This vector is set by [`import_metacells_h5ad!`](@ref Metacells.AnnDataFormat.import_metacells_h5ad!) at import time.
+"""
+function vector_of_is_base_outlier_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "is_base_outlier") =>
+        (expectation, Bool, "A mask of cells that were outliers at the original input.")
+end
+
 ## Metacells
 
 """
@@ -514,7 +536,7 @@ function matrix_of_UMIs_per_gene_per_metacell(expectation::ContractExpectation):
 end
 
 """
-    metacell_total_UMIs_vector(
+    vector_of_total_UMIs_per_metacell(
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
@@ -1232,6 +1254,7 @@ metacell based analysis for a data set, then type annotation is done at the meta
 type vector can be populated by [`compute_vector_of_type_per_cell_by_metacells!`](@ref
 Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!). If the type annotation is done at the block
 level, the per-cell type vector can be populated by [`compute_vector_of_type_per_cell_by_blocks!`](@ref
+Metacells.AnalyzeBlocks.compute_vector_of_type_per_cell_by_blocks!).
 """
 function vector_of_type_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("cell", "type") => (expectation, AbstractString, "The type each cell belongs to.")
@@ -1490,6 +1513,30 @@ function vector_of_std_euclidean_modules_cells_distance_per_metacell(
     )
 end
 
+"""
+    matrix_of_cells_dispersion_per_metacell_per_module(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+In each metacell and gene module, the ratio between the actual standard deviation of the (normalized) UMIs of the module
+in the cells of the metacell, and the expected standard deviation assuming all the noise is technical multinomial
+sampling noise. The higher this dispersion value is, the less homogeneous the metacell is in expression of this module.
+This is zero if the gene module was not found in the block the metacell belongs to, or if the mean (normalized) UMIs of
+the module per cell in the metacell is too low to be informative.
+
+This matrix is populated by [`compute_matrix_of_cells_dispersion_per_metacell_per_module!`](@ref
+Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!).
+"""
+function matrix_of_cells_dispersion_per_metacell_per_module(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("module", "metacell", "cells_dispersion") => (
+        expectation,
+        StorageFloat,
+        "The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.",
+    )
+end
+
 ## Projection
 
 """
@@ -1501,7 +1548,7 @@ The projected atlas metacell for each cell. This is our "best match" of the cell
 necessarily a *good* match. If you project blood cells on an atlas containing only neuron metacells, there will still be
 a "best match" ("least bad match" would be a better term).
 
-This vector is populated by [`compute_cells_projection`](@ref Metacells.ProjectCells.compute_cells_projection!).
+This vector is populated by [`compute_cells_projection!`](@ref Metacells.ProjectCells.compute_cells_projection!).
 """
 function vector_of_projected_metacell_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("cell", "projected_metacell") =>
@@ -1515,7 +1562,7 @@ end
 
 The atlas block of the projected metacell for each query cell.
 
-This vector is populated by [`compute_cells_projection`](@ref Metacells.ProjectCells.compute_cells_projection!).
+This vector is populated by [`compute_cells_projection!`](@ref Metacells.ProjectCells.compute_cells_projection!).
 """
 function vector_of_projected_block_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("cell", "projected_block") =>
@@ -1530,7 +1577,7 @@ end
 The z score of the distance between each query cell and its projected atlas metacell modules. If this is low, then it is
 likely that the cell is actually a good match for the metacell.
 
-This vector is populated by [`compute_cells_projection`](@ref Metacells.ProjectCells.compute_cells_projection!).
+This vector is populated by [`compute_cells_projection!`](@ref Metacells.ProjectCells.compute_cells_projection!).
 """
 function vector_of_projected_modules_z_score_per_cell(
     expectation::ContractExpectation,
@@ -1627,12 +1674,38 @@ function matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(
 end
 
 """
+    matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood
+marker gene per block. The pool we rank against is just the pertinent (non-lateral) neighborhood markers of the block
+whose correlation-with-most is non-zero. Genes outside that pool, and genes in the pool whose correlation-with-most is
+zero, are stored as zero, so the matrix is sparse.
+
+This matrix is populated by [`compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!).
+"""
+function matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "block", "most_correlated_quantile_in_neighborhood") => (
+        expectation,
+        AbstractFloat,
+        "The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood marker gene per block.",
+    )
+end
+
+"""
     base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
 
 A copy of the base [`block_axis`](@ref), copied into the alternative. This is needed to store per-base-block quality
 control data. Such data is more directly comparable between the alternative metacells and the base ones.
 
 This axis is typically created by
+[`compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!)
+or by
 [`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
 """

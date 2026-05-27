@@ -245,22 +245,29 @@ end
 
 Compute and set [`matrix_of_euclidean_skeleton_fold_distance_between_metacells`](@ref).
 
+!!! note
+
+    We use a higher regularization here even though these are fractions for metacells to avoid over-sensitivity for
+    differences in weakly-expressed genes between the metacells.
+
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
     axes = [metacell_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
         vector_of_is_skeleton_per_gene(RequiredInput),
-        matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
+        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_euclidean_skeleton_fold_distance_between_metacells(CreatedOutput),
     ],
 ) function compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(
     daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
 )::Nothing
-    log_linear_fraction_per_metacell_per_skeleton =
-        daf["@ metacell @ gene [ is_skeleton ] :: log_linear_fraction"].array
-    log_linear_fraction_per_skeleton_per_metacell = flipped(log_linear_fraction_per_metacell_per_skeleton)
+    linear_fraction_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"].array
+    linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
+    log_linear_fraction_per_skeleton_per_metacell =
+        log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
     n_metacells = axis_length(daf, "metacell")
     distances_between_metacells = parallel_pairwise(  # NOJET
         Euclidean(),
@@ -282,6 +289,7 @@ end
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
         fold_confidence::AbstractFloat = $(DEFAULT.fold_confidence),
+        min_confidence_UMIs::Real = $(DEFAULT.min_confidence_UMIs),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
@@ -308,6 +316,7 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     min_significant_gene_UMIs::Integer = 40,
     fold_confidence::AbstractFloat = 0.9,
+    min_confidence_UMIs::Real = 3,  # TODOX
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization >= 0
@@ -337,9 +346,12 @@ $(CONTRACT)
     ) do metacell_index
         @turbo for skeleton_index in 1:n_skeletons
             confidence_linear_fractions_per_skeleton_per_metacells[skeleton_index, metacell_index] =
-                confidence_stds * sqrt(
-                    linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] *
-                    total_UMIs_per_metacell[metacell_index],
+                confidence_stds * max(
+                    sqrt(
+                        linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] *
+                        total_UMIs_per_metacell[metacell_index],
+                    ),
+                    min_confidence_UMIs,
                 ) / total_UMIs_per_metacell[metacell_index]
         end
         return nothing

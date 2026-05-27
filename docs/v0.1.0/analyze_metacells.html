@@ -777,6 +777,16 @@
 </code>
 </a>.
 </p>
+<div class="admonition is-info" id="Note-ecf5441cfe130967">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-ecf5441cfe130967" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>We use a higher regularization here even though these are fractions for metacells to avoid over-sensitivity for differences in weakly-expressed genes between the metacells.
+</p>
+</div>
+</div>
 <p>
 <strong>Inputs
 </strong>
@@ -806,10 +816,8 @@
 </strong>
 </p>
 <p>
-<strong>gene, metacell @ log
-<em>linear
-</em>fraction
-</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
 </p>
 <p>
 <strong>Outputs
@@ -847,6 +855,7 @@
     gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     min_significant_gene_UMIs::Integer = ```40```,
     fold_confidence::AbstractFloat = ```0.9```,
+    min_confidence_UMIs::Real = ```3```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>

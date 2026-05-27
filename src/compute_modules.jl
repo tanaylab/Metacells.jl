@@ -93,7 +93,7 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         vector_of_anchor_per_module(CreatedOutput),
         matrix_of_is_found_per_module_per_block(CreatedOutput),
         matrix_of_module_per_gene_per_block(CreatedOutput),
-        matrix_of_module_status_per_gene_per_block(OptionalInput),
+        matrix_of_module_status_per_gene_per_block(OptionalOutput),
     ],
 ) function compute_blocks_modules!(
     daf::DafWriter;
@@ -252,6 +252,7 @@ function compute_block_modules!(
         is_lateral_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene .& is_lateral_per_gene
         indices_of_lateral_neighborhood_markers = findall(is_lateral_neighborhood_marker_per_gene)
         n_lateral_neighborhood_marker_genes = length(indices_of_lateral_neighborhood_markers)
+        @assert n_lateral_neighborhood_marker_genes > 0
 
         @views log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene =
             log_fraction_per_metacell_per_gene[
@@ -281,7 +282,7 @@ function compute_block_modules!(
         kmeans_results = flame_timed("kmeans_in_rounds") do
             return kmeans_in_rounds(
                 z_score_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene,
-                max_clusters;
+                min(n_lateral_neighborhood_marker_genes, max_clusters);
                 rounds = kmeans_rounds,
                 rng,
             )
@@ -340,7 +341,7 @@ function compute_block_modules!(
         kmeans_results = flame_timed("kmeans_in_rounds") do
             return kmeans_in_rounds(
                 z_score_per_neighborhood_metacell_per_local_gene,
-                max_clusters;
+                min(n_local_genes, max_clusters);
                 rounds = kmeans_rounds,
                 rng,
             )
@@ -418,7 +419,10 @@ function compute_block_modules!(
                 z_score_per_neighborhood_metacell_per_cluster[:, cluster_index]
             is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
             n_cluster_genes = sum(is_in_cluster_per_local_gene)
-            @assert n_cluster_genes > 0
+            if n_cluster_genes == 0
+                # K-means returned a center with no assigned genes; nothing to do for this cluster.
+                continue
+            end
             is_lateral_ish_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_lateral_ish_per_local_gene
 
             cluster_index_per_local_gene[is_lateral_ish_in_cluster_per_local_gene] .= -1

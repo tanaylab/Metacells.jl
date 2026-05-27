@@ -41,6 +41,7 @@ Metacells.Contracts.vector_of_total_UMIs_per_cell
 
 ```@docs
 Metacells.Contracts.vector_of_is_excluded_per_cell
+Metacells.Contracts.vector_of_is_base_outlier_per_cell
 ```
 
 ## Metacells
@@ -174,6 +175,7 @@ Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_mod
 Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
 Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
 Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
+Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module
 ```
 
 ## Projection
@@ -191,6 +193,7 @@ Metacells.Contracts.projected_block_axis
 
 ```@docs
 Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 Metacells.Contracts.base_block_axis

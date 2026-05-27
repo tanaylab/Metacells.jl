@@ -1307,6 +1307,10 @@
 <a href="contracts.html#Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
 <code>matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
 </code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block">
+<code>matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
+</code>
 </a>. This takes a long time. Still better than doing full two-way cross validation, though, and only needed to be done once (for some base metacells).
 </p>
 <p>
@@ -1394,6 +1398,14 @@
 <em>in
 </em>neighborhood
 </strong>::AbstractString (created): The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block.
+</p>
+<p>
+<strong>gene, block @ most
+<em>correlated
+</em>quantile
+<em>in
+</em>neighborhood
+</strong>::AbstractFloat (created): The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood marker gene per block.
 </p>
 </div>
 </section>
@@ -1688,8 +1700,8 @@
 </strong>
 </p>
 <p>
-<strong>metacell @ type
-</strong>::AbstractString (created): The type each metacell belongs to.
+<strong>cell @ type
+</strong>::AbstractString (created): The type each cell belongs to.
 </p>
 </div>
 </section>

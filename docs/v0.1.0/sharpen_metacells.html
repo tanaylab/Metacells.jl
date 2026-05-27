@@ -202,6 +202,12 @@
     base_daf::DafReader,
     prefix::AbstractString = ```&quot;M&quot;```,
     min_cells_in_metacell::Integer = ```12```,
+    target_cell_total_UMIs_quantile::AbstractFloat = ```0.25```,
+    min_metacell_total_UMIs::Integer = ```40000```,
+    max_cells_dispersion_in_metacell::AbstractFloat = ```3.0```,
+    min_cells_dispersion_in_metacell::AbstractFloat = ```1.0```,
+    normalized_UMIs_quantile::AbstractFloat = ```0.25```,
+    min_module_UMIs::Integer = ```9```,
     min_migration_likelihood::AbstractFloat = ```1.5```,
     kmeans_rounds::Integer = ```10```,
     rng::AbstractRNG = default_rng(),
@@ -224,7 +230,19 @@
 </li>
 <li>Having finalized the block to which each cell belongs to, we cluster all the cells in each block using K-means using the modules of the neighborhood of that block. We start with the expected number of metacells in that block (based on the mean number of cells per metacell in the base block) and adjust the number of clusters to try and enforce the sizes of the clusters - not more than twice that mean and no less than 
 <code>min_cells_in_metacell
-</code>. In edge cases we dissolve too-small clusters, so this can create new outlier cells.
+</code>. A cluster is also considered too-large if its maximal 
+<code>cells_dispersion
+</code> (across the block&#39;s modules) is above 
+<code>max_cells_dispersion_in_metacell
+</code>, and too-small if its maximal 
+<code>cells_dispersion
+</code> is below 
+<code>min_cells_dispersion_in_metacell
+</code>. In edge cases we dissolve too-small clusters, so this can create new outlier cells. We increase the number of target metacells for every input metacell whose maximal 
+<code>cells_dispersion
+</code> is above 
+<code>max_cells_dispersion_in_metacell
+</code>.
 </li>
 <li>The final clusters are the sharp metacells. We name them using the 
 <code>prefix
@@ -322,8 +340,20 @@
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
 </p>
 <p>
+<strong>cell @ is
+<em>base
+</em>outlier
+</strong>::Bool (required): A mask of cells that were outliers at the original input.
+</p>
+<p>
 <strong>cell @ metacell
 </strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>cell @ block.closest
+<em>by
+</em>pertinent_markers
+</strong>::AbstractString (required): The block each cell is closest to considering only the non-lateral marker genes.
 </p>
 <p>
 <strong>metacell @ block
@@ -354,6 +384,10 @@
 <p>
 <strong>gene, cell @ UMIs
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>module, metacell @ cells_dispersion
+</strong>::Union{Float32, Float64} (required): The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.
 </p>
 <p>
 <strong>block, gene @ module

@@ -1028,7 +1028,27 @@ $(CONTRACT2)
                         indices_of_common_included_atlas_genes,
                         atlas_block_index,
                     ] .& .! is_lateral_per_common_included_gene
-                @assert any(is_neighborhood_pertinent_marker_per_common_included_gene)
+                if !any(is_neighborhood_pertinent_marker_per_common_included_gene)
+                    n_block_neighborhood_markers =
+                        sum(@view(is_neighborhood_marker_per_atlas_gene_per_atlas_block[:, atlas_block_index]))
+                    n_common_included_block_neighborhood_markers = sum(
+                        @view(
+                            is_neighborhood_marker_per_atlas_gene_per_atlas_block[
+                                indices_of_common_included_atlas_genes,
+                                atlas_block_index,
+                            ]
+                        ),
+                    )
+                    n_common_included_lateral = sum(is_lateral_per_common_included_gene)
+                    @warn (
+                        "Skipping atlas block: $(name_per_atlas_block[atlas_block_index]): no non-lateral neighborhood markers\n" *
+                        "  block neighborhood markers: $(n_block_neighborhood_markers)\n" *
+                        "  common+included block neighborhood markers: $(n_common_included_block_neighborhood_markers)\n" *
+                        "  common+included lateral genes: $(n_common_included_lateral)\n" *
+                        "  common+included genes: $(length(indices_of_common_included_atlas_genes))"
+                    )
+                    continue
+                end
 
                 if in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing
                     is_in_bin_neighborhood_pertinent_marker_per_common_included_gene = nothing

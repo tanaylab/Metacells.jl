@@ -1,5 +1,6 @@
 *.jl.*.cov
 *.jl.cov
+.claude
 .*.swo
 .*.swp
 .DS_Store

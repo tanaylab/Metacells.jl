@@ -320,6 +320,119 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!">
+<a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!">
+<code>Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_cells_dispersion_per_metacell_per_module!(
+    daf::DafWriter;
+    normalized_UMIs_quantile::AbstractFloat = ```0.25```,
+    min_module_UMIs::Integer = ```9```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module">
+<code>matrix_of_cells_dispersion_per_metacell_per_module
+</code>
+</a>. For each metacell and each gene module of the metacell&#39;s block, set the value to the ratio between the actual standard deviation of the (normalized) UMIs of the module in the cells of the metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.
+</p>
+<p>We normalize each cell total UMIs to the 
+<code>normalized_UMIs_quantile
+</code> of the cells in each metacell. The expected standard deviation is the square root of the mean normalized UMIs of the module in the cells (this reflect pure multinomial sampling noise). We set the dispersion to 0 for non-found modules, and found modules whose mean normalized UMIs in the cells is below 
+<code>min_module_UMIs
+</code>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>module
+</strong> (required): Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (required): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (required): The module each gene belongs to in each block.
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>module, metacell @ cells_dispersion
+</strong>::Union{Float32, Float64} (created): The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
 <a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
 <code>Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!
@@ -386,6 +499,10 @@
 <p>
 <strong>metacell @ block
 </strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
 </p>
 <p>
 <strong>cell @ total_UMIs
@@ -657,6 +774,12 @@
 <li>
 <a href="analyze_modules.html#Metacells.AnalyzeModules">
 <code>Metacells.AnalyzeModules
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!">
+<code>Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!
 </code>
 </a>
 </li>

@@ -69,6 +69,7 @@ import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
 import Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+import Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 import Metacells.Contracts.vector_of_block_per_metacell
@@ -88,6 +89,7 @@ import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 import Metacells.Contracts.vector_of_type_per_block
+import Metacells.Contracts.vector_of_type_per_cell
 import Metacells.Contracts.vector_of_type_per_metacell
 import Metacells.Contracts.vector_of_umap_u_per_block
 import Metacells.Contracts.vector_of_umap_u_per_metacell
@@ -446,31 +448,19 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
         return nothing
     end
 
-    distances_between_blocks_and_cells = parallel_pairwise(  # NOJET
+    closest_block_index_per_cell = Vector{Int32}(undef, n_cells)
+    parallel_pairwise_closest(
         Euclidean(),
         log_linear_fraction_per_pertinent_marker_per_block,
-        log_linear_fraction_per_pertinent_marker_per_cell,
+        log_linear_fraction_per_pertinent_marker_per_cell;
+        closest_index = closest_block_index_per_cell,
         dims = 2,
-        progress = DebugProgress(n_cells; group = :mcs_loops, desc = "distances_between_blocks_and_cells"),
+        progress = DebugProgress(n_cells; group = :mcs_loops, desc = "closest_block_per_cell"),
         progress_chunk = 100,
     )
 
     name_per_block = axis_vector(daf, "block")
-    closest_block_index_per_cell = Vector{Int32}(undef, n_cells)
-    closest_block_name_per_cell = Vector{AbstractString}(undef, n_cells)
-    parallel_loop_wo_rng(
-        1:n_cells;
-        name = "closest_block_index_per_cell",
-        progress = DebugProgress(n_cells; group = :mcs_loops, desc = "closest_block_index_per_cell"),
-        progress_chunk = 100,
-    ) do cell_index
-        @views distance_per_block = distances_between_blocks_and_cells[:, cell_index]
-        closest_block_index = argmin(distance_per_block)
-        @views closest_block_index_per_cell[cell_index] = closest_block_index
-        closest_block_name_per_cell[cell_index] = name_per_block[closest_block_index]
-        return nothing
-    end
-
+    closest_block_name_per_cell = name_per_block[closest_block_index_per_cell]
     set_vector!(daf, "cell", "block.closest_by_pertinent_markers", closest_block_name_per_cell; overwrite)
 
     return nothing
@@ -1750,8 +1740,9 @@ end
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set [`matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block`](@ref). This takes a long time. Still better than
-doing full two-way cross validation, though, and only needed to be done once (for some base metacells).
+Compute and set [`matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block`](@ref) and
+[`matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block`](@ref). This takes a long time. Still
+better than doing full two-way cross validation, though, and only needed to be done once (for some base metacells).
 
 $(CONTRACT)
 """
@@ -1772,6 +1763,7 @@ $(CONTRACT)
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_is_neighborhood_marker_per_gene_per_block(RequiredInput),
         matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
+        matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
     ],
 ) function compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!(
     daf::DafWriter;
@@ -1808,12 +1800,17 @@ $(CONTRACT)
     most_correlated_gene_per_gene_per_block = Matrix{AbstractString}(undef, n_genes, n_blocks)
     fill!(most_correlated_gene_per_gene_per_block, "")
 
+    most_correlated_quantile_per_gene_per_block = zeros(Float32, n_genes, n_blocks)
+
     total_pertinent_neighborhood_marker_genes = sum(is_neighborhood_marker_per_gene_per_block[.!is_lateral_per_gene, :])
 
     is_in_neighborhood_per_cell = BitVector(undef, n_cells)
     is_pertinent_neighborhood_marker_per_gene = BitVector(undef, n_genes)
     indices_of_max_neighborhood_cells = Vector{Int}(undef, max_n_neighborhood_cells)
     indices_of_max_neighborhood_markers = Vector{Int}(undef, max_n_neighborhood_markers)
+    correlation_with_most_per_max_neighborhood_marker = Vector{Float32}(undef, max_n_neighborhood_markers)
+    permutation_per_max_neighborhood_marker = Vector{Int}(undef, max_n_neighborhood_markers)
+    rank_per_max_neighborhood_marker = Vector{Int}(undef, max_n_neighborhood_markers)
 
     log_fraction_per_max_neighborhood_cell_per_max_neighborhood_marker =
         Matrix{Float32}(undef, max_n_neighborhood_cells, max_n_neighborhood_markers)
@@ -1829,6 +1826,7 @@ $(CONTRACT)
 
     for block_index in 1:n_blocks
         @views most_correlated_gene_per_gene = most_correlated_gene_per_gene_per_block[:, block_index]
+        @views most_correlated_quantile_per_gene = most_correlated_quantile_per_gene_per_block[:, block_index]
 
         @views is_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene_per_block[:, block_index]
         @. is_pertinent_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene & !is_lateral_per_gene
@@ -1864,7 +1862,6 @@ $(CONTRACT)
             1:n_pertinent_neighborhood_markers,
             1:n_pertinent_neighborhood_markers,
         ]
-        correlation_between_pertinent_neighborhood_markers[1, 1] = 0
 
         parallel_loop_wo_rng(
             1:n_pertinent_neighborhood_markers;
@@ -1898,6 +1895,9 @@ $(CONTRACT)
             scratch_matrix,
             scratch_row,
         )
+        correlation_between_pertinent_neighborhood_markers[diagind(
+            correlation_between_pertinent_neighborhood_markers,
+        )] .= 0
 
         parallel_loop_wo_rng(
             1:n_pertinent_neighborhood_markers;
@@ -1910,10 +1910,38 @@ $(CONTRACT)
                 correlation_between_pertinent_neighborhood_markers[:, pertinent_neighborhood_marker_position]
             most_correlated_pertinent_neighborhood_marker_position =
                 argmax(correlation_with_pertinent_neighborhood_marker)
+            @assert most_correlated_pertinent_neighborhood_marker_position != pertinent_neighborhood_marker_position
             most_correlated_gene_index =
                 indices_of_pertinent_neighborhood_markers[most_correlated_pertinent_neighborhood_marker_position]
             most_correlated_gene_per_gene[gene_index] = name_per_gene[most_correlated_gene_index]
+            correlation_with_most_per_max_neighborhood_marker[pertinent_neighborhood_marker_position] =
+                correlation_with_pertinent_neighborhood_marker[most_correlated_pertinent_neighborhood_marker_position]
             return nothing
+        end
+
+        @views correlation_with_most_per_pertinent_neighborhood_marker =
+            correlation_with_most_per_max_neighborhood_marker[1:n_pertinent_neighborhood_markers]
+        n_positive_pertinent_neighborhood_markers = count(>(0), correlation_with_most_per_pertinent_neighborhood_marker)
+        if n_positive_pertinent_neighborhood_markers > 0
+            @views permutation_per_pertinent_neighborhood_marker =
+                permutation_per_max_neighborhood_marker[1:n_pertinent_neighborhood_markers]
+            @views rank_per_pertinent_neighborhood_marker =
+                rank_per_max_neighborhood_marker[1:n_pertinent_neighborhood_markers]
+            sortperm!(
+                permutation_per_pertinent_neighborhood_marker,
+                correlation_with_most_per_pertinent_neighborhood_marker,
+            )
+            @inbounds for sorted_position in 1:n_pertinent_neighborhood_markers
+                rank_per_pertinent_neighborhood_marker[permutation_per_pertinent_neighborhood_marker[sorted_position]] =
+                    sorted_position
+            end
+            # Non-positive correlation-with-most values sort to the bottom; positive genes occupy the top ranks, so
+            # `max(0, rank - n_non_positive) / n_positive` is the quantile for positives and 0 for everyone else.
+            n_non_positive_pertinent_neighborhood_markers =
+                n_pertinent_neighborhood_markers - n_positive_pertinent_neighborhood_markers
+            most_correlated_quantile_per_gene[indices_of_pertinent_neighborhood_markers] .=
+                max.(0, rank_per_pertinent_neighborhood_marker .- n_non_positive_pertinent_neighborhood_markers) ./
+                n_positive_pertinent_neighborhood_markers
         end
     end
 
@@ -1923,6 +1951,14 @@ $(CONTRACT)
         "block",
         "most_correlated_gene_in_neighborhood",
         most_correlated_gene_per_gene_per_block;
+        overwrite,
+    )
+    set_matrix!(
+        daf,
+        "gene",
+        "block",
+        "most_correlated_quantile_in_neighborhood",
+        most_correlated_quantile_per_gene_per_block;
         overwrite,
     )
 
@@ -2071,7 +2107,10 @@ $(CONTRACT2)
             is_in_base_neighborhood_per_other_block_per_base_block[:, base_block_index]
         is_in_base_neighborhood_per_cell .=
             (other_metacell_index_per_cell .> 0) .& (base_block_index_per_cell .> 0) .&
-            getindex.(Ref(is_in_base_neighborhood_per_other_block), max.(base_block_index_per_cell, 1))
+            getindex.(Ref(is_in_base_neighborhood_per_other_block), max.(base_block_index_per_cell, 1)) .& (
+                getindex.(Ref(total_UMIs_per_other_metacell), max.(other_metacell_index_per_cell, 1)) .>
+                total_UMIs_per_cell
+            )
 
         n_correlated_genes = 0
         @foreach_true_index is_correlated_per_gene gene_index begin  # NOLINT
@@ -2283,7 +2322,7 @@ $(CONTRACT)
         vector_of_metacell_per_cell(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
         vector_of_type_per_block(RequiredInput),
-        vector_of_type_per_metacell(CreatedOutput),
+        vector_of_type_per_cell(CreatedOutput),
     ],
 ) function compute_vector_of_type_per_cell_by_blocks!(  # UNTESTED
     daf::DafWriter;

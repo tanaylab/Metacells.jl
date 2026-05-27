@@ -874,6 +874,36 @@
 </section>
 </details>
 </article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_base_outlier_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_base_outlier_per_cell">
+<code>Metacells.Contracts.vector_of_is_base_outlier_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_base_outlier_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of cells that were not assigned to any metacell at the original (round-0) input. These cells are permanently excluded from any subsequent metacell-based analysis (in contrast to cells that lose their metacell during a sharpening round, which are eligible to be re-assigned in the next round).
+</p>
+<p>This vector is set by 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>import_metacells_h5ad!
+</code>
+</a> at import time.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Metacells">
 <a class="docs-heading-anchor" href="#Metacells">Metacells
 </a>
@@ -1009,7 +1039,7 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">metacell_total_UMIs_vector(
+<code class="language-julia hljs">vector_of_total_UMIs_per_metacell(
     expectation::ContractExpectation
 )::Pair{VectorKey, DataSpecification}
 </code>
@@ -2316,9 +2346,11 @@
 <a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!">
 <code>compute_vector_of_type_per_cell_by_metacells!
 </code>
-</a>. If the type annotation is done at the block level, the per-cell type vector can be populated by [
+</a>. If the type annotation is done at the block level, the per-cell type vector can be populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_type_per_cell_by_blocks!">
 <code>compute_vector_of_type_per_cell_by_blocks!
-</code>](@ref
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -2766,6 +2798,36 @@
 </section>
 </details>
 </article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module">
+<code>Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_cells_dispersion_per_metacell_per_module(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>In each metacell and gene module, the ratio between the actual standard deviation of the (normalized) UMIs of the module in the cells of the metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise. The higher this dispersion value is, the less homogeneous the metacell is in expression of this module. This is zero if the gene module was not found in the block the metacell belongs to, or if the mean (normalized) UMIs of the module per cell in the metacell is too low to be informative.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!">
+<code>compute_matrix_of_cells_dispersion_per_metacell_per_module!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Projection">
 <a class="docs-heading-anchor" href="#Projection">Projection
 </a>
@@ -2800,7 +2862,7 @@
 </p>
 <p>This vector is populated by 
 <a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
-<code>compute_cells_projection
+<code>compute_cells_projection!
 </code>
 </a>.
 </p>
@@ -2830,7 +2892,7 @@
 </p>
 <p>This vector is populated by 
 <a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
-<code>compute_cells_projection
+<code>compute_cells_projection!
 </code>
 </a>.
 </p>
@@ -2860,7 +2922,7 @@
 </p>
 <p>This vector is populated by 
 <a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
-<code>compute_cells_projection
+<code>compute_cells_projection!
 </code>
 </a>.
 </p>
@@ -3006,6 +3068,36 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood marker gene per block. The pool we rank against is just the pertinent (non-lateral) neighborhood markers of the block whose correlation-with-most is non-zero. Genes outside that pool, and genes in the pool whose correlation-with-most is zero, are stored as zero, so the matrix is sparse.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!">
+<code>compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
 <a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
 <code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
@@ -3087,6 +3179,10 @@
 </a>, copied into the alternative. This is needed to store per-base-block quality control data. Such data is more directly comparable between the alternative metacells and the base ones.
 </p>
 <p>This axis is typically created by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
+</code>
+</a> or by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
 <code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 </code>
@@ -3150,6 +3246,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell">
 <code>Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module">
+<code>Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module
 </code>
 </a>
 </li>
@@ -3280,6 +3382,12 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_n_genes_per_module_per_block">
 <code>Metacells.Contracts.matrix_of_n_genes_per_module_per_block
 </code>
@@ -3366,6 +3474,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_excluded_UMIs_per_cell">
 <code>Metacells.Contracts.vector_of_excluded_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_base_outlier_per_cell">
+<code>Metacells.Contracts.vector_of_is_base_outlier_per_cell
 </code>
 </a>
 </li>

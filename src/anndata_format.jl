@@ -296,7 +296,7 @@ Per-metacell-per-metacell:
     copy_axis!(; destination = daf, source = metacells_daf, axis = "metacell", overwrite, insist)
     copy_axis!(; destination = daf, source = metacells_daf, axis = "gene", overwrite, insist)
 
-    copy_metacells_of_cells(daf, cells_h5ad; overwrite, insist)
+    copy_metacells_of_cells(daf, cells_h5ad; bestify, overwrite, insist)
 
     import_scalars_data(daf, metacells_daf; overwrite, insist)
 
@@ -656,7 +656,13 @@ function import_matrices_data(
     return nothing
 end
 
-function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; overwrite::Bool, insist::Bool)::Nothing
+function copy_metacells_of_cells(
+    daf::DafWriter,
+    cells_h5ad::AbstractString;
+    bestify::Bool,
+    overwrite::Bool,
+    insist::Bool,
+)::Nothing
     cells_adata = flame_timed("readh5ad") do
         return readh5ad(cells_h5ad)  # NOJET
     end
@@ -669,7 +675,7 @@ function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; ove
 
     index_per_metacell = axis_dict(daf, "metacell")
     name_per_cell = cells_adata.obs_names
-    is_outlier_per_cell = cells_adata.obs[!, "metacell"] .< 0
+    is_base_outlier_per_cell = cells_adata.obs[!, "metacell"] .< 0
 
     for (vector, rename, be_outlier) in
         (("metacell_name", "metacell", false), ("most_similar_name", "most_similar.metacell", true))
@@ -681,7 +687,7 @@ function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; ove
         end
 
         data = cells_adata.obs[!, vector]
-        data[is_outlier_per_cell .!= be_outlier] .= ""
+        data[is_base_outlier_per_cell .!= be_outlier] .= ""
 
         for (cell_name, metacell_name) in zip(name_per_cell, data)
             if metacell_name != "" && !haskey(index_per_metacell, metacell_name)
@@ -706,6 +712,19 @@ function copy_metacells_of_cells(daf::DafWriter, cells_h5ad::AbstractString; ove
 
         @debug "copy cell vector: $(vector) to: $(rename)" _group = :mcs_details
         set_vector!(daf, "cell", rename, data; overwrite)
+    end
+
+    if overwrite || insist || !has_vector(daf, "cell", "is_base_outlier")
+        if cell_indices !== nothing
+            full_is_base_outlier_per_cell = fill(true, axis_length(daf, "cell"))
+            full_is_base_outlier_per_cell[cell_indices] .= is_base_outlier_per_cell
+            is_base_outlier_per_cell = full_is_base_outlier_per_cell
+        end
+        if bestify
+            is_base_outlier_per_cell = TanayLabUtilities.bestify(is_base_outlier_per_cell)
+        end
+        @debug "set cell vector: is_base_outlier" _group = :mcs_details
+        set_vector!(daf, "cell", "is_base_outlier", is_base_outlier_per_cell; overwrite)
     end
 end
 
