@@ -8,7 +8,6 @@ export sharpen_metacells!
 using Base.Threads
 using Clustering
 using DataAxesFormats
-using LoopVectorization
 using ProgressMeter
 using Random
 using SparseArrays
@@ -84,7 +83,6 @@ struct KmeansSizesBuffers{T <: AbstractFloat}
     max_current_cells_dispersion::Vector{Float32}
     max_candidate_cells_dispersion::Vector{Float32}
     cells_dispersion_per_max_module::Vector{Float32}
-    mean_normalized_per_max_module::Vector{Float64}
 end
 
 function KmeansSizesBuffers{T}(;
@@ -124,7 +122,6 @@ function KmeansSizesBuffers{T}(;
         Vector{Float32}(undef, max_k),        # max_current_cells_dispersion
         Vector{Float32}(undef, max_k),        # max_candidate_cells_dispersion
         Vector{Float32}(undef, n_modules),    # cells_dispersion_per_max_module
-        Vector{Float64}(undef, n_modules),    # mean_normalized_per_max_module
     )
 end
 
@@ -149,7 +146,6 @@ end
     block_cell_indices::AbstractVector{<:Integer}
     cluster_index_per_block_cell::AbstractVector{<:Integer}
     is_too_small_per_cluster::BitVector
-    todox_cells_dispersion_per_cluster::Vector{Float32}  # TODOX: only used for diagnostic logs
 end
 
 @kwdef struct DispersionContext
@@ -903,7 +899,6 @@ function compute_local_clusters(;
                     is_too_small_per_cluster = BitVector([
                         n_block_cells < min_cells_in_metacell || weight_total < min_metacell_total_UMIs,
                     ]),
-                    todox_cells_dispersion_per_cluster = Float32[0.0],
                 ),
             ]
         else
@@ -991,353 +986,10 @@ function combine_local_clusters(;
     return (cells_of_new_metacells, block_name_per_new_metacell)
 end
 
-# Build the incremental `GroupedSeriesCorrelations` structure for one base block at baseline. Points = the base
-# block's neighborhood cells (round-0 base-block frame). Groups = the current-round blocks whose cells contribute,
-# in `block_index` order. Series = the base block's strong genes (filtered to those with a non-empty friend gene).
-# Fixed values = `log2(cell_UMIs[c,g]/cell_total[c] + reg)` (cell's own log fraction of the strong gene). Variable
-# values = `log2((slot_friend[m_c] - cell_friend[c]) / (slot_total[m_c] - cell_total[c]) + reg)` (punctuated metacell
-# log fraction of the strong gene's friend) under baseline. The baseline mask marks a point as active iff its
-# baseline metacell satisfies the existing membership guards (`m_c > 0` and `slot_total[m_c] > cell_total[c]`).
-# Returns `(grouped, group_index_per_block)` - the latter maps each `block_index` to its group index in `grouped`
-# (or `0` if that block contributes no cells to this base block's neighborhood).
-function build_grouped_for_base_block(;
-    base_block_index::Integer,
-    n_blocks::Integer,
-    n_cells::Integer,
-    base_block_index_per_cell::AbstractVector{<:Integer},
-    block_index_per_cell::AbstractVector{<:Integer},
-    block_cell_indices_per_block::AbstractVector,
-    is_in_base_neighborhood_for_base_block::AbstractVector{Bool},
-    baseline_metacell_index_per_cell::AbstractVector{<:Integer},
-    slot_total_UMIs::AbstractVector{<:Integer},
-    slot_UMIs_per_relevant_gene::AbstractMatrix{<:Integer},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
-    total_UMIs_per_cell::AbstractVector{<:Integer},
-    strong_gene_indices::AbstractVector{<:Integer},
-    friend_gene_indices::AbstractVector{<:Integer},
-    relevant_gene_position_per_gene::AbstractVector{<:Integer},
-    gene_fraction_regularization::AbstractFloat,
-)::Tuple{GroupedSeriesCorrelations{Float32}, Vector{Int}}
-    n_series = length(strong_gene_indices)
-    @assert length(friend_gene_indices) == n_series
-
-    # Count how many cells each block contributes to this base block's neighborhood.
-    n_points_per_block = zeros(Int, n_blocks)
-    for cell_index in 1:n_cells
-        base_block_of_cell = base_block_index_per_cell[cell_index]
-        block_of_cell = block_index_per_cell[cell_index]
-        if base_block_of_cell > 0 && block_of_cell > 0 && is_in_base_neighborhood_for_base_block[base_block_of_cell]
-            n_points_per_block[block_of_cell] += 1
-        end
-    end
-
-    # Assign group indices to contributing blocks in `block_index` order.
-    group_index_per_block = zeros(Int, n_blocks)
-    n_groups = 0
-    for block_index in 1:n_blocks
-        if n_points_per_block[block_index] > 0
-            n_groups += 1
-            group_index_per_block[block_index] = n_groups
-        end
-    end
-
-    n_points = sum(n_points_per_block)
-    n_points_per_group = Vector{Int}(undef, n_groups)
-    for block_index in 1:n_blocks
-        g = group_index_per_block[block_index]
-        if g > 0
-            n_points_per_group[g] = n_points_per_block[block_index]
-        end
-    end
-
-    # Lay out cells contiguously by group, preserving the order in `block_cell_indices_per_block` within each block.
-    cell_indices_in_order = Vector{Int}(undef, n_points)
-    write_position = 1
-    for block_index in 1:n_blocks
-        if group_index_per_block[block_index] == 0
-            continue
-        end
-        for cell_index in block_cell_indices_per_block[block_index]
-            base_block_of_cell = base_block_index_per_cell[cell_index]
-            if base_block_of_cell > 0 && is_in_base_neighborhood_for_base_block[base_block_of_cell]
-                cell_indices_in_order[write_position] = cell_index
-                write_position += 1
-            end
-        end
-    end
-    @assert write_position == n_points + 1
-
-    # Compute the fixed and variable matrices and the baseline mask.
-    fixed_per_point_per_series = Matrix{Float32}(undef, n_points, n_series)
-    variable_per_point_per_series = Matrix{Float32}(undef, n_points, n_series)
-    is_active_per_point = Vector{Bool}(undef, n_points)
-    regularization = Float32(gene_fraction_regularization)
-    for point_index in 1:n_points
-        cell_index = cell_indices_in_order[point_index]
-        cell_total = Int(total_UMIs_per_cell[cell_index])
-        baseline_slot = Int(baseline_metacell_index_per_cell[cell_index])
-        slot_total = baseline_slot > 0 ? Int(slot_total_UMIs[baseline_slot]) : 0
-        is_active = baseline_slot > 0 && slot_total > cell_total
-        is_active_per_point[point_index] = is_active
-
-        for series_index in 1:n_series
-            strong_gene_index = strong_gene_indices[series_index]
-            friend_gene_index = friend_gene_indices[series_index]
-            friend_relevant_position = relevant_gene_position_per_gene[friend_gene_index]
-
-            cell_strong_UMIs = Int(UMIs_per_cell_per_gene[cell_index, strong_gene_index])
-            fixed_per_point_per_series[point_index, series_index] =
-                log2(Float32(cell_strong_UMIs) / Float32(cell_total) + regularization)
-
-            if is_active
-                slot_friend_UMIs = Int(slot_UMIs_per_relevant_gene[baseline_slot, friend_relevant_position])
-                cell_friend_UMIs = Int(UMIs_per_cell_per_gene[cell_index, friend_gene_index])
-                punctuated_friend = slot_friend_UMIs - cell_friend_UMIs
-                punctuated_total = slot_total - cell_total
-                variable_per_point_per_series[point_index, series_index] =
-                    log2(Float32(punctuated_friend) / Float32(punctuated_total) + regularization)
-            else
-                variable_per_point_per_series[point_index, series_index] = 0.0f0
-            end
-        end
-    end
-
-    grouped = GroupedSeriesCorrelations(
-        fixed_per_point_per_series,
-        variable_per_point_per_series,
-        n_points_per_group;
-        is_active_per_point,
-    )
-
-    return (grouped, group_index_per_block)
-end
-
-# Fill `log_linear_fraction_per_block_with_options_cell_per_relevant_gene` and the per-cell auxiliaries
-# `is_active_per_block_with_options_cell` / `punctuated_total_per_block_with_options_cell` for one block under one
-# K-option. The matrix stores `log2((slot_friend - cell_friend) / (slot_total - cell_total) + reg)` per (B's cell,
-# relevant gene), independent of which base block scores it; each (cell, relevant gene) pair is therefore log-computed
-# at most once per (B, K-option) rather than once per (B, K-option, affected base block). Inactive cells (too-small
-# cluster, or slot-total not exceeding cell-total) get a placeholder `punctuated_total = 1` so the @turbo log fill below
-# is branch-free; their values are masked out downstream. Returns the count of cells in the block.
-function compute_block_with_options_logs_under_k_option!(;
-    block_index::Integer,
-    k_option_index::Integer,
-    local_clusters_per_block::AbstractVector{Maybe{Vector{LocalClusters}}},
-    slot_start_per_k_option_per_block::AbstractVector{Vector{Int}},
-    slot_UMIs_per_relevant_gene::AbstractMatrix{<:Integer},
-    slot_total_UMIs::AbstractVector{<:Integer},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
-    total_UMIs_per_cell::AbstractVector{<:Integer},
-    gene_index_per_friend_position::AbstractVector{<:Integer},
-    relevant_gene_position_per_friend_position::AbstractVector{<:Integer},
-    gene_fraction_regularization::AbstractFloat,
-    is_active_per_block_with_options_cell::AbstractVector{Bool},
-    punctuated_total_per_block_with_options_cell::AbstractVector{Float32},
-    log_linear_fraction_per_block_with_options_cell_per_friend_position::AbstractMatrix{Float32},
-)::Int
-    local_clusters = local_clusters_per_block[block_index][k_option_index]
-    slot_start = slot_start_per_k_option_per_block[block_index][k_option_index]
-    regularization = Float32(gene_fraction_regularization)
-    n_block_cells = length(local_clusters.cluster_index_per_block_cell)
-    n_friend_positions = length(gene_index_per_friend_position)
-
-    @inbounds for block_cell_position in 1:n_block_cells
-        cell_index = local_clusters.block_cell_indices[block_cell_position]
-        cluster_index_within_k = local_clusters.cluster_index_per_block_cell[block_cell_position]
-        cell_total = Int(total_UMIs_per_cell[cell_index])
-        slot_total = Int(slot_total_UMIs[slot_start + cluster_index_within_k - 1])
-        is_inactive = local_clusters.is_too_small_per_cluster[cluster_index_within_k] || slot_total <= cell_total
-        if is_inactive
-            is_active_per_block_with_options_cell[block_cell_position] = false
-            punctuated_total_per_block_with_options_cell[block_cell_position] = 1.0f0
-        else
-            is_active_per_block_with_options_cell[block_cell_position] = true
-            punctuated_total_per_block_with_options_cell[block_cell_position] = Float32(slot_total - cell_total)
-        end
-    end
-
-    # Scalar gather pass writes the `Float32(slot_friend - cell_friend)` numerator into the log matrix; @turbo can't
-    # cleanly vectorize integer-gather + integer→Float32 conversion, so this stage is scalar but cache-friendly (outer
-    # loop is over B's friend-gene columns, inner over the cell rows that share that column). The friend axis is B-
-    # specific (union of friend genes across B's affected base blocks) and much narrower than `n_relevant_genes`.
-    @inbounds for friend_position in 1:n_friend_positions
-        gene_index = gene_index_per_friend_position[friend_position]
-        relevant_gene_position = relevant_gene_position_per_friend_position[friend_position]
-        for block_cell_position in 1:n_block_cells
-            cell_index = local_clusters.block_cell_indices[block_cell_position]
-            cluster_index_within_k = local_clusters.cluster_index_per_block_cell[block_cell_position]
-            new_slot = slot_start + cluster_index_within_k - 1
-            slot_friend_UMIs = Int(slot_UMIs_per_relevant_gene[new_slot, relevant_gene_position])
-            cell_friend_UMIs = Int(UMIs_per_cell_per_gene[cell_index, gene_index])
-            log_linear_fraction_per_block_with_options_cell_per_friend_position[
-                block_cell_position,
-                friend_position,
-            ] = Float32(slot_friend_UMIs - cell_friend_UMIs)
-        end
-    end
-
-    # In-place log2 over the whole (cell × friend position) matrix - the transcendental that dominates this function.
-    @check_turbo_matrix(log_linear_fraction_per_block_with_options_cell_per_friend_position)
-    @check_turbo_vector(punctuated_total_per_block_with_options_cell)
-    @turbo for friend_position in 1:n_friend_positions
-        for block_cell_position in 1:n_block_cells
-            log_linear_fraction_per_block_with_options_cell_per_friend_position[
-                block_cell_position,
-                friend_position,
-            ] = log2(
-                log_linear_fraction_per_block_with_options_cell_per_friend_position[
-                    block_cell_position,
-                    friend_position,
-                ] / punctuated_total_per_block_with_options_cell[block_cell_position] + regularization,
-            )
-        end
-    end
-
-    return n_block_cells
-end
-
-# TODOX: only used by the diagnostic NEXT / BETTER / PERFECT K logs in `kmeans_with_sizes`. Returns extrema for cells
-# per cluster, total UMIs per cluster, and dispersion per cluster, taken across the solution's active K range. The
-# dispersion extrema skip clusters whose cell count is below `min_cluster_size` (outliers) - those have undefined or
-# degenerate dispersion and would otherwise drive the min to 0.
-function todox_solution_extrema(
-    solution::KmeansSolution,
-    min_cluster_size::Real,
-)::Tuple{Tuple{Int, Int}, Tuple{Float64, Float64}, Tuple{Float32, Float32}}
-    cells_range = extrema(@view solution.counts[1:solution.k])
-    UMIs_range = extrema(@view solution.weight_per_cluster[1:solution.k])
-    dispersion_min = Float32(Inf)
-    dispersion_max = -Float32(Inf)
-    @inbounds for cluster_index in 1:solution.k
-        if solution.counts[cluster_index] >= min_cluster_size
-            dispersion = solution.cells_dispersion_per_cluster[cluster_index]
-            dispersion_min = min(dispersion_min, dispersion)
-            dispersion_max = max(dispersion_max, dispersion)
-        end
-    end
-    return (cells_range, UMIs_range, (dispersion_min, dispersion_max))
-end
-
-# TODOX: dumps every non-outlier cluster's (count, weight, dispersion) so the offending cluster with dispersion = 0 is
-# identifiable when the corresponding assertion in `kmeans_with_sizes` fires. For each cluster with `dispersion == 0`
-# AND `count >= min_cluster_size`, also dumps per-found-module mean normalized UMIs (= what
-# `maximal_cells_dispersion_of_modules!` computes and compares against `min_module_UMIs` to decide whether to skip the
-# module). That distinguishes the three known causes of a zero non-outlier dispersion: (a) count < 2 (impossible if
-# `min_cluster_size >= 2`); (b) `is_found_per_module` is all false (n_found = 0 in the dump); (c) every found module's
-# mean is below `min_module_UMIs` (n_found > 0 and n_passing = 0 in the dump).
-function todox_describe_solution_clusters(
-    solution::KmeansSolution,
-    min_cluster_size::Real,
-    sizes_buffers::KmeansSizesBuffers,
-    dispersion_context::DispersionContext,
-    context::AbstractString,
-)::Nothing
-    @warn "TODOX - $(context) non-outlier clusters dump (min_cluster_size=$(min_cluster_size)):"
-    for cluster_index in 1:solution.k
-        count = solution.counts[cluster_index]
-        if count < min_cluster_size
-            continue
-        end
-        weight = solution.weight_per_cluster[cluster_index]
-        dispersion = solution.cells_dispersion_per_cluster[cluster_index]
-        @warn "  cluster $(cluster_index): count=$(count) weight=$(round(weight / 1000; digits=1))K dispersion=$(dispersion)"
-        if dispersion == 0
-            todox_describe_cluster_modules(solution, cluster_index, sizes_buffers, dispersion_context)
-            @assert false  # TODOX
-        end
-    end
-    return nothing
-end
-
-# TODOX: mirrors the per-found-module setup of `maximal_cells_dispersion_of_modules!` for a single cluster but logs the
-# `mean_normalized_module_UMIs` it computes per found module (the value compared against `min_module_UMIs` to decide
-# whether the module is `continue`d). Trashes `sizes_buffers` scratch (max_split_point_indices, total_UMIs_per_max_-
-# cluster_cell, normalized_factor_per_max_cluster_cell, is_gene_in_module); only called immediately before an assertion
-# fires so the trash is irrelevant.
-function todox_describe_cluster_modules(
-    solution::KmeansSolution,
-    cluster_index::Integer,
-    sizes_buffers::KmeansSizesBuffers,
-    dispersion_context::DispersionContext,
-)::Nothing
-    n_block_cells = length(dispersion_context.block_cell_indices)
-    n_cluster_cells = 0
-    @inbounds for point_index in 1:n_block_cells
-        if solution.assignments[point_index] == cluster_index
-            n_cluster_cells += 1
-            sizes_buffers.max_split_point_indices[n_cluster_cells] =
-                dispersion_context.block_cell_indices[point_index]
-        end
-    end
-    @views indices_of_cluster_cells = sizes_buffers.max_split_point_indices[1:n_cluster_cells]
-    @views total_UMIs_per_cells = sizes_buffers.total_UMIs_per_max_cluster_cell[1:n_cluster_cells]
-    @views normalized_factor_per_cells = sizes_buffers.normalized_factor_per_max_cluster_cell[1:n_cluster_cells]
-    normalized_factor_per_cells .= getindex.(Ref(dispersion_context.total_UMIs_per_cell), indices_of_cluster_cells)
-    total_UMIs_per_cells .= normalized_factor_per_cells
-    normalized_total_UMIs = quantile!(total_UMIs_per_cells, dispersion_context.normalized_UMIs_quantile)
-    @. normalized_factor_per_cells = normalized_total_UMIs / normalized_factor_per_cells
-
-    n_modules = length(dispersion_context.is_found_per_module)
-    n_genes = length(dispersion_context.module_index_per_gene)
-    is_gene_in_module = sizes_buffers.is_gene_in_module
-    n_found = 0
-    n_passing = 0
-    max_mean_for_found = 0.0
-    for module_index in 1:n_modules
-        if !dispersion_context.is_found_per_module[module_index]
-            continue
-        end
-        n_found += 1
-        @. is_gene_in_module = dispersion_context.module_index_per_gene == module_index
-        sum_normalized = 0.0
-        @inbounds for cell_position in 1:n_cluster_cells
-            cell_index = indices_of_cluster_cells[cell_position]
-            module_UMIs = 0
-            for gene_index in 1:n_genes
-                if is_gene_in_module[gene_index]
-                    module_UMIs += Int(dispersion_context.UMIs_per_cell_per_gene[cell_index, gene_index])
-                end
-            end
-            sum_normalized += module_UMIs * normalized_factor_per_cells[cell_position]
-        end
-        mean_normalized = sum_normalized / n_cluster_cells
-        passing = mean_normalized >= dispersion_context.min_module_UMIs
-        if passing
-            n_passing += 1
-        end
-        max_mean_for_found = max(max_mean_for_found, mean_normalized)
-        @warn "    module $(module_index): mean_normalized=$(round(mean_normalized; digits=3)) passing=$(passing)"
-    end
-    @warn "    summary: n_found=$(n_found) n_passing=$(n_passing) max_mean=$(round(max_mean_for_found; digits=3)) min_module_UMIs=$(dispersion_context.min_module_UMIs)"
-    return nothing
-end
-
-# TODOX: only used by the diagnostic APPLY log to summarize a K-swap's per-cluster size / UMI load / dispersion
-# ranges; remove together with `todox_cells_dispersion_per_cluster`. Returns extrema for cells per cluster, total UMIs
-# per cluster, and dispersion per cluster.
-function todox_cluster_extrema(
-    local_clusters::LocalClusters,
-    total_UMIs_per_cell::AbstractVector{<:Integer},
-)::Tuple{Tuple{Int, Int}, Tuple{Int, Int}, Tuple{Float32, Float32}}
-    n_block_cells_per_cluster = zeros(Int, local_clusters.n_clusters)
-    total_UMIs_per_cluster = zeros(Int, local_clusters.n_clusters)
-    @inbounds for block_cell_position in eachindex(local_clusters.cluster_index_per_block_cell)
-        cluster_index = local_clusters.cluster_index_per_block_cell[block_cell_position]
-        cell_index = local_clusters.block_cell_indices[block_cell_position]
-        n_block_cells_per_cluster[cluster_index] += 1
-        total_UMIs_per_cluster[cluster_index] += Int(total_UMIs_per_cell[cell_index])
-    end
-    return (
-        extrema(n_block_cells_per_cluster),
-        extrema(total_UMIs_per_cluster),
-        extrema(local_clusters.todox_cells_dispersion_per_cluster),
-    )
-end
-
 # Pick one `LocalClusters` per block out of each block's solutions list to maximise the global mean of per-base-block
-# mean correlation-with-most over the strong genes. Phase-3 entry point; this iteration builds an incremental
-# `GroupedSeriesCorrelations` per base block, evaluates each block's alternative K-options against it, and applies
-# winning swaps via `replace_group!` so the per-bb baselines stay incrementally maintained between iterations.
+# mean correlation-with-most over the strong genes. Phase-3 entry point; this iteration runs the initial scoring on the
+# all-1s selection (in parallel across base blocks, with preallocated per-thread scratch), logs the global
+# mean-of-means score, and returns that selection unchanged (actual swapping comes later).
 function optimize_block_k_choices!(;
     local_clusters_per_block::AbstractVector{Maybe{Vector{LocalClusters}}},
     base_block_index_per_cell::AbstractVector{<:Integer},
@@ -1381,15 +1033,6 @@ function optimize_block_k_choices!(;
             relevant_gene_position_per_gene[gene_index] = n_relevant_genes
         end
     end
-    # Inverse of `relevant_gene_position_per_gene` for indexing back from the relevant-only column space into the
-    # original gene axis (needed inside the per-(B, K-option) log-fill loop to read `UMIs_per_cell_per_gene`).
-    gene_index_per_relevant_gene_position = Vector{Int}(undef, n_relevant_genes)
-    @inbounds for gene_index in 1:n_genes
-        relevant_position = relevant_gene_position_per_gene[gene_index]
-        if relevant_position > 0
-            gene_index_per_relevant_gene_position[relevant_position] = gene_index
-        end
-    end
 
     # Per-(block, K-option, cluster) slot indexing. Each K-option owns a contiguous range of slots so swapping a
     # block's selection just re-points `metacell_index_per_cell` at its slot range; the aggregates are precomputed.
@@ -1409,136 +1052,146 @@ function optimize_block_k_choices!(;
         slot_start_per_k_option_per_block[block_index] = starts
     end
 
-    slot_UMIs_per_relevant_gene = Matrix{UInt32}(undef, total_slots, n_relevant_genes)
-    slot_total_UMIs = Vector{UInt32}(undef, total_slots)
-
-    # Single per-block sweep that prepares everything downstream needs from `local_clusters_per_block`:
-    # - `cell_indices_per_slot[s]`: global cell indices contributing to slot `s` (used by the parallel slot_aggregates
-    #   loop below to balance over slots and iterate only the relevant-gene columns per cell).
-    # - `baseline_metacell_index_per_cell[c]`: cell `c`'s slot id under the baseline K (= K-option 1, since
-    #   `selected_k_index_per_block` is all ones at this point); 0 for cells in a too-small baseline cluster. Read by
-    #   `build_grouped_for_base_block` to set the initial mask + variable values.
-    # - `block_index_per_cell[c]` and `block_cell_indices_per_block[b]`: current-round block <-> cell membership. Also
-    #   read by `build_grouped_for_base_block`.
-    cell_indices_per_slot = [Int[] for _ in 1:total_slots]
-    baseline_metacell_index_per_cell = zeros(UInt32, n_cells)
-    block_index_per_cell = zeros(Int, n_cells)
-    block_cell_indices_per_block = Vector{Vector{Int}}(undef, n_blocks)
-    for block_index in 1:n_blocks
+    slot_UMIs_per_relevant_gene = zeros(UInt32, total_slots, n_relevant_genes)
+    slot_total_UMIs = zeros(UInt32, total_slots)
+    parallel_loop_wo_rng(1:n_blocks; policy = :static, name = "optimize_block_k_choices.slot_aggregates") do block_index
         list = local_clusters_per_block[block_index]
         if list === nothing
-            block_cell_indices_per_block[block_index] = Int[]
-            continue
+            return nothing
         end
-        block_cell_indices_per_block[block_index] = list[1].block_cell_indices
-        @inbounds for (k_option_index, local_clusters) in enumerate(list)
+        for (k_option_index, local_clusters) in enumerate(list)
             slot_start = slot_start_per_k_option_per_block[block_index][k_option_index]
-            for block_cell_position in eachindex(local_clusters.cluster_index_per_block_cell)
-                cluster_index_within_k = local_clusters.cluster_index_per_block_cell[block_cell_position]
+            @inbounds for block_cell_position in eachindex(local_clusters.cluster_index_per_block_cell)
                 cell_index = local_clusters.block_cell_indices[block_cell_position]
-                slot_id = slot_start + cluster_index_within_k - 1
-                push!(cell_indices_per_slot[slot_id], cell_index)
-                if k_option_index == 1
-                    block_index_per_cell[cell_index] = block_index
-                    if local_clusters.is_too_small_per_cluster[cluster_index_within_k]
-                        baseline_metacell_index_per_cell[cell_index] = 0
-                    else
-                        baseline_metacell_index_per_cell[cell_index] = slot_id
+                slot_id = slot_start + local_clusters.cluster_index_per_block_cell[block_cell_position] - 1
+                slot_total_UMIs[slot_id] += total_UMIs_per_cell[cell_index]
+                for gene_index in 1:n_genes
+                    relevant_position = relevant_gene_position_per_gene[gene_index]
+                    if relevant_position > 0
+                        slot_UMIs_per_relevant_gene[slot_id, relevant_position] +=
+                            UMIs_per_cell_per_gene[cell_index, gene_index]
                     end
                 end
             end
         end
+        return nothing
     end
 
-    parallel_loop_wo_rng(
-        1:total_slots;
-        policy = :greedy,
-        name = "optimize_block_k_choices.slot_aggregates",
-        progress = DebugProgress(total_slots; group = :mcs_loops, desc = "optimize_block_k_choices.slot_aggregates"),
-    ) do slot_id
-        cell_indices = cell_indices_per_slot[slot_id]
-        slot_total = zero(UInt32)
-        @inbounds for cell_index in cell_indices
-            slot_total += UInt32(total_UMIs_per_cell[cell_index])
-        end
-        slot_total_UMIs[slot_id] = slot_total
-        @inbounds for relevant_gene_position in 1:n_relevant_genes
-            gene_index = gene_index_per_relevant_gene_position[relevant_gene_position]
-            gene_sum = zero(UInt32)
-            for cell_index in cell_indices
-                gene_sum += UInt32(UMIs_per_cell_per_gene[cell_index, gene_index])
+    # Set `metacell_index_per_cell` for one block's cells to its `k_option_index` slot IDs (0 for too-small clusters).
+    function set_block_metacell_indices!(
+        metacell_index_per_cell::AbstractVector{<:Integer},
+        block_index::Integer,
+        k_option_index::Integer,
+    )::Nothing
+        local_clusters = local_clusters_per_block[block_index][k_option_index]
+        slot_start = slot_start_per_k_option_per_block[block_index][k_option_index]
+        @inbounds for block_cell_position in eachindex(local_clusters.cluster_index_per_block_cell)
+            cluster_index_within_k = local_clusters.cluster_index_per_block_cell[block_cell_position]
+            cell_index = local_clusters.block_cell_indices[block_cell_position]
+            if local_clusters.is_too_small_per_cluster[cluster_index_within_k]
+                metacell_index_per_cell[cell_index] = 0
+            else
+                metacell_index_per_cell[cell_index] = slot_start + cluster_index_within_k - 1
             end
-            slot_UMIs_per_relevant_gene[slot_id, relevant_gene_position] = gene_sum
         end
         return nothing
     end
 
+    baseline_metacell_index_per_cell = zeros(UInt32, n_cells)
+    for block_index in 1:n_blocks
+        if local_clusters_per_block[block_index] !== nothing
+            set_block_metacell_indices!(
+                baseline_metacell_index_per_cell,
+                block_index,
+                selected_k_index_per_block[block_index],
+            )
+        end
+    end
+
+    # TODOX - audit all `sum` / `all` / `any` over broadcasts (here and elsewhere) and switch to `count` / predicate
+    # forms (e.g. `all(>(0), v)`) to avoid allocating temporary vectors.
     # Every base block must have at least one strong gene, so every base block is scorable.
     n_relevant_genes_per_base_block = vec(sum(is_strong_per_gene_per_base_block; dims = 1))
     @assert all(n_relevant_genes_per_base_block .> 0)
+    n_max_relevant_genes = maximum(n_relevant_genes_per_base_block)
 
-    # Per base block: the strong genes that also have a non-empty friend gene name (the existing scoring code skips
-    # strong genes whose `most_correlated_gene_in_base_neighborhood_per_gene` entry is empty).
-    strong_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
-    friend_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
-    for base_block_index in 1:n_base_blocks
-        @views is_strong_per_gene_column = is_strong_per_gene_per_base_block[:, base_block_index]
-        @views most_correlated_gene_in_base_neighborhood_per_gene_column =
-            most_correlated_gene_in_base_neighborhood_per_gene_per_base_block[:, base_block_index]
-        strong_list = Int[]
-        friend_list = Int[]
-        for gene_index in 1:n_genes
-            if is_strong_per_gene_column[gene_index]
-                friend_name = most_correlated_gene_in_base_neighborhood_per_gene_column[gene_index]
-                if !isempty(friend_name)
-                    push!(strong_list, gene_index)
-                    push!(friend_list, gene_name_to_index[friend_name])
-                end
-            end
-        end
-        strong_gene_indices_per_base_block[base_block_index] = strong_list
-        friend_gene_indices_per_base_block[base_block_index] = friend_list
+    n_base_neighborhood_cells_per_base_block = [
+        sum(
+            (base_block_index_per_cell .> 0) .& getindex.(
+                Ref(is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]),
+                max.(base_block_index_per_cell, 1),
+            ),
+        ) for base_block_index in 1:n_base_blocks
+    ]
+    max_n_base_neighborhood_cells = maximum(n_base_neighborhood_cells_per_base_block)
+
+    # Per-thread scratch so each block's evaluation allocates nothing. Each thread owns a full copy of the baseline
+    # `metacell_index_per_cell` that it overrides for its block and reverts afterwards (so blocks don't see each other's
+    # in-flight swaps), plus a per-gene correlation column and the scratch the scoring helper needs.
+    metacell_index_per_cell_per_thread = [copy(baseline_metacell_index_per_cell) for _ in 1:maxthreadid()]
+    correlation_with_most_per_gene_per_thread = [Vector{Float32}(undef, n_genes) for _ in 1:maxthreadid()]
+    is_correlated_per_gene_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
+    is_in_base_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
+    indices_of_max_correlated_genes_per_thread = [Vector{Int}(undef, n_max_relevant_genes) for _ in 1:maxthreadid()]
+    friend_indices_of_max_correlated_genes_per_thread =
+        [Vector{Int}(undef, n_max_relevant_genes) for _ in 1:maxthreadid()]
+    indices_of_max_base_neighborhood_cells_per_thread =
+        [Vector{Int}(undef, max_n_base_neighborhood_cells) for _ in 1:maxthreadid()]
+    other_metacell_index_per_max_base_neighborhood_cell_per_thread =
+        [Vector{UInt32}(undef, max_n_base_neighborhood_cells) for _ in 1:maxthreadid()]
+    total_UMIs_per_max_base_neighborhood_cell_per_thread =
+        [Vector{UInt32}(undef, max_n_base_neighborhood_cells) for _ in 1:maxthreadid()]
+    total_punctuated_metacell_UMIs_per_max_base_neighborhood_cell_per_thread =
+        [Vector{UInt32}(undef, max_n_base_neighborhood_cells) for _ in 1:maxthreadid()]
+    cell_log_fraction_per_max_neighborhood_cell_per_thread =
+        [Vector{Float32}(undef, max_n_base_neighborhood_cells) for _ in 1:maxthreadid()]
+    punctuated_metacell_log_fraction_per_max_neighborhood_cell_per_thread =
+        [Vector{Float32}(undef, max_n_base_neighborhood_cells) for _ in 1:maxthreadid()]
+
+    # Score a single base block against the given `metacell_index_per_cell` and return its mean correlation-with-most.
+    function score_one_base_block!(
+        base_block_index::Integer,
+        metacell_index_per_cell::AbstractVector{<:Integer},
+    )::Float32
+        return compute_correlation_with_most_for_base_block!(;
+            base_block_index,
+            most_correlated_gene_in_base_neighborhood_per_gene_per_base_block,
+            gene_name_to_index,
+            is_in_base_neighborhood_per_other_block_per_base_block = is_in_base_neighborhood_per_other_base_block_per_base_block,
+            other_metacell_index_per_cell = metacell_index_per_cell,
+            base_block_index_per_cell,
+            total_UMIs_per_other_metacell = slot_total_UMIs,
+            total_UMIs_per_cell,
+            UMIs_per_cell_per_gene,
+            UMIs_per_other_metacell_per_relevant_gene = slot_UMIs_per_relevant_gene,
+            relevant_gene_position_per_gene,
+            gene_fraction_regularization,
+            correlation_with_most_per_gene = correlation_with_most_per_gene_per_thread[threadid()],
+            is_correlated_per_gene = is_correlated_per_gene_per_thread[threadid()],
+            is_in_base_neighborhood_per_cell = is_in_base_neighborhood_per_cell_per_thread[threadid()],
+            indices_of_max_correlated_genes = indices_of_max_correlated_genes_per_thread[threadid()],
+            friend_indices_of_max_correlated_genes = friend_indices_of_max_correlated_genes_per_thread[threadid()],
+            indices_of_max_base_neighborhood_cells = indices_of_max_base_neighborhood_cells_per_thread[threadid()],
+            other_metacell_index_per_max_base_neighborhood_cell = other_metacell_index_per_max_base_neighborhood_cell_per_thread[threadid()],
+            total_UMIs_per_max_base_neighborhood_cell = total_UMIs_per_max_base_neighborhood_cell_per_thread[threadid()],
+            total_punctuated_metacell_UMIs_per_max_base_neighborhood_cell = total_punctuated_metacell_UMIs_per_max_base_neighborhood_cell_per_thread[threadid()],
+            cell_log_fraction_per_max_neighborhood_cell_per_thread,
+            punctuated_metacell_log_fraction_per_max_neighborhood_cell_per_thread,
+            is_relevant_gene_per_base_block = is_strong_per_gene_per_base_block,
+            progress = nothing,
+        )
     end
 
-
-    # Build the incremental `GroupedSeriesCorrelations` per base block and compute its initial baseline mean
-    # correlation-with-most in the same parallel pass.
-    grouped_per_base_block = Vector{GroupedSeriesCorrelations{Float32}}(undef, n_base_blocks)
-    group_index_per_block_per_base_block = zeros(Int, n_blocks, n_base_blocks)
-    baseline_mean_per_base_block = Vector{Float32}(undef, n_base_blocks)
+    # Baseline mean correlation-with-most per base block (computed once against the current selection).
+    baseline_mean_per_base_block = zeros(Float32, n_base_blocks)
     parallel_loop_wo_rng(
         1:n_base_blocks;
         policy = :static,
-        name = "optimize_block_k_choices.build_grouped",
-        progress = DebugProgress(
-            n_base_blocks;
-            group = :mcs_loops,
-            desc = "optimize_block_k_choices.build_grouped",
-        ),
+        name = "optimize_block_k_choices.baseline_score",
+        progress = DebugProgress(n_base_blocks; group = :mcs_loops, desc = "optimize_block_k_choices.baseline"),
     ) do base_block_index
-        @views is_in_base_neighborhood_for_base_block =
-            is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]
-        (grouped, group_index_per_block) = build_grouped_for_base_block(;
-            base_block_index,
-            n_blocks,
-            n_cells,
-            base_block_index_per_cell,
-            block_index_per_cell,
-            block_cell_indices_per_block,
-            is_in_base_neighborhood_for_base_block,
-            baseline_metacell_index_per_cell,
-            slot_total_UMIs,
-            slot_UMIs_per_relevant_gene,
-            UMIs_per_cell_per_gene,
-            total_UMIs_per_cell,
-            strong_gene_indices = strong_gene_indices_per_base_block[base_block_index],
-            friend_gene_indices = friend_gene_indices_per_base_block[base_block_index],
-            relevant_gene_position_per_gene,
-            gene_fraction_regularization,
-        )
-        grouped_per_base_block[base_block_index] = grouped
-        @views group_index_per_block_per_base_block[:, base_block_index] .= group_index_per_block
-        baseline_mean_per_base_block[base_block_index] = Float32(mean_correlation(grouped))
+        baseline_mean_per_base_block[base_block_index] =
+            score_one_base_block!(base_block_index, metacell_index_per_cell_per_thread[threadid()])
         return nothing
     end
     @warn "TODOX OPTIMIZE - INITIAL SCORE: $(sum(baseline_mean_per_base_block) / n_base_blocks) over $(n_base_blocks) base blocks"
@@ -1550,26 +1203,13 @@ function optimize_block_k_choices!(;
     ]
     n_blocks_with_options = length(blocks_with_options)
 
-    # Per-thread scratch for the log-fill helper's internal `punctuated_total` intermediate. The bb-canonical
-    # `variable_per_point_per_series` / `is_active_per_group_point` scratch is gone - the indirect-gather correlation
-    # API reads log values + activity straight from B's cached per-(B, K-option) matrix and `is_active_per_block_cell`
-    # via point→block_cell + series→friend_position indirection vectors. Per-(B, K-option) log matrices and is_active
-    # vectors themselves live in the persistent cache below.
-    max_n_block_with_options_cells = 0
-    for block_index in blocks_with_options
-        max_n_block_with_options_cells =
-            max(max_n_block_with_options_cells, length(local_clusters_per_block[block_index][1].block_cell_indices))
-    end
-    punctuated_total_per_block_with_options_cell_per_thread =
-        [Vector{Float32}(undef, max_n_block_with_options_cells) for _ in 1:maxthreadid()]
-
     # The base blocks affected by swapping a block (those whose base neighborhood overlaps the block's cells) depend
     # only on the fixed cell-to-base-block mapping and neighborhoods, so cache them once and reuse across improvement
     # steps. `is_base_block_of_block` and `is_affected_base_block` are reused below as the union scratch when applying.
     is_base_block_of_block = falses(n_base_blocks)
     is_affected_base_block = falses(n_base_blocks)
-    affected_base_blocks_per_block_with_options = Vector{Vector{Int}}(undef, n_blocks_with_options)
-    for (block_with_options_position, block_index) in enumerate(blocks_with_options)
+    affected_base_blocks_per_options_block = Vector{Vector{Int}}(undef, n_blocks_with_options)
+    for (options_block_position, block_index) in enumerate(blocks_with_options)
         fill!(is_base_block_of_block, false)
         for cell_index in local_clusters_per_block[block_index][1].block_cell_indices
             base_block_index = base_block_index_per_cell[cell_index]
@@ -1582,382 +1222,97 @@ function optimize_block_k_choices!(;
             @views is_affected_base_block .|=
                 is_in_base_neighborhood_per_other_base_block_per_base_block[base_block_index, :]  # NOLINT
         end
-        affected_base_blocks_per_block_with_options[block_with_options_position] = findall(is_affected_base_block)
-    end
-
-    # Per B in `blocks_with_options`: the union of friend gene indices across B's affected base blocks. This is B's
-    # friend-gene subspace - the column axis of its cached log matrix - and is typically much smaller than the global
-    # `n_relevant_genes`, cutting both log fill work and cache size by ~`n_relevant_genes / n_friend_positions_for_B`.
-    # `gene_index_per_friend_position_per_block_with_options[B][friend_position]` is the global gene index for B's
-    # friend column; `relevant_gene_position_per_friend_position_per_block_with_options[B][friend_position]` is the
-    # corresponding column in `slot_UMIs_per_relevant_gene` for the slot_friend UMI lookup inside log fill.
-    # `friend_position_per_series_per_base_block_per_block_with_options[B][bb]` is per (B, bb) the column position in
-    # B's log matrix for each of bb's strong-friend series; the indirect-gather correlation API consumes it.
-    # `block_cell_per_point_per_base_block_per_block_with_options[B][bb]` is per (B, bb) the list of B's
-    # `block_cell_position`s of the cells that fall in bb's base neighborhood, in B's canonical block_cell_position
-    # order - this is the row indirection the indirect-gather API needs to look up cached log values per point.
-    # Both are stored as `Dict` per B because only B's affected base blocks have entries.
-    gene_index_per_friend_position_per_block_with_options = Vector{Vector{Int}}(undef, n_blocks_with_options)
-    relevant_gene_position_per_friend_position_per_block_with_options =
-        Vector{Vector{Int}}(undef, n_blocks_with_options)
-    friend_position_per_series_per_base_block_per_block_with_options =
-        Vector{Dict{Int, Vector{Int}}}(undef, n_blocks_with_options)
-    block_cell_per_point_per_base_block_per_block_with_options =
-        Vector{Dict{Int, Vector{Int}}}(undef, n_blocks_with_options)
-    let
-        is_friend_gene_for_block_with_options = falses(n_genes)
-        friend_position_per_gene = zeros(Int, n_genes)
-        for block_with_options_position in 1:n_blocks_with_options
-            block_index = blocks_with_options[block_with_options_position]
-            block_cell_indices_of_block_with_options =
-                local_clusters_per_block[block_index][1].block_cell_indices
-            n_block_cells = length(block_cell_indices_of_block_with_options)
-            affected_base_blocks = affected_base_blocks_per_block_with_options[block_with_options_position]
-            fill!(is_friend_gene_for_block_with_options, false)
-            for base_block_index in affected_base_blocks
-                for friend_gene_index in friend_gene_indices_per_base_block[base_block_index]
-                    is_friend_gene_for_block_with_options[friend_gene_index] = true
-                end
-            end
-            fill!(friend_position_per_gene, 0)
-            gene_index_per_friend_position = Int[]
-            for gene_index in 1:n_genes
-                if is_friend_gene_for_block_with_options[gene_index]
-                    push!(gene_index_per_friend_position, gene_index)
-                    friend_position_per_gene[gene_index] = length(gene_index_per_friend_position)
-                end
-            end
-            gene_index_per_friend_position_per_block_with_options[block_with_options_position] =
-                gene_index_per_friend_position
-            relevant_gene_position_per_friend_position_per_block_with_options[block_with_options_position] =
-                [relevant_gene_position_per_gene[gene_index] for gene_index in gene_index_per_friend_position]
-            friend_position_per_series_per_base_block = Dict{Int, Vector{Int}}()
-            block_cell_per_point_per_base_block = Dict{Int, Vector{Int}}()
-            for base_block_index in affected_base_blocks
-                friend_position_per_series_per_base_block[base_block_index] =
-                    [friend_position_per_gene[friend_gene_index]
-                     for friend_gene_index in friend_gene_indices_per_base_block[base_block_index]]
-                @views is_in_base_neighborhood_for_base_block =
-                    is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]
-                block_cell_per_point = Int[]
-                for block_cell_position in 1:n_block_cells
-                    cell_index = block_cell_indices_of_block_with_options[block_cell_position]
-                    base_block_of_cell = base_block_index_per_cell[cell_index]
-                    if base_block_of_cell > 0 && is_in_base_neighborhood_for_base_block[base_block_of_cell]
-                        push!(block_cell_per_point, block_cell_position)
-                    end
-                end
-                block_cell_per_point_per_base_block[base_block_index] = block_cell_per_point
-            end
-            friend_position_per_series_per_base_block_per_block_with_options[block_with_options_position] =
-                friend_position_per_series_per_base_block
-            block_cell_per_point_per_base_block_per_block_with_options[block_with_options_position] =
-                block_cell_per_point_per_base_block
-        end
+        affected_base_blocks_per_options_block[options_block_position] = findall(is_affected_base_block)
     end
 
     proposed_k_index_per_block = copy(selected_k_index_per_block)
 
-    # A block need only be re-evaluated while one of its affected base blocks might have changed since it was last
-    # evaluated. Initially all do; each step clears the blocks whose affected base blocks were all left untouched, since
-    # their inputs (and hence their best K) provably cannot have changed.
-    needs_evaluation_per_block_with_options = trues(n_blocks_with_options)
-
-    # Per-improvement-step score buffer for the per-(B, K-option) parallel evaluate path. Filled by the parallel loop
-    # (one writer per slot) and consumed by the serial best-K reduce that follows. Allocated once since the per-B K-
-    # option counts are invariant across steps. `local_baseline_score_per_block_with_options[B]` caches each evaluated
-    # B's baseline (sum of `baseline_mean_per_base_block` over B's affected base blocks) so it isn't re-summed per K.
-    local_baseline_score_per_block_with_options = Vector{Float64}(undef, n_blocks_with_options)
-    score_per_k_option_per_block_with_options = [
-        Vector{Float64}(undef, length(local_clusters_per_block[blocks_with_options[block_with_options_position]]))
-        for block_with_options_position in 1:n_blocks_with_options
-    ]
-
-    # Persistent cache of per-(B, K-option) log matrices and activity vectors. Lazy-filled on first access by EVALUATE
-    # (and reused by APPLY); never invalidated because the values are step-invariant - they depend only on B's cells'
-    # UMIs, slot UMIs, and total UMIs, none of which change during the improvement loop. Cuts EVALUATE's per-step log
-    # fill work to "the (B, K-option) pairs newly visited this step" and lets APPLY skip its dedicated dedup pass.
-    cached_log_linear_fraction_per_k_option_per_block_with_options =
-        Vector{Vector{Maybe{Matrix{Float32}}}}(undef, n_blocks_with_options)
-    cached_is_active_per_k_option_per_block_with_options =
-        Vector{Vector{Maybe{Vector{Bool}}}}(undef, n_blocks_with_options)
-    for block_with_options_position in 1:n_blocks_with_options
-        n_k_options =
-            length(local_clusters_per_block[blocks_with_options[block_with_options_position]])
-        cached_log_linear_fraction_per_k_option_per_block_with_options[block_with_options_position] =
-            Maybe{Matrix{Float32}}[nothing for _ in 1:n_k_options]
-        cached_is_active_per_k_option_per_block_with_options[block_with_options_position] =
-            Maybe{Vector{Bool}}[nothing for _ in 1:n_k_options]
-    end
-
-    # One improvement step: in parallel, each block flagged for evaluation tries each alternative K against a thread-local
-    # copy of the current selection (the rest held constant), scoring only its affected base blocks and proposing the
-    # best by local score; then all winning swaps are applied at once (updating the selection and every thread's working
-    # copy) and only the affected base block scores recomputed. Returns whether any swap was applied. The setup above is
+    # One improvement step: in parallel, each block with options tries each alternative K against a thread-local copy of
+    # the current selection (the rest held constant), scoring only its affected base blocks and proposing the best by
+    # local score; then all winning swaps are applied at once (updating the selection and every thread's working copy)
+    # and only the affected base block scores recomputed. Returns whether any swap was applied. The setup above is
     # invariant and reused across steps.
     function run_improvement_step!()::Bool
-        blocks_with_options_to_evaluate = findall(needs_evaluation_per_block_with_options)
-        @warn "TODOX OPTIMIZE - EVALUATE blocks: $(length(blocks_with_options_to_evaluate)) / $(n_blocks_with_options)"
+        parallel_loop_wo_rng(
+            1:n_blocks_with_options;
+            policy = :greedy,
+            name = "optimize_block_k_choices.evaluate",
+            progress = DebugProgress(
+                n_blocks_with_options;
+                group = :mcs_loops,
+                desc = "optimize_block_k_choices.evaluate",
+            ),
+        ) do options_block_position
+            block_index = blocks_with_options[options_block_position]
+            affected_base_blocks = affected_base_blocks_per_options_block[options_block_position]
+            metacell_index_per_cell = metacell_index_per_cell_per_thread[threadid()]
 
-        # Cache each evaluated B's baseline score (= sum of `baseline_mean_per_base_block` over B's affected base
-        # blocks) so the serial best-K reduce below can compare against it without re-summing.
-        for block_with_options_position in blocks_with_options_to_evaluate
-            affected_base_blocks = affected_base_blocks_per_block_with_options[block_with_options_position]
-            local_baseline = 0.0
+            local_baseline_score = 0.0
             for base_block_index in affected_base_blocks
-                local_baseline += baseline_mean_per_base_block[base_block_index]
+                local_baseline_score += baseline_mean_per_base_block[base_block_index]
             end
-            local_baseline_score_per_block_with_options[block_with_options_position] = local_baseline
-        end
 
-        # Flatten the work into two grain levels:
-        # - `work_items[wi] = (block_with_options_position, k_option)` for the per-(B, K) log fill (Stage A).
-        # - `triples[t] = (block_with_options_position, k_option, base_block_index)` for the per-(B, K, bb) gather +
-        #   correlation (Stage B); this is `n_affected_bb`x more work items than Stage A so the parallel loop balances
-        #   much better - big blocks no longer stall the tail.
-        # `first_triple_per_work_item` slices `triples` into contiguous per-(B, K) ranges so the serial Stage C reduce
-        # can sum partial scores per (B, K) without re-grouping. Skips each B's current K-option since its score is
-        # already the cached baseline.
-        work_items = Tuple{Int, Int}[]
-        first_triple_per_work_item = Int[]
-        n_triples = 0
-        for block_with_options_position in blocks_with_options_to_evaluate
-            block_index = blocks_with_options[block_with_options_position]
-            current_k_option = selected_k_index_per_block[block_index]
-            n_affected = length(affected_base_blocks_per_block_with_options[block_with_options_position])
-            for k_option in 1:length(local_clusters_per_block[block_index])
-                if k_option != current_k_option
-                    push!(work_items, (block_with_options_position, k_option))
-                    push!(first_triple_per_work_item, n_triples + 1)
-                    n_triples += n_affected
-                end
-            end
-        end
-        push!(first_triple_per_work_item, n_triples + 1)
-        triples = Vector{Tuple{Int, Int, Int}}(undef, n_triples)
-        triple_index = 0
-        for (work_item_index, (block_with_options_position, k_option)) in enumerate(work_items)
-            for base_block_index in affected_base_blocks_per_block_with_options[block_with_options_position]
-                triple_index += 1
-                triples[triple_index] = (block_with_options_position, k_option, base_block_index)
-            end
-        end
-
-        # Stage A: parallel over (B, K-option) work items, fill the log cache where needed. Each work item is unique so
-        # there's no race on the cache slot; Stage B reads from the populated cache.
-        parallel_loop_wo_rng(
-            1:length(work_items);
-            policy = :greedy,
-            name = "optimize_block_k_choices.evaluate_logs",
-            progress = DebugProgress(
-                length(work_items);
-                group = :mcs_loops,
-                desc = "optimize_block_k_choices.evaluate_logs",
-            ),
-        ) do work_item_index
-            (block_with_options_position, k_option) = work_items[work_item_index]
-            block_index = blocks_with_options[block_with_options_position]
-            if cached_log_linear_fraction_per_k_option_per_block_with_options[block_with_options_position][k_option] ===
-               nothing
-                n_block_cells = length(local_clusters_per_block[block_index][1].block_cell_indices)
-                gene_index_per_friend_position =
-                    gene_index_per_friend_position_per_block_with_options[block_with_options_position]
-                relevant_gene_position_per_friend_position =
-                    relevant_gene_position_per_friend_position_per_block_with_options[block_with_options_position]
-                log_linear_fraction_per_block_cell_per_friend_position =
-                    Matrix{Float32}(undef, n_block_cells, length(gene_index_per_friend_position))
-                is_active_per_block_cell = Vector{Bool}(undef, n_block_cells)
-                punctuated_total_per_block_cell =
-                    punctuated_total_per_block_with_options_cell_per_thread[threadid()]
-                compute_block_with_options_logs_under_k_option!(;
-                    block_index,
-                    k_option_index = k_option,
-                    local_clusters_per_block,
-                    slot_start_per_k_option_per_block,
-                    slot_UMIs_per_relevant_gene,
-                    slot_total_UMIs,
-                    UMIs_per_cell_per_gene,
-                    total_UMIs_per_cell,
-                    gene_index_per_friend_position,
-                    relevant_gene_position_per_friend_position,
-                    gene_fraction_regularization,
-                    is_active_per_block_with_options_cell = is_active_per_block_cell,
-                    punctuated_total_per_block_with_options_cell = punctuated_total_per_block_cell,
-                    log_linear_fraction_per_block_with_options_cell_per_friend_position =
-                        log_linear_fraction_per_block_cell_per_friend_position,
-                )
-                cached_log_linear_fraction_per_k_option_per_block_with_options[block_with_options_position][k_option] =
-                    log_linear_fraction_per_block_cell_per_friend_position
-                cached_is_active_per_k_option_per_block_with_options[block_with_options_position][k_option] =
-                    is_active_per_block_cell
-            end
-            return nothing
-        end
-
-        # Stage B: parallel over (B, K-option, bb) triples - the gather + correlation work split fine-grained so big
-        # blocks don't stall the tail. Reads log values from the cache populated by Stage A; writes per-triple partial
-        # scores into `score_partial_per_triple`. Different triples write disjoint slots, no races.
-        score_partial_per_triple = Vector{Float64}(undef, n_triples)
-        parallel_loop_wo_rng(
-            1:n_triples;
-            policy = :greedy,
-            name = "optimize_block_k_choices.evaluate_scores",
-            progress = DebugProgress(
-                n_triples;
-                group = :mcs_loops,
-                desc = "optimize_block_k_choices.evaluate_scores",
-            ),
-        ) do triple_index_in_loop
-            (block_with_options_position, k_option, base_block_index) = triples[triple_index_in_loop]
-            block_index = blocks_with_options[block_with_options_position]
-            log_linear_fraction_per_block_cell_per_friend_position =
-                cached_log_linear_fraction_per_k_option_per_block_with_options[block_with_options_position][k_option]
-            is_active_per_block_cell =
-                cached_is_active_per_k_option_per_block_with_options[block_with_options_position][k_option]
-            @assert log_linear_fraction_per_block_cell_per_friend_position !== nothing
-            @assert is_active_per_block_cell !== nothing
-            block_cell_per_point =
-                block_cell_per_point_per_base_block_per_block_with_options[block_with_options_position][base_block_index]
-            friend_position_per_series =
-                friend_position_per_series_per_base_block_per_block_with_options[block_with_options_position][base_block_index]
-            group_index_in_base_block = group_index_per_block_per_base_block[block_index, base_block_index]
-            score_partial_per_triple[triple_index_in_loop] = mean_correlation_if_group_replaced(
-                grouped_per_base_block[base_block_index],
-                group_index_in_base_block,
-                log_linear_fraction_per_block_cell_per_friend_position,
-                is_active_per_block_cell,
-                block_cell_per_point,
-                friend_position_per_series,
-            )
-            return nothing
-        end
-
-        # Stage C: serial reduce per (B, K-option) by summing the partial scores in its triple range. Tiny vs the
-        # parallel scoring.
-        for (work_item_index, (block_with_options_position, k_option)) in enumerate(work_items)
-            score = 0.0
-            for triple_index_in_loop in
-                first_triple_per_work_item[work_item_index]:(first_triple_per_work_item[work_item_index + 1] - 1)
-                score += score_partial_per_triple[triple_index_in_loop]
-            end
-            score_per_k_option_per_block_with_options[block_with_options_position][k_option] = score
-        end
-
-        # Serial reduce: per evaluated B, pick the best K-option. Options are sorted by ascending K and the initial
-        # selection is the lowest, so each non-current candidate is a higher-K (smaller-cluster) alternative; require a
-        # meaningful improvement over the baseline (= current K's score) to switch.
-        for block_with_options_position in blocks_with_options_to_evaluate
-            block_index = blocks_with_options[block_with_options_position]
             current_k_option = selected_k_index_per_block[block_index]
             best_k_option = current_k_option
-            best_local_score = local_baseline_score_per_block_with_options[block_with_options_position]
-            scores = score_per_k_option_per_block_with_options[block_with_options_position]
-            for k_option in 1:length(scores)
+            best_local_score = local_baseline_score
+            for k_option in 1:length(local_clusters_per_block[block_index])
                 if k_option == current_k_option
                     continue
                 end
-                if scores[k_option] > best_local_score + 1e-6
-                    best_local_score = scores[k_option]
+                set_block_metacell_indices!(metacell_index_per_cell, block_index, k_option)
+                local_score = 0.0
+                for base_block_index in affected_base_blocks
+                    local_score += score_one_base_block!(base_block_index, metacell_index_per_cell)
+                end
+                if local_score > best_local_score
+                    best_local_score = local_score
                     best_k_option = k_option
                 end
             end
+            set_block_metacell_indices!(metacell_index_per_cell, block_index, current_k_option)  # Revert.
+
             proposed_k_index_per_block[block_index] = best_k_option
-        end
-
-        # First apply pass (serial): identify changed blocks, log each swap, update `selected_k_index_per_block`, and
-        # group the change indices by affected base block. `changed_blocks[i] = (block_with_options_position,
-        # new_k_option)` is the flat list (the position is needed to look up the cached log matrix below);
-        # `changed_indices_per_base_block[bb]` indexes into it.
-        fill!(is_affected_base_block, false)
-        changed_blocks = Tuple{Int, Int}[]
-        changed_indices_per_base_block = Dict{Int, Vector{Int}}()
-        for (block_with_options_position, block_index) in enumerate(blocks_with_options)
-            new_k_option = proposed_k_index_per_block[block_index]
-            old_k_option = selected_k_index_per_block[block_index]
-            if new_k_option == old_k_option
-                continue
-            end
-            list = local_clusters_per_block[block_index]
-            (cells_old, UMIs_old, dispersion_old) = todox_cluster_extrema(list[old_k_option], total_UMIs_per_cell)
-            (cells_new, UMIs_new, dispersion_new) = todox_cluster_extrema(list[new_k_option], total_UMIs_per_cell)
-            @warn "TODOX OPTIMIZE - APPLY block: $(block_index) " *
-                  "K: $(list[old_k_option].n_clusters) -> $(list[new_k_option].n_clusters) " *
-                  "C: $(cells_old[1])..$(cells_old[2]) -> $(cells_new[1])..$(cells_new[2]) " *
-                  "U: $(UMIs_old[1])..$(UMIs_old[2]) -> $(UMIs_new[1])..$(UMIs_new[2]) " *
-                  "D: $(round(dispersion_old[1]; digits=3))..$(round(dispersion_old[2]; digits=3)) -> " *
-                  "$(round(dispersion_new[1]; digits=3))..$(round(dispersion_new[2]; digits=3))"
-            selected_k_index_per_block[block_index] = new_k_option
-            push!(changed_blocks, (block_with_options_position, new_k_option))
-            changed_index = length(changed_blocks)
-            for base_block_index in affected_base_blocks_per_block_with_options[block_with_options_position]
-                is_affected_base_block[base_block_index] = true
-                changed_indices_for_base_block = get!(changed_indices_per_base_block, base_block_index) do
-                    return Int[]
-                end
-                push!(changed_indices_for_base_block, changed_index)
-            end
-        end
-
-        if isempty(changed_blocks)
-            return false
-        end
-
-        # Second apply pass (parallel over affected base blocks): each base block gathers from the cached per-(B,
-        # K_new) log matrices (filled by EVALUATE; any K_new that wins an APPLY swap was a non-current candidate in
-        # EVALUATE's work_items list, so its cache slot is populated) and applies its swaps to its own `grouped` struct
-        # serially because `replace_group!` mutates the struct's global totals. It then immediately refreshes
-        # `baseline_mean_per_base_block` via `mean_correlation`. Different base blocks own different `grouped`
-        # instances so this is race-free across the parallel loop.
-        union_affected_base_blocks = findall(is_affected_base_block)
-        parallel_loop_wo_rng(
-            union_affected_base_blocks;
-            policy = :greedy,
-            name = "optimize_block_k_choices.apply_and_rescore",
-            progress = DebugProgress(
-                length(union_affected_base_blocks);
-                group = :mcs_loops,
-                desc = "optimize_block_k_choices.apply_and_rescore",
-            ),
-        ) do base_block_index
-            for changed_index in changed_indices_per_base_block[base_block_index]
-                (block_with_options_position, new_k_option) = changed_blocks[changed_index]
-                block_index = blocks_with_options[block_with_options_position]
-                log_linear_fraction_per_block_cell_per_friend_position =
-                    cached_log_linear_fraction_per_k_option_per_block_with_options[block_with_options_position][new_k_option]
-                is_active_per_block_cell =
-                    cached_is_active_per_k_option_per_block_with_options[block_with_options_position][new_k_option]
-                @assert log_linear_fraction_per_block_cell_per_friend_position !== nothing
-                @assert is_active_per_block_cell !== nothing
-                block_cell_per_point =
-                    block_cell_per_point_per_base_block_per_block_with_options[block_with_options_position][base_block_index]
-                friend_position_per_series =
-                    friend_position_per_series_per_base_block_per_block_with_options[block_with_options_position][base_block_index]
-                group_index_in_base_block = group_index_per_block_per_base_block[block_index, base_block_index]
-                replace_group!(
-                    grouped_per_base_block[base_block_index],
-                    group_index_in_base_block,
-                    log_linear_fraction_per_block_cell_per_friend_position,
-                    is_active_per_block_cell,
-                    block_cell_per_point,
-                    friend_position_per_series,
-                )
-            end
-
-            baseline_mean_per_base_block[base_block_index] =
-                Float32(mean_correlation(grouped_per_base_block[base_block_index]))
             return nothing
         end
 
-        # Re-evaluate next step only the blocks with an affected base block among those just rescored; the rest saw no
-        # change to their inputs and would propose the same (no) swap again.
-        for block_with_options_position in 1:n_blocks_with_options
-            needs_evaluation_per_block_with_options[block_with_options_position] = false
-            for base_block_index in affected_base_blocks_per_block_with_options[block_with_options_position]
-                if is_affected_base_block[base_block_index]
-                    needs_evaluation_per_block_with_options[block_with_options_position] = true
-                    break
-                end
+        # Apply all winning swaps at once: update the selection and every thread's working copy, and accumulate the
+        # union of affected base blocks so we only rescore what actually changed.
+        fill!(is_affected_base_block, false)
+        any_changed = false
+        for (options_block_position, block_index) in enumerate(blocks_with_options)
+            new_k_option = proposed_k_index_per_block[block_index]
+            if new_k_option == selected_k_index_per_block[block_index]
+                continue
             end
+            @warn "TODOX OPTIMIZE - APPLY block: $(block_index) K-option: $(selected_k_index_per_block[block_index]) -> $(new_k_option)"
+            any_changed = true
+            selected_k_index_per_block[block_index] = new_k_option
+            for thread_index in 1:maxthreadid()
+                set_block_metacell_indices!(metacell_index_per_cell_per_thread[thread_index], block_index, new_k_option)
+            end
+            for base_block_index in affected_base_blocks_per_options_block[options_block_position]
+                is_affected_base_block[base_block_index] = true
+            end
+        end
+
+        if !any_changed
+            return false
+        end
+
+        union_affected_base_blocks = findall(is_affected_base_block)
+        parallel_loop_wo_rng(
+            union_affected_base_blocks;
+            policy = :static,
+            name = "optimize_block_k_choices.rescore",
+            progress = DebugProgress(
+                length(union_affected_base_blocks);
+                group = :mcs_loops,
+                desc = "optimize_block_k_choices.rescore",
+            ),
+        ) do base_block_index
+            baseline_mean_per_base_block[base_block_index] =
+                score_one_base_block!(base_block_index, metacell_index_per_cell_per_thread[threadid()])
+            return nothing
         end
         return true
     end
@@ -1968,18 +1323,12 @@ function optimize_block_k_choices!(;
     for improvement_step_index in 1:n_max_improvement_steps
         global_score_before = sum(baseline_mean_per_base_block) / n_base_blocks
         if !run_improvement_step!()
-            @warn "TODOX OPTIMIZE - CONVERGED after $(improvement_step_index - 1) improvement step(s): $(global_score_before)"
+            @warn "TODOX OPTIMIZE - CONVERGED after $(improvement_step_index - 1) improvement step(s)"
             break
         end
         global_score_after = sum(baseline_mean_per_base_block) / n_base_blocks
         tag = global_score_after >= global_score_before ? "IMPROVEMENT" : "REGRESSION"
-        @warn "TODOX OPTIMIZE - STEP $(improvement_step_index) $(tag): $(global_score_before) -> $(global_score_after) (Δ $(global_score_after - global_score_before))"
-        # Stop if the applied swaps didn't meaningfully improve the global score (covers regressions and tiny gains);
-        # the just-applied selection stays committed regardless.
-        if global_score_after - global_score_before < 1.0f-5
-            @warn "TODOX OPTIMIZE - CONVERGED after $(improvement_step_index) improvement step(s) (insufficient gain): $(global_score_after)"
-            break
-        end
+        @warn "TODOX OPTIMIZE - STEP $(improvement_step_index) $(tag): $(global_score_before) -> $(global_score_after)"
     end
 
     return selected_k_index_per_block
@@ -2065,7 +1414,6 @@ function compute_cluster_dispersion!(
     @views indices_of_cluster_cells = sizes_buffers.max_split_point_indices[1:n_cluster_cells]
     solution.cells_dispersion_per_cluster[cluster_index] = maximal_cells_dispersion_of_modules!(;
         cells_dispersion_per_module = sizes_buffers.cells_dispersion_per_max_module,
-        mean_normalized_per_module = sizes_buffers.mean_normalized_per_max_module,
         indices_of_cells = indices_of_cluster_cells,
         UMIs_per_cell_per_gene = dispersion_context.UMIs_per_cell_per_gene,
         total_UMIs_per_cell = dispersion_context.total_UMIs_per_cell,
@@ -2104,7 +1452,6 @@ function update_size_statistics!(
     max_cluster_size::Real,
     dispersion_context::DispersionContext,
 )::Nothing
-    max_cluster_size = 2 * solution.n_points / solution.k  # TODOX
     n_too_tight = 0
     n_too_small = 0
     n_too_wide = 0
@@ -2214,7 +1561,6 @@ function split_largest_cluster!(
     rng::AbstractRNG,
 )::Integer where {T <: AbstractFloat}
     k = current_solution.k
-    max_cluster_size = 2 * current_solution.n_points / current_solution.k  # TODOX
 
     min_splittable_size = 2 * min_cluster_size
     min_splittable_weight = 2 * min_cluster_weight
@@ -2347,7 +1693,6 @@ function build_local_clusters_from_solution(
         block_cell_indices = dispersion_context.block_cell_indices,
         cluster_index_per_block_cell,
         is_too_small_per_cluster,
-        todox_cells_dispersion_per_cluster = Vector{Float32}(solution.cells_dispersion_per_cluster[1:solution.k]),
     )
 end
 
@@ -2465,39 +1810,15 @@ function kmeans_with_sizes(
     )
 
     @warn "TODOX ### KMEANS K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large)"
-    let (cells_range, UMIs_range, dispersion_range) = todox_solution_extrema(best_solution, min_cluster_size)
-        @warn "TODOX - PERFECT K: $(best_solution.k) " *
-              "C: $(cells_range[1])..$(cells_range[2]) " *
-              "U: $(round(UMIs_range[1] / 1000; digits=1))K..$(round(UMIs_range[2] / 1000; digits=1))K " *
-              "D: $(round(dispersion_range[1]; digits=3))..$(round(dispersion_range[2]; digits=3))"
-        if !(dispersion_range[1] > 0)
-            todox_describe_solution_clusters(
-                best_solution,
-                min_cluster_size,
-                sizes_buffers,
-                dispersion_context,
-                "PERFECT K $(best_solution.k)",
-            )
-        end
-    end
+    @warn "TODOX - PERFECT K: $(best_solution.k)"
 
     has_too_big = best_solution.n_too_wide + best_solution.n_too_large > 0
     has_too_tiny = best_solution.n_too_tight + best_solution.n_too_small > 0
-    # Collect perfect solutions by walking K away from the initial fit. With no too-big and no too-small clusters
-    # (already perfect), explore both bigger clusters (smaller K) and smaller clusters (bigger K). With only one size
-    # problem, walk the single direction that fixes it. With both problems at once, leave it to the split loop.
-    directions = if !has_too_big && !has_too_tiny
-        (-1, +1)
-    elseif has_too_big && !has_too_tiny
-        (+1,)
-    elseif has_too_tiny && !has_too_big
-        (-1,)
-    else
-        ()
-    end
-    start_k = best_solution.k
-    for direction in directions
-        walk_k = start_k
+    have_perfect = !has_too_big && !has_too_tiny
+    if has_too_big != has_too_tiny || have_perfect
+        # Modify K to avoid only too-small or only too-large clusters, or to have less clusters.
+        direction = has_too_big ? +1 : -1
+        walk_k = best_solution.k
         while true
             walk_k += direction
             if walk_k < 2 || max_k < walk_k
@@ -2521,35 +1842,26 @@ function kmeans_with_sizes(
                 rng,
             )
 
-            (cells_range, UMIs_range, dispersion_range) = todox_solution_extrema(current_solution, min_cluster_size)
-            todox_ranges_suffix =
-                "C: $(cells_range[1])..$(cells_range[2]) " *
-                "U: $(round(UMIs_range[1] / 1000; digits=1))K..$(round(UMIs_range[2] / 1000; digits=1))K " *
-                "D: $(round(dispersion_range[1]; digits=3))..$(round(dispersion_range[2]; digits=3))"
             if penalty(current_solution) >= penalty(best_solution)
-                @warn "TODOX - NEXT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " *
-                      todox_ranges_suffix
+                @warn "TODOX - NEXT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large)"
             else
                 copy_solution!(best_solution, current_solution)
                 if best_solution.n_too_tight +
                    best_solution.n_too_small +
                    best_solution.n_too_wide +
                    best_solution.n_too_large > 0
-                    @warn "TODOX - BETTER K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " *
-                          todox_ranges_suffix
+                    @warn "TODOX - BETTER K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large)"
                 else
-                    @warn "TODOX - PERFECT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " *
-                          todox_ranges_suffix
+                    if have_perfect
+                        @warn "TODOX - REPERFECT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large)"
+                    else
+                        @warn "TODOX - PERFECT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large)"
+                    end
+                    have_perfect = true
+                    if direction > 0
+                        break
+                    end
                 end
-            end
-            if !(dispersion_range[1] > 0)
-                todox_describe_solution_clusters(
-                    current_solution,
-                    min_cluster_size,
-                    sizes_buffers,
-                    dispersion_context,
-                    "K $(current_solution.k)",
-                )
             end
 
             current_is_pure_in_same_direction = if direction > 0

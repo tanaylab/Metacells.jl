@@ -249,17 +249,10 @@ function compute_block_modules!(
         indices_of_neighborhood_metacells = findall(is_in_neighborhood_per_other_block[block_index_per_metacell])
 
         @views is_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene_per_block[:, block_index]
-        @assert any(is_neighborhood_marker_per_gene)
         is_lateral_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene .& is_lateral_per_gene
         indices_of_lateral_neighborhood_markers = findall(is_lateral_neighborhood_marker_per_gene)
         n_lateral_neighborhood_marker_genes = length(indices_of_lateral_neighborhood_markers)
-        if n_lateral_neighborhood_marker_genes == 0
-            block_name = axis_vector(daf, "block")[block_index]
-            @warn "no lateral neighborhood markers for block $(block_name); not ruling out gene clusters as lateral"
-            z_score_per_neighborhood_metacell_per_lateral_cluster =
-                Matrix{Float32}(undef, length(indices_of_neighborhood_metacells), 0)
-            return nothing
-        end
+        @assert n_lateral_neighborhood_marker_genes > 0
 
         @views log_fraction_per_neighborhood_metacell_per_lateral_neighborhood_marker_gene =
             log_fraction_per_metacell_per_gene[
@@ -372,8 +365,6 @@ function compute_block_modules!(
         is_neighborhood_distinct_per_local_gene =
             is_neighborhood_distinct_per_gene_per_block[indices_of_local_genes, block_index]
 
-        n_lateral_clusters = size(z_score_per_neighborhood_metacell_per_lateral_cluster, 2)
-
         for local_gene_position in 1:n_local_genes
             @views z_score_per_neighborhood_metacell_of_local_gene =
                 z_score_per_neighborhood_metacell_per_local_gene[:, local_gene_position]
@@ -384,6 +375,12 @@ function compute_block_modules!(
                 z_score_per_neighborhood_metacell_of_local_gene,
                 cluster_log_fraction_per_neighborhood_metacell,
             )
+            correlation_per_lateral_cluster = zero_cor_between_vector_and_matrix_columns(
+                z_score_per_neighborhood_metacell_of_local_gene,
+                z_score_per_neighborhood_metacell_per_lateral_cluster,
+            )
+            lateral_cluster_index = argmax(correlation_per_lateral_cluster)  # NOJET
+            lateral_correlation = correlation_per_lateral_cluster[lateral_cluster_index]
             qualifier = ""
             if is_neighborhood_distinct_per_local_gene[local_gene_position]
                 qualifier *= " distinct"
@@ -391,19 +388,11 @@ function compute_block_modules!(
             if is_skeleton_per_local_gene[local_gene_position]
                 qualifier *= " skeleton"
             end
-            if n_lateral_clusters > 0
-                correlation_per_lateral_cluster = zero_cor_between_vector_and_matrix_columns(
-                    z_score_per_neighborhood_metacell_of_local_gene,
-                    z_score_per_neighborhood_metacell_per_lateral_cluster,
-                )
-                lateral_cluster_index = argmax(correlation_per_lateral_cluster)  # NOJET
-                lateral_correlation = correlation_per_lateral_cluster[lateral_cluster_index]
-                if lateral_correlation > cluster_correlation
-                    if qualifier == ""
-                        is_lateral_ish_per_local_gene[local_gene_position] = true
-                    else
-                        qualifier *= " kept"
-                    end
+            if lateral_correlation > cluster_correlation
+                if qualifier == ""
+                    is_lateral_ish_per_local_gene[local_gene_position] = true
+                else
+                    qualifier *= " kept"
                 end
             end
         end

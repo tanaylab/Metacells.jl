@@ -443,13 +443,10 @@ end
 # Compute and return the maximum (across the block's found modules) cells_dispersion - the ratio between the actual
 # standard deviation of normalized module UMIs in the given group of cells (e.g. a metacell or a candidate cluster)
 # and the standard deviation expected from pure multinomial sampling noise. Also fills the per-module values into the
-# `cells_dispersion_per_module` scratch (zero for non-found modules and for modules that don't pass the effective
-# threshold). If no found module's mean reaches `min_module_UMIs`, the threshold is auto-reduced by integer steps until
-# at least one module qualifies (concretely: `effective_threshold = min(min_module_UMIs, floor(max_mean))`). Returns 0
-# when there are fewer than two cells, no found modules, or every found module has mean = 0.
+# `cells_dispersion_per_module` scratch (zero for non-found modules and for modules whose mean normalized UMIs falls
+# below `min_module_UMIs`). Returns 0 when there are fewer than two cells (the variance is undefined).
 function maximal_cells_dispersion_of_modules!(;
     cells_dispersion_per_module::AbstractVector{<:AbstractFloat},
-    mean_normalized_per_module::AbstractVector{<:AbstractFloat},
     indices_of_cells::AbstractVector{<:Integer},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -462,7 +459,6 @@ function maximal_cells_dispersion_of_modules!(;
     min_module_UMIs::Integer,
 )::AbstractFloat
     cells_dispersion_per_module .= 0
-    mean_normalized_per_module .= 0
     n_cells = length(indices_of_cells)
     if n_cells < 2
         return 0.0f0
@@ -476,11 +472,8 @@ function maximal_cells_dispersion_of_modules!(;
     normalized_total_UMIs = quantile!(total_UMIs_per_cells, normalized_UMIs_quantile)  # NOJET
     @. normalized_factor_per_cells = normalized_total_UMIs / normalized_factor_per_cells
 
-    # Single pass: per found module with a positive mean, compute mean + dispersion in the same per-cell loop. Store
-    # both in scratch. Track max mean so the effective threshold can be derived from the data after the loop instead of
-    # iterating thresholds.
     n_modules = length(is_found_per_module)
-    max_mean_normalized_module_UMIs = 0.0
+    max_cells_dispersion = 0.0f0
     for module_index in 1:n_modules
         if !is_found_per_module[module_index]
             continue
@@ -502,40 +495,21 @@ function maximal_cells_dispersion_of_modules!(;
         end
 
         mean_normalized_module_UMIs = sum_normalized_module_UMIs / n_cells
-        if mean_normalized_module_UMIs <= 0
+        if mean_normalized_module_UMIs < min_module_UMIs
             continue
         end
-        mean_normalized_per_module[module_index] = mean_normalized_module_UMIs
 
         actual_var_normalized_module_UMIs = max(
             (sum_squared_normalized_module_UMIs - sum_normalized_module_UMIs * mean_normalized_module_UMIs) /
             (n_cells - 1),
             0.0,
         )
-        cells_dispersion_per_module[module_index] =
-            Float32(sqrt(actual_var_normalized_module_UMIs / mean_normalized_module_UMIs))
-        max_mean_normalized_module_UMIs = max(max_mean_normalized_module_UMIs, mean_normalized_module_UMIs)
+
+        cells_dispersion = Float32(sqrt(actual_var_normalized_module_UMIs / mean_normalized_module_UMIs))
+        cells_dispersion_per_module[module_index] = cells_dispersion
+        max_cells_dispersion = max(max_cells_dispersion, cells_dispersion)
     end
 
-    if max_mean_normalized_module_UMIs <= 0
-        return 0.0f0
-    end
-
-    # Auto-reduce `min_module_UMIs` to the largest integer that still admits at least one module - which is
-    # `floor(max_mean)` when no module reached the original threshold, and stays at `min_module_UMIs` otherwise.
-    effective_threshold = min(Float64(min_module_UMIs), floor(max_mean_normalized_module_UMIs))
-
-    max_cells_dispersion = 0.0f0
-    for module_index in 1:n_modules
-        if !is_found_per_module[module_index]
-            continue
-        end
-        if mean_normalized_per_module[module_index] < effective_threshold
-            cells_dispersion_per_module[module_index] = 0
-        else
-            max_cells_dispersion = max(max_cells_dispersion, cells_dispersion_per_module[module_index])
-        end
-    end
     return max_cells_dispersion
 end
 
@@ -610,7 +584,6 @@ $(CONTRACT)
         [Vector{Float32}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
     normalized_factor_per_max_metacell_cell_per_thread =
         [Vector{Float32}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
-    mean_normalized_per_module_per_thread = [Vector{Float64}(undef, n_modules) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_metacells;
@@ -644,7 +617,6 @@ $(CONTRACT)
 
         max_cells_dispersion_per_per_metacell[metacell_index] = maximal_cells_dispersion_of_modules!(;
             cells_dispersion_per_module,
-            mean_normalized_per_module = mean_normalized_per_module_per_thread[threadid()],
             indices_of_cells = indices_of_metacell_cells,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,

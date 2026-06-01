@@ -278,8 +278,8 @@ $(CONTRACT)
         Float32;
         overwrite,
     ) do log_fraction_per_gene_per_block
-        @check_turbo_matrix(log_fraction_per_gene_per_block)
-        @check_turbo_matrix(fraction_per_gene_per_block)
+        @assert LoopVectorization.check_args(log_fraction_per_gene_per_block) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_block!\nfor log_fraction_per_gene_per_block: $(brief(log_fraction_per_gene_per_block))"
+        @assert LoopVectorization.check_args(fraction_per_gene_per_block) "check_args failed in compute_matrix_of_log_linear_fraction_per_gene_per_block!\nfor fraction_per_gene_per_block: $(brief(fraction_per_gene_per_block))"
         n_genes, n_blocks = size(log_fraction_per_gene_per_block)
         parallel_loop_wo_rng(
             1:n_blocks;
@@ -402,9 +402,9 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
     dense_UMIs_per_pertinent_marker_per_cell = Matrix(flip(UMIs_per_cell_per_pertinent_marker))
     log_linear_fraction_per_pertinent_marker_per_cell =
         Matrix{Float32}(undef, size(dense_UMIs_per_pertinent_marker_per_cell))
-    @check_turbo_matrix(dense_UMIs_per_pertinent_marker_per_cell)
-    @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_cell)
-    @check_turbo_vector(total_UMIs_per_cell)
+    @assert LoopVectorization.check_args(dense_UMIs_per_pertinent_marker_per_cell) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor dense_UMIs_per_pertinent_marker_per_cell: $(brief(dense_UMIs_per_pertinent_marker_per_cell))"
+    @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker_per_cell) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor log_linear_fraction_per_pertinent_marker_per_cell: $(brief(log_linear_fraction_per_pertinent_marker_per_cell))"
+    @assert LoopVectorization.check_args(total_UMIs_per_cell) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor total_UMIs_per_cell: $(brief(total_UMIs_per_cell))"
     n_pertinent_markers, n_cells = size(dense_UMIs_per_pertinent_marker_per_cell)
     parallel_loop_wo_rng(
         1:n_cells;
@@ -430,8 +430,8 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
     linear_fraction_per_pertinent_marker_per_block = Matrix(flip(linear_fraction_per_block_per_pertinent_marker))
     log_linear_fraction_per_pertinent_marker_per_block =
         Matrix{Float32}(undef, size(linear_fraction_per_pertinent_marker_per_block))
-    @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_block)
-    @check_turbo_matrix(linear_fraction_per_pertinent_marker_per_block)
+    @assert LoopVectorization.check_args(log_linear_fraction_per_pertinent_marker_per_block) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor log_linear_fraction_per_pertinent_marker_per_block: $(brief(log_linear_fraction_per_pertinent_marker_per_block))"
+    @assert LoopVectorization.check_args(linear_fraction_per_pertinent_marker_per_block) "check_args failed in compute_vector_of_block_closest_by_pertinent_markers_per_cell!\nfor linear_fraction_per_pertinent_marker_per_block: $(brief(linear_fraction_per_pertinent_marker_per_block))"
     n_pertinent_markers_for_blocks, n_blocks_for_markers = size(log_linear_fraction_per_pertinent_marker_per_block)
     parallel_loop_wo_rng(
         1:n_blocks_for_markers;
@@ -1353,10 +1353,10 @@ $(CONTRACT)
                     UMIs_per_metacell_per_gene[metacell_index, gene_index] -
                     UMIs_per_cell_per_gene[cell_index, gene_index]
             end
-            @check_turbo_vector(cell_log_fraction_per_neighborhood_cell)
-            @check_turbo_vector(total_UMIs_per_neighborhood_cell)
-            @check_turbo_vector(punctuated_metacell_log_fraction_per_neighborhood_cell)
-            @check_turbo_vector(total_punctuated_metacell_UMIs_per_neighborhood_cell)
+            @assert LoopVectorization.check_args(cell_log_fraction_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!\nfor cell_log_fraction_per_neighborhood_cell: $(brief(cell_log_fraction_per_neighborhood_cell))"
+            @assert LoopVectorization.check_args(total_UMIs_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!\nfor total_UMIs_per_neighborhood_cell: $(brief(total_UMIs_per_neighborhood_cell))"
+            @assert LoopVectorization.check_args(punctuated_metacell_log_fraction_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!\nfor punctuated_metacell_log_fraction_per_neighborhood_cell: $(brief(punctuated_metacell_log_fraction_per_neighborhood_cell))"
+            @assert LoopVectorization.check_args(total_punctuated_metacell_UMIs_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!\nfor total_punctuated_metacell_UMIs_per_neighborhood_cell: $(brief(total_punctuated_metacell_UMIs_per_neighborhood_cell))"
             @turbo for neighborhood_cell_position in 1:n_neighborhood_cells
                 cell_log_fraction_per_neighborhood_cell[neighborhood_cell_position] = log2(
                     cell_log_fraction_per_neighborhood_cell[neighborhood_cell_position] /
@@ -1643,10 +1643,10 @@ $(CONTRACT2)
                     UMIs_per_other_metacell_per_gene[other_metacell_index, gene_index] -
                     UMIs_per_cell_per_gene[cell_index, gene_index]
             end
-            @check_turbo_vector(cell_log_fraction_per_neighborhood_cell)
-            @check_turbo_vector(total_UMIs_per_neighborhood_cell)
-            @check_turbo_vector(punctuated_metacell_log_fraction_per_neighborhood_cell)
-            @check_turbo_vector(total_punctuated_metacell_UMIs_per_neighborhood_cell)
+            @assert LoopVectorization.check_args(cell_log_fraction_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor cell_log_fraction_per_neighborhood_cell: $(brief(cell_log_fraction_per_neighborhood_cell))"
+            @assert LoopVectorization.check_args(total_UMIs_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor total_UMIs_per_neighborhood_cell: $(brief(total_UMIs_per_neighborhood_cell))"
+            @assert LoopVectorization.check_args(punctuated_metacell_log_fraction_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor punctuated_metacell_log_fraction_per_neighborhood_cell: $(brief(punctuated_metacell_log_fraction_per_neighborhood_cell))"
+            @assert LoopVectorization.check_args(total_punctuated_metacell_UMIs_per_neighborhood_cell) "check_args failed in compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!\nfor total_punctuated_metacell_UMIs_per_neighborhood_cell: $(brief(total_punctuated_metacell_UMIs_per_neighborhood_cell))"
             @turbo for neighborhood_cell_position in 1:n_neighborhood_cells
                 cell_log_fraction_per_neighborhood_cell[neighborhood_cell_position] = log2(
                     cell_log_fraction_per_neighborhood_cell[neighborhood_cell_position] /
@@ -1883,7 +1883,7 @@ $(CONTRACT)
                 :,
                 pertinent_neighborhood_marker_position,
             ]
-            @check_turbo_vector(col)
+            @assert LoopVectorization.check_args(col) "check_args failed in compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!\nfor col: $(brief(col))"
             @turbo for neighborhood_cell_position in 1:n_neighborhood_cells
                 col[neighborhood_cell_position] = log2(col[neighborhood_cell_position] + gene_fraction_regularization)
             end
@@ -2102,10 +2102,10 @@ function compute_correlation_with_most_for_base_block!(;
                 UMIs_per_other_metacell_per_relevant_gene[other_metacell_index, friend_relevant_gene_position] -
                 UMIs_per_cell_per_gene[cell_index, friend_gene_index]
         end
-        @check_turbo_vector(cell_log_fraction_per_base_neighborhood_cell)
-        @check_turbo_vector(total_UMIs_per_base_neighborhood_cell)
-        @check_turbo_vector(punctuated_metacell_log_fraction_per_base_neighborhood_cell)
-        @check_turbo_vector(total_punctuated_metacell_UMIs_per_base_neighborhood_cell)
+        @assert LoopVectorization.check_args(cell_log_fraction_per_base_neighborhood_cell) "check_args failed in compute_correlation_with_most_for_base_block!\nfor cell_log_fraction_per_base_neighborhood_cell: $(brief(cell_log_fraction_per_base_neighborhood_cell))"
+        @assert LoopVectorization.check_args(total_UMIs_per_base_neighborhood_cell) "check_args failed in compute_correlation_with_most_for_base_block!\nfor total_UMIs_per_base_neighborhood_cell: $(brief(total_UMIs_per_base_neighborhood_cell))"
+        @assert LoopVectorization.check_args(punctuated_metacell_log_fraction_per_base_neighborhood_cell) "check_args failed in compute_correlation_with_most_for_base_block!\nfor punctuated_metacell_log_fraction_per_base_neighborhood_cell: $(brief(punctuated_metacell_log_fraction_per_base_neighborhood_cell))"
+        @assert LoopVectorization.check_args(total_punctuated_metacell_UMIs_per_base_neighborhood_cell) "check_args failed in compute_correlation_with_most_for_base_block!\nfor total_punctuated_metacell_UMIs_per_base_neighborhood_cell: $(brief(total_punctuated_metacell_UMIs_per_base_neighborhood_cell))"
         @turbo for base_neighborhood_cell_position in 1:n_base_neighborhood_cells
             cell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] = log2(
                 cell_log_fraction_per_base_neighborhood_cell[base_neighborhood_cell_position] /
