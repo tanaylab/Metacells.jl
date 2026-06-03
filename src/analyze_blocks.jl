@@ -602,41 +602,41 @@ $(CONTRACT)
         @views fold_distance_per_other_block =
             mean_euclidean_skeleton_fold_distance_per_block_per_block[:, base_block_index]
 
-        for i in 1:n_blocks
-            priority_per_other_block[i] =
-                (-confusion_fraction_per_other_block[i], Float32(fold_distance_per_other_block[i]))
+        for block_index in 1:n_blocks
+            priority_per_other_block[block_index] =
+                (-confusion_fraction_per_other_block[block_index], Float32(fold_distance_per_other_block[block_index]))
         end
         priority_per_other_block[base_block_index] = (-Inf32, -Inf32)
         sortperm!(ordered_block_indices, priority_per_other_block)
 
-        neighborhood_n_confused_blocks = 0
-        neighborhood_n_disjoint_blocks = 0
-        neighborhood_n_overflow_blocks = 0
+        n_neighborhood_confused_blocks = 0
+        n_neighborhood_disjoint_blocks = 0
+        n_neighborhood_overflow_blocks = 0
 
-        neighborhood_n_blocks = 0
-        neighborhood_n_metacells = 0
+        n_neighborhood_blocks = 0
+        n_neighborhood_metacells = 0
         neighborhood_total_UMIs = 0
 
         while true
-            next_block_index = ordered_block_indices[neighborhood_n_blocks + 1]
+            next_block_index = ordered_block_indices[n_neighborhood_blocks + 1]
             include_next_block = false
 
-            if neighborhood_n_blocks == 0
+            if n_neighborhood_blocks == 0
                 include_next_block = true
-                neighborhood_n_confused_blocks += 1
+                n_neighborhood_confused_blocks += 1
             elseif confusion_fraction_per_other_block[next_block_index] >= min_neighbour_confusion_fractions
-                if neighborhood_n_blocks <= max_blocks_in_neighborhood &&
-                   neighborhood_n_metacells <= max_metacells_in_neighborhood &&
+                if n_neighborhood_blocks <= max_blocks_in_neighborhood &&
+                   n_neighborhood_metacells <= max_metacells_in_neighborhood &&
                    neighborhood_total_UMIs <= max_total_UMIs_in_neighborhood
                     include_next_block = true
-                    neighborhood_n_confused_blocks += 1
+                    n_neighborhood_confused_blocks += 1
                 end
             else
-                if neighborhood_n_blocks < min_blocks_in_neighborhood ||
-                   neighborhood_n_metacells < min_metacells_in_neighborhood ||
+                if n_neighborhood_blocks < min_blocks_in_neighborhood ||
+                   n_neighborhood_metacells < min_metacells_in_neighborhood ||
                    neighborhood_total_UMIs < min_total_UMIs_in_neighborhood
                     include_next_block = true
-                    neighborhood_n_disjoint_blocks += 1
+                    n_neighborhood_disjoint_blocks += 1
                 end
             end
 
@@ -644,16 +644,16 @@ $(CONTRACT)
                 break
             end
 
-            neighborhood_n_blocks += 1
+            n_neighborhood_blocks += 1
             is_in_neighborhood_per_other_block_per_base_block[next_block_index, base_block_index] = true
-            neighborhood_n_metacells += n_metacells_per_block[next_block_index]
+            n_neighborhood_metacells += n_metacells_per_block[next_block_index]
             neighborhood_total_UMIs += total_UMIs_per_block[next_block_index]
         end
 
-        while neighborhood_n_blocks + neighborhood_n_overflow_blocks < n_blocks
-            next_block_index = ordered_block_indices[neighborhood_n_blocks + neighborhood_n_overflow_blocks + 1]
+        while n_neighborhood_blocks + n_neighborhood_overflow_blocks < n_blocks
+            next_block_index = ordered_block_indices[n_neighborhood_blocks + n_neighborhood_overflow_blocks + 1]
             if confusion_fraction_per_other_block[next_block_index] >= min_neighbour_confusion_fractions
-                neighborhood_n_overflow_blocks += 1
+                n_neighborhood_overflow_blocks += 1
             else
                 break
             end
@@ -661,14 +661,14 @@ $(CONTRACT)
 
         @debug (
             "Neighborhood: $(name_per_block[base_block_index])" *
-            " Blocks: $(neighborhood_n_blocks)" *
-            " Confused: $(neighborhood_n_confused_blocks)" *
-            " Disjoint: $(neighborhood_n_disjoint_blocks)" *
-            " Overflow: $(neighborhood_n_overflow_blocks)" *
-            " Metacells: $(neighborhood_n_metacells)" *
+            " Blocks: $(n_neighborhood_blocks)" *
+            " Confused: $(n_neighborhood_confused_blocks)" *
+            " Disjoint: $(n_neighborhood_disjoint_blocks)" *
+            " Overflow: $(n_neighborhood_overflow_blocks)" *
+            " Metacells: $(n_neighborhood_metacells)" *
             " Covered M-UMIs: $(neighborhood_total_UMIs / 1e6)"
         ) _group = :mcs_details
-        @assert neighborhood_n_disjoint_blocks == 0 || neighborhood_n_overflow_blocks == 0
+        @assert n_neighborhood_disjoint_blocks == 0 || n_neighborhood_overflow_blocks == 0
         return nothing
     end
 

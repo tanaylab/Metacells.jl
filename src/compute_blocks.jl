@@ -37,7 +37,7 @@ end
 """
     function compute_metacells_blocks!(
         daf::DafWriter;
-        num_blocks::Integer = $(DEFAULT.num_blocks),
+        n_blocks::Integer = $(DEFAULT.n_blocks),
         max_block_span::Real = $(DEFAULT.max_block_span),
         prefix::AbstractString = $(DEFAULT.prefix),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -47,7 +47,7 @@ Compute and set the [`block_axis`](@ref) and [`vector_of_block_per_metacell`](@r
 where the metacells in each one are "similar" in all the skeleton genes. That is, each block is an approximation of a
 single cell state, assuming the skeleton genes adequately predict the rest of the genes.
 
-If `num_blocks` is not specified, we decide on the number of blocks by using hierarchical clustering based on the
+If `n_blocks` is not specified, we decide on the number of blocks by using hierarchical clustering based on the
 maximal skeleton fold distance between the metacells in each cluster of `max_block_span` (that is, `hclust` with
 `:complete` linkage using the [`matrix_of_max_skeleton_fold_distance_between_metacells`](@ref).
 
@@ -65,21 +65,21 @@ $(CONTRACT)
     ],
 ) function compute_metacells_blocks!(
     daf::DafWriter;
-    num_blocks::Maybe{Integer} = nothing,
+    n_blocks::Maybe{Integer} = nothing,
     max_block_span::Real = function_default(compute_vector_of_is_marker_per_gene!, :min_marker_gene_range_fold),
     prefix::AbstractString = "B",
     overwrite::Bool = false,
 )::Nothing
-    if num_blocks === nothing
+    if n_blocks === nothing
         distances_between_metacells = get_matrix(daf, "metacell", "metacell", "max_skeleton_fold_distance").array
         clusters = hclust(distances_between_metacells; linkage = :complete)
         block_index_per_metacell = cutree(clusters; h = max_block_span)
-        num_blocks = maximum(block_index_per_metacell)
+        n_blocks = maximum(block_index_per_metacell)
     end
 
     distances_between_metacells = get_matrix(daf, "metacell", "metacell", "euclidean_skeleton_fold_distance").array
     clusters = hclust(distances_between_metacells; linkage = :ward)  # NOJET
-    block_index_per_metacell = cutree(clusters; k = num_blocks)
+    block_index_per_metacell = cutree(clusters; k = n_blocks)
 
     metacell_indices_per_block = collect_group_members(block_index_per_metacell)
     n_blocks = length(metacell_indices_per_block)

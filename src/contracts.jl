@@ -154,14 +154,14 @@ end
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
-A mask of mitochondrial genes. These genes are typically excluded from the analysis, as they aren't always unrelated to
+A mask of ribosomal genes. These genes are typically excluded from the analysis, as they aren't always unrelated to
 the biological behaviors of interest, they have such a large and variable expression level that including them would
 skew the denominator when estimating linear gene expression level fractions.
 
 This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in Gmara.
 """
 function vector_of_is_ribosomal_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
-    return ("gene", "is_mitochondrial") => (expectation, Bool, "A mask of ribosomal genes.")
+    return ("gene", "is_ribosomal") => (expectation, Bool, "A mask of ribosomal genes.")
 end
 
 """
@@ -228,7 +228,7 @@ This vector is populated by [`compute_vector_of_marker_rank_per_gene!`](@ref
 Metacells.AnalyzeGenes.compute_vector_of_marker_rank_per_gene!).
 """
 function vector_of_marker_rank_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("gene", "marker_rank") => (expectation, StorageUnsigned, "The ralative ranks of the marker genes.")
+    return ("gene", "marker_rank") => (expectation, StorageUnsigned, "The relative ranks of the marker genes.")
 end
 
 """
@@ -1426,7 +1426,7 @@ Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_
 function tensor_of_linear_fraction_per_block_per_module_per_metacell(
     expectation::ContractExpectation,
 )::Pair{TensorKey, DataSpecification}
-    return ("block", "metacell", "module", "linear_fraction") => (
+    return ("block", "module", "metacell", "linear_fraction") => (
         expectation,
         StorageFloat,
         "The linear fraction of the UMIs of each block's found module genes out of the total UMIs in each metacell.",
@@ -1554,7 +1554,7 @@ This vector is populated by [`compute_cells_projection!`](@ref Metacells.Project
 """
 function vector_of_projected_metacell_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
     return ("cell", "projected_metacell") =>
-        (expectation, AbstractString, "The projected atlas cell for each metacell.")
+        (expectation, AbstractString, "The projected atlas metacell for each cell.")
 end
 
 """
@@ -1781,6 +1781,8 @@ end
 
 """
     matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
 
 The correlation between cells and their metacells (minus the correlated cell) of each gene's expression levels in each
 base block's neighborhood. This is zero for excluded genes. This allows comparing the correlation between alternative

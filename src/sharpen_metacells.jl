@@ -53,66 +53,6 @@ import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 
-# TODOX TIME instrumentation: module-level atomic counters accumulated across the parallel loops of
-# `compute_local_clusters`. Reset at the start of each `compute_local_clusters` call by `todox_reset_counters!()`;
-# read and dumped at the end via the final summary log.
-const TODOX_PHASE_1_KMEANS_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PHASE_1_DISPERSION_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PHASE_1_N_RERUN_KMEANS_CALLS = Threads.Atomic{Int}(0)
-const TODOX_PHASE_1_SUM_K_PROBED = Threads.Atomic{Int}(0)
-const TODOX_PHASE_1_MAX_K_SEEN = Threads.Atomic{Int}(0)
-const TODOX_PHASE_1_N_PERFECT_TOTAL = Threads.Atomic{Int}(0)
-
-const TODOX_PHASE_2_POPULATE_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PHASE_2_QUERY_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PHASE_2_N_WORK_ITEMS = Threads.Atomic{Int}(0)
-const TODOX_PHASE_2_SUM_NCELLS_TIMES_NFRIEND = Threads.Atomic{Int}(0)
-const TODOX_PHASE_2_SUM_AFFECTED_BBS = Threads.Atomic{Int}(0)
-
-const TODOX_PASS_A_POPULATE_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PASS_A_APPEND_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PASS_A_N_CHANGES = Threads.Atomic{Int}(0)
-const TODOX_PASS_B_REPLACE_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PASS_B_MEAN_TIME = Threads.Atomic{Float64}(0.0)
-const TODOX_PASS_B_N_REPLACE_CALLS = Threads.Atomic{Int}(0)
-const TODOX_PASS_B_N_TOUCHED_BBS = Threads.Atomic{Int}(0)
-
-# Reset every TODOX TIME counter to zero. Called once at the start of `compute_local_clusters`.
-function todox_reset_counters!()::Nothing
-    TODOX_PHASE_1_KMEANS_TIME[] = 0.0
-    TODOX_PHASE_1_DISPERSION_TIME[] = 0.0
-    TODOX_PHASE_1_N_RERUN_KMEANS_CALLS[] = 0
-    TODOX_PHASE_1_SUM_K_PROBED[] = 0
-    TODOX_PHASE_1_MAX_K_SEEN[] = 0
-    TODOX_PHASE_1_N_PERFECT_TOTAL[] = 0
-    TODOX_PHASE_2_POPULATE_TIME[] = 0.0
-    TODOX_PHASE_2_QUERY_TIME[] = 0.0
-    TODOX_PHASE_2_N_WORK_ITEMS[] = 0
-    TODOX_PHASE_2_SUM_NCELLS_TIMES_NFRIEND[] = 0
-    TODOX_PHASE_2_SUM_AFFECTED_BBS[] = 0
-    TODOX_PASS_A_POPULATE_TIME[] = 0.0
-    TODOX_PASS_A_APPEND_TIME[] = 0.0
-    TODOX_PASS_A_N_CHANGES[] = 0
-    TODOX_PASS_B_REPLACE_TIME[] = 0.0
-    TODOX_PASS_B_MEAN_TIME[] = 0.0
-    TODOX_PASS_B_N_REPLACE_CALLS[] = 0
-    TODOX_PASS_B_N_TOUCHED_BBS[] = 0
-    return nothing
-end
-
-# Atomic max via CAS retry loop - `Threads.Atomic` ships add/sub but not max.
-function todox_atomic_max!(atomic::Threads.Atomic{Int}, value::Integer)::Nothing
-    while true
-        current = atomic[]
-        if value <= current
-            return nothing
-        end
-        if Threads.atomic_cas!(atomic, current, Int(value)) === current
-            return nothing
-        end
-    end
-end
-
 struct KmeansSizesBuffers{T <: AbstractFloat}
     kmeans_buffers::Tuple{KMeansBuffers{T}, KMeansBuffers{T}}
     max_best_assignments::Vector{Int}
@@ -274,19 +214,25 @@ end
     function sharpen_metacells!(;
         sharp_daf::DafWriter,
         base_daf::DafReader,
+        base_blocks_daf::DafReader,
         prefix::AbstractString = $(DEFAULT.prefix),
         min_cells_in_metacell::Integer = $(DEFAULT.min_cells_in_metacell),
         target_cell_total_UMIs_quantile::AbstractFloat = $(DEFAULT.target_cell_total_UMIs_quantile),
         min_metacell_total_UMIs::Integer = $(DEFAULT.min_metacell_total_UMIs),
+        min_migration_likelihood::AbstractFloat = $(DEFAULT.min_migration_likelihood),
         max_cells_dispersion_in_metacell::AbstractFloat = $(DEFAULT.max_cells_dispersion_in_metacell),
         min_cells_dispersion_in_metacell::AbstractFloat = $(DEFAULT.min_cells_dispersion_in_metacell),
         normalized_UMIs_quantile::AbstractFloat = $(DEFAULT.normalized_UMIs_quantile),
         min_module_UMIs::Integer = $(DEFAULT.min_module_UMIs),
-        min_migration_likelihood::AbstractFloat = $(DEFAULT.min_migration_likelihood),
         kmeans_rounds::Integer = $(DEFAULT.kmeans_rounds),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
+
+TODOX: description below needs manual rework - it predates parameters like `base_blocks_daf`,
+`gene_fraction_regularization`, and the new `target_cell_total_UMIs_quantile` semantics, and the high-level steps it
+describes are now distributed across `compute_preferred_block_index_per_cell_per_block` and `compute_local_clusters`.
 
 Given an `base_daf` metacells repository with a blocks structure and local gene modules that describe the cell state
 manifold, compute a `sharp_daf` metacells repository, which hopefully more faithfully captures this manifold.
@@ -721,7 +667,7 @@ function compute_preferred_block_index_per_cell_per_block(;
     )
     preferred_block_index_per_cluster_per_thread =
         [Vector{Int}(undef, max_n_neighborhood_clusters) for _ in 1:maxthreadid()]
-    block_count_scratch_per_thread = [zeros(Int, n_blocks) for _ in 1:maxthreadid()]
+    n_cluster_cells_per_block_scratch_per_thread = [zeros(Int, n_blocks) for _ in 1:maxthreadid()]
     preferred_block_index_per_max_neighborhood_cell_per_thread =
         [Vector{Int}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
 
@@ -793,7 +739,7 @@ function compute_preferred_block_index_per_cell_per_block(;
         n_cells_per_cluster = counts(kmeans_result)
 
         preferred_block_index_per_cluster = preferred_block_index_per_cluster_per_thread[threadid()]
-        count_per_block = block_count_scratch_per_thread[threadid()]
+        n_cluster_cells_per_block = n_cluster_cells_per_block_scratch_per_thread[threadid()]
 
         preferred_block_index_per_max_neighborhood_cell =
             preferred_block_index_per_max_neighborhood_cell_per_thread[threadid()]
@@ -807,7 +753,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             cluster_index_per_neighborhood_cell,
             n_cells_per_cluster,
             preferred_block_index_per_cluster,
-            count_per_block,
+            n_cluster_cells_per_block,
             preferred_block_index_per_max_neighborhood_cell,
         )
 
@@ -834,7 +780,7 @@ function pick_preferred_block_index_per_neighborhood_cell(;
     cluster_index_per_neighborhood_cell::AbstractVector{<:Integer},
     n_cells_per_cluster::AbstractVector{<:Integer},
     preferred_block_index_per_cluster::AbstractVector{<:Integer},
-    count_per_block::AbstractVector{<:Integer},
+    n_cluster_cells_per_block::AbstractVector{<:Integer},
     preferred_block_index_per_max_neighborhood_cell::AbstractVector{<:Integer},
 )::AbstractVector{<:Integer}
     n_block_cells = n_cells_per_block[block_index]
@@ -844,14 +790,14 @@ function pick_preferred_block_index_per_neighborhood_cell(;
     @views preferred_block_index_per_cluster[1:n_clusters] .= 0
 
     for cluster_index in 1:n_clusters
-        fill!(count_per_block, 0)
+        fill!(n_cluster_cells_per_block, 0)
         n_block_cells_in_cluster = 0
 
-        for i in 1:n_neighborhood_cells
-            if cluster_index_per_neighborhood_cell[i] == cluster_index
-                block_index = block_index_per_cell[indices_of_neighborhood_cells[i]]
-                count_per_block[block_index] += 1
-                if block_index == block_index
+        for neighborhood_cell_position in 1:n_neighborhood_cells
+            if cluster_index_per_neighborhood_cell[neighborhood_cell_position] == cluster_index
+                cell_block_index = block_index_per_cell[indices_of_neighborhood_cells[neighborhood_cell_position]]
+                n_cluster_cells_per_block[cell_block_index] += 1
+                if cell_block_index == block_index
                     n_block_cells_in_cluster += 1
                 end
             end
@@ -860,10 +806,10 @@ function pick_preferred_block_index_per_neighborhood_cell(;
         if n_block_cells_in_cluster > 0
             most_frequent_block_index = block_index
             most_frequent_count = n_block_cells_in_cluster
-            for block_index in eachindex(count_per_block)
-                if count_per_block[block_index] > most_frequent_count
-                    most_frequent_count = count_per_block[block_index]
-                    most_frequent_block_index = block_index
+            for other_block_index in eachindex(n_cluster_cells_per_block)
+                if n_cluster_cells_per_block[other_block_index] > most_frequent_count
+                    most_frequent_count = n_cluster_cells_per_block[other_block_index]
+                    most_frequent_block_index = other_block_index
                 end
             end
 
@@ -1003,29 +949,6 @@ function compute_local_clusters(;
     n_genes = size(module_index_per_gene_per_block, 1)
     n_base_blocks = size(is_in_base_neighborhood_per_other_base_block_per_base_block, 1)
 
-    # TODOX TIME chronological log: relative to function entry, with reset counters at the start.
-    todox_reset_counters!()
-    todox_t0 = time()
-    function todox_log(msg::AbstractString)::Nothing
-        @warn "TODOX TIME [+$(round(time() - todox_t0; digits=2))s] $msg"
-        return nothing
-    end
-    function todox_stats(values::AbstractVector{<:Real}, label::AbstractString)::String
-        if isempty(values)
-            return "$label: empty"
-        end
-        sorted_values = sort(values)
-        n_values = length(sorted_values)
-        median_value = sorted_values[(n_values + 1) ÷ 2]
-        mean_value = sum(sorted_values) / n_values
-        return "$label: n=$n_values, min=$(sorted_values[1]), median=$(median_value), " *
-               "mean=$(round(mean_value; digits=2)), max=$(sorted_values[end])"
-    end
-    todox_log("compute_local_clusters START: n_blocks=$n_blocks, n_cells=$n_cells, " *
-              "n_base_blocks=$n_base_blocks, n_genes=$n_genes, n_modules=$n_modules, " *
-              "max_n_kmeans_clusters=$max_n_kmeans_clusters, max_optimization_passes=$max_optimization_passes, " *
-              "nthreads=$(nthreads())")
-
     local_clusters_per_block = Vector{Maybe{LocalClusters}}(undef, n_blocks)
     local_clusters_per_block .= nothing
     solution_candidates_per_block = Vector{Maybe{SolutionCandidates}}(undef, n_blocks)
@@ -1119,14 +1042,6 @@ function compute_local_clusters(;
         )
     end
 
-    # TODOX TIME per-block stats vectors - each task writes its own slot, no locking. Read after Phase 1 to log
-    # distribution + top-5 outliers by elapsed_total.
-    todox_phase_1_n_block_cells_per_block = zeros(Int, n_blocks)
-    todox_phase_1_n_candidates_per_block = zeros(Int, n_blocks)
-    todox_phase_1_elapsed_per_block = zeros(Float64, n_blocks)
-    todox_phase_1_initial_k_per_block = zeros(Int, n_blocks)
-    todox_phase_1_max_k_per_block = zeros(Int, n_blocks)
-
     # `DispersionScratches` channel pool for the nested parallel dispersion loops (compute_all_dispersions! /
     # compute_changed_dispersions!) and the serial split-then-disperse path in `split_one_cluster!`. Sized to
     # `nthreads()` because every take/put is a single non-yielding scope, so each running task holds at most one
@@ -1140,8 +1055,7 @@ function compute_local_clusters(;
     end
 
     # ===== Phase 1: per-block walk to a perfect K (or exhaustion) =====
-    todox_log("phase_1 START")
-    todox_phase_1_total_elapsed = @elapsed parallel_loop_with_rng(
+    parallel_loop_with_rng(
         1:n_blocks;
         rng,
         policy = :static_greedy,
@@ -1149,7 +1063,6 @@ function compute_local_clusters(;
         name = "compute_local_clusters_phase_1",
         progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "local_clusters_phase_1"),
     ) do block_index, rng
-        todox_block_t0 = time()
         setup = setup_block_context(block_index)
         if setup === nothing
             return nothing
@@ -1157,9 +1070,6 @@ function compute_local_clusters(;
         (z_score_per_found_module_per_block_cell, dispersion_context, sizes_buffers, n_block_clusters,
          weight_per_block_cell, block_cell_indices) = setup
         n_block_cells = length(block_cell_indices)
-        todox_phase_1_n_block_cells_per_block[block_index] = n_block_cells
-        todox_phase_1_initial_k_per_block[block_index] = n_block_clusters
-        todox_phase_1_max_k_per_block[block_index] = 2 * n_block_clusters
 
         if n_block_clusters == 1
             weight_total = sum(weight_per_block_cell)
@@ -1171,8 +1081,6 @@ function compute_local_clusters(;
                     n_block_cells < min_cells_in_metacell || weight_total < min_metacell_total_UMIs,
                 ]),
             )
-            todox_phase_1_n_candidates_per_block[block_index] = 1
-            todox_phase_1_elapsed_per_block[block_index] = time() - todox_block_t0
             return nothing
         end
 
@@ -1200,58 +1108,27 @@ function compute_local_clusters(;
             min_cells_in_metacell,
             min_metacell_total_UMIs,
         )
-        todox_phase_1_n_candidates_per_block[block_index] = length(candidates.candidates)
-        todox_phase_1_elapsed_per_block[block_index] = time() - todox_block_t0
         return nothing
-    end
-
-    # TODOX TIME Phase 1 summary - distributions + top-5 outliers + atomic totals.
-    todox_log("phase_1 DONE total=$(round(todox_phase_1_total_elapsed; digits=2))s")
-    todox_log("phase_1 atomics: kmeans_time=$(round(TODOX_PHASE_1_KMEANS_TIME[]; digits=2))s, " *
-              "dispersion_time=$(round(TODOX_PHASE_1_DISPERSION_TIME[]; digits=2))s, " *
-              "n_rerun_kmeans_calls=$(TODOX_PHASE_1_N_RERUN_KMEANS_CALLS[]), " *
-              "sum_k_probed=$(TODOX_PHASE_1_SUM_K_PROBED[]), " *
-              "max_k_seen=$(TODOX_PHASE_1_MAX_K_SEEN[]), " *
-              "n_perfect_total=$(TODOX_PHASE_1_N_PERFECT_TOTAL[])")
-    todox_log("phase_1 " * todox_stats(todox_phase_1_n_block_cells_per_block, "n_block_cells"))
-    todox_log("phase_1 " * todox_stats(todox_phase_1_n_candidates_per_block, "n_candidates_per_block"))
-    todox_log("phase_1 " * todox_stats(todox_phase_1_initial_k_per_block, "initial_k_per_block"))
-    todox_log("phase_1 " * todox_stats(todox_phase_1_max_k_per_block, "max_k_per_block"))
-    todox_log("phase_1 " * todox_stats(todox_phase_1_elapsed_per_block, "elapsed_per_block_s"))
-    let outlier_order = sortperm(todox_phase_1_elapsed_per_block; rev = true)
-        for outlier_position in 1:min(5, n_blocks)
-            outlier_block_index = outlier_order[outlier_position]
-            todox_log("phase_1 top$(outlier_position) block=$(outlier_block_index): " *
-                      "n_cells=$(todox_phase_1_n_block_cells_per_block[outlier_block_index]), " *
-                      "initial_k=$(todox_phase_1_initial_k_per_block[outlier_block_index]), " *
-                      "n_candidates=$(todox_phase_1_n_candidates_per_block[outlier_block_index]), " *
-                      "elapsed=$(round(todox_phase_1_elapsed_per_block[outlier_block_index]; digits=2))s")
-        end
     end
 
     # `block_cell_indices_per_block` is constant across optimization passes (block membership is fixed by Phase 1;
     # only cluster assignments within a block change). Same for `n_points_per_base_block` (depends only on
     # `base_block_index_per_cell` and the neighborhood matrix).
-    todox_log("constants START (block_cell_indices_per_block + n_points_per_base_block + order)")
-    todox_constants_elapsed = @elapsed begin
-        block_cell_indices_per_block = [
-            local_clusters === nothing ? Int[] : Vector{Int}(local_clusters.block_cell_indices)
-            for local_clusters in local_clusters_per_block
-        ]
+    block_cell_indices_per_block = [
+        local_clusters === nothing ? Int[] : Vector{Int}(local_clusters.block_cell_indices)
+        for local_clusters in local_clusters_per_block
+    ]
 
-        n_cells_per_cell_base_block = zeros(Int, n_base_blocks)
-        for cell_index in 1:n_cells
-            base_block_of_cell = base_block_index_per_cell[cell_index]
-            if base_block_of_cell > 0
-                n_cells_per_cell_base_block[base_block_of_cell] += 1
-            end
+    n_cells_per_cell_base_block = zeros(Int, n_base_blocks)
+    for cell_index in 1:n_cells
+        base_block_of_cell = base_block_index_per_cell[cell_index]
+        if base_block_of_cell > 0
+            n_cells_per_cell_base_block[base_block_of_cell] += 1
         end
-        n_points_per_base_block =
-            vec(is_in_base_neighborhood_per_other_base_block_per_base_block' * n_cells_per_cell_base_block)
-        order_per_base_block = sortperm(n_points_per_base_block; rev = true)
     end
-    todox_log("constants DONE $(round(todox_constants_elapsed; digits=2))s")
-    todox_log("constants " * todox_stats(n_points_per_base_block, "n_points_per_base_block"))
+    n_points_per_base_block =
+        vec(is_in_base_neighborhood_per_other_base_block_per_base_block' * n_cells_per_cell_base_block)
+    order_per_base_block = sortperm(n_points_per_base_block; rev = true)
 
     # Pre-allocate the grouped-correlations outputs; each pass overwrites them via `build_grouped_for_base_block`.
     grouped_per_base_block = Vector{GroupedSeriesCorrelations{Float32}}(undef, n_base_blocks)
@@ -1268,12 +1145,10 @@ function compute_local_clusters(;
     end
 
     if isempty(walkable_block_indices)
-        todox_log("compute_local_clusters DONE (no walkable blocks)")
         return local_clusters_per_block
     end
 
-    todox_log("precompute_walkable_indirection START n_walkable=$(length(walkable_block_indices))")
-    todox_indirection_elapsed = @elapsed (affected_base_block_indices_per_walkable_block,
+    (affected_base_block_indices_per_walkable_block,
      gene_index_per_friend_per_walkable_block,
      _,
      friend_position_per_series_per_base_block_per_walkable_block,
@@ -1288,19 +1163,8 @@ function compute_local_clusters(;
             n_base_blocks,
             n_genes,
         )
-    todox_log("precompute_walkable_indirection DONE $(round(todox_indirection_elapsed; digits=2))s")
 
     n_walkable_blocks = length(walkable_block_indices)
-    todox_log("walkable " * todox_stats(
-        [length(gene_index_per_friend_per_walkable_block[walkable_position])
-         for walkable_position in 1:n_walkable_blocks],
-        "n_friends_per_walkable",
-    ))
-    todox_log("walkable " * todox_stats(
-        [length(affected_base_block_indices_per_walkable_block[walkable_position])
-         for walkable_position in 1:n_walkable_blocks],
-        "n_affected_bbs_per_walkable",
-    ))
 
     # Flatten (walkable_position, candidate_index) into a single work list covering *all* candidates - whichever index
     # is the current baseline for a walkable block is short-circuited inside the Phase 2 body to `delta = 0`. Going
@@ -1333,10 +1197,6 @@ function compute_local_clusters(;
     end
     n_work_items = length(walkable_position_per_work_item)
     order_per_work_item = sortperm(n_block_cells_per_work_item; rev = true)  # NOJET
-    todox_log("work_list built: n_work_items=$n_work_items, " *
-              "sum_n_block_cells_per_work_item=$(sum(n_block_cells_per_work_item)), " *
-              "max_n_walkable_block_cells=$max_n_walkable_block_cells, " *
-              "max_n_friends=$max_n_friends")
 
     # One mutable `DeltaCorrelationContext` per thread - the per-walkable-block fields get re-assigned per work item
     # under top-level `:static_greedy` (stable `threadid()`), and the scratch fields stay sized to the global maxima.
@@ -1381,7 +1241,6 @@ function compute_local_clusters(;
     variable_per_block_cell_per_friend_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
     is_active_per_block_cell_per_walkable_block = Vector{Vector{Bool}}(undef, n_walkable_blocks)
     UMI_per_friend_per_block_cell_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
-    todox_per_walkable_bytes = 0
     for walkable_position in 1:n_walkable_blocks
         block_index = walkable_block_indices[walkable_position]
         n_block_cells = solution_candidates_per_block[block_index].n_points
@@ -1391,15 +1250,11 @@ function compute_local_clusters(;
         is_active_per_block_cell_per_walkable_block[walkable_position] = Vector{Bool}(undef, n_block_cells)
         UMI_per_friend_per_block_cell_per_walkable_block[walkable_position] =
             Matrix{Float32}(undef, n_friends, n_block_cells)
-        # Float32 variable + Float32 UMI cache + Bool mask.
-        todox_per_walkable_bytes += 2 * n_block_cells * n_friends * 4 + n_block_cells
     end
-    todox_log("per-walkable buffers allocated: total=$(round(todox_per_walkable_bytes / 1024 / 1024; digits=2))MB")
 
     # One-time fill of the per-walkable UMI cache. Outer friend_position so each `UMIs_per_cell_per_gene[:, gene_index]`
     # column is touched contiguously; inner block_cell scatter reads only within that already-loaded column.
-    todox_log("UMI_cache_fill START")
-    todox_umi_cache_fill_elapsed = @elapsed parallel_loop_wo_rng(
+    parallel_loop_wo_rng(
         1:n_walkable_blocks;
         policy = :static_greedy,
         name = "compute_local_clusters.umi_cache_fill",
@@ -1421,13 +1276,11 @@ function compute_local_clusters(;
         end
         return nothing
     end
-    todox_log("UMI_cache_fill DONE $(round(todox_umi_cache_fill_elapsed; digits=2))s")
 
     # Per-base-block commit queues + locks for Pass A's append. Cleared per pass via `empty!` (no realloc), so this
     # whole structure is allocated once and reused across all optimization passes.
     commits_per_base_block = [Int[] for _ in 1:n_base_blocks]
     append_lock_per_base_block = [SpinLock() for _ in 1:n_base_blocks]
-    todox_log("commits_per_base_block + locks allocated: n_base_blocks=$n_base_blocks")
 
     # Run one optimization pass: evaluate every (walkable, candidate) work item's delta-correlation against the cached
     # groupeds (Phase 2), then in parallel per walkable argmax the deltas + populate the chosen candidate's persistent
@@ -1442,8 +1295,7 @@ function compute_local_clusters(;
             group = :mcs_loops,
             desc = "local_clusters_phase_2 pass $pass_index",
         )
-        todox_log("pass $pass_index phase_2 START")
-        todox_phase_2_pass_elapsed = @elapsed parallel_loop_wo_rng(
+        parallel_loop_wo_rng(
             1:n_work_items;
             policy = :static_greedy,
             order = copy(order_per_work_item),
@@ -1468,27 +1320,11 @@ function compute_local_clusters(;
                     friend_position_per_series_per_base_block_per_walkable_block[walkable_position]
                 delta_context.block_cell_position_per_point_per_base_block =
                     block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position]
-                # TODOX TIME Phase 2: split populate vs. query so the atomic time accumulators distinguish them.
-                todox_phase_2_populate_elapsed = @elapsed populate_candidate_scratches!(
+                delta_per_work_item[work_index] = compute_delta_correlation(
                     candidate,
                     solution_candidates.n_points,
                     delta_context,
                     UMI_per_friend_per_block_cell_per_walkable_block[walkable_position],
-                    delta_context.variable_per_block_cell_per_friend,
-                    delta_context.is_active_per_block_cell,
-                )
-                todox_phase_2_query_elapsed = @elapsed delta_per_work_item[work_index] =
-                    query_delta_correlation_from_scratches(delta_context)
-                Threads.atomic_add!(TODOX_PHASE_2_POPULATE_TIME, todox_phase_2_populate_elapsed)
-                Threads.atomic_add!(TODOX_PHASE_2_QUERY_TIME, todox_phase_2_query_elapsed)
-                Threads.atomic_add!(TODOX_PHASE_2_N_WORK_ITEMS, 1)
-                Threads.atomic_add!(
-                    TODOX_PHASE_2_SUM_NCELLS_TIMES_NFRIEND,
-                    solution_candidates.n_points * length(delta_context.gene_index_per_friend),
-                )
-                Threads.atomic_add!(
-                    TODOX_PHASE_2_SUM_AFFECTED_BBS,
-                    length(delta_context.affected_base_block_indices),
                 )
             end
             if progress_phase_2 !== nothing
@@ -1496,8 +1332,6 @@ function compute_local_clusters(;
             end
             return nothing
         end
-
-        todox_log("pass $pass_index phase_2 DONE $(round(todox_phase_2_pass_elapsed; digits=2))s")
 
         # Clear last pass's per-base-block commit queues (preserves capacity, no realloc).
         for base_block_index in 1:n_base_blocks
@@ -1509,8 +1343,7 @@ function compute_local_clusters(;
         # `local_clusters_per_block[block_index]`, and lock-appends the walkable to each affected base block's commit
         # queue. The populate runs at most once per changed walkable across the whole pass.
         n_changes = Threads.Atomic{Int}(0)
-        todox_log("pass $pass_index pass_a START")
-        todox_pass_a_pass_elapsed = @elapsed parallel_loop_wo_rng(
+        parallel_loop_wo_rng(
             1:n_walkable_blocks;
             policy = :static_greedy,
             name = "compute_local_clusters_phase_2_reduce.pass_$pass_index",
@@ -1537,7 +1370,7 @@ function compute_local_clusters(;
                 return nothing
             end
             chosen = candidates[best_candidate_index]
-            @warn "TODOX - PHASE 2 PASS $pass_index CHOSEN K: $(chosen.k) (baseline K: $(candidates[previous_candidate_index].k); delta: $(round(best_delta; digits=4)); $(length(candidates)) candidates)"
+            # @warn "TODOX - PHASE 2 PASS $pass_index CHOSEN K: $(chosen.k) (baseline K: $(candidates[previous_candidate_index].k); delta: $(round(best_delta; digits=4)); $(length(candidates)) candidates)"
             Threads.atomic_add!(n_changes, 1)
             chosen_candidate_index_per_walkable_block[walkable_position] = best_candidate_index
             local_clusters_per_block[block_index] = build_local_clusters_from_candidate(
@@ -1558,7 +1391,7 @@ function compute_local_clusters(;
                 friend_position_per_series_per_base_block_per_walkable_block[walkable_position]
             delta_context.block_cell_position_per_point_per_base_block =
                 block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position]
-            todox_pass_a_populate_elapsed = @elapsed populate_candidate_scratches!(
+            populate_candidate_scratches!(
                 chosen,
                 solution_candidates.n_points,
                 delta_context,
@@ -1566,11 +1399,9 @@ function compute_local_clusters(;
                 variable_per_block_cell_per_friend_per_walkable_block[walkable_position],
                 is_active_per_block_cell_per_walkable_block[walkable_position],
             )
-            Threads.atomic_add!(TODOX_PASS_A_POPULATE_TIME, todox_pass_a_populate_elapsed)
 
             # Lock-append the walkable to each affected base block's commit queue.
-            todox_pass_a_append_elapsed = @elapsed for base_block_index in
-                                                     affected_base_block_indices_per_walkable_block[walkable_position]
+            for base_block_index in affected_base_block_indices_per_walkable_block[walkable_position]
                 if group_index_per_block_per_base_block[block_index, base_block_index] == 0
                     continue
                 end
@@ -1578,19 +1409,13 @@ function compute_local_clusters(;
                     return push!(commits_per_base_block[base_block_index], walkable_position)
                 end
             end
-            Threads.atomic_add!(TODOX_PASS_A_APPEND_TIME, todox_pass_a_append_elapsed)
-            Threads.atomic_add!(TODOX_PASS_A_N_CHANGES, 1)
             return nothing
         end
-
-        todox_log("pass $pass_index pass_a DONE $(round(todox_pass_a_pass_elapsed; digits=2))s " *
-                  "n_changes=$(n_changes[])")
 
         # Pass B: parallel over base blocks. Each task drains its commit queue with `replace_group!` reusing the
         # per-walkable populated scratch (no re-populate), then refreshes the cached baseline mean correlation. Base
         # blocks with no commits skip the recompute - their mean is unchanged.
-        todox_log("pass $pass_index pass_b START")
-        todox_pass_b_pass_elapsed = @elapsed parallel_loop_wo_rng(
+        parallel_loop_wo_rng(
             1:n_base_blocks;
             policy = :static_greedy,
             name = "compute_local_clusters_phase_2_commit.pass_$pass_index",
@@ -1610,7 +1435,7 @@ function compute_local_clusters(;
                     block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position][base_block_index]
                 friend_position_per_series =
                     friend_position_per_series_per_base_block_per_walkable_block[walkable_position][base_block_index]
-                todox_pass_b_replace_elapsed = @elapsed replace_group!(
+                replace_group!(
                     grouped_for_base_block,
                     group_index_in_base_block,
                     variable_per_block_cell_per_friend_per_walkable_block[walkable_position],
@@ -1618,25 +1443,18 @@ function compute_local_clusters(;
                     block_cell_position_per_point,
                     friend_position_per_series,
                 )
-                Threads.atomic_add!(TODOX_PASS_B_REPLACE_TIME, todox_pass_b_replace_elapsed)
-                Threads.atomic_add!(TODOX_PASS_B_N_REPLACE_CALLS, 1)
             end
-            todox_pass_b_mean_elapsed = @elapsed baseline_mean_correlation_per_base_block[base_block_index] =
+            baseline_mean_correlation_per_base_block[base_block_index] =
                 Float32(mean_correlation(grouped_for_base_block))
-            Threads.atomic_add!(TODOX_PASS_B_MEAN_TIME, todox_pass_b_mean_elapsed)
-            Threads.atomic_add!(TODOX_PASS_B_N_TOUCHED_BBS, 1)
             return nothing
         end
-
-        todox_log("pass $pass_index pass_b DONE $(round(todox_pass_b_pass_elapsed; digits=2))s")
         return n_changes[]
     end
 
     # One-time setup: build the per-base-block grouped correlations from the Phase-1 `local_clusters_per_block`. All
     # later updates happen in place via Pass B's `replace_group!`.
-    todox_log("baseline_aggregates START")
-    todox_baseline_aggregates_elapsed = @elapsed (total_UMIs_per_baseline_metacell,
-     UMIs_per_relevant_gene_per_baseline_metacell, baseline_metacell_index_per_cell, _) =
+    (total_UMIs_per_baseline_metacell, UMIs_per_relevant_gene_per_baseline_metacell,
+     baseline_metacell_index_per_cell, _) =
         compute_baseline_metacell_aggregates(
             local_clusters_per_block,
             UMIs_per_cell_per_gene,
@@ -1644,12 +1462,8 @@ function compute_local_clusters(;
             gene_index_per_relevant_gene_position,
             n_cells,
         )
-    todox_log("baseline_aggregates DONE $(round(todox_baseline_aggregates_elapsed; digits=2))s " *
-              "n_baseline_metacells=$(length(total_UMIs_per_baseline_metacell)) " *
-              "size_UMIs_per_relevant_gene=$(size(UMIs_per_relevant_gene_per_baseline_metacell))")
 
-    todox_log("build_grouped START")
-    todox_build_grouped_elapsed = @elapsed parallel_loop_wo_rng(
+    parallel_loop_wo_rng(
         1:n_base_blocks;
         policy = :static_greedy,
         order = copy(order_per_base_block),
@@ -1680,40 +1494,15 @@ function compute_local_clusters(;
         baseline_mean_correlation_per_base_block[base_block_index] = Float32(mean_correlation(grouped))
         return nothing
     end
-    todox_log("build_grouped DONE $(round(todox_build_grouped_elapsed; digits=2))s")
 
     # Run up to `max_optimization_passes` passes; skip remaining passes once one converges (no walkable block changed).
     for pass_index in 1:max_optimization_passes
         n_changes = run_optimization_pass!(pass_index)
-        @warn "TODOX - PHASE 2 PASS $pass_index: $n_changes walkable blocks moved"
+        # @warn "TODOX - PHASE 2 PASS $pass_index: $n_changes walkable blocks moved"
         if n_changes == 0
             break
         end
     end
-
-    # TODOX TIME final summary: all atomic counters dumped at the end of `compute_local_clusters`. Phase 1 inner
-    # totals (kmeans + dispersion) come from `rerun_kmeans!`; Phase 2 / Pass A / Pass B totals come from the parallel
-    # loop bodies. Cumulative across all optimization passes - per-pass deltas are visible in the per-pass START/DONE
-    # log lines above.
-    todox_log("compute_local_clusters DONE TOTAL=$(round(time() - todox_t0; digits=2))s | " *
-              "phase_1_kmeans=$(round(TODOX_PHASE_1_KMEANS_TIME[]; digits=2))s, " *
-              "phase_1_dispersion=$(round(TODOX_PHASE_1_DISPERSION_TIME[]; digits=2))s, " *
-              "phase_1_n_rerun_kmeans=$(TODOX_PHASE_1_N_RERUN_KMEANS_CALLS[]), " *
-              "phase_1_sum_k_probed=$(TODOX_PHASE_1_SUM_K_PROBED[]), " *
-              "phase_1_max_k_seen=$(TODOX_PHASE_1_MAX_K_SEEN[]), " *
-              "phase_1_n_perfect=$(TODOX_PHASE_1_N_PERFECT_TOTAL[]) | " *
-              "phase_2_populate=$(round(TODOX_PHASE_2_POPULATE_TIME[]; digits=2))s, " *
-              "phase_2_query=$(round(TODOX_PHASE_2_QUERY_TIME[]; digits=2))s, " *
-              "phase_2_n_work_items=$(TODOX_PHASE_2_N_WORK_ITEMS[]), " *
-              "phase_2_sum_ncells_x_nfriend=$(TODOX_PHASE_2_SUM_NCELLS_TIMES_NFRIEND[]), " *
-              "phase_2_sum_affected_bbs=$(TODOX_PHASE_2_SUM_AFFECTED_BBS[]) | " *
-              "pass_a_populate=$(round(TODOX_PASS_A_POPULATE_TIME[]; digits=2))s, " *
-              "pass_a_append=$(round(TODOX_PASS_A_APPEND_TIME[]; digits=2))s, " *
-              "pass_a_n_changes=$(TODOX_PASS_A_N_CHANGES[]) | " *
-              "pass_b_replace=$(round(TODOX_PASS_B_REPLACE_TIME[]; digits=2))s, " *
-              "pass_b_mean=$(round(TODOX_PASS_B_MEAN_TIME[]; digits=2))s, " *
-              "pass_b_n_replace_calls=$(TODOX_PASS_B_N_REPLACE_CALLS[]), " *
-              "pass_b_n_touched_bbs=$(TODOX_PASS_B_N_TOUCHED_BBS[])")
 
     return local_clusters_per_block
 end
@@ -2730,7 +2519,7 @@ function rerun_kmeans!(
     # When given centers, kmeans is essentially deterministic from those centers (rng is only used to repick a center
     # if a cluster empties out during iteration), so multiple rounds typically produce the same result.
     rounds = initial_centers === nothing ? kmeans_rounds : 1
-    kmeans_elapsed = @elapsed kmeans_result = flame_timed("kmeans_in_rounds") do
+    kmeans_result = flame_timed("kmeans_in_rounds") do
         return kmeans_in_rounds(
             values_of_points,
             new_k;
@@ -2740,11 +2529,6 @@ function rerun_kmeans!(
             rng,
         )
     end
-    # TODOX TIME: K-walk step accounting - one call per (block, K probe).
-    Threads.atomic_add!(TODOX_PHASE_1_KMEANS_TIME, kmeans_elapsed)
-    Threads.atomic_add!(TODOX_PHASE_1_N_RERUN_KMEANS_CALLS, 1)
-    Threads.atomic_add!(TODOX_PHASE_1_SUM_K_PROBED, Int(new_k))
-    todox_atomic_max!(TODOX_PHASE_1_MAX_K_SEEN, new_k)
     rerun_solution.is_filled = true
     rerun_solution.k = new_k
     @views rerun_solution.centers[1:rerun_solution.n_dims, 1:new_k] .= kmeans_result.centers
@@ -2758,7 +2542,7 @@ function rerun_kmeans!(
         reference_cells_dispersion_per_cluster !== nothing &&
         length(reference_assignments) >= rerun_solution.n_points &&
         length(reference_cells_dispersion_per_cluster) >= new_k
-    dispersion_elapsed = @elapsed if can_incremental
+    if can_incremental
         compute_changed_dispersions!(
             rerun_solution,
             reference_assignments::AbstractVector{<:Integer},
@@ -2769,11 +2553,9 @@ function rerun_kmeans!(
     else
         compute_all_dispersions!(rerun_solution, dispersion_scratches_pool, dispersion_context)
     end
-    Threads.atomic_add!(TODOX_PHASE_1_DISPERSION_TIME, dispersion_elapsed)
     update_size_statistics!(rerun_solution, min_cluster_size, min_cluster_weight, max_cluster_size, dispersion_context)
     if is_perfect(rerun_solution)
         push!(perfect_candidates, build_candidate_from_solution(rerun_solution))
-        Threads.atomic_add!(TODOX_PHASE_1_N_PERFECT_TOTAL, 1)
     end
     return nothing
 end
@@ -2835,16 +2617,13 @@ function walk_directions!(
                 "U: $(round(UMIs_range[1] / 1000; digits=1))K..$(round(UMIs_range[2] / 1000; digits=1))K " *
                 "D: $(round(dispersion_range[1]; digits=3))..$(round(dispersion_range[2]; digits=3))"
             if penalty(current_solution) >= penalty(best_solution)
-                @warn "TODOX - NEXT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " *
-                      todox_ranges_suffix
+                # @warn "TODOX - NEXT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " * todox_ranges_suffix
             else
                 copy_solution!(best_solution, current_solution)
                 if is_perfect(best_solution)
-                    @warn "TODOX - PERFECT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " *
-                          todox_ranges_suffix
+                    # @warn "TODOX - PERFECT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " * todox_ranges_suffix
                 else
-                    @warn "TODOX - BETTER K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " *
-                          todox_ranges_suffix
+                    # @warn "TODOX - BETTER K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " * todox_ranges_suffix
                 end
             end
             if !(dispersion_range[1] > 0)
@@ -2929,10 +2708,10 @@ function walk_split!(
         if split_cluster_index == 0
             break  # No more candidate clusters to split.
         end
-        @warn "TODOX - SPLIT K: $(candidate_solution.k) T: $(candidate_solution.n_too_tight) S: $(candidate_solution.n_too_small) W: $(candidate_solution.n_too_wide) L: $(candidate_solution.n_too_large)"
+        # @warn "TODOX - SPLIT K: $(candidate_solution.k) T: $(candidate_solution.n_too_tight) S: $(candidate_solution.n_too_small) W: $(candidate_solution.n_too_wide) L: $(candidate_solution.n_too_large)"
 
         if penalty(candidate_solution) < penalty(best_solution)
-            @warn "TODOX   SPLIT IS BETTER"
+            # @warn "TODOX   SPLIT IS BETTER"
             copy_solution!(best_solution, candidate_solution)
             if is_perfect(best_solution)
                 push!(perfect_candidates, build_candidate_from_solution(best_solution))
@@ -2962,10 +2741,10 @@ function walk_split!(
                 reference_cells_dispersion_per_cluster =
                     @view(candidate_solution.cells_dispersion_per_cluster[1:candidate_solution.k]),
             )
-            @warn "TODOX - INCR K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large)"
+            # @warn "TODOX - INCR K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large)"
 
             if penalty(current_solution) < penalty(best_solution)
-                @warn "TODOX   INCR IS BETTER"
+                # @warn "TODOX   INCR IS BETTER"
                 copy_solution!(best_solution, current_solution)
                 # Cluster indices were reshuffled by K-means; rejected mask no longer corresponds.
                 @views fill!(is_rejected_for_split_per_max_cluster[1:best_solution.k], false)
@@ -3090,13 +2869,10 @@ function kmeans_with_sizes_phase_1(
         rng,
     )
 
-    @warn "TODOX ### KMEANS K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large)"
+    # @warn "TODOX ### KMEANS K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large)"
     let (cells_range, UMIs_range, dispersion_range) = todox_solution_extrema(best_solution, min_cluster_size)
         initial_label = is_perfect(best_solution) ? "PERFECT" : "INITIAL"
-        @warn "TODOX - $initial_label K: $(best_solution.k) " *
-              "C: $(cells_range[1])..$(cells_range[2]) " *
-              "U: $(round(UMIs_range[1] / 1000; digits=1))K..$(round(UMIs_range[2] / 1000; digits=1))K " *
-              "D: $(round(dispersion_range[1]; digits=3))..$(round(dispersion_range[2]; digits=3))"
+        # @warn "TODOX - $initial_label K: $(best_solution.k) " * "C: $(cells_range[1])..$(cells_range[2]) " * "U: $(round(UMIs_range[1] / 1000; digits=1))K..$(round(UMIs_range[2] / 1000; digits=1))K " * "D: $(round(dispersion_range[1]; digits=3))..$(round(dispersion_range[2]; digits=3))"
         if !(dispersion_range[1] > 0)
             todox_describe_solution_clusters(
                 best_solution,
@@ -3141,7 +2917,7 @@ function kmeans_with_sizes_phase_1(
         )
     end
 
-    @warn "TODOX = INTER K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large)"
+    # @warn "TODOX = INTER K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large)"
 
     walk_split!(
         best_solution,
@@ -3162,7 +2938,7 @@ function kmeans_with_sizes_phase_1(
     )
 
     @assert best_solution.is_filled
-    @warn "TODOX - PHASE 1 BEST K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large) PERFECT CANDIDATES: $(length(perfect_candidates))"
+    # @warn "TODOX - PHASE 1 BEST K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large) PERFECT CANDIDATES: $(length(perfect_candidates))"
 
     if isempty(perfect_candidates)
         # No perfect found - take the best-by-penalty imperfect compromise as the lone candidate.

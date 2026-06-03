@@ -123,7 +123,7 @@ end
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set [`compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!`](@ref).
+Compute and set [`tensor_of_linear_fraction_per_block_per_module_per_metacell`](@ref).
 
 $(CONTRACT)
 """

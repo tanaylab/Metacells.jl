@@ -461,7 +461,7 @@ function import_mask_matrix(
         mask_name = "$(prefix)_gene_of_$(type_name)"
         mask_vector = get_vector(daf, "gene", mask_name; default = false)
         @assert eltype(mask_vector) == Bool
-        if !(mask_name isa SparseVector{Bool})
+        if !(mask_vector isa SparseVector{Bool})
             mask_vector = SparseVector{Bool}(mask_vector)
         end
         push!(mask_vectors, mask_vector)

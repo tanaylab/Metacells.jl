@@ -54,7 +54,7 @@ import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 
 """
-    compute_cells_projection(;
+    compute_cells_projection!(;
         query_daf::DafWriter,
         atlas_daf::DafReader,
         gene_fraction_regularization::Real = $(DEFAULT.gene_fraction_regularization),
@@ -1062,7 +1062,7 @@ $(CONTRACT2)
                     @. is_in_bin_neighborhood_pertinent_marker_per_common_included_gene =
                         is_neighborhood_pertinent_marker_per_common_included_gene & is_in_bin_per_common_included_gene
                     @. is_out_bin_neighborhood_pertinent_marker_per_common_included_gene =
-                        is_neighborhood_pertinent_marker_per_common_included_gene & is_in_bin_per_common_included_gene
+                        is_neighborhood_pertinent_marker_per_common_included_gene & !is_in_bin_per_common_included_gene
                     @assert any(is_in_bin_neighborhood_pertinent_marker_per_common_included_gene)
                     @assert any(is_out_bin_neighborhood_pertinent_marker_per_common_included_gene)
                 end
