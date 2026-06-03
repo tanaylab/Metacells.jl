@@ -229,7 +229,7 @@ function compute_provisional_projection_per_query_cell!(;
     parallel_loop_wo_rng(
         1:n_query_cells;
         name = "provisional_projection_per_cell",
-        policy = :static,
+        policy = :static_greedy,
         progress = DebugProgress(n_query_cells; group = :mcs_loops, desc = "provisional_projection_per_cell"),
         progress_chunk = 100,
     ) do query_cell_index
@@ -591,7 +591,7 @@ $(CONTRACT2)
 
     parallel_loop_wo_rng(
         1:n_common_included_genes;
-        policy = :static,
+        policy = :static_greedy,
         progress = DebugProgress(
             n_common_included_genes;
             group = :mcs_loops,
@@ -926,7 +926,7 @@ $(CONTRACT2)
 
             parallel_loop_wo_rng(
                 1:n_common_included_genes;
-                policy = :static,
+                policy = :static_greedy,
                 progress,
                 progress_chunk = 100,
             ) do common_included_gene_position

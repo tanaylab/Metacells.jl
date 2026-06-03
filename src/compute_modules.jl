@@ -297,7 +297,7 @@ function compute_block_modules!(
 
         lateral_cluster_per_gene[indices_of_lateral_neighborhood_markers] .= kmeans_results.assignments
 
-        z_score_per_neighborhood_metacell_per_lateral_cluster = kmeans_results.centers  # NOLINT
+        z_score_per_neighborhood_metacell_per_lateral_cluster = kmeans_results.centers
         return nothing
     end
 

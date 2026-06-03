@@ -594,7 +594,7 @@ $(CONTRACT)
     parallel_loop_wo_rng(
         1:n_blocks;
         progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "is_in_neighborhood_per_block_per_block"),
-        policy = :static,
+        policy = :static_greedy,
     ) do base_block_index
         priority_per_other_block = priority_per_other_block_per_thread[threadid()]
         ordered_block_indices = ordered_block_indices_per_thread[threadid()]
@@ -960,10 +960,19 @@ $(CONTRACT)
     is_neighborhood_distinct_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
     is_in_neighborhood_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:maxthreadid()]
 
+    # Per-block work iterates the metacells in the block's neighborhood; weight blocks heaviest-first by that count.
+    n_metacells_per_block = zeros(Int, n_blocks)
+    for metacell_index in 1:n_metacells
+        n_metacells_per_block[block_index_per_metacell[metacell_index]] += 1
+    end
+    n_metacells_in_neighborhood_per_block =
+        vec(is_in_neighborhood_per_other_block_per_base_block' * n_metacells_per_block)
+
     parallel_loop_wo_rng(
         1:n_blocks;
         progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "is_neighborhood_distinct_per_gene_per_block"),
-        policy = :static,
+        policy = :static_greedy,
+        order = sortperm(n_metacells_in_neighborhood_per_block; rev = true),
     ) do block_index
         is_in_neighborhood_per_metacell = is_in_neighborhood_per_metacell_per_thread[threadid()]
         @views is_neighborhood_distinct_per_gene = is_neighborhood_distinct_per_gene_per_block[:, block_index]
@@ -1094,7 +1103,8 @@ Compute and set [`matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene
 
     parallel_loop_wo_rng(
         1:n_blocks;
-        policy = :static,
+        policy = :static_greedy,
+        order = sortperm(n_neighborhood_metacells_per_block; rev = true),
         progress = DebugProgress(
             n_blocks;
             group = :mcs_loops,
@@ -1303,7 +1313,7 @@ $(CONTRACT)
         parallel_loop_wo_rng(
             1:n_included_genes;
             progress,
-            policy = :static,
+            policy = :static_greedy,
             progress_chunk = 100,
         ) do included_gene_position
             gene_index = indices_of_included_genes[included_gene_position]
@@ -1593,7 +1603,7 @@ $(CONTRACT2)
         parallel_loop_wo_rng(
             1:n_included_genes;
             progress,
-            policy = :static,
+            policy = :static_greedy,
             progress_chunk = 100,
         ) do included_gene_position
             gene_index = indices_of_included_genes[included_gene_position]
@@ -2050,7 +2060,7 @@ function compute_correlation_with_most_for_base_block!(;
     parallel_loop_wo_rng(
         1:n_correlated_genes;
         progress,
-        policy = :static,
+        policy = :static_greedy,
         progress_chunk = 100,
     ) do correlated_gene_position
         gene_index = indices_of_correlated_genes[correlated_gene_position]

@@ -256,6 +256,17 @@ $(CONTRACT)
     is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
     is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
 
+    # Per-block work iterates the cells in the block's neighborhood; weight blocks heaviest-first by that count.
+    n_cells_per_block_with_metacell = zeros(Int, n_blocks)
+    for cell_index in 1:n_cells
+        block_of_cell = block_index_per_cell[cell_index]
+        if block_of_cell > 0
+            n_cells_per_block_with_metacell[block_of_cell] += 1
+        end
+    end
+    n_cells_in_neighborhood_per_block =
+        vec(is_in_neighborhood_per_other_block_per_base_block' * n_cells_per_block_with_metacell)
+
     parallel_loop_wo_rng(
         1:n_blocks;
         progress = DebugProgress(
@@ -263,7 +274,8 @@ $(CONTRACT)
             group = :mcs_loops,
             desc = "stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block",
         ),
-        policy = :static,
+        policy = :static_greedy,
+        order = sortperm(n_cells_in_neighborhood_per_block; rev = true),
     ) do block_index
         is_in_neighborhood_per_cell = is_in_neighborhood_per_cell_per_thread[threadid()]
         is_gene_in_module = is_gene_in_module_per_thread[threadid()]
@@ -383,7 +395,8 @@ $(CONTRACT)
             group = :mcs_loops,
             desc = "stats_of_euclidean_modules_cells_distance_per_metacell",
         ),
-        policy = :static,
+        policy = :static_greedy,
+        order = sortperm(n_cells_per_metacell; rev = true),
     ) do metacell_index
         indices_of_metacell_max_cells = indices_of_metacell_max_cells_per_thread[threadid()]
 
@@ -615,7 +628,8 @@ $(CONTRACT)
     parallel_loop_wo_rng(
         1:n_metacells;
         progress = DebugProgress(n_metacells; group = :mcs_loops, desc = "cells_dispersion_per_metacell_per_module"),
-        policy = :static,
+        policy = :static_greedy,
+        order = sortperm(n_cells_per_metacell; rev = true),
     ) do metacell_index
         is_gene_in_module = is_gene_in_module_per_thread[threadid()]
         indices_of_metacell_max_cells = indices_of_metacell_max_cells_per_thread[threadid()]
