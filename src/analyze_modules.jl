@@ -467,8 +467,7 @@ function maximal_cells_dispersion_of_modules!(;
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     is_found_per_module::Union{AbstractVector{Bool}, BitVector},
-    module_index_per_gene::AbstractVector{<:Integer},
-    is_gene_in_module::BitVector,
+    gene_indices_per_module::AbstractVector{<:AbstractVector{<:Integer}},
     total_UMIs_per_max_cells::AbstractVector{<:AbstractFloat},
     normalized_factor_per_max_cells::AbstractVector{<:AbstractFloat},
     normalized_UMIs_quantile::AbstractFloat,
@@ -499,15 +498,15 @@ function maximal_cells_dispersion_of_modules!(;
             continue
         end
 
-        @. is_gene_in_module = module_index_per_gene == module_index
+        gene_indices_in_module = gene_indices_per_module[module_index]
 
         sum_normalized_module_UMIs = 0.0
         sum_squared_normalized_module_UMIs = 0.0
         for cell_position in 1:n_cells
             cell_index = indices_of_cells[cell_position]
             module_UMIs = 0
-            @foreach_true_index is_gene_in_module gene_index begin  # NOLINT
-                module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]  # NOLINT
+            for gene_index in gene_indices_in_module
+                module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]
             end
             normalized_module_UMIs = module_UMIs * normalized_factor_per_cells[cell_position]
             sum_normalized_module_UMIs += normalized_module_UMIs
@@ -617,7 +616,6 @@ $(CONTRACT)
     max_cells_dispersion_per_per_metacell = zeros(Float32, n_metacells)
     cells_dispersion_per_module_per_metacell = zeros(Float32, n_modules, n_metacells)
 
-    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
     indices_of_metacell_max_cells_per_thread = [Vector{Int}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
     total_UMIs_per_max_metacell_cell_per_thread =
         [Vector{Float32}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
@@ -625,13 +623,31 @@ $(CONTRACT)
         [Vector{Float32}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
     mean_normalized_per_module_per_thread = [Vector{Float64}(undef, n_modules) for _ in 1:maxthreadid()]
 
+    # Per-block inverted index from `module_index_per_gene`: for every (block, module) the gene indices that belong to
+    # the module. Computed once and reused across all the block's metacells in the parallel loop below; replaces the
+    # per-call `is_gene_in_module` BitVector that every `maximal_cells_dispersion_of_modules!` used to rebuild.
+    n_blocks = size(module_index_per_gene_per_block, 2)
+    gene_indices_per_module_per_block = [
+        [Int[] for _ in 1:n_modules]
+        for _ in 1:n_blocks
+    ]
+    for block_index in 1:n_blocks
+        gene_indices_per_module = gene_indices_per_module_per_block[block_index]
+        @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
+        for gene_index in 1:n_genes
+            module_index = module_index_per_gene[gene_index]
+            if module_index > 0
+                push!(gene_indices_per_module[module_index], gene_index)
+            end
+        end
+    end
+
     parallel_loop_wo_rng(
         1:n_metacells;
         progress = DebugProgress(n_metacells; group = :mcs_loops, desc = "cells_dispersion_per_metacell_per_module"),
         policy = :static_greedy,
         order = sortperm(n_cells_per_metacell; rev = true),
     ) do metacell_index
-        is_gene_in_module = is_gene_in_module_per_thread[threadid()]
         indices_of_metacell_max_cells = indices_of_metacell_max_cells_per_thread[threadid()]
         total_UMIs_per_max_metacell_cell = total_UMIs_per_max_metacell_cell_per_thread[threadid()]
         normalized_factor_per_max_metacell_cell = normalized_factor_per_max_metacell_cell_per_thread[threadid()]
@@ -652,7 +668,6 @@ $(CONTRACT)
         block_index = block_index_per_metacell[metacell_index]
 
         @views indices_of_metacell_cells = indices_of_metacell_max_cells[1:n_metacell_cells]
-        @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
         @views is_found_per_module = is_found_per_module_per_block[:, block_index]
         @views cells_dispersion_per_module = cells_dispersion_per_module_per_metacell[:, metacell_index]
 
@@ -663,8 +678,7 @@ $(CONTRACT)
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             is_found_per_module,
-            module_index_per_gene,
-            is_gene_in_module,
+            gene_indices_per_module = gene_indices_per_module_per_block[block_index],
             total_UMIs_per_max_cells = total_UMIs_per_max_metacell_cell,
             normalized_factor_per_max_cells = normalized_factor_per_max_metacell_cell,
             normalized_UMIs_quantile,
