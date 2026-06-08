@@ -551,7 +551,6 @@ $(CONTRACT)
 
     parallel_loop_wo_rng(
         1:n_included_genes;
-        policy = :static_greedy,
         progress = DebugProgress(
             n_included_genes;
             group = :mcs_loops,

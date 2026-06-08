@@ -32,6 +32,7 @@ TanayLabUtilities = "2fad9582-3092-42c8-a7a2-4a8f52ca25c8"
 UMAP = "c4f8c510-2410-5be4-91d7-4fbaeb39457e"
 
 [compat]
+DataAxesFormats = "0.3.0"
 Logging = "1.11.0"
 LoopVectorization = "0.12.173"
 MultipleTesting = "0.6.0"

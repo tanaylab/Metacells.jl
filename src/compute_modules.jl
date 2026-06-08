@@ -137,10 +137,17 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         module_status_per_gene_per_block = nothing
     end
 
+    # Per-block work dominates on the neighborhood metacells (k-means + correlations); weight blocks heaviest-first.
+    n_neighborhood_blocks_per_block = vec(sum(is_in_neighborhood_per_other_block_per_base_block; dims = 1))
     parallel_loop_with_rng(
         1:n_blocks;
         rng,
-        progress = DebugProgress(n_blocks; group = :mcs_loops, desc = "compute_blocks_modules"),
+        weights = n_neighborhood_blocks_per_block,
+        progress = DebugProgress(
+            sum(n_neighborhood_blocks_per_block);
+            group = :mcs_loops,
+            desc = "compute_blocks_modules",
+        ),
     ) do block_index, rng
         if module_status_per_gene_per_block === nothing
             module_status_per_gene = nothing

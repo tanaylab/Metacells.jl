@@ -13,6 +13,7 @@ export compute_vector_of_n_modules_per_block!
 using Base.Threads
 using DataAxesFormats
 using Distances
+using LoopVectorization
 using Random
 using StatsBase
 using TanayLabUtilities
@@ -159,12 +160,15 @@ $(CONTRACT)
 
     module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
 
+    n_neighborhood_blocks_per_block = vec(sum(is_in_neighborhood_per_other_block_per_base_block; dims = 1))
+
     # TODO: This does a lot of memory allocations in the parallel loop.
     # Given it also sets a matrix in each iteration, there's probably not much point in optimization?
     parallel_loop_wo_rng(
         1:n_blocks;
+        weights = n_neighborhood_blocks_per_block,
         progress = DebugProgress(
-            n_blocks;
+            sum(n_neighborhood_blocks_per_block);
             group = :mcs_loops,
             desc = "linear_fraction_per_block_per_module_per_metacell",
         ),
@@ -175,8 +179,17 @@ $(CONTRACT)
         n_neighborhood_metacells = length(indices_of_neighborhood_metacells)
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
 
+        # Invert `module_index_per_gene` once per block: the per-module loop below reads the gene list directly.
+        gene_indices_per_module = [Int[] for _ in 1:n_modules]
+        for gene_index in eachindex(module_index_per_gene)
+            module_index = module_index_per_gene[gene_index]
+            if module_index > 0
+                push!(gene_indices_per_module[module_index], gene_index)
+            end
+        end
+
         for module_index in 1:n_modules
-            indices_of_module_genes = findall(module_index_per_gene .== module_index)
+            indices_of_module_genes = gene_indices_per_module[module_index]
             if length(indices_of_module_genes) > 0
                 module_UMIs_per_neighborhood_metacell = vec(
                     sum(
@@ -254,7 +267,6 @@ $(CONTRACT)
     mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
-    is_gene_in_module_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
 
     # Per-block work iterates the cells in the block's neighborhood; weight blocks heaviest-first by that count.
     n_cells_per_block_with_metacell = zeros(Int, n_blocks)
@@ -266,51 +278,98 @@ $(CONTRACT)
     end
     n_cells_in_neighborhood_per_block =
         vec(is_in_neighborhood_per_other_block_per_base_block' * n_cells_per_block_with_metacell)
+    max_n_neighborhood_cells = maximum(n_cells_in_neighborhood_per_block)
+
+    # Channel pool of per-neighborhood-cell Float32 accumulators for the nested parallel-over-modules loop. Each inner
+    # task takes one for its module's gene-outer fill, then puts it back. Sized to `nthreads()` because each take/put
+    # is a single non-yielding scope.
+    module_UMIs_accumulator_pool = Channel{Vector{Float32}}(nthreads())
+    for _ in 1:nthreads()
+        put!(module_UMIs_accumulator_pool, Vector{Float32}(undef, max_n_neighborhood_cells))
+    end
 
     parallel_loop_wo_rng(
         1:n_blocks;
         progress = DebugProgress(
-            n_blocks;
+            sum(n_cells_in_neighborhood_per_block);
             group = :mcs_loops,
             desc = "stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block",
         ),
-        policy = :static_greedy,
-        order = sortperm(n_cells_in_neighborhood_per_block; rev = true),
+        weights = n_cells_in_neighborhood_per_block,
     ) do block_index
         is_in_neighborhood_per_cell = is_in_neighborhood_per_cell_per_thread[threadid()]
-        is_gene_in_module = is_gene_in_module_per_thread[threadid()]
         @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
         is_in_neighborhood_per_cell .=
             (block_index_per_cell .> 0) .&
             getindex.(Ref(is_in_neighborhood_per_other_block), max.(block_index_per_cell, 1))
-        n_neighborhood_cells = count(is_in_neighborhood_per_cell)
+        indices_of_neighborhood_cells = findall(is_in_neighborhood_per_cell)
+        n_neighborhood_cells = length(indices_of_neighborhood_cells)
         @assert n_neighborhood_cells > 0
 
+        # Invert `module_index_per_gene` once per block: the per-module loop below reads the gene list directly.
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
-        for module_index in 1:n_modules
-            @. is_gene_in_module = module_index_per_gene == module_index
-            sum_fractions = 0.0
-            sum_squared_fractions = 0.0
-            @foreach_true_index is_in_neighborhood_per_cell cell_index begin  # NOLINT
-                module_UMIs = 0
-                @foreach_true_index is_gene_in_module gene_index begin  # NOLINT
-                    module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]  # NOLINT
+        gene_indices_per_module = [Int[] for _ in 1:n_modules]
+        for gene_index in 1:n_genes
+            module_index = module_index_per_gene[gene_index]
+            if module_index > 0
+                push!(gene_indices_per_module[module_index], gene_index)
+            end
+        end
+
+        # Parallel over modules - each writes to its own (module_index, block_index) slot in the output matrices, so
+        # the inner tasks are race-free. Per task: take an accumulator vector, gene-outer / cell-inner `@turbo` fill,
+        # scalar reduction, write mean+std, return accumulator.
+        parallel_loop_wo_rng(
+            1:n_modules;
+            nested = true,
+            policy = :greedy,
+            name = "stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block.modules",
+        ) do module_index
+            gene_indices_in_module = gene_indices_per_module[module_index]
+            if isempty(gene_indices_in_module)
+                mean_linear_fraction_per_module_per_block[module_index, block_index] = 0.0f0
+                std_linear_fraction_per_module_per_block[module_index, block_index] = 0.0f0
+                return nothing
+            end
+            module_UMIs_per_neighborhood_cell = take!(module_UMIs_accumulator_pool)
+            try
+                @views fill!(module_UMIs_per_neighborhood_cell[1:n_neighborhood_cells], 0.0f0)
+                # `UMIs_per_cell_per_gene` is a sparse matrix; `@turbo` can't SIMD the gather, so use a plain
+                # `@inbounds` scalar accumulate.
+                @inbounds for gene_index in gene_indices_in_module
+                    for neighborhood_cell_position in 1:n_neighborhood_cells
+                        cell_index = indices_of_neighborhood_cells[neighborhood_cell_position]
+                        module_UMIs_per_neighborhood_cell[neighborhood_cell_position] +=
+                            UMIs_per_cell_per_gene[cell_index, gene_index]
+                    end
                 end
-                fraction = module_UMIs / total_UMIs_per_cell[cell_index]  # NOLINT
-                sum_fractions += fraction
-                sum_squared_fractions += fraction * fraction
+                sum_fractions = 0.0
+                sum_squared_fractions = 0.0
+                @inbounds for neighborhood_cell_position in 1:n_neighborhood_cells
+                    cell_index = indices_of_neighborhood_cells[neighborhood_cell_position]
+                    fraction =
+                        module_UMIs_per_neighborhood_cell[neighborhood_cell_position] / total_UMIs_per_cell[cell_index]
+                    sum_fractions += fraction
+                    sum_squared_fractions += fraction * fraction
+                end
+                mean_fraction = sum_fractions / n_neighborhood_cells
+                mean_linear_fraction_per_module_per_block[module_index, block_index] = Float32(mean_fraction)
+                std_linear_fraction_per_module_per_block[module_index, block_index] = if n_neighborhood_cells > 1
+                    Float32(
+                        sqrt(
+                            max(
+                                (sum_squared_fractions - sum_fractions * mean_fraction) / (n_neighborhood_cells - 1),
+                                0.0,
+                            ),
+                        ),
+                    )
+                else
+                    0.0f0
+                end
+            finally
+                put!(module_UMIs_accumulator_pool, module_UMIs_per_neighborhood_cell)
             end
-            mean_fraction = sum_fractions / n_neighborhood_cells
-            mean_linear_fraction_per_module_per_block[module_index, block_index] = Float32(mean_fraction)
-            std_linear_fraction_per_module_per_block[module_index, block_index] = if n_neighborhood_cells > 1
-                Float32(
-                    sqrt(
-                        max((sum_squared_fractions - sum_fractions * mean_fraction) / (n_neighborhood_cells - 1), 0.0),
-                    ),
-                )
-            else
-                0.0f0
-            end
+            return nothing
         end
         return nothing
     end
@@ -387,16 +446,33 @@ $(CONTRACT)
 
     indices_of_metacell_max_cells_per_thread = [Vector{Int}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
 
+    # Per-block inverted index from `module_per_gene` (string names): for each (block, module) the gene indices that
+    # belong to the module. Computed once and reused across all the block's metacells in the parallel loop below;
+    # replaces the per-call `findall(module_per_gene .== module_name)` that was rebuilt for every (metacell, module).
+    n_blocks = size(module_per_gene_per_block, 2)
+    n_genes = size(module_per_gene_per_block, 1)
+    gene_indices_per_module_per_block = [[Int[] for _ in 1:n_modules] for _ in 1:n_blocks]
+    for block_index in 1:n_blocks
+        gene_indices_per_module = gene_indices_per_module_per_block[block_index]
+        @views module_per_gene = module_per_gene_per_block[:, block_index]
+        for gene_index in 1:n_genes
+            module_name = module_per_gene[gene_index]
+            module_index = findfirst(==(module_name), name_per_module)
+            if module_index !== nothing
+                push!(gene_indices_per_module[module_index], gene_index)
+            end
+        end
+    end
+
     # TODO: This does a lot of memory allocations in the parallel loop.
     parallel_loop_wo_rng(
         1:n_metacells;
         progress = DebugProgress(
-            n_metacells;
+            sum(n_cells_per_metacell);
             group = :mcs_loops,
             desc = "stats_of_euclidean_modules_cells_distance_per_metacell",
         ),
-        policy = :static_greedy,
-        order = sortperm(n_cells_per_metacell; rev = true),
+        weights = n_cells_per_metacell,
     ) do metacell_index
         indices_of_metacell_max_cells = indices_of_metacell_max_cells_per_thread[threadid()]
 
@@ -417,10 +493,9 @@ $(CONTRACT)
         fraction_per_module_per_cell = zeros(Float32, n_modules, n_metacell_cells)
         mean_fraction_per_module = zeros(Float32, n_modules)
 
-        @views module_per_gene = module_per_gene_per_block[:, block_index]
+        gene_indices_per_module = gene_indices_per_module_per_block[block_index]
         for module_index in 1:n_modules
-            module_name = name_per_module[module_index]
-            indices_of_module_genes = findall(module_per_gene .== module_name)
+            indices_of_module_genes = gene_indices_per_module[module_index]
             n_module_genes = length(indices_of_module_genes)
             if n_module_genes > 0
                 module_UMIs_per_metacell_cell =
@@ -627,10 +702,7 @@ $(CONTRACT)
     # the module. Computed once and reused across all the block's metacells in the parallel loop below; replaces the
     # per-call `is_gene_in_module` BitVector that every `maximal_cells_dispersion_of_modules!` used to rebuild.
     n_blocks = size(module_index_per_gene_per_block, 2)
-    gene_indices_per_module_per_block = [
-        [Int[] for _ in 1:n_modules]
-        for _ in 1:n_blocks
-    ]
+    gene_indices_per_module_per_block = [[Int[] for _ in 1:n_modules] for _ in 1:n_blocks]
     for block_index in 1:n_blocks
         gene_indices_per_module = gene_indices_per_module_per_block[block_index]
         @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
@@ -644,9 +716,12 @@ $(CONTRACT)
 
     parallel_loop_wo_rng(
         1:n_metacells;
-        progress = DebugProgress(n_metacells; group = :mcs_loops, desc = "cells_dispersion_per_metacell_per_module"),
-        policy = :static_greedy,
-        order = sortperm(n_cells_per_metacell; rev = true),
+        progress = DebugProgress(
+            sum(n_cells_per_metacell);
+            group = :mcs_loops,
+            desc = "cells_dispersion_per_metacell_per_module",
+        ),
+        weights = n_cells_per_metacell,
     ) do metacell_index
         indices_of_metacell_max_cells = indices_of_metacell_max_cells_per_thread[threadid()]
         total_UMIs_per_max_metacell_cell = total_UMIs_per_max_metacell_cell_per_thread[threadid()]

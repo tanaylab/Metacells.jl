@@ -229,7 +229,6 @@ function compute_provisional_projection_per_query_cell!(;
     parallel_loop_wo_rng(
         1:n_query_cells;
         name = "provisional_projection_per_cell",
-        policy = :static_greedy,
         progress = DebugProgress(n_query_cells; group = :mcs_loops, desc = "provisional_projection_per_cell"),
         progress_chunk = 100,
     ) do query_cell_index
@@ -241,14 +240,11 @@ function compute_provisional_projection_per_query_cell!(;
                 UMIs_per_query_cell_per_query_gene[query_cell_index, query_gene_index_per_atlas_pertinent_marker]
 
             log_linear_fraction_per_pertinent_marker = log_linear_fraction_per_pertinent_marker_per_thread[threadid()]
-            for gene_position in 1:n_pertinent_neighborhood_markers
-                log_linear_fraction_per_pertinent_marker[gene_position] =
-                    UMIs_per_pertinent_marker[gene_position] / total_query_cell_UMIs
-            end
             @check_turbo_vector(log_linear_fraction_per_pertinent_marker)
             @turbo for gene_position in 1:n_pertinent_neighborhood_markers
-                log_linear_fraction_per_pertinent_marker[gene_position] =
-                    log2(log_linear_fraction_per_pertinent_marker[gene_position] + gene_fraction_regularization)
+                log_linear_fraction_per_pertinent_marker[gene_position] = log2(
+                    UMIs_per_pertinent_marker[gene_position] / total_query_cell_UMIs + gene_fraction_regularization,
+                )
             end
 
             distances_to_blocks = flame_timed("pairwise.Euclidean") do
@@ -321,11 +317,17 @@ function compute_final_projection_per_query_cell(;
             @debug "Determined: $(n_determined_query_cells[]) $(percent(n_determined_query_cells[], n_query_cells)) Phase $(phase)..." _group =
                 :mcs_details
 
+            n_undetermined_query_cells_per_block = length.(indices_of_undetermined_query_cells_per_block)
             # TODO: Many memory allocations inside the parallel loop.
             parallel_loop_wo_rng(
                 1:n_blocks;
                 name = "final_projection_per_cell.loop",
-                progress = DebugProgress(n_blocks; group = :mcs_loops, desc = phase_name),
+                weights = n_undetermined_query_cells_per_block,
+                progress = DebugProgress(
+                    sum(n_undetermined_query_cells_per_block);
+                    group = :mcs_loops,
+                    desc = phase_name,
+                ),
             ) do block_index
                 block_name = name_per_block[block_index]
 
@@ -591,7 +593,6 @@ $(CONTRACT2)
 
     parallel_loop_wo_rng(
         1:n_common_included_genes;
-        policy = :static_greedy,
         progress = DebugProgress(
             n_common_included_genes;
             group = :mcs_loops,
@@ -926,7 +927,6 @@ $(CONTRACT2)
 
             parallel_loop_wo_rng(
                 1:n_common_included_genes;
-                policy = :static_greedy,
                 progress,
                 progress_chunk = 100,
             ) do common_included_gene_position
