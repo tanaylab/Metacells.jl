@@ -225,6 +225,8 @@ function compute_provisional_projection_per_query_cell!(;
     n_pertinent_neighborhood_markers = length(query_gene_index_per_atlas_pertinent_marker)
     log_linear_fraction_per_pertinent_marker_per_thread =
         [Vector{Float32}(undef, n_pertinent_neighborhood_markers) for _ in 1:maxthreadid()]
+    UMIs_per_pertinent_marker_per_thread =
+        [Vector{Float32}(undef, n_pertinent_neighborhood_markers) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_query_cells;
@@ -236,10 +238,22 @@ function compute_provisional_projection_per_query_cell!(;
             provisional_block_index_per_query_cell[query_cell_index] = 0
         else
             total_query_cell_UMIs = total_UMIs_per_query_cell[query_cell_index]
-            @views UMIs_per_pertinent_marker =
-                UMIs_per_query_cell_per_query_gene[query_cell_index, query_gene_index_per_atlas_pertinent_marker]
+
+            # `UMIs_per_query_cell_per_query_gene` is gathered at the pertinent-marker columns - a non-strided fancy
+            # index `@turbo` can't SIMD. Gather into a contiguous buffer with a plain `@inbounds` loop, then SIMD the
+            # costly per-element `log2` over the strided buffers.
+            UMIs_per_pertinent_marker = UMIs_per_pertinent_marker_per_thread[threadid()]
+            @inbounds for gene_position in 1:n_pertinent_neighborhood_markers
+                UMIs_per_pertinent_marker[gene_position] = Float32(
+                    UMIs_per_query_cell_per_query_gene[
+                        query_cell_index,
+                        query_gene_index_per_atlas_pertinent_marker[gene_position],
+                    ],
+                )
+            end
 
             log_linear_fraction_per_pertinent_marker = log_linear_fraction_per_pertinent_marker_per_thread[threadid()]
+            @check_turbo_vector(UMIs_per_pertinent_marker)
             @check_turbo_vector(log_linear_fraction_per_pertinent_marker)
             @turbo for gene_position in 1:n_pertinent_neighborhood_markers
                 log_linear_fraction_per_pertinent_marker[gene_position] = log2(

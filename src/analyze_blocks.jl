@@ -674,15 +674,6 @@ $(CONTRACT)
             end
         end
 
-        @warn (
-            "TODOX Neighborhood: $(name_per_block[base_block_index])" *
-            " Blocks: $(n_neighborhood_blocks)" *
-            " Confused: $(n_neighborhood_confused_blocks)" *
-            " Disjoint: $(n_neighborhood_disjoint_blocks)" *
-            " Overflow: $(n_neighborhood_overflow_blocks)" *
-            " Metacells: $(n_neighborhood_metacells)" *
-            " Covered M-UMIs: $(neighborhood_total_UMIs / 1e6)"
-        )
         @assert n_neighborhood_blocks > 1
         @debug (
             "Neighborhood: $(name_per_block[base_block_index])" *
@@ -2333,9 +2324,8 @@ $(CONTRACT2)
 
     most_correlated_gene_in_base_neighborhood_per_gene_per_base_block =
         get_matrix(base_daf, "gene", "block", "most_correlated_gene_in_neighborhood").array
-    # TODOX: Go over all code that sums a temporary and replace it with count w/o a temporary?
     n_most_correlated_gene_per_base_block =
-        vec(sum(most_correlated_gene_in_base_neighborhood_per_gene_per_base_block .!= ""; dims = 1))
+        vec(count(!isempty, most_correlated_gene_in_base_neighborhood_per_gene_per_base_block; dims = 1))
     @assert_vector(n_most_correlated_gene_per_base_block, n_base_blocks)
     n_max_correlated_genes = maximum(n_most_correlated_gene_per_base_block)
 
@@ -2354,12 +2344,9 @@ $(CONTRACT2)
     end
     relevant_gene_position_per_gene = zeros(Int, n_genes)
     n_relevant_genes = 0
-    # TODOX: Replace by foreach_true_index?
-    @inbounds for gene_index in 1:n_genes
-        if is_relevant_per_gene[gene_index]
-            n_relevant_genes += 1
-            relevant_gene_position_per_gene[gene_index] = n_relevant_genes
-        end
+    @foreach_true_index is_relevant_per_gene gene_index begin  # NOLINT
+        n_relevant_genes += 1
+        relevant_gene_position_per_gene[gene_index] = n_relevant_genes  # NOLINT
     end
     UMIs_per_other_metacell_per_relevant_gene = UMIs_per_other_metacell_per_full_gene[:, is_relevant_per_gene]
 
@@ -2367,7 +2354,7 @@ $(CONTRACT2)
 
     mean_correlation_with_most_per_base_block = Vector{Float32}(undef, n_base_blocks)
 
-    total_correlated_genes = sum(most_correlated_gene_in_base_neighborhood_per_gene_per_base_block .!= "")
+    total_correlated_genes = count(!isempty, most_correlated_gene_in_base_neighborhood_per_gene_per_base_block)
 
     is_correlated_per_gene = BitVector(undef, n_genes)
     is_in_base_neighborhood_per_cell = BitVector(undef, n_cells)

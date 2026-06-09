@@ -90,11 +90,7 @@ function DispersionScratches(; n_points::Integer, n_modules::Integer)
     )
 end
 
-function KmeansSizesBuffers{T}(;
-    n_dims::Integer,
-    max_k::Integer,
-    n_points::Integer,
-) where {T <: AbstractFloat}
+function KmeansSizesBuffers{T}(; n_dims::Integer, max_k::Integer, n_points::Integer) where {T <: AbstractFloat}
     return KmeansSizesBuffers{T}(
         Vector{Int}(undef, n_points),         # max_best_assignments
         Vector{Int}(undef, max_k),            # max_best_counts
@@ -150,6 +146,7 @@ end
     min_module_UMIs::Integer
     min_cells_dispersion::AbstractFloat
     max_cells_dispersion::AbstractFloat
+    min_cluster_size::Integer
 end
 
 @kwdef mutable struct DeltaCorrelationContext
@@ -209,10 +206,6 @@ end
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-TODOX: description below needs manual rework - it predates parameters like `base_blocks_daf`,
-`gene_fraction_regularization`, and the new `target_cell_total_UMIs_quantile` semantics, and the high-level steps it
-describes are now distributed across `compute_preferred_block_index_per_cell_per_block` and `compute_local_clusters`.
-
 Given an `base_daf` metacells repository with a blocks structure and local gene modules that describe the cell state
 manifold, compute a `sharp_daf` metacells repository, which hopefully more faithfully captures this manifold.
 
@@ -227,11 +220,13 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     using the modules of the neighborhood of that block. We start with the expected number of metacells in that block
     (based on the mean number of cells per metacell in the base block) and adjust the number of clusters to try and
     enforce the sizes of the clusters - not more than twice that mean, no more than `max_cells_in_metacell`, and no less
-    than `min_cells_in_metacell`. A cluster is also considered too-large if its maximal `cells_dispersion` (across the
-    block's modules) is above `max_cells_dispersion_in_metacell`, and too-small if its maximal `cells_dispersion` is
-    below `min_cells_dispersion_in_metacell`. In edge cases we dissolve too-small clusters, so this can create new
-    outlier cells. We increase the number of target metacells for every input metacell whose maximal `cells_dispersion`
-    is above `max_cells_dispersion_in_metacell`.
+    than `min_cells_in_metacell`. A cluster is also considered too-large if it is larger than `max_cells_in_metacell`,
+    if its maximal `cells_dispersion` (across the block's modules) is above `max_cells_dispersion_in_metacell`, and
+    too-small if its maximal `cells_dispersion` is below `min_cells_dispersion_in_metacell`. In edge cases we dissolve
+    too-small clusters, so this can create new outlier cells. We increase the number of target metacells for every input
+    metacell whose maximal `cells_dispersion` is above `max_cells_dispersion_in_metacell`. This still leaves us with
+    multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation
+    with most-correlated marker genes in the base repository neighborhoods.
  4. The final clusters are the sharp metacells. We name them using the `prefix`, the convention is to advance the letter
     for each sharpening round (`M` to `N` to `O` to ...).
 
@@ -353,7 +348,7 @@ $(CONTRACT2)
         zero(eltype(block_index_per_cell)),
         ifelse.(block_index_per_cell .> 0, block_index_per_cell, closest_block_index_per_cell),
     )
-    n_cells_per_block = [Int(sum(block_index_per_cell .== block_index)) for block_index in 1:n_blocks]
+    n_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
 
     # Floor on metacell size (in cells) needed for each block to clear `min_metacell_total_UMIs`, assuming each cell
     # contributes at the `target_cell_total_UMIs_quantile` of the block's per-cell UMI distribution.
@@ -362,11 +357,7 @@ $(CONTRACT2)
         1:n_blocks;
         name = "target_min_cells_per_block",
         weights = n_cells_per_block,
-        progress = DebugProgress(
-            sum(n_cells_per_block);
-            group = :mcs_loops,
-            desc = "target_min_cells_per_block",
-        ),
+        progress = DebugProgress(sum(n_cells_per_block); group = :mcs_loops, desc = "target_min_cells_per_block"),
     ) do block_index
         @views block_total_UMIs_per_cell = total_UMIs_per_cell[block_index_per_cell .== block_index]
         if isempty(block_total_UMIs_per_cell)
@@ -374,7 +365,8 @@ $(CONTRACT2)
         else
             target_total_UMIs_per_cell = quantile(block_total_UMIs_per_cell, target_cell_total_UMIs_quantile)  # NOLINT
             n_cells_for_min_UMIs = Int(ceil(min_metacell_total_UMIs / target_total_UMIs_per_cell))
-            target_min_cells_per_block[block_index] = min(max(n_cells_for_min_UMIs, min_cells_in_metacell), div(max_cells_in_metacell, 2))
+            target_min_cells_per_block[block_index] =
+                min(max(n_cells_for_min_UMIs, min_cells_in_metacell), div(max_cells_in_metacell, 2))
         end
         return nothing
     end
@@ -420,23 +412,13 @@ $(CONTRACT2)
             max(
                 Int(
                     round(
-                        max(
-                            n_neighborhood_cells_per_block[block_index],
-                            n_cells_per_block[block_index],
-                        ) / mean_metacell_cells_per_block[block_index],
+                        max(n_neighborhood_cells_per_block[block_index], n_cells_per_block[block_index]) /
+                        mean_metacell_cells_per_block[block_index],
                     ),
                 ),
                 1,
             ) for block_index in 1:n_blocks
         )
-    kmeans_sizes_max_buffers_per_thread = [
-        KmeansSizesBuffers{Float32}(;
-            n_dims = max_n_block_modules,
-            max_k = max_n_kmeans_clusters,
-            n_points = max_n_kmeans_points,
-        ) for _ in 1:maxthreadid()
-    ]
-
     # Channel pool of `KMeansBuffers` for `kmeans_in_rounds`'s nested parallel rounds, shared across
     # `compute_preferred_block_index_per_cell_per_block` and `compute_local_clusters` (which run sequentially below).
     # One buffer per thread is sufficient because nested parallel rounds are bounded by Julia's thread pool.
@@ -468,7 +450,6 @@ $(CONTRACT2)
         mean_linear_fraction_in_neighborhood_cells_per_module_per_block,
         std_linear_fraction_in_neighborhood_cells_per_module_per_block,
         min_migration_likelihood,
-        kmeans_sizes_max_buffers_per_thread,
         kmeans_buffer_pool,
         rng,
     )
@@ -476,31 +457,20 @@ $(CONTRACT2)
     block_index_per_cell =
         compute_preferred_block_index_of_cells(; block_index_per_cell, preferred_block_index_per_cell_per_block)
 
-    # Post-migration blocks can have more cells than pre-migration; reallocate buffers if needed.
-    post_migration_n_cells_per_block =
-        [sum(block_index_per_cell .== block_index) for block_index in 1:n_blocks]
+    # Post-migration blocks can have more cells than pre-migration; grow the pre-migration `kmeans_buffer_pool` if
+    # needed (`kmeans_sizes_max_buffers_per_thread` is allocated once below, after the maxes are final).
+    post_migration_n_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
     post_max_n_kmeans_points = maximum(post_migration_n_cells_per_block)
     post_max_n_kmeans_clusters =
         2 * maximum(
             max(
-                Int(
-                    round(
-                        post_migration_n_cells_per_block[block_index] / mean_metacell_cells_per_block[block_index],
-                    ),
-                ),
+                Int(round(post_migration_n_cells_per_block[block_index] / mean_metacell_cells_per_block[block_index])),
                 1,
             ) for block_index in 1:n_blocks
         )
     if post_max_n_kmeans_points > max_n_kmeans_points || post_max_n_kmeans_clusters > max_n_kmeans_clusters
         max_n_kmeans_points = max(max_n_kmeans_points, post_max_n_kmeans_points)
         max_n_kmeans_clusters = max(max_n_kmeans_clusters, post_max_n_kmeans_clusters)
-        kmeans_sizes_max_buffers_per_thread = [
-            KmeansSizesBuffers{Float32}(;
-                n_dims = max_n_block_modules,
-                max_k = max_n_kmeans_clusters,
-                n_points = max_n_kmeans_points,
-            ) for _ in 1:maxthreadid()
-        ]
         # The pool holds references to the old (smaller) buffers. Rebuild to match the new maxes. Only fires when at
         # least one of the maxes actually grew (gated by the surrounding `if`).
         close(kmeans_buffer_pool)
@@ -517,6 +487,15 @@ $(CONTRACT2)
         end
     end
 
+    # Sized to the final maxes; consumed only by `compute_local_clusters` below.
+    kmeans_sizes_max_buffers_per_thread = [
+        KmeansSizesBuffers{Float32}(;
+            n_dims = max_n_block_modules,
+            max_k = max_n_kmeans_clusters,
+            n_points = max_n_kmeans_points,
+        ) for _ in 1:maxthreadid()
+    ]
+
     @assert axis_vector(base_blocks_daf, "cell") == axis_vector(base_daf, "cell")
     @assert axis_vector(base_blocks_daf, "gene") == axis_vector(base_daf, "gene")
 
@@ -532,22 +511,22 @@ $(CONTRACT2)
     # is the gene's most-correlated-in-base-neighborhood partner; every gene with such a partner contributes a series.
     # Consumed by `build_grouped_for_base_block` (for reading `UMIs_per_cell_per_gene` columns) and by
     # `precompute_walkable_indirection` (to build each walkable block's friend-gene subspace).
-    strong_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
+    correlated_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
     friend_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
     for base_block_index in 1:n_base_blocks
         @views most_correlated_gene_in_base_neighborhood_per_gene =
             most_correlated_gene_in_base_neighborhood_per_gene_per_base_block[:, base_block_index]
-        strong_gene_indices = Int[]
+        correlated_gene_indices = Int[]
         friend_gene_indices = Int[]
         for gene_index in 1:n_genes
             name = most_correlated_gene_in_base_neighborhood_per_gene[gene_index]
             if !isempty(name)
                 friend_gene_index = gene_name_to_index[name]
-                push!(strong_gene_indices, gene_index)
+                push!(correlated_gene_indices, gene_index)
                 push!(friend_gene_indices, friend_gene_index)
             end
         end
-        strong_gene_indices_per_base_block[base_block_index] = strong_gene_indices
+        correlated_gene_indices_per_base_block[base_block_index] = correlated_gene_indices
         friend_gene_indices_per_base_block[base_block_index] = friend_gene_indices
     end
 
@@ -571,7 +550,7 @@ $(CONTRACT2)
         std_linear_fraction_in_neighborhood_cells_per_module_per_block,
         base_block_index_per_cell,
         is_in_base_neighborhood_per_other_base_block_per_base_block,
-        strong_gene_indices_per_base_block,
+        correlated_gene_indices_per_base_block,
         friend_gene_indices_per_base_block,
         gene_fraction_regularization,
         max_n_kmeans_clusters,
@@ -617,7 +596,6 @@ function compute_preferred_block_index_per_cell_per_block(;
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     mean_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     std_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
-    kmeans_sizes_max_buffers_per_thread::AbstractVector{<:KmeansSizesBuffers},
     kmeans_buffer_pool::Channel{KMeansBuffers{Float32}},
     rng::AbstractRNG,
 )::Vector{Maybe{SparseVector{<:Integer}}}
@@ -649,10 +627,7 @@ function compute_preferred_block_index_per_cell_per_block(;
     end
 
     max_n_neighborhood_clusters = maximum(
-        max(
-            Int(round(n_neighborhood_cells_per_block[block_index] / mean_metacell_cells_per_block[block_index])),
-            1,
-        ) for block_index in 1:n_blocks
+        max(Int(round(n_neighborhood_cells_per_block[block_index] / mean_metacell_cells_per_block[block_index])), 1) for block_index in 1:n_blocks
     )
     preferred_block_index_per_cluster_per_thread =
         [Vector{Int}(undef, max_n_neighborhood_clusters) for _ in 1:maxthreadid()]
@@ -922,7 +897,7 @@ function compute_local_clusters(;
     std_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     base_block_index_per_cell::AbstractVector{<:Integer},
     is_in_base_neighborhood_per_other_base_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
-    strong_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
+    correlated_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
     friend_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
     gene_fraction_regularization::AbstractFloat,
     max_n_kmeans_clusters::Integer,
@@ -941,7 +916,7 @@ function compute_local_clusters(;
     solution_candidates_per_block = Vector{Maybe{SolutionCandidates}}(undef, n_blocks)
     solution_candidates_per_block .= nothing
 
-    n_cells_per_block = [sum(block_index_per_cell .== block_index) for block_index in 1:n_blocks]
+    n_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
     max_n_block_cells = maximum(n_cells_per_block)
 
     n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
@@ -1024,6 +999,7 @@ function compute_local_clusters(;
             min_module_UMIs,
             min_cells_dispersion = min_cells_dispersion_in_metacell,
             max_cells_dispersion = max_cells_dispersion_in_metacell,
+            min_cluster_size = min_cells_in_metacell,
         )
 
         return (
@@ -1042,10 +1018,7 @@ function compute_local_clusters(;
     # scratch.
     dispersion_scratches_pool = Channel{DispersionScratches}(nthreads())
     for _ in 1:nthreads()
-        put!(
-            dispersion_scratches_pool,
-            DispersionScratches(; n_points = max_n_block_cells, n_modules),
-        )
+        put!(dispersion_scratches_pool, DispersionScratches(; n_points = max_n_block_cells, n_modules))
     end
 
     # ===== Phase 1: per-block walk to a perfect K (or exhaustion) =====
@@ -1054,18 +1027,20 @@ function compute_local_clusters(;
         rng,
         weights = n_cells_per_block,
         name = "compute_local_clusters.clustering_options",
-        progress = DebugProgress(
-            sum(n_cells_per_block);
-            group = :mcs_loops,
-            desc = "clustering_options",
-        ),
+        progress = DebugProgress(sum(n_cells_per_block); group = :mcs_loops, desc = "clustering_options"),
     ) do block_index, rng
         setup = setup_block_context(block_index)
         if setup === nothing
             return nothing
         end
-        (z_score_per_found_module_per_block_cell, dispersion_context, sizes_buffers, n_block_clusters,
-         weight_per_block_cell, block_cell_indices) = setup
+        (
+            z_score_per_found_module_per_block_cell,
+            dispersion_context,
+            sizes_buffers,
+            n_block_clusters,
+            weight_per_block_cell,
+            block_cell_indices,
+        ) = setup
         n_block_cells = length(block_cell_indices)
 
         if n_block_clusters == 1
@@ -1113,8 +1088,8 @@ function compute_local_clusters(;
     # only cluster assignments within a block change). Same for `n_points_per_base_block` (depends only on
     # `base_block_index_per_cell` and the neighborhood matrix).
     block_cell_indices_per_block = [
-        local_clusters === nothing ? Int[] : Vector{Int}(local_clusters.block_cell_indices)
-        for local_clusters in local_clusters_per_block
+        local_clusters === nothing ? Int[] : Vector{Int}(local_clusters.block_cell_indices) for
+        local_clusters in local_clusters_per_block
     ]
 
     n_cells_per_cell_base_block = zeros(Int, n_base_blocks)
@@ -1145,19 +1120,20 @@ function compute_local_clusters(;
         return local_clusters_per_block
     end
 
-    (affected_base_block_indices_per_walkable_block,
-     gene_index_per_friend_per_walkable_block,
-     friend_position_per_series_per_base_block_per_walkable_block,
-     block_cell_position_per_point_per_base_block_per_walkable_block) =
-        precompute_walkable_indirection(
-            walkable_block_indices,
-            block_cell_indices_per_block,
-            base_block_index_per_cell,
-            is_in_base_neighborhood_per_other_base_block_per_base_block,
-            friend_gene_indices_per_base_block,
-            n_base_blocks,
-            n_genes,
-        )
+    (
+        affected_base_block_indices_per_walkable_block,
+        gene_index_per_friend_per_walkable_block,
+        friend_position_per_series_per_base_block_per_walkable_block,
+        block_cell_position_per_point_per_base_block_per_walkable_block,
+    ) = precompute_walkable_indirection(
+        walkable_block_indices,
+        block_cell_indices_per_block,
+        base_block_index_per_cell,
+        is_in_base_neighborhood_per_other_base_block_per_base_block,
+        friend_gene_indices_per_base_block,
+        n_base_blocks,
+        n_genes,
+    )
 
     n_walkable_blocks = length(walkable_block_indices)
 
@@ -1178,10 +1154,7 @@ function compute_local_clusters(;
         n_candidates = length(solution_candidates.candidates)
         n_block_cells = solution_candidates.n_points
         max_n_walkable_block_cells = max(max_n_walkable_block_cells, n_block_cells)
-        max_n_friends = max(
-            max_n_friends,
-            length(gene_index_per_friend_per_walkable_block[walkable_position]),
-        )
+        max_n_friends = max(max_n_friends, length(gene_index_per_friend_per_walkable_block[walkable_position]))
         for candidate_index in 1:n_candidates
             push!(walkable_position_per_work_item, walkable_position)
             push!(candidate_index_per_work_item, candidate_index)
@@ -1209,10 +1182,8 @@ function compute_local_clusters(;
             block_cell_position_per_point_per_base_block = Dict{Int, Vector{Int}}(),
             # Per-thread scratch.
             total_UMIs_per_max_cluster = Vector{Float64}(undef, max_n_kmeans_clusters),
-            UMIs_per_friend_per_max_cluster =
-                Matrix{Float64}(undef, max_n_friends, max_n_kmeans_clusters),
-            variable_per_block_cell_per_friend =
-                Matrix{Float32}(undef, max_n_walkable_block_cells, max_n_friends),
+            UMIs_per_friend_per_max_cluster = Matrix{Float64}(undef, max_n_friends, max_n_kmeans_clusters),
+            variable_per_block_cell_per_friend = Matrix{Float32}(undef, max_n_walkable_block_cells, max_n_friends),
             is_active_per_block_cell = Vector{Bool}(undef, max_n_walkable_block_cells),
             punctuated_total_per_block_cell = Vector{Float64}(undef, max_n_walkable_block_cells),
         ) for _ in 1:maxthreadid()
@@ -1263,8 +1234,7 @@ function compute_local_clusters(;
         block_index = walkable_block_indices[walkable_position]
         block_cell_indices = block_cell_indices_per_block[block_index]
         gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
-        UMI_per_friend_per_block_cell =
-            UMI_per_friend_per_block_cell_per_walkable_block[walkable_position]
+        UMI_per_friend_per_block_cell = UMI_per_friend_per_block_cell_per_walkable_block[walkable_position]
         n_block_cells = length(block_cell_indices)
         n_friends = length(gene_index_per_friend)
         @inbounds for friend_position in 1:n_friends
@@ -1283,8 +1253,7 @@ function compute_local_clusters(;
 
     # One-time setup: build the per-base-block grouped correlations from the Phase-1 `local_clusters_per_block`. All
     # later updates happen in place via the optimization loop's `replace_group!`.
-    (total_UMIs_per_baseline_metacell, UMIs_per_gene_per_baseline_metacell,
-     baseline_metacell_index_per_cell, _) =
+    (total_UMIs_per_baseline_metacell, UMIs_per_gene_per_baseline_metacell, baseline_metacell_index_per_cell, _) =
         compute_baseline_metacell_aggregates(
             local_clusters_per_block,
             UMIs_per_cell_per_gene,
@@ -1297,11 +1266,7 @@ function compute_local_clusters(;
         1:n_base_blocks;
         weights = n_points_per_base_block,
         name = "compute_local_clusters.build_grouped",
-        progress = DebugProgress(
-            sum(n_points_per_base_block);
-            group = :mcs_loops,
-            desc = "build_grouped",
-        ),
+        progress = DebugProgress(sum(n_points_per_base_block); group = :mcs_loops, desc = "build_grouped"),
     ) do base_block_index
         @views is_in_base_neighborhood_for_base_block =
             is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]
@@ -1317,7 +1282,7 @@ function compute_local_clusters(;
             UMIs_per_gene_per_baseline_metacell,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            strong_gene_indices = strong_gene_indices_per_base_block[base_block_index],
+            correlated_gene_indices = correlated_gene_indices_per_base_block[base_block_index],
             friend_gene_indices = friend_gene_indices_per_base_block[base_block_index],
             gene_fraction_regularization,
         )
@@ -1327,7 +1292,7 @@ function compute_local_clusters(;
         return nothing
     end
 
-    baseline_correlation = mean(baseline_mean_correlation_per_base_block)
+    baseline_correlation = mean(baseline_mean_correlation_per_base_block)  # NOLINT
     @debug "Baseline mean correlation: $(baseline_correlation)" _group = :mcs_results
 
     epsilon = 1e-6
@@ -1359,8 +1324,7 @@ function compute_local_clusters(;
                 delta_context.block_cell_indices = block_cell_indices_per_block[block_index]
                 delta_context.affected_base_block_indices =
                     affected_base_block_indices_per_walkable_block[walkable_position]
-                delta_context.gene_index_per_friend =
-                    gene_index_per_friend_per_walkable_block[walkable_position]
+                delta_context.gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
                 delta_context.friend_position_per_series_per_base_block =
                     friend_position_per_series_per_base_block_per_walkable_block[walkable_position]
                 delta_context.block_cell_position_per_point_per_base_block =
@@ -1405,7 +1369,6 @@ function compute_local_clusters(;
                 return nothing
             end
             chosen = candidates[best_candidate_index]
-            # @warn "TODOX - PHASE 2 PASS $pass_index CHOSEN K: $(chosen.k) (baseline K: $(candidates[previous_candidate_index].k); delta: $(round(best_delta; digits=4)); $(length(candidates)) candidates)"
             Threads.atomic_add!(n_changes, 1)
             chosen_candidate_index_per_walkable_block[walkable_position] = best_candidate_index
             local_clusters_per_block[block_index] = build_local_clusters_from_candidate(
@@ -1419,9 +1382,9 @@ function compute_local_clusters(;
             delta_context = delta_context_per_thread[threadid()]
             delta_context.walkable_block_index = block_index
             delta_context.block_cell_indices = block_cell_indices_per_block[block_index]
-            delta_context.affected_base_block_indices = affected_base_block_indices_per_walkable_block[walkable_position]
-            delta_context.gene_index_per_friend =
-                gene_index_per_friend_per_walkable_block[walkable_position]
+            delta_context.affected_base_block_indices =
+                affected_base_block_indices_per_walkable_block[walkable_position]
+            delta_context.gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
             delta_context.friend_position_per_series_per_base_block =
                 friend_position_per_series_per_base_block_per_walkable_block[walkable_position]
             delta_context.block_cell_position_per_point_per_base_block =
@@ -1461,7 +1424,7 @@ function compute_local_clusters(;
             return nothing
         end
 
-        pass_correlation = mean(baseline_mean_correlation_per_base_block)
+        pass_correlation = mean(baseline_mean_correlation_per_base_block)  # NOLINT
         delta_correlation = pass_correlation - baseline_correlation
         baseline_correlation = pass_correlation
 
@@ -1490,7 +1453,7 @@ function combine_local_clusters(;
         if local_clusters !== nothing
             n_total_new_metacells += local_clusters.n_clusters
             @foreach_true_index local_clusters.is_too_small_per_cluster cluster_index begin  # NOLINT
-                n_new_outlier_cells += sum(local_clusters.cluster_index_per_block_cell .== cluster_index)  # NOLINT
+                n_new_outlier_cells += count(==(cluster_index), local_clusters.cluster_index_per_block_cell)  # NOLINT
             end
         end
     end
@@ -1526,7 +1489,7 @@ end
 # Build one base block's baseline `GroupedSeriesCorrelations{Float32}`. Each group corresponds to one block whose
 # cells contribute to the base block's neighborhood; the points within a group are the contributing cells laid out
 # contiguously, preserving the per-block cell order. Per (point, base-block series) we store the cell's
-# `log2(strong_UMIs / total_UMIs + reg)` as the fixed side and the punctuated baseline-metacell
+# `log2(correlated_UMIs / total_UMIs + reg)` as the fixed side and the punctuated baseline-metacell
 # `log2((baseline_metacell_friend_UMIs - cell_friend_UMIs) / (baseline_metacell_total - cell_total) + reg)` as the
 # variable side - with the mask `is_active_per_point` set false (and the variable value zeroed) when the cell's
 # baseline metacell is missing or the punctuation denominator is non-positive. `baseline_metacell_index_per_cell` and
@@ -1546,11 +1509,11 @@ function build_grouped_for_base_block(;
     UMIs_per_gene_per_baseline_metacell::AbstractMatrix{<:Integer},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
-    strong_gene_indices::AbstractVector{<:Integer},
+    correlated_gene_indices::AbstractVector{<:Integer},
     friend_gene_indices::AbstractVector{<:Integer},
     gene_fraction_regularization::AbstractFloat,
 )::Tuple{GroupedSeriesCorrelations{Float32}, Vector{Int}}
-    n_series = length(strong_gene_indices)
+    n_series = length(correlated_gene_indices)
     @assert length(friend_gene_indices) == n_series
 
     # Count how many cells each block contributes to this base block's neighborhood.
@@ -1607,20 +1570,22 @@ function build_grouped_for_base_block(;
         cell_index = cell_indices_in_order[point_index]
         cell_total = Int(total_UMIs_per_cell[cell_index])
         baseline_metacell_index = Int(baseline_metacell_index_per_cell[cell_index])
-        baseline_metacell_total = baseline_metacell_index > 0 ? Int(total_UMIs_per_baseline_metacell[baseline_metacell_index]) : 0
+        baseline_metacell_total =
+            baseline_metacell_index > 0 ? Int(total_UMIs_per_baseline_metacell[baseline_metacell_index]) : 0
         is_active = baseline_metacell_index > 0 && baseline_metacell_total > cell_total
         is_active_per_point[point_index] = is_active
 
         for series_index in 1:n_series
-            strong_gene_index = strong_gene_indices[series_index]
+            correlated_gene_index = correlated_gene_indices[series_index]
             friend_gene_index = friend_gene_indices[series_index]
 
-            cell_strong_UMIs = Int(UMIs_per_cell_per_gene[cell_index, strong_gene_index])
+            cell_correlated_UMIs = Int(UMIs_per_cell_per_gene[cell_index, correlated_gene_index])
             fixed_per_point_per_series[point_index, series_index] =
-                log2(Float32(cell_strong_UMIs) / Float32(cell_total) + regularization)
+                log2(Float32(cell_correlated_UMIs) / Float32(cell_total) + regularization)
 
             if is_active
-                baseline_metacell_friend_UMIs = Int(UMIs_per_gene_per_baseline_metacell[baseline_metacell_index, friend_gene_index])
+                baseline_metacell_friend_UMIs =
+                    Int(UMIs_per_gene_per_baseline_metacell[baseline_metacell_index, friend_gene_index])
                 cell_friend_UMIs = Int(UMIs_per_cell_per_gene[cell_index, friend_gene_index])
                 punctuated_friend = baseline_metacell_friend_UMIs - cell_friend_UMIs
                 punctuated_total = baseline_metacell_total - cell_total
@@ -1717,7 +1682,12 @@ function compute_baseline_metacell_aggregates(
         return nothing
     end
 
-    return (total_UMIs_per_baseline_metacell, UMIs_per_gene_per_baseline_metacell, baseline_metacell_index_per_cell, first_baseline_metacell_per_block)
+    return (
+        total_UMIs_per_baseline_metacell,
+        UMIs_per_gene_per_baseline_metacell,
+        baseline_metacell_index_per_cell,
+        first_baseline_metacell_per_block,
+    )
 end
 
 # Per walkable block, precompute the indirection vectors the delta-correlation scoring will need: which base blocks'
@@ -1729,7 +1699,7 @@ end
 #   * `gene_index_per_friend_per_walkable_block[walkable_position]`: the block's friend-gene subspace (global gene index per
 #     column).
 #   * `friend_position_per_series_per_base_block_per_walkable_block[walkable_position][base_block_index]`: per (block, base block), the
-#     block's friend column for each of the base block's strong-friend series.
+#     block's friend column for each of the base block's correlated-friend series.
 #   * `block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position][base_block_index]`: per (block, base block), the block's
 #     `block_cell_position`s of the cells in the base block's neighborhood, in the block's canonical block-cell order.
 #     Row indirection for the indirect-gather query.
@@ -1741,12 +1711,7 @@ function precompute_walkable_indirection(
     friend_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
     n_base_blocks::Integer,
     n_genes::Integer,
-)::Tuple{
-    Vector{Vector{Int}},
-    Vector{Vector{Int}},
-    Vector{Dict{Int, Vector{Int}}},
-    Vector{Dict{Int, Vector{Int}}},
-}
+)::Tuple{Vector{Vector{Int}}, Vector{Vector{Int}}, Vector{Dict{Int, Vector{Int}}}, Vector{Dict{Int, Vector{Int}}}}
     n_walkable_blocks = length(walkable_block_indices)
 
     affected_base_block_indices_per_walkable_block = Vector{Vector{Int}}(undef, n_walkable_blocks)
@@ -1819,8 +1784,8 @@ function precompute_walkable_indirection(
         block_cell_position_per_point_per_base_block = Dict{Int, Vector{Int}}()
         for base_block_index in affected_base_block_indices
             friend_position_per_series_per_base_block[base_block_index] = [
-                friend_position_per_gene[friend_gene_index]
-                for friend_gene_index in friend_gene_indices_per_base_block[base_block_index]
+                friend_position_per_gene[friend_gene_index] for
+                friend_gene_index in friend_gene_indices_per_base_block[base_block_index]
             ]
             @views is_in_base_neighborhood_for_base_block =
                 is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]
@@ -1849,115 +1814,6 @@ function precompute_walkable_indirection(
     )
 end
 
-# TODOX: only used by the diagnostic NEXT / BETTER / PERFECT K logs in `kmeans_with_sizes`. Returns extrema for cells
-# per cluster, total UMIs per cluster, and dispersion per cluster, taken across the solution's active K range. The
-# dispersion extrema skip clusters whose cell count is below `min_cluster_size` (outliers) - those have undefined or
-# degenerate dispersion and would otherwise drive the min to 0.
-function todox_solution_extrema(
-    solution::KmeansSolution,
-    min_cluster_size::Real,
-)::Tuple{Tuple{Int, Int}, Tuple{Float64, Float64}, Tuple{Float32, Float32}}
-    cells_range = extrema(@view solution.counts[1:solution.k])
-    UMIs_range = extrema(@view solution.weight_per_cluster[1:solution.k])
-    dispersion_min = Float32(Inf)
-    dispersion_max = -Float32(Inf)
-    @inbounds for cluster_index in 1:solution.k
-        if solution.counts[cluster_index] >= min_cluster_size
-            dispersion = solution.cells_dispersion_per_cluster[cluster_index]
-            dispersion_min = min(dispersion_min, dispersion)
-            dispersion_max = max(dispersion_max, dispersion)
-        end
-    end
-    return (cells_range, UMIs_range, (dispersion_min, dispersion_max))
-end
-
-# TODOX: dumps every non-outlier cluster's (count, weight, dispersion) so the offending cluster with dispersion = 0 is
-# identifiable when the corresponding assertion in `kmeans_with_sizes` fires. For each cluster with `dispersion == 0`
-# AND `count >= min_cluster_size`, also dumps per-found-module mean normalized UMIs (= what
-# `maximal_cells_dispersion_of_modules!` computes and compares against `min_module_UMIs` to decide whether to skip the
-# module). That distinguishes the three known causes of a zero non-outlier dispersion: (a) count < 2 (impossible if
-# `min_cluster_size >= 2`); (b) `is_found_per_module` is all false (n_found = 0 in the dump); (c) every found module's
-# mean is below `min_module_UMIs` (n_found > 0 and n_passing = 0 in the dump).
-function todox_describe_solution_clusters(
-    solution::KmeansSolution,
-    min_cluster_size::Real,
-    dispersion_context::DispersionContext,
-    context::AbstractString,
-)::Nothing
-    @warn "$(context) non-outlier clusters dump (min_cluster_size=$(min_cluster_size)):"
-    for cluster_index in 1:solution.k
-        count = solution.counts[cluster_index]
-        if count < min_cluster_size
-            continue
-        end
-        weight = solution.weight_per_cluster[cluster_index]
-        dispersion = solution.cells_dispersion_per_cluster[cluster_index]
-        @warn "  cluster $(cluster_index): count=$(count) weight=$(round(weight / 1000; digits=1))K dispersion=$(dispersion)"
-        if dispersion == 0
-            todox_describe_cluster_modules(solution, cluster_index, dispersion_context)
-            @assert false  # TODOX
-        end
-    end
-    return nothing
-end
-
-# TODOX: mirrors the per-found-module setup of `maximal_cells_dispersion_of_modules!` for a single cluster but logs the
-# `mean_normalized_module_UMIs` it computes per found module (the value compared against `min_module_UMIs` to decide
-# whether the module is `continue`d). Allocates its own scratch (only called immediately before an `@assert false` so
-# perf and the alloc are irrelevant).
-function todox_describe_cluster_modules(
-    solution::KmeansSolution,
-    cluster_index::Integer,
-    dispersion_context::DispersionContext,
-)::Nothing
-    n_block_cells = length(dispersion_context.block_cell_indices)
-    indices_of_cluster_cells_scratch = Vector{Int}(undef, n_block_cells)
-    n_cluster_cells = 0
-    @inbounds for point_index in 1:n_block_cells
-        if solution.assignments[point_index] == cluster_index
-            n_cluster_cells += 1
-            indices_of_cluster_cells_scratch[n_cluster_cells] = dispersion_context.block_cell_indices[point_index]
-        end
-    end
-    @views indices_of_cluster_cells = indices_of_cluster_cells_scratch[1:n_cluster_cells]
-    total_UMIs_per_cells = Vector{Float32}(undef, n_cluster_cells)
-    normalized_factor_per_cells = Vector{Float32}(undef, n_cluster_cells)
-    normalized_factor_per_cells .= getindex.(Ref(dispersion_context.total_UMIs_per_cell), indices_of_cluster_cells)
-    total_UMIs_per_cells .= normalized_factor_per_cells
-    normalized_total_UMIs = quantile!(total_UMIs_per_cells, dispersion_context.normalized_UMIs_quantile)
-    @. normalized_factor_per_cells = normalized_total_UMIs / normalized_factor_per_cells
-
-    n_modules = length(dispersion_context.is_found_per_module)
-    n_found = 0
-    n_passing = 0
-    max_mean_for_found = 0.0
-    for module_index in 1:n_modules
-        if !dispersion_context.is_found_per_module[module_index]
-            continue
-        end
-        n_found += 1
-        gene_indices_in_module = dispersion_context.gene_indices_per_module[module_index]
-        sum_normalized = 0.0
-        @inbounds for cell_position in 1:n_cluster_cells
-            cell_index = indices_of_cluster_cells[cell_position]
-            module_UMIs = 0
-            for gene_index in gene_indices_in_module
-                module_UMIs += Int(dispersion_context.UMIs_per_cell_per_gene[cell_index, gene_index])
-            end
-            sum_normalized += module_UMIs * normalized_factor_per_cells[cell_position]
-        end
-        mean_normalized = sum_normalized / n_cluster_cells
-        passing = mean_normalized >= dispersion_context.min_module_UMIs
-        if passing
-            n_passing += 1
-        end
-        max_mean_for_found = max(max_mean_for_found, mean_normalized)
-        @warn "    module $(module_index): mean_normalized=$(round(mean_normalized; digits=3)) passing=$(passing)"
-    end
-    @warn "    summary: n_found=$(n_found) n_passing=$(n_passing) max_mean=$(round(max_mean_for_found; digits=3)) min_module_UMIs=$(dispersion_context.min_module_UMIs)"
-    return nothing
-end
-
 function compute_z_score_per_found_module_per_region_cell!(;
     z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
@@ -1978,8 +1834,7 @@ function compute_z_score_per_found_module_per_region_cell!(;
     # `@turbo` accumulation into it (each UMI column visited once and amortized across all region cells), then
     # normalize + write the strided row into the z-score matrix and return the accumulator to the pool. Weight
     # dispatch by each found module's gene count so the biggest modules go first.
-    n_genes_per_found_module =
-        [length(gene_indices_per_module[found_module_indices[k]]) for k in 1:n_found_modules]
+    n_genes_per_found_module = [length(gene_indices_per_module[found_module_indices[k]]) for k in 1:n_found_modules]
     parallel_loop_wo_rng(
         1:n_found_modules;
         nested = true,
@@ -2070,7 +1925,7 @@ function compute_cluster_dispersion!(
     end
 
     @views indices_of_cluster_cells = dispersion_scratches.cluster_cell_indices[1:n_cluster_cells]
-    solution.cells_dispersion_per_cluster[cluster_index] = maximal_cells_dispersion_of_modules!(;
+    dispersion = maximal_cells_dispersion_of_modules!(;
         cells_dispersion_per_module = dispersion_scratches.cells_dispersion_per_module,
         mean_normalized_per_module = dispersion_scratches.mean_normalized_per_module,
         indices_of_cells = indices_of_cluster_cells,
@@ -2083,6 +1938,10 @@ function compute_cluster_dispersion!(
         normalized_UMIs_quantile = dispersion_context.normalized_UMIs_quantile,
         min_module_UMIs = dispersion_context.min_module_UMIs,
     )
+    # A cluster smaller than `min_cluster_size` can legitimately disperse to zero (too few cells to estimate spread,
+    # or no module expression), so only enforce positivity once it is large enough to be a real candidate.
+    @assert dispersion > 0 || n_cluster_cells < dispersion_context.min_cluster_size
+    solution.cells_dispersion_per_cluster[cluster_index] = dispersion
     return nothing
 end
 
@@ -2149,14 +2008,12 @@ function compute_changed_dispersions!(
                 put!(dispersion_scratches_pool, dispersion_scratches)
             end
         else
-            solution.cells_dispersion_per_cluster[cluster_index] =
-                reference_cells_dispersion_per_cluster[cluster_index]
+            solution.cells_dispersion_per_cluster[cluster_index] = reference_cells_dispersion_per_cluster[cluster_index]
         end
         return nothing
     end
     return nothing
 end
-
 
 # Fill `variable_per_block_cell_per_friend` and `is_active_per_block_cell` with `candidate`'s punctuated
 # cluster-mean log-fractions over the walkable block's cells × friend genes; cells in too-small or zero-punctuated-
@@ -2181,6 +2038,10 @@ function populate_candidate_scratches!(
     punctuated_total_per_block_cell = delta_context.punctuated_total_per_block_cell
     @views fill!(total_UMIs_per_max_cluster[1:k], 0.0)
     @views fill!(UMIs_per_friend_per_max_cluster[1:n_friends, 1:k], 0.0)
+
+    @check_turbo_matrix(UMI_per_friend_per_block_cell)
+    @check_turbo_matrix(UMIs_per_friend_per_max_cluster)
+    @check_turbo_matrix(variable_per_block_cell_per_friend)
 
     # Per K-candidate cluster: total UMIs of the block's cells in the cluster + per-friend-gene UMI sums (only over
     # the walkable block's friend-gene subspace, not the full relevant gene set). Inner `friend` loop is contiguous on
@@ -2222,8 +2083,7 @@ function populate_candidate_scratches!(
             cluster_friend_UMIs = UMIs_per_friend_per_max_cluster[friend_position, cluster_index]
             punctuated_friend = cluster_friend_UMIs - cell_friend_UMIs
             result = log2(Float32(punctuated_friend / punctuated_total) + regularization)
-            variable_per_block_cell_per_friend[block_cell_position, friend_position] =
-                ifelse(is_active, result, 0.0f0)
+            variable_per_block_cell_per_friend[block_cell_position, friend_position] = ifelse(is_active, result, 0.0f0)
         end
     end
     return nothing
@@ -2389,12 +2249,8 @@ function split_one_cluster!(
     # Take a `DispersionScratches` from the pool for both per-cluster dispersion calls (serial, no yield in between).
     dispersion_scratches = take!(dispersion_scratches_pool)
     try
-        compute_cluster_dispersion!(
-            candidate_solution, old_cluster_index, dispersion_scratches, dispersion_context,
-        )
-        compute_cluster_dispersion!(
-            candidate_solution, new_cluster_index, dispersion_scratches, dispersion_context,
-        )
+        compute_cluster_dispersion!(candidate_solution, old_cluster_index, dispersion_scratches, dispersion_context)
+        compute_cluster_dispersion!(candidate_solution, new_cluster_index, dispersion_scratches, dispersion_context)
     finally
         put!(dispersion_scratches_pool, dispersion_scratches)
     end
@@ -2504,7 +2360,6 @@ function rerun_kmeans!(
     max_cluster_size::Real,
     min_cluster_weight::Real,
     kmeans_rounds::Integer,
-    sizes_buffers::KmeansSizesBuffers{T},
     kmeans_buffer_pool::Channel{KMeansBuffers{T}},
     dispersion_scratches_pool::Channel{DispersionScratches},
     dispersion_context::DispersionContext,
@@ -2577,7 +2432,6 @@ function walk_directions!(
     max_cluster_size::Real,
     min_cluster_weight::Real,
     kmeans_rounds::Integer,
-    sizes_buffers::KmeansSizesBuffers{T},
     kmeans_buffer_pool::Channel{KMeansBuffers{T}},
     dispersion_scratches_pool::Channel{DispersionScratches},
     dispersion_context::DispersionContext,
@@ -2603,36 +2457,11 @@ function walk_directions!(
                 max_cluster_size,
                 min_cluster_weight,
                 kmeans_rounds,
-                sizes_buffers,
                 kmeans_buffer_pool,
                 dispersion_scratches_pool,
                 dispersion_context,
                 rng,
             )
-
-            (cells_range, UMIs_range, dispersion_range) = todox_solution_extrema(current_solution, min_cluster_size)
-            todox_ranges_suffix =
-                "C: $(cells_range[1])..$(cells_range[2]) " *
-                "U: $(round(UMIs_range[1] / 1000; digits=1))K..$(round(UMIs_range[2] / 1000; digits=1))K " *
-                "D: $(round(dispersion_range[1]; digits=3))..$(round(dispersion_range[2]; digits=3))"
-            if penalty(current_solution) >= penalty(best_solution)
-                # @warn "TODOX - NEXT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " * todox_ranges_suffix
-            else
-                copy_solution!(best_solution, current_solution)
-                if is_perfect(best_solution)
-                    # @warn "TODOX - PERFECT K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " * todox_ranges_suffix
-                else
-                    # @warn "TODOX - BETTER K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large) " * todox_ranges_suffix
-                end
-            end
-            if !(dispersion_range[1] > 0)
-                todox_describe_solution_clusters(
-                    current_solution,
-                    min_cluster_size,
-                    dispersion_context,
-                    "K $(current_solution.k)",
-                )
-            end
 
             # Continue walking the same direction only while the latest result is "pure" - it carries no
             # opposite-direction size issue. The opposite-direction issue means walking further only worsens things.
@@ -2709,10 +2538,8 @@ function walk_split!(
         if split_cluster_index == 0
             break  # No more candidate clusters to split.
         end
-        # @warn "TODOX - SPLIT K: $(candidate_solution.k) T: $(candidate_solution.n_too_tight) S: $(candidate_solution.n_too_small) W: $(candidate_solution.n_too_wide) L: $(candidate_solution.n_too_large)"
 
         if penalty(candidate_solution) < penalty(best_solution)
-            # @warn "TODOX   SPLIT IS BETTER"
             copy_solution!(best_solution, candidate_solution)
             if is_perfect(best_solution)
                 push!(perfect_candidates, build_candidate_from_solution(best_solution))
@@ -2734,19 +2561,17 @@ function walk_split!(
                 max_cluster_size,
                 min_cluster_weight,
                 kmeans_rounds,
-                sizes_buffers,
                 kmeans_buffer_pool,
                 dispersion_scratches_pool,
                 dispersion_context,
                 rng;
                 reference_assignments = @view(candidate_solution.assignments[1:candidate_solution.n_points]),
-                reference_cells_dispersion_per_cluster =
-                    @view(candidate_solution.cells_dispersion_per_cluster[1:candidate_solution.k]),
+                reference_cells_dispersion_per_cluster = @view(
+                    candidate_solution.cells_dispersion_per_cluster[1:candidate_solution.k]
+                ),
             )
-            # @warn "TODOX - INCR K: $(current_solution.k) T: $(current_solution.n_too_tight) S: $(current_solution.n_too_small) W: $(current_solution.n_too_wide) L: $(current_solution.n_too_large)"
 
             if penalty(current_solution) < penalty(best_solution)
-                # @warn "TODOX   INCR IS BETTER"
                 copy_solution!(best_solution, current_solution)
                 # Cluster indices were reshuffled by K-means; rejected mask no longer corresponds.
                 @views fill!(is_rejected_for_split_per_max_cluster[1:best_solution.k], false)
@@ -2840,26 +2665,11 @@ function kmeans_with_sizes_candidates(
         max_cluster_size,
         min_cluster_weight,
         kmeans_rounds,
-        sizes_buffers,
         kmeans_buffer_pool,
         dispersion_scratches_pool,
         dispersion_context,
         rng,
     )
-
-    # @warn "TODOX ### KMEANS K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large)"
-    let (cells_range, UMIs_range, dispersion_range) = todox_solution_extrema(best_solution, min_cluster_size)
-        initial_label = is_perfect(best_solution) ? "PERFECT" : "INITIAL"
-        # @warn "TODOX - $initial_label K: $(best_solution.k) " * "C: $(cells_range[1])..$(cells_range[2]) " * "U: $(round(UMIs_range[1] / 1000; digits=1))K..$(round(UMIs_range[2] / 1000; digits=1))K " * "D: $(round(dispersion_range[1]; digits=3))..$(round(dispersion_range[2]; digits=3))"
-        if !(dispersion_range[1] > 0)
-            todox_describe_solution_clusters(
-                best_solution,
-                min_cluster_size,
-                dispersion_context,
-                "$initial_label K $(best_solution.k)",
-            )
-        end
-    end
 
     has_too_big = best_solution.n_too_wide + best_solution.n_too_large > 0
     has_too_tiny = best_solution.n_too_tight + best_solution.n_too_small > 0
@@ -2888,15 +2698,12 @@ function kmeans_with_sizes_candidates(
             max_cluster_size,
             min_cluster_weight,
             kmeans_rounds,
-            sizes_buffers,
             kmeans_buffer_pool,
             dispersion_scratches_pool,
             dispersion_context,
             rng,
         )
     end
-
-    # @warn "TODOX = INTER K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large)"
 
     walk_split!(
         best_solution,
@@ -2918,17 +2725,16 @@ function kmeans_with_sizes_candidates(
     )
 
     @assert best_solution.is_filled
-    # @warn "TODOX - PHASE 1 BEST K: $(best_solution.k) T: $(best_solution.n_too_tight) S: $(best_solution.n_too_small) W: $(best_solution.n_too_wide) L: $(best_solution.n_too_large) PERFECT CANDIDATES: $(length(perfect_candidates))"
 
     if isempty(perfect_candidates)
         # No perfect found - take the best-by-penalty imperfect compromise as the lone candidate.
         return SolutionCandidates(n_points, [build_candidate_from_solution(best_solution)])
     end
+
     # Sort ascending by K so `candidates[1]` is the minimal-K baseline.
     sort!(perfect_candidates; by = candidate -> candidate.k)
     return SolutionCandidates(n_points, perfect_candidates)
 end
-
 
 # Build a `LocalClusters` from a `SolutionCandidate`. `block_cell_indices` is shared (not copied); the assignment
 # vector and `is_too_small_per_cluster` are owned by the returned `LocalClusters`.
@@ -2947,6 +2753,5 @@ function build_local_clusters_from_candidate(
         is_too_small_per_cluster,
     )
 end
-
 
 end  # module

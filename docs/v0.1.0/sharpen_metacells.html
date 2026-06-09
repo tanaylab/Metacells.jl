@@ -218,18 +218,6 @@
 )::Nothing
 </code>
 </pre>
-<p>TODOX: description below needs manual rework - it predates parameters like 
-<code>base_blocks_daf
-</code>, 
-<code>gene_fraction_regularization
-</code>, and the new 
-<code>target_cell_total_UMIs_quantile
-</code> semantics, and the high-level steps it describes are now distributed across 
-<code>compute_preferred_block_index_per_cell_per_block
-</code> and 
-<code>compute_local_clusters
-</code>.
-</p>
 <p>Given an 
 <code>base_daf
 </code> metacells repository with a blocks structure and local gene modules that describe the cell state manifold, compute a 
@@ -247,7 +235,9 @@
 <code>max_cells_in_metacell
 </code>, and no less than 
 <code>min_cells_in_metacell
-</code>. A cluster is also considered too-large if its maximal 
+</code>. A cluster is also considered too-large if it is larger than 
+<code>max_cells_in_metacell
+</code>, if its maximal 
 <code>cells_dispersion
 </code> (across the block&#39;s modules) is above 
 <code>max_cells_dispersion_in_metacell
@@ -259,7 +249,7 @@
 <code>cells_dispersion
 </code> is above 
 <code>max_cells_dispersion_in_metacell
-</code>.
+</code>. This still leaves us with multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation with most-correlated marker genes in the base repository neighborhoods.
 </li>
 <li>The final clusters are the sharp metacells. We name them using the 
 <code>prefix

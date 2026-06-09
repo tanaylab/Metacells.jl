@@ -478,7 +478,7 @@ function compute_block_modules!(
             n_correlated_pertinent_local_genes = sum(is_correlated_pertinent_in_cluster_per_local_gene)
             n_uncorrelated_pertinent_cluster_genes = sum(is_uncorrelated_pertinent_in_cluster_per_local_gene)
 
-            @assert n_correlated_pertinent_local_genes == sum(cluster_index_per_local_gene .== cluster_index)
+            @assert n_correlated_pertinent_local_genes == count(==(cluster_index), cluster_index_per_local_gene)
             if n_correlated_pertinent_local_genes == 0
                 if module_status_per_gene !== nothing
                     module_status_per_gene[indices_of_local_genes[is_uncorrelated_pertinent_in_cluster_per_local_gene]] .*= ",uncorrelated_gene,uncorrelated_cluster"

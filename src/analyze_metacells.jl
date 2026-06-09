@@ -316,7 +316,7 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     min_significant_gene_UMIs::Integer = 40,
     fold_confidence::AbstractFloat = 0.9,
-    min_confidence_UMIs::Real = 3,  # TODOX
+    min_confidence_UMIs::Real = 3,
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization >= 0
