@@ -209,6 +209,7 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
                     :mcs_details
             end
         end
+        @assert any(@view is_found_per_module_per_block[:, block_index])
     end
 
     set_matrix!(daf, "module", "block", "is_found", bestify(is_found_per_module_per_block); overwrite)

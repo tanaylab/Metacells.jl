@@ -935,11 +935,23 @@ function compute_local_clusters(;
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_block_cells))
     end
 
-    # Per-block setup: build the z-score matrix, dispersion context, and a few derived per-block values shared by
-    # Phase 1 and Phase 2 worker bodies. Captures per-thread scratch from the enclosing scope. Returns
-    # `(z_score_per_found_module_per_block_cell, dispersion_context, sizes_buffers, n_block_clusters,
-    # weight_per_block_cell, block_cell_indices)` or `nothing` if the block has no cells.
-    function setup_block_context(block_index::Integer)
+    # `DispersionScratches` channel pool for the nested parallel dispersion loops (compute_all_dispersions! /
+    # compute_changed_dispersions!) and the serial split-then-disperse path in `split_one_cluster!`. Sized to
+    # `nthreads()` because every take/put is a single non-yielding scope, so each running task holds at most one
+    # scratch.
+    dispersion_scratches_pool = Channel{DispersionScratches}(nthreads())
+    for _ in 1:nthreads()
+        put!(dispersion_scratches_pool, DispersionScratches(; n_points = max_n_block_cells, n_modules))
+    end
+
+    # ===== Phase 1: per-block walk to a perfect K (or exhaustion) =====
+    parallel_loop_with_rng(
+        1:n_blocks;
+        rng,
+        weights = n_cells_per_block,
+        name = "compute_local_clusters.clustering_options",
+        progress = DebugProgress(sum(n_cells_per_block); group = :mcs_loops, desc = "clustering_options"),
+    ) do block_index, rng
         is_in_block_per_cell = is_in_block_per_cell_per_thread[threadid()]
         is_in_block_per_cell .= block_index_per_cell .== block_index
         block_cell_indices = findall(is_in_block_per_cell)
@@ -1001,47 +1013,6 @@ function compute_local_clusters(;
             max_cells_dispersion = max_cells_dispersion_in_metacell,
             min_cluster_size = min_cells_in_metacell,
         )
-
-        return (
-            z_score_per_found_module_per_block_cell,
-            dispersion_context,
-            sizes_buffers,
-            n_block_clusters,
-            weight_per_block_cell,
-            block_cell_indices,
-        )
-    end
-
-    # `DispersionScratches` channel pool for the nested parallel dispersion loops (compute_all_dispersions! /
-    # compute_changed_dispersions!) and the serial split-then-disperse path in `split_one_cluster!`. Sized to
-    # `nthreads()` because every take/put is a single non-yielding scope, so each running task holds at most one
-    # scratch.
-    dispersion_scratches_pool = Channel{DispersionScratches}(nthreads())
-    for _ in 1:nthreads()
-        put!(dispersion_scratches_pool, DispersionScratches(; n_points = max_n_block_cells, n_modules))
-    end
-
-    # ===== Phase 1: per-block walk to a perfect K (or exhaustion) =====
-    parallel_loop_with_rng(
-        1:n_blocks;
-        rng,
-        weights = n_cells_per_block,
-        name = "compute_local_clusters.clustering_options",
-        progress = DebugProgress(sum(n_cells_per_block); group = :mcs_loops, desc = "clustering_options"),
-    ) do block_index, rng
-        setup = setup_block_context(block_index)
-        if setup === nothing
-            return nothing
-        end
-        (
-            z_score_per_found_module_per_block_cell,
-            dispersion_context,
-            sizes_buffers,
-            n_block_clusters,
-            weight_per_block_cell,
-            block_cell_indices,
-        ) = setup
-        n_block_cells = length(block_cell_indices)
 
         if n_block_clusters == 1
             weight_total = sum(weight_per_block_cell)
@@ -1938,9 +1909,11 @@ function compute_cluster_dispersion!(
         normalized_UMIs_quantile = dispersion_context.normalized_UMIs_quantile,
         min_module_UMIs = dispersion_context.min_module_UMIs,
     )
-    # A cluster smaller than `min_cluster_size` can legitimately disperse to zero (too few cells to estimate spread,
-    # or no module expression), so only enforce positivity once it is large enough to be a real candidate.
-    @assert dispersion > 0 || n_cluster_cells < dispersion_context.min_cluster_size
+    # `dispersion` is the maximal spread across the block's found modules, and can legitimately be zero: for a cluster
+    # too small to estimate spread, or for a block with a single found module where a large cluster of cells that do
+    # not express it has no other module to carry a positive value. Enforce positivity only outside these cases.
+    n_found_modules = count(dispersion_context.is_found_per_module)
+    @assert dispersion > 0 || n_cluster_cells < dispersion_context.min_cluster_size || n_found_modules <= 1
     solution.cells_dispersion_per_cluster[cluster_index] = dispersion
     return nothing
 end

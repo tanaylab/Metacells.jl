@@ -548,6 +548,7 @@ function maximal_cells_dispersion_of_modules!(;
     normalized_UMIs_quantile::AbstractFloat,
     min_module_UMIs::Integer,
 )::AbstractFloat
+    @assert any(is_found_per_module)
     cells_dispersion_per_module .= 0
     mean_normalized_per_module .= 0
     n_cells = length(indices_of_cells)
@@ -605,11 +606,23 @@ function maximal_cells_dispersion_of_modules!(;
     end
 
     if max_mean_normalized_module_UMIs <= 0
+        n_found = count(is_found_per_module)
+        for module_index in 1:n_modules
+            if !is_found_per_module[module_index]
+                continue
+            end
+            gene_indices_in_module = gene_indices_per_module[module_index]
+            raw_module_UMIs = 0
+            for cell_position in 1:n_cells
+                cell_index = indices_of_cells[cell_position]
+                for gene_index in gene_indices_in_module
+                    raw_module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]
+                end
+            end
+        end
         return 0.0f0
     end
 
-    # Auto-reduce `min_module_UMIs` to the largest integer that still admits at least one module - which is
-    # `floor(max_mean)` when no module reached the original threshold, and stays at `min_module_UMIs` otherwise.
     effective_threshold = min(Float64(min_module_UMIs), floor(max_mean_normalized_module_UMIs))
 
     max_cells_dispersion = 0.0f0
@@ -623,6 +636,7 @@ function maximal_cells_dispersion_of_modules!(;
             max_cells_dispersion = max(max_cells_dispersion, cells_dispersion_per_module[module_index])
         end
     end
+
     return max_cells_dispersion
 end
 
