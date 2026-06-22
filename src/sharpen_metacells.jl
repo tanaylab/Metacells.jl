@@ -19,7 +19,6 @@ using ..AnalyzeModules
 using ..Contracts
 using ..Defaults
 
-import ..AnalyzeBlocks.compute_correlation_with_most_for_base_block!
 import ..AnalyzeModules.maximal_cells_dispersion_of_modules!
 
 import Base.Threads.maxthreadid
@@ -189,7 +188,6 @@ end
     function sharpen_metacells!(;
         sharp_daf::DafWriter,
         base_daf::DafReader,
-        base_blocks_daf::DafReader,
         prefix::AbstractString = $(DEFAULT.prefix),
         min_cells_in_metacell::Integer = $(DEFAULT.min_cells_in_metacell),
         max_cells_in_metacell::Integer = $(DEFAULT.max_cells_in_metacell),
@@ -201,6 +199,8 @@ end
         normalized_UMIs_quantile::AbstractFloat = $(DEFAULT.normalized_UMIs_quantile),
         min_module_UMIs::Integer = $(DEFAULT.min_module_UMIs),
         kmeans_rounds::Integer = $(DEFAULT.kmeans_rounds),
+        sharpening_round::Integer,
+        improvement_half_life::Maybe{Integer} = $(DEFAULT.improvement_half_life),
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -226,7 +226,12 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     too-small clusters, so this can create new outlier cells. We increase the number of target metacells for every input
     metacell whose maximal `cells_dispersion` is above `max_cells_dispersion_in_metacell`. This still leaves us with
     multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation
-    with most-correlated marker genes in the base repository neighborhoods.
+    with most-correlated marker genes in the (previous round's) neighborhoods. To stabilize the choice as sharpening
+    proceeds, a candidate whose number of clusters differs from the expected number must improve this prediction by an
+    extra `cooldown_margin` for each cluster of difference. The `sharpening_round` is 1-based: the first sharpening
+    round (`sharpening_round == 1`) applies no cooldown (the plain correlation tie-break), and for each later round the
+    margin's distance from its maximum halves every `improvement_half_life` rounds. Passing
+    `improvement_half_life == nothing` disables the cooldown entirely.
  4. The final clusters are the sharp metacells. We name them using the `prefix`, the convention is to advance the letter
     for each sharpening round (`M` to `N` to `O` to ...).
 
@@ -268,27 +273,13 @@ $(CONTRACT2)
         matrix_of_is_found_per_module_per_block(RequiredInput),
         vector_of_n_neighborhood_cells_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
+        matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(RequiredInput),
         matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
         matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
-    ],
-) Contract(;
-    name = "base_blocks_daf",
-    axes = [
-        cell_axis(RequiredInput),
-        metacell_axis(RequiredInput),
-        block_axis(RequiredInput),
-        gene_axis(RequiredInput),
-    ],
-    data = [
-        vector_of_metacell_per_cell(RequiredInput),
-        vector_of_block_per_metacell(RequiredInput),
-        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
-        matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(RequiredInput),
     ],
 ) function sharpen_metacells!(;
     sharp_daf::DafWriter,
     base_daf::DafReader,
-    base_blocks_daf::DafReader,
     prefix::AbstractString = "M",
     min_cells_in_metacell::Integer = 12,
     max_cells_in_metacell::Integer = 800,
@@ -306,6 +297,8 @@ $(CONTRACT2)
         :min_module_UMIs,
     ),
     kmeans_rounds::Integer = function_default(kmeans_in_rounds, :rounds),
+    sharpening_round::Integer,
+    improvement_half_life::Maybe{Integer} = 2,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
@@ -319,6 +312,8 @@ $(CONTRACT2)
     @assert 0 <= normalized_UMIs_quantile <= 1
     @assert min_module_UMIs >= 0
     @assert kmeans_rounds > 0
+    @assert sharpening_round >= 1
+    @assert improvement_half_life === nothing || improvement_half_life > 0
 
     n_cells = axis_length(base_daf, "cell")
     n_blocks = axis_length(base_daf, "block")
@@ -496,16 +491,13 @@ $(CONTRACT2)
         ) for _ in 1:maxthreadid()
     ]
 
-    @assert axis_vector(base_blocks_daf, "cell") == axis_vector(base_daf, "cell")
-    @assert axis_vector(base_blocks_daf, "gene") == axis_vector(base_daf, "gene")
-
-    base_block_index_per_cell = base_blocks_daf["@ cell : metacell ?? 0 : block : index"].array
-    is_in_base_neighborhood_per_other_base_block_per_base_block =
-        get_matrix(base_blocks_daf, "block", "block", "is_in_neighborhood").array
+    # The tie-break evaluates against the previous round (base_daf), so its blocks are the base blocks.
+    base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
+    is_in_base_neighborhood_per_other_base_block_per_base_block = is_in_neighborhood_per_other_block_per_base_block
     most_correlated_gene_in_base_neighborhood_per_gene_per_base_block =
-        get_matrix(base_blocks_daf, "gene", "block", "most_correlated_gene_in_neighborhood").array
-    gene_name_to_index = axis_dict(base_blocks_daf, "gene")
-    n_base_blocks = axis_length(base_blocks_daf, "block")
+        get_matrix(base_daf, "gene", "block", "most_correlated_gene_in_neighborhood").array
+    gene_name_to_index = axis_dict(base_daf, "gene")
+    n_base_blocks = n_blocks
 
     # Per base block, the (gene, friend) correlation series as raw (global) gene indices - parallel vectors. The friend
     # is the gene's most-correlated-in-base-neighborhood partner; every gene with such a partner contributes a series.
@@ -542,6 +534,8 @@ $(CONTRACT2)
         normalized_UMIs_quantile,
         min_module_UMIs,
         kmeans_rounds,
+        sharpening_round,
+        improvement_half_life,
         is_found_per_module_per_block,
         module_index_per_gene_per_block,
         block_index_per_cell,
@@ -889,6 +883,8 @@ function compute_local_clusters(;
     normalized_UMIs_quantile::AbstractFloat,
     min_module_UMIs::Integer,
     kmeans_rounds::Integer,
+    sharpening_round::Integer,
+    improvement_half_life::Maybe{Integer},
     is_found_per_module_per_block::AbstractMatrix{Bool},
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     block_index_per_cell::AbstractVector{<:Integer},
@@ -915,6 +911,7 @@ function compute_local_clusters(;
     local_clusters_per_block .= nothing
     solution_candidates_per_block = Vector{Maybe{SolutionCandidates}}(undef, n_blocks)
     solution_candidates_per_block .= nothing
+    expected_n_clusters_per_block = zeros(Int, n_blocks)
 
     n_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
     max_n_block_cells = maximum(n_cells_per_block)
@@ -998,6 +995,7 @@ function compute_local_clusters(;
         )
 
         n_block_clusters = max(Int(round(n_block_cells / mean_metacell_cells_per_block[block_index])), 1)
+        expected_n_clusters_per_block[block_index] = n_block_clusters
         sizes_buffers = kmeans_sizes_max_buffers_per_thread[threadid()]
         @views weight_per_block_cell = total_UMIs_per_cell[block_cell_indices]
 
@@ -1267,6 +1265,13 @@ function compute_local_clusters(;
     @debug "Baseline mean correlation: $(baseline_correlation)" _group = :mcs_results
 
     epsilon = 1e-6
+    if improvement_half_life === nothing
+        cooldown_margin_per_k_distance = 0.0
+    else
+        max_cooldown_margin_per_k_distance = 100 * epsilon
+        cooldown_margin_per_k_distance = max_cooldown_margin_per_k_distance * (1 - 2.0^(-(sharpening_round - 1) / improvement_half_life))
+    end
+    @debug "Cooldown margin per K distance: $(cooldown_margin_per_k_distance)" _group = :mcs_results
     pass_index = 0
     delta_correlation = 1
     while (delta_correlation < -epsilon || epsilon < delta_correlation) && pass_index < 50
@@ -1325,15 +1330,24 @@ function compute_local_clusters(;
             solution_candidates = solution_candidates_per_block[block_index]
             candidates = solution_candidates.candidates
             previous_candidate_index = chosen_candidate_index_per_walkable_block[walkable_position]
+            expected_n_clusters = expected_n_clusters_per_block[block_index]
+            current_distance_from_expected = abs(candidates[previous_candidate_index].k - expected_n_clusters)
             best_candidate_index = previous_candidate_index
-            best_delta = 0.0
+            # Seed with the current candidate's penalized score: its delta is 0, but it still owes its K-distance penalty.
+            best_score = -cooldown_margin_per_k_distance * current_distance_from_expected
+            todox_best_delta = 0.0
             slice_start = work_item_start_per_walkable_block[walkable_position]
             slice_end = work_item_start_per_walkable_block[walkable_position + 1] - 1
             for work_index in slice_start:slice_end
-                delta = delta_per_work_item[work_index]
-                if delta > best_delta + epsilon
-                    best_delta = delta
-                    best_candidate_index = candidate_index_per_work_item[work_index]
+                candidate_index = candidate_index_per_work_item[work_index]
+                candidate_distance_from_expected = abs(candidates[candidate_index].k - expected_n_clusters)
+                score = delta_per_work_item[work_index] - cooldown_margin_per_k_distance * candidate_distance_from_expected
+                if score > best_score + epsilon
+                    best_score = score
+                    todox_best_delta = delta_per_work_item[work_index]
+                    best_candidate_index = candidate_index
+                elseif delta_per_work_item[work_index] > todox_best_delta
+                    @warn "TODOX SKIP OPTION FOR $(delta_per_work_item[work_index]) DELTA $(delta_per_work_item[work_index] - todox_best_delta)"
                 end
             end
             if best_candidate_index == previous_candidate_index

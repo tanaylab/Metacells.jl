@@ -1657,8 +1657,7 @@ end
         expectation::ContractExpectation
     )::Pair{MatrixKey, DataSpecification}
 
-The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block. This is
-intended for use for computing [`matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref).
+The most correlated neighborhood marker gene of each neighborhood marker gene per block.
 
 This is sparse, we actually only compute it for the non-lateral neighborhood markers.
 
@@ -1671,7 +1670,7 @@ function matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(
     return ("gene", "block", "most_correlated_gene_in_neighborhood") => (
         expectation,
         AbstractString,
-        "The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block.",
+        "The most correlated neighborhood marker gene of each neighborhood marker gene per block.",
     )
 end
 
