@@ -32,9 +32,9 @@ import Metacells.Contracts.matrix_of_is_found_per_module_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
 import Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
-import Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
+import Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_module_per_gene_per_block
-import Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
+import Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.module_axis
 import Metacells.Contracts.projected_block_axis
@@ -109,8 +109,8 @@ $(CONTRACT2)
         vector_of_is_lateral_per_gene(RequiredInput),
         matrix_of_is_found_per_module_per_block(RequiredInput),
         matrix_of_module_per_gene_per_block(RequiredInput),
-        matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
-        matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
+        matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
+        matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
         tensor_of_linear_fraction_per_block_per_module_per_metacell(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_block(RequiredInput),
@@ -302,10 +302,10 @@ function compute_final_projection_per_query_cell(;
         get_matrix(atlas_daf, "block", "block", "is_in_neighborhood").array
     block_index_per_metacell = atlas_daf["@ metacell : block : index"].array
 
-    mean_linear_fraction_in_neighborhood_cells_per_module_per_block =
-        get_matrix(atlas_daf, "module", "block", "mean_linear_fraction_in_neighborhood_cells").array
-    std_linear_fraction_in_neighborhood_cells_per_module_per_block =
-        get_matrix(atlas_daf, "module", "block", "std_linear_fraction_in_neighborhood_cells").array
+    mean_linear_fraction_in_environment_cells_per_module_per_block =
+        get_matrix(atlas_daf, "module", "block", "mean_linear_fraction_in_environment_cells").array
+    std_linear_fraction_in_environment_cells_per_module_per_block =
+        get_matrix(atlas_daf, "module", "block", "std_linear_fraction_in_environment_cells").array
 
     mean_euclidean_modules_cells_distance_per_metacell =
         get_vector(atlas_daf, "metacell", "mean_euclidean_modules_cells_distance").array
@@ -404,27 +404,30 @@ function compute_final_projection_per_query_cell(;
                             found_module_UMIs_per_undetermined_query_cell ./ total_UMIs_per_undetermined_query_cell
                     end
 
-                    mean_linear_fraction_in_neighborhood_cells_per_found_module =
-                        mean_linear_fraction_in_neighborhood_cells_per_module_per_block[
+                    mean_linear_fraction_in_environment_cells_per_found_module =
+                        mean_linear_fraction_in_environment_cells_per_module_per_block[
                             indices_of_found_modules,
                             block_index,
                         ]
-                    std_linear_fraction_in_neighborhood_cells_per_found_module =
-                        std_linear_fraction_in_neighborhood_cells_per_module_per_block[
+                    std_linear_fraction_in_environment_cells_per_found_module =
+                        std_linear_fraction_in_environment_cells_per_module_per_block[
                             indices_of_found_modules,
                             block_index,
                         ]
+                    @assert !any(std_linear_fraction_in_environment_cells_per_found_module .== 0)
+                    std_linear_fraction_in_environment_cells_per_found_module[std_linear_fraction_in_environment_cells_per_found_module .== 0] .=
+                        Inf32
                     z_score_per_found_module_per_candidate_metacell =
                         (
                             linear_fraction_per_found_module_per_candidate_metacell .-
-                            mean_linear_fraction_in_neighborhood_cells_per_found_module
-                        ) ./ std_linear_fraction_in_neighborhood_cells_per_found_module
+                            mean_linear_fraction_in_environment_cells_per_found_module
+                        ) ./ std_linear_fraction_in_environment_cells_per_found_module
 
                     z_score_per_found_module_per_undetermined_query_cell =
                         (
                             linear_fraction_per_found_module_per_undetermined_query_cell .-
-                            mean_linear_fraction_in_neighborhood_cells_per_found_module
-                        ) ./ std_linear_fraction_in_neighborhood_cells_per_found_module
+                            mean_linear_fraction_in_environment_cells_per_found_module
+                        ) ./ std_linear_fraction_in_environment_cells_per_found_module
 
                     distances_between_candidate_metacells_and_undetermined_query_cells =
                         flame_timed("pairwise.Euclidean") do

@@ -35,8 +35,12 @@ export matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_
 export matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
 export matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 export matrix_of_euclidean_skeleton_fold_distance_between_metacells
+export matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 export matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
+export matrix_of_is_environment_distinct_per_gene_per_block
+export matrix_of_is_environment_marker_per_gene_per_block
 export matrix_of_is_found_per_module_per_block
+export matrix_of_is_in_environment_per_metacell_per_block
 export matrix_of_is_in_neighborhood_per_block_per_block
 export matrix_of_is_neighborhood_distinct_per_gene_per_block
 export matrix_of_is_neighborhood_marker_per_gene_per_block
@@ -48,17 +52,22 @@ export matrix_of_log_linear_fraction_per_gene_per_block
 export matrix_of_log_linear_fraction_per_gene_per_metacell
 export matrix_of_max_skeleton_fold_distance_between_metacells
 export matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+export matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 export matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_module_per_gene_per_block
 export matrix_of_module_status_per_gene_per_block
 export matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
 export matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
+export matrix_of_n_cells_per_prev_block_per_block
+export matrix_of_n_cells_per_prev_block_type_per_block_type
 export matrix_of_n_genes_per_module_per_block
+export matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 export matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_UMIs_per_gene_per_block
 export matrix_of_UMIs_per_gene_per_cell
 export metacell_axis
 export module_axis
+export prev_block_axis
 export projected_block_axis
 export tensor_of_linear_fraction_per_block_per_module_per_metacell
 export type_axis
@@ -70,6 +79,7 @@ export vector_of_color_per_type
 export vector_of_correlation_between_cells_and_projected_metacells_per_gene
 export vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
 export vector_of_excluded_UMIs_per_cell
+export vector_of_global_flow_order_per_type
 export vector_of_is_base_outlier_per_cell
 export vector_of_is_correlated_with_skeleton_per_gene
 export vector_of_is_excluded_per_cell
@@ -88,6 +98,8 @@ export vector_of_metacell_per_cell
 export vector_of_mitochondrial_UMIs_per_cell
 export vector_of_n_cells_per_block
 export vector_of_n_cells_per_metacell
+export vector_of_n_environment_cells_per_block
+export vector_of_n_environment_metacells_per_block
 export vector_of_n_metacells_per_block
 export vector_of_n_modules_per_block
 export vector_of_n_neighborhood_blocks_per_block
@@ -98,6 +110,7 @@ export vector_of_projected_metacell_per_cell
 export vector_of_projected_modules_z_score_per_cell
 export vector_of_ribosomal_UMIs_per_cell
 export vector_of_std_euclidean_modules_cells_distance_per_metacell
+export vector_of_total_environment_UMIs_per_block
 export vector_of_total_neighborhood_UMIs_per_block
 export vector_of_total_UMIs_per_block
 export vector_of_total_UMIs_per_cell
@@ -1127,6 +1140,144 @@ function matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacel
     )
 end
 
+### Blocks Environments
+
+"""
+    matrix_of_is_in_environment_per_metacell_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+For each block, whether each metacell is in its environment. The environment of a block contains all the
+metacells of the blocks in the block's neighborhood; additional metacells may be added during sharpening based on the
+state of the previous round. This larger (environment) region of the manifold gives us more metacells for estimating
+local gene programs (modules).
+
+This matrix is populated by [`compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!) (using the neighborhoods
+as-is) or [`compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!) (adding metacells from a
+base repository).
+"""
+function matrix_of_is_in_environment_per_metacell_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("metacell", "block", "is_in_environment") =>
+        (expectation, Bool, "For each block, whether each metacell is in its environment.")
+end
+
+"""
+    vector_of_n_environment_metacells_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The total number of metacells in each block's environment.
+
+This vector is populated by [`compute_vector_of_n_environment_metacells_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!).
+"""
+function vector_of_n_environment_metacells_per_block(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("block", "n_environment_metacells") =>
+        (expectation, StorageUnsigned, "The total number of metacells in each block's environment.")
+end
+
+"""
+    vector_of_n_environment_cells_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The total number of cells in the metacells in each block's environment.
+
+This vector is populated by [`compute_vector_of_n_environment_cells_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!).
+"""
+function vector_of_n_environment_cells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("block", "n_environment_cells") =>
+        (expectation, StorageUnsigned, "The total number of cells in the metacells in each block's environment.")
+end
+
+"""
+    vector_of_total_environment_UMIs_per_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The total number of non-excluded gene UMIs in the cells in the metacells in each block's environment.
+
+This vector is populated by [`compute_vector_of_total_environment_UMIs_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!).
+"""
+function vector_of_total_environment_UMIs_per_block(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("block", "total_environment_UMIs") => (
+        expectation,
+        StorageUnsigned,
+        "The total number of non-excluded gene UMIs in the cells in the metacells in each block's environment.",
+    )
+end
+
+"""
+    matrix_of_is_environment_marker_per_gene_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+A mask of genes that distinguish between cell states in each block's environment. Such genes do not necessarily
+distinguish the environment from the rest of the population - see
+[`matrix_of_is_environment_distinct_per_gene_per_block`](@ref).
+
+This matrix is populated by [`compute_matrix_of_is_environment_marker_per_gene_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!).
+"""
+function matrix_of_is_environment_marker_per_gene_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("gene", "block", "is_environment_marker") =>
+        (expectation, Bool, "A mask of genes that distinguish between cell states in each block's environment.")
+end
+
+"""
+    matrix_of_is_environment_distinct_per_gene_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+A mask of genes that distinguish between cell states of each block's environment and the rest of the manifold.
+
+This matrix is populated by [`compute_matrix_of_is_environment_distinct_per_gene_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!).
+"""
+function matrix_of_is_environment_distinct_per_gene_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}  # untested
+    return ("block", "gene", "is_environment_distinct") => (
+        expectation,
+        Bool,
+        "A mask of genes that distinguish between cell states of each block's environment and the rest of the manifold.",
+    )
+end
+
+"""
+    matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+Whether each gene has strong correlation with the skeleton genes in each block's environment. If relevant genes are not
+correlated with any skeleton gene, the list of skeleton (or, more likely, regulator) genes may be incomplete and need to
+be fixed.
+
+This matrix is populated by [`compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!).
+"""
+function matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "block", "is_correlated_with_skeleton_in_environment") => (
+        expectation,
+        Bool,
+        "Whether each gene has strong correlation with the skeleton genes in each block's environment.",
+    )
+end
+
 ### Blocks UMAP
 
 """
@@ -1242,6 +1393,25 @@ on some gene expression levels.
 """
 function vector_of_color_per_type(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("type", "color") => (expectation, AbstractString, "A unique color for each type for visualizations.")
+end
+
+"""
+    vector_of_global_flow_order_per_type(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The position (1 based) of each type in a global ordering chosen to minimize the weighted crossings when the types are
+plotted in this order in each pair of consecutive sharpening rounds.
+
+This vector is populated by [`compute_vector_of_global_flow_order_per_type!`](@ref
+Metacells.SharpenMetacells.compute_vector_of_global_flow_order_per_type!).
+"""
+function vector_of_global_flow_order_per_type(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("type", "global_flow_order") => (
+        expectation,
+        StorageUnsigned,
+        "The position of each type in a global ordering minimizing the weighted crossings between consecutive rounds.",
+    )
 end
 
 """
@@ -1470,6 +1640,46 @@ function matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_bloc
         expectation,
         StorageFloat,
         "The standard deviation of the linear fraction of each module in the cells of the neighborhood of each block.",
+    )
+end
+
+"""
+    matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The mean of the linear fraction of each module in the cells of the environment of each block.
+
+This matrix is populated by [`compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!`](@ref
+Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!).
+"""
+function matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("block", "module", "mean_linear_fraction_in_environment_cells") => (
+        expectation,
+        StorageFloat,
+        "The mean of the linear fraction of each module in the cells of the environment of each block.",
+    )
+end
+
+"""
+    matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+
+This matrix is populated by [`compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!`](@ref
+Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!).
+"""
+function matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("block", "module", "std_linear_fraction_in_environment_cells") => (
+        expectation,
+        StorageFloat,
+        "The standard deviation of the linear fraction of each module in the cells of the environment of each block.",
     )
 end
 
@@ -1715,6 +1925,20 @@ function base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSp
 end
 
 """
+    prev_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+
+A copy of the previous round's [`block_axis`](@ref), copied into the alternative. This is needed to relate the blocks of
+consecutive sharpening rounds (as opposed to the [`base_block_axis`](@ref), which is always the round-0 base).
+
+This axis is typically created by [`compute_matrix_of_n_cells_per_prev_block_per_block!`](@ref
+Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_per_block!).
+"""
+function prev_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+    return "prev_block" =>
+        (expectation, "A copy of the previous round's [`block_axis`](@ref), copied into the alternative.")
+end
+
+"""
     matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
         expectation::ContractExpectation,
     )::Pair{MatrixKey, DataSpecification}
@@ -1798,6 +2022,46 @@ function matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_me
         expectation,
         StorageFloat,
         "The correlation between cells and their metacells (minus the correlated cell) of each gene's expression levels in each base block's neighborhood.",
+    )
+end
+
+"""
+    matrix_of_n_cells_per_prev_block_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The number of cells in each block that existed in each previous-round block.
+
+This matrix is populated by [`compute_matrix_of_n_cells_per_prev_block_per_block!`](@ref
+Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_per_block!).
+"""
+function matrix_of_n_cells_per_prev_block_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("prev_block", "block", "n_cells") =>
+        (expectation, StorageUnsigned, "The number of cells in each block that existed in each previous-round block.")
+end
+
+"""
+    matrix_of_n_cells_per_prev_block_type_per_block_type(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The number of cells that were of each block type in the previous round and of each block type in the new. The block type
+of a cell is the type of the block of the metacell of the cell. Both axes are the (shared) [`type_axis`](@ref); the
+`prev_block_type` naming merely clarifies that the rows refer to the previous-round block types and the columns to the
+new ones.
+
+This matrix is populated by [`compute_matrix_of_n_cells_per_prev_block_type_per_block_type!`](@ref
+Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_type_per_block_type!).
+"""
+function matrix_of_n_cells_per_prev_block_type_per_block_type(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("type", "type", "n_cells") => (
+        expectation,
+        StorageUnsigned,
+        "The number of cells that were of each block type in the previous round and of each block type in the new.",
     )
 end
 

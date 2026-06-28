@@ -669,6 +669,121 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!">
+<code>Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block">
+<code>matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
+</code>
+</a> and and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block">
+<code>matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>module
+</strong> (required): Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (required): The module each gene belongs to in each block.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, module @ mean
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (created): The mean of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>block, module @ std
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (created): The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
 <a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
 <code>Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!
@@ -792,6 +907,12 @@
 <li>
 <a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
 <code>Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!">
+<code>Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!
 </code>
 </a>
 </li>

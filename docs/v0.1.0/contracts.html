@@ -2082,6 +2082,232 @@
 </section>
 </details>
 </article>
+<h3 id="Blocks-Environments">
+<a class="docs-heading-anchor" href="#Blocks-Environments">Blocks Environments
+</a>
+<a id="Blocks-Environments-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Blocks-Environments" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_in_environment_per_metacell_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>For each block, whether each metacell is in its environment. The environment of a block contains all the metacells of the blocks in the block&#39;s neighborhood; additional metacells may be added during sharpening based on the state of the previous round. This larger (environment) region of the manifold gives us more metacells for estimating local gene programs (modules).
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!">
+<code>compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!
+</code>
+</a> (using the neighborhoods as-is) or 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!">
+<code>compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!
+</code>
+</a> (adding metacells from a base repository).
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_environment_metacells_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_environment_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_environment_metacells_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_environment_metacells_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of metacells in each block&#39;s environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!">
+<code>compute_vector_of_n_environment_metacells_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_n_environment_cells_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_n_environment_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_environment_cells_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_n_environment_cells_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of cells in the metacells in each block&#39;s environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!">
+<code>compute_vector_of_n_environment_cells_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_total_environment_UMIs_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_total_environment_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_environment_UMIs_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_total_environment_UMIs_per_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s environment.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!">
+<code>compute_vector_of_total_environment_UMIs_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_environment_marker_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states in each block&#39;s environment. Such genes do not necessarily distinguish the environment from the rest of the population - see 
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block">
+<code>matrix_of_is_environment_distinct_per_gene_per_block
+</code>
+</a>.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!">
+<code>compute_matrix_of_is_environment_marker_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_environment_distinct_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes that distinguish between cell states of each block&#39;s environment and the rest of the manifold.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!">
+<code>compute_matrix_of_is_environment_distinct_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>Whether each gene has strong correlation with the skeleton genes in each block&#39;s environment. If relevant genes are not correlated with any skeleton gene, the list of skeleton (or, more likely, regulator) genes may be incomplete and need to be fixed.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!">
+<code>compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h3 id="Blocks-UMAP">
 <a class="docs-heading-anchor" href="#Blocks-UMAP">Blocks UMAP
 </a>
@@ -2317,6 +2543,36 @@
 <p>This vector is created in a supervised way based on biological considerations and conventions (e.g., red blood cells are often given some red color). It is also possible to use 
 <code>Chameleon
 </code> to automatically assign colors to cell types based on some gene expression levels.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_global_flow_order_per_type">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_global_flow_order_per_type">
+<code>Metacells.Contracts.vector_of_global_flow_order_per_type
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_global_flow_order_per_type(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The position (1 based) of each type in a global ordering chosen to minimize the weighted crossings when the types are plotted in this order in each pair of consecutive sharpening rounds.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.compute_vector_of_global_flow_order_per_type!">
+<code>compute_vector_of_global_flow_order_per_type!
+</code>
+</a>.
 </p>
 </div>
 </section>
@@ -2740,6 +2996,66 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The mean of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!">
+<code>compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!">
+<code>compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
 <a class="docstring-binding" href="#Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
 <code>Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
@@ -3048,11 +3364,7 @@
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block. This is intended for use for computing 
-<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
-<code>matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
-</code>
-</a>.
+<p>The most correlated neighborhood marker gene of each neighborhood marker gene per block.
 </p>
 <p>This is sparse, we actually only compute it for the non-lateral neighborhood markers.
 </p>
@@ -3222,6 +3534,72 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block">
+<code>Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_n_cells_per_prev_block_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells in each block that existed in each previous-round block.
+</p>
+<p>This matrix is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_per_block!">
+<code>compute_matrix_of_n_cells_per_prev_block_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type">
+<code>Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_n_cells_per_prev_block_type_per_block_type(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells that were of each block type in the previous round and of each block type in the new. The block type of a cell is the type of the block of the metacell of the cell. Both axes are the (shared) 
+<a href="contracts.html#Metacells.Contracts.type_axis">
+<code>type_axis
+</code>
+</a>; the 
+<code>prev_block_type
+</code> naming merely clarifies that the rows refer to the previous-round block types and the columns to the new ones.
+</p>
+<p>This matrix is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_type_per_block_type!">
+<code>compute_matrix_of_n_cells_per_prev_block_type_per_block_type!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.base_block_axis">
 <a class="docstring-binding" href="#Metacells.Contracts.base_block_axis">
 <code>Metacells.Contracts.base_block_axis
@@ -3249,6 +3627,42 @@
 </a> or by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
 <code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.prev_block_axis">
+<a class="docstring-binding" href="#Metacells.Contracts.prev_block_axis">
+<code>Metacells.Contracts.prev_block_axis
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">prev_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+</code>
+</pre>
+<p>A copy of the previous round&#39;s 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative. This is needed to relate the blocks of consecutive sharpening rounds (as opposed to the 
+<a href="contracts.html#Metacells.Contracts.base_block_axis">
+<code>base_block_axis
+</code>
+</a>, which is always the round-0 base).
+</p>
+<p>This axis is typically created by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_per_block!">
+<code>compute_matrix_of_n_cells_per_prev_block_per_block!
 </code>
 </a>.
 </p>
@@ -3356,14 +3770,38 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 </code>
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block">
+<code>Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_found_per_module_per_block">
 <code>Metacells.Contracts.matrix_of_is_found_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block
 </code>
 </a>
 </li>
@@ -3434,6 +3872,12 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block">
 <code>Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
 </code>
@@ -3464,8 +3908,26 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block">
+<code>Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type">
+<code>Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_n_genes_per_module_per_block">
 <code>Metacells.Contracts.matrix_of_n_genes_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block">
+<code>Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 </code>
 </a>
 </li>
@@ -3484,6 +3946,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.module_axis">
 <code>Metacells.Contracts.module_axis
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.prev_block_axis">
+<code>Metacells.Contracts.prev_block_axis
 </code>
 </a>
 </li>
@@ -3550,6 +4018,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_excluded_UMIs_per_cell">
 <code>Metacells.Contracts.vector_of_excluded_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_global_flow_order_per_type">
+<code>Metacells.Contracts.vector_of_global_flow_order_per_type
 </code>
 </a>
 </li>
@@ -3662,6 +4136,18 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_environment_cells_per_block">
+<code>Metacells.Contracts.vector_of_n_environment_cells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_n_environment_metacells_per_block">
+<code>Metacells.Contracts.vector_of_n_environment_metacells_per_block
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.vector_of_n_metacells_per_block">
 <code>Metacells.Contracts.vector_of_n_metacells_per_block
 </code>
@@ -3736,6 +4222,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_total_UMIs_per_metacell">
 <code>Metacells.Contracts.vector_of_total_UMIs_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_total_environment_UMIs_per_block">
+<code>Metacells.Contracts.vector_of_total_environment_UMIs_per_block
 </code>
 </a>
 </li>

@@ -10,13 +10,22 @@ Metacells.AnalyzeBlocks
 Metacells.AnalyzeBlocks.compute_matrix_of_is_in_neighborhood_per_block_per_block!
 ```
 
+## Environments
+
+```@docs
+Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!
+Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!
+```
+
 ## Counts
 
 ```@docs
 Metacells.AnalyzeBlocks.compute_vector_of_n_cells_per_block!
 Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_cells_per_block!
+Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!
 Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!
 Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_metacells_per_block!
+Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!
 Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_blocks_per_block!
 ```
 
@@ -26,6 +35,7 @@ Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_blocks_per_block!
 Metacells.AnalyzeBlocks.compute_matrix_of_UMIs_per_gene_per_block!
 Metacells.AnalyzeBlocks.compute_vector_of_total_UMIs_per_block!
 Metacells.AnalyzeBlocks.compute_vector_of_total_neighborhood_UMIs_per_block!
+Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!
 Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!
 Metacells.AnalyzeBlocks.compute_matrix_of_log_linear_fraction_per_gene_per_block!
 ```
@@ -34,8 +44,11 @@ Metacells.AnalyzeBlocks.compute_matrix_of_log_linear_fraction_per_gene_per_block
 
 ```@docs
 Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_marker_per_gene_per_block!
+Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!
 Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
+Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!
 Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!
+Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!
 Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
 Metacells.AnalyzeBlocks.compute_matrix_of_is_strong_per_gene_per_block!
 ```

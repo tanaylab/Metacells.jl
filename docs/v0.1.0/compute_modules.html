@@ -229,14 +229,14 @@
 <a href="contracts.html#Metacells.Contracts.matrix_of_module_status_per_gene_per_block">
 <code>matrix_of_module_status_per_gene_per_block
 </code>
-</a>. To do this, for each neighborhood:
+</a>. To do this, for each environment:
 </p>
 <ol>
-<li>We cluster all the neighborhood lateral marker genes into 
+<li>We cluster all the environment lateral marker genes into 
 <code>max_clusters
-</code> using K-means of the normalized gene expression levels (z-score using the mean and standard deviation in the neighborhood).
+</code> using K-means of the normalized gene expression levels (z-score using the mean and standard deviation in the environment).
 </li>
-<li>We similarly cluster all the non-lateral genes which are correlated with a skeleton in the neighborhood.
+<li>We similarly cluster all the non-lateral genes which are correlated with a skeleton in the environment.
 </li>
 <li>We identify as lateral-ish any of these genes which are more correlated to a center of some lateral cluster than to the center of their own cluster.
 </li>

@@ -3,6 +3,9 @@ Compute "better" metacells based on the local linear model approximating the man
 """
 module SharpenMetacells
 
+export compute_matrix_of_n_cells_per_prev_block_per_block!
+export compute_matrix_of_n_cells_per_prev_block_type_per_block_type!
+export compute_vector_of_global_flow_order_per_type!
 export sharpen_metacells!
 
 using Base.Threads
@@ -32,15 +35,20 @@ import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
 import Metacells.Contracts.matrix_of_is_found_per_module_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
 import Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
-import Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
+import Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_module_per_gene_per_block
-import Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
+import Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block
+import Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type
+import Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.module_axis
+import Metacells.Contracts.prev_block_axis
+import Metacells.Contracts.type_axis
 import Metacells.Contracts.vector_of_base_block_per_metacell
 import Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_block_per_metacell
+import Metacells.Contracts.vector_of_global_flow_order_per_type
 import Metacells.Contracts.vector_of_is_base_outlier_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
@@ -49,6 +57,7 @@ import Metacells.Contracts.vector_of_n_metacells_per_block
 import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
+import Metacells.Contracts.vector_of_type_per_block
 
 struct KmeansSizesBuffers{T <: AbstractFloat}
     max_best_assignments::Vector{Int}
@@ -274,8 +283,8 @@ $(CONTRACT2)
         vector_of_n_neighborhood_cells_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(RequiredInput),
-        matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
-        matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(RequiredInput),
+        matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
+        matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
     ],
 ) function sharpen_metacells!(;
     sharp_daf::DafWriter,
@@ -323,10 +332,10 @@ $(CONTRACT2)
     UMIs_per_cell_per_gene = get_matrix(base_daf, "cell", "gene", "UMIs").array
     total_UMIs_per_cell = mutable_array(densify(get_vector(base_daf, "cell", "total_UMIs").array))
 
-    mean_linear_fraction_in_neighborhood_cells_per_module_per_block =
-        get_matrix(base_daf, "module", "block", "mean_linear_fraction_in_neighborhood_cells").array
-    std_linear_fraction_in_neighborhood_cells_per_module_per_block =
-        get_matrix(base_daf, "module", "block", "std_linear_fraction_in_neighborhood_cells").array
+    mean_linear_fraction_in_environment_cells_per_module_per_block =
+        get_matrix(base_daf, "module", "block", "mean_linear_fraction_in_environment_cells").array
+    std_linear_fraction_in_environment_cells_per_module_per_block =
+        get_matrix(base_daf, "module", "block", "std_linear_fraction_in_environment_cells").array
 
     is_in_neighborhood_per_other_block_per_base_block =
         get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
@@ -442,8 +451,8 @@ $(CONTRACT2)
         is_in_neighborhood_per_other_block_per_base_block,
         is_found_per_module_per_block,
         module_index_per_gene_per_block,
-        mean_linear_fraction_in_neighborhood_cells_per_module_per_block,
-        std_linear_fraction_in_neighborhood_cells_per_module_per_block,
+        mean_linear_fraction_in_environment_cells_per_module_per_block,
+        std_linear_fraction_in_environment_cells_per_module_per_block,
         min_migration_likelihood,
         kmeans_buffer_pool,
         rng,
@@ -540,8 +549,8 @@ $(CONTRACT2)
         module_index_per_gene_per_block,
         block_index_per_cell,
         mean_metacell_cells_per_block,
-        mean_linear_fraction_in_neighborhood_cells_per_module_per_block,
-        std_linear_fraction_in_neighborhood_cells_per_module_per_block,
+        mean_linear_fraction_in_environment_cells_per_module_per_block,
+        std_linear_fraction_in_environment_cells_per_module_per_block,
         base_block_index_per_cell,
         is_in_base_neighborhood_per_other_base_block_per_base_block,
         correlated_gene_indices_per_base_block,
@@ -588,8 +597,8 @@ function compute_preferred_block_index_per_cell_per_block(;
     min_migration_likelihood::AbstractFloat,
     is_found_per_module_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
-    mean_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
-    std_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    mean_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    std_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     kmeans_buffer_pool::Channel{KMeansBuffers{Float32}},
     rng::AbstractRNG,
 )::Vector{Maybe{SparseVector{<:Integer}}}
@@ -661,10 +670,10 @@ function compute_preferred_block_index_per_cell_per_block(;
             z_score_per_max_module_per_max_neighborhood_cell_per_thread[threadid()]
         @views z_score_per_found_module_per_neighborhood_cell =
             z_score_per_max_module_per_max_neighborhood_cell[1:n_block_modules, 1:n_neighborhood_cells]
-        @views mean_linear_fraction_in_neighborhood_cells_per_module =
-            mean_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
-        @views std_linear_fraction_in_neighborhood_cells_per_module =
-            std_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
+        @views mean_linear_fraction_in_environment_cells_per_module =
+            mean_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
+        @views std_linear_fraction_in_environment_cells_per_module =
+            std_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
 
         # Invert `module_index_per_gene` once per block: parallel-over-found-modules in compute_z_score reads the list
         # directly instead of rebuilding a per-call `is_gene_in_module` BitVector.
@@ -684,8 +693,8 @@ function compute_preferred_block_index_per_cell_per_block(;
             indices_of_region_cells = indices_of_neighborhood_cells,
             gene_indices_per_module,
             z_score_accumulator_pool,
-            mean_linear_fraction_in_neighborhood_cells_per_module,
-            std_linear_fraction_in_neighborhood_cells_per_module,
+            mean_linear_fraction_in_environment_cells_per_module,
+            std_linear_fraction_in_environment_cells_per_module,
         )
 
         n_neighborhood_clusters = max(Int(round(n_neighborhood_cells / mean_metacell_cells_per_block[block_index])), 1)
@@ -889,8 +898,8 @@ function compute_local_clusters(;
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     block_index_per_cell::AbstractVector{<:Integer},
     mean_metacell_cells_per_block::AbstractVector{<:AbstractFloat},
-    mean_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
-    std_linear_fraction_in_neighborhood_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    mean_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    std_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     base_block_index_per_cell::AbstractVector{<:Integer},
     is_in_base_neighborhood_per_other_base_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
     correlated_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
@@ -967,10 +976,10 @@ function compute_local_clusters(;
         z_score_per_max_module_per_max_block_cell = z_score_per_max_module_per_max_block_cell_per_thread[threadid()]
         @views z_score_per_found_module_per_block_cell =
             z_score_per_max_module_per_max_block_cell[1:n_block_modules, 1:n_block_cells]
-        @views mean_linear_fraction_in_neighborhood_cells_per_module =
-            mean_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
-        @views std_linear_fraction_in_neighborhood_cells_per_module =
-            std_linear_fraction_in_neighborhood_cells_per_module_per_block[:, block_index]
+        @views mean_linear_fraction_in_environment_cells_per_module =
+            mean_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
+        @views std_linear_fraction_in_environment_cells_per_module =
+            std_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
 
         # Invert `module_index_per_gene` once per block: used by Phase 1 K-walk dispersion AND by `compute_z_score`
         # below for the parallel-over-found-modules z-score fill.
@@ -990,8 +999,8 @@ function compute_local_clusters(;
             indices_of_region_cells = block_cell_indices,
             gene_indices_per_module,
             z_score_accumulator_pool,
-            mean_linear_fraction_in_neighborhood_cells_per_module,
-            std_linear_fraction_in_neighborhood_cells_per_module,
+            mean_linear_fraction_in_environment_cells_per_module,
+            std_linear_fraction_in_environment_cells_per_module,
         )
 
         n_block_clusters = max(Int(round(n_block_cells / mean_metacell_cells_per_block[block_index])), 1)
@@ -1269,7 +1278,8 @@ function compute_local_clusters(;
         cooldown_margin_per_k_distance = 0.0
     else
         max_cooldown_margin_per_k_distance = 100 * epsilon
-        cooldown_margin_per_k_distance = max_cooldown_margin_per_k_distance * (1 - 2.0^(-(sharpening_round - 1) / improvement_half_life))
+        cooldown_margin_per_k_distance =
+            max_cooldown_margin_per_k_distance * (1 - 2.0^(-(sharpening_round - 1) / improvement_half_life))
     end
     @debug "Cooldown margin per K distance: $(cooldown_margin_per_k_distance)" _group = :mcs_results
     pass_index = 0
@@ -1335,19 +1345,16 @@ function compute_local_clusters(;
             best_candidate_index = previous_candidate_index
             # Seed with the current candidate's penalized score: its delta is 0, but it still owes its K-distance penalty.
             best_score = -cooldown_margin_per_k_distance * current_distance_from_expected
-            todox_best_delta = 0.0
             slice_start = work_item_start_per_walkable_block[walkable_position]
             slice_end = work_item_start_per_walkable_block[walkable_position + 1] - 1
             for work_index in slice_start:slice_end
                 candidate_index = candidate_index_per_work_item[work_index]
                 candidate_distance_from_expected = abs(candidates[candidate_index].k - expected_n_clusters)
-                score = delta_per_work_item[work_index] - cooldown_margin_per_k_distance * candidate_distance_from_expected
+                score =
+                    delta_per_work_item[work_index] - cooldown_margin_per_k_distance * candidate_distance_from_expected
                 if score > best_score + epsilon
                     best_score = score
-                    todox_best_delta = delta_per_work_item[work_index]
                     best_candidate_index = candidate_index
-                elseif delta_per_work_item[work_index] > todox_best_delta
-                    @warn "TODOX SKIP OPTION FOR $(delta_per_work_item[work_index]) DELTA $(delta_per_work_item[work_index] - todox_best_delta)"
                 end
             end
             if best_candidate_index == previous_candidate_index
@@ -1807,8 +1814,8 @@ function compute_z_score_per_found_module_per_region_cell!(;
     indices_of_region_cells::AbstractVector{<:Integer},
     gene_indices_per_module::AbstractVector{<:AbstractVector{<:Integer}},
     z_score_accumulator_pool::Channel{Vector{Float32}},
-    mean_linear_fraction_in_neighborhood_cells_per_module::AbstractVector{<:AbstractFloat},
-    std_linear_fraction_in_neighborhood_cells_per_module::AbstractVector{<:AbstractFloat},
+    mean_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
+    std_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
 )::Nothing
     n_region_cells = length(indices_of_region_cells)
     found_module_indices = findall(is_found_per_module)
@@ -1841,8 +1848,9 @@ function compute_z_score_per_found_module_per_region_cell!(;
                     accumulator[region_cell_position] += UMIs_per_cell_per_gene[cell_index, gene_index]
                 end
             end
-            mean_linear_fraction = mean_linear_fraction_in_neighborhood_cells_per_module[module_index]
-            std_linear_fraction = std_linear_fraction_in_neighborhood_cells_per_module[module_index]
+            mean_linear_fraction = mean_linear_fraction_in_environment_cells_per_module[module_index]
+            std_linear_fraction = std_linear_fraction_in_environment_cells_per_module[module_index]
+            @assert std_linear_fraction > 0
             @check_turbo_vector(accumulator)
             @check_turbo_vector(indices_of_region_cells)
             @check_turbo_vector(total_UMIs_per_cell)
@@ -2739,6 +2747,427 @@ function build_local_clusters_from_candidate(
         cluster_index_per_block_cell = copy(candidate.assignments),
         is_too_small_per_cluster,
     )
+end
+
+"""
+    compute_matrix_of_n_cells_per_prev_block_per_block!(;
+        other_daf::DafWriter,
+        base_daf::DafReader,
+        overwrite::Bool = false,
+    )::Nothing
+
+Compute and set [`matrix_of_n_cells_per_prev_block_per_block`](@ref). This counts, for each pair of a `prev_daf` block
+and an `other_daf` block, the cells that are grouped in both. This will also copy [`prev_block_axis`](@ref) from the
+`prev_daf` into the `other_daf` if needed.
+
+# Other
+
+$(CONTRACT1)
+
+# Previous
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "other_daf",
+    axes = [
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        block_axis(RequiredInput),
+        prev_block_axis(GuaranteedOutput),
+    ],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        matrix_of_n_cells_per_prev_block_per_block(CreatedOutput),
+    ],
+) Contract(;
+    name = "prev_daf",
+    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [vector_of_metacell_per_cell(RequiredInput), vector_of_block_per_metacell(RequiredInput)],
+) function compute_matrix_of_n_cells_per_prev_block_per_block!(;
+    other_daf::DafWriter,
+    prev_daf::DafReader,
+    overwrite::Bool = false,
+)::Nothing
+    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") "the cells differ between `other_daf` and `prev_daf`"
+
+    if has_axis(other_daf, "prev_block")
+        @assert axis_vector(other_daf, "prev_block") == axis_vector(prev_daf, "block")
+    else
+        copy_axis!(source = prev_daf, destination = other_daf, axis = "block", rename = "prev_block"; overwrite)
+    end
+
+    n_blocks = axis_length(other_daf, "block")
+    n_prev_blocks = axis_length(prev_daf, "block")
+
+    block_index_per_cell = other_daf["@ cell : metacell ?? 0 : block : index"].array
+    prev_block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
+
+    n_cells_per_prev_block_per_block = zeros(UInt32, n_prev_blocks, n_blocks)
+    for (prev_block_index, block_index) in zip(prev_block_index_per_cell, block_index_per_cell)
+        if prev_block_index > 0 && block_index > 0
+            n_cells_per_prev_block_per_block[prev_block_index, block_index] += 1
+        end
+    end
+
+    set_matrix!(other_daf, "prev_block", "block", "n_cells", bestify(n_cells_per_prev_block_per_block); overwrite)
+
+    return nothing
+end
+
+"""
+    compute_matrix_of_n_cells_per_prev_block_type_per_block_type!(;
+        other_daf::DafWriter,
+        prev_daf::DafReader,
+        overwrite::Bool = false,
+    )::Nothing
+
+Compute and set [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref). This counts, for each pair of a
+previous-round block type and an `other_daf` block type, the cells that are of both. The block type of a cell is the type
+of the block of the metacell of the cell, so it reflects this repository's blocks rather than any per-cell type
+annotation. The (shared) [`type_axis`](@ref) must be identical between the `prev_daf` and the `other_daf`.
+
+# Other
+
+$(CONTRACT1)
+
+# Previous
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "other_daf",
+    axes = [
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        block_axis(RequiredInput),
+        type_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_type_per_block(RequiredInput),
+        matrix_of_n_cells_per_prev_block_type_per_block_type(CreatedOutput),
+    ],
+) Contract(;
+    name = "prev_daf",
+    axes = [
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        block_axis(RequiredInput),
+        type_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_type_per_block(RequiredInput),
+    ],
+) function compute_matrix_of_n_cells_per_prev_block_type_per_block_type!(;
+    other_daf::DafWriter,
+    prev_daf::DafReader,
+    overwrite::Bool = false,
+)::Nothing
+    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") "the cells differ between `other_daf` and `prev_daf`"
+    @assert axis_vector(other_daf, "type") == axis_vector(prev_daf, "type") "the types differ between `other_daf` and `prev_daf`"
+
+    n_types = axis_length(other_daf, "type")
+
+    block_type_index_per_cell = other_daf["@ cell : metacell ?? 0 : block : type ?? 0 : index"].array
+    prev_block_type_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : type ?? 0 : index"].array
+
+    n_cells_per_prev_block_type_per_block_type = zeros(UInt32, n_types, n_types)
+    for (prev_block_type_index, block_type_index) in zip(prev_block_type_index_per_cell, block_type_index_per_cell)
+        if prev_block_type_index > 0 && block_type_index > 0
+            n_cells_per_prev_block_type_per_block_type[prev_block_type_index, block_type_index] += 1
+        end
+    end
+
+    set_matrix!(other_daf, "type", "type", "n_cells", bestify(n_cells_per_prev_block_type_per_block_type); overwrite)
+
+    return nothing
+end
+
+# The total weighted crossings of the type flow for a given order, summed over all the consecutive-round transitions.
+# Each transition is a list of edges; an edge connects a base type (in the left column) to a type (in the right column)
+# and weighs the number of cells with that base type and type. Two edges cross when their endpoints are in the opposite
+# order in the two columns, and such a crossing weighs the product of the two edges' cell counts. Both columns of every
+# transition use the same order, given by `position_per_type`.
+function total_type_flow_crossings(
+    position_per_type::AbstractVector{<:Integer},
+    base_type_per_edge_per_transition::AbstractVector{Vector{Int}},
+    type_per_edge_per_transition::AbstractVector{Vector{Int}},
+    n_cells_per_edge_per_transition::AbstractVector{Vector{Float64}},
+)::Float64
+    total_crossings = 0.0
+    @inbounds for transition_index in eachindex(base_type_per_edge_per_transition)
+        base_type_per_edge = base_type_per_edge_per_transition[transition_index]
+        type_per_edge = type_per_edge_per_transition[transition_index]
+        n_cells_per_edge = n_cells_per_edge_per_transition[transition_index]
+        n_edges = length(base_type_per_edge)
+        for first_edge_index in 1:(n_edges - 1)
+            first_left_position = position_per_type[base_type_per_edge[first_edge_index]]
+            first_right_position = position_per_type[type_per_edge[first_edge_index]]
+            first_n_cells = n_cells_per_edge[first_edge_index]
+            for second_edge_index in (first_edge_index + 1):n_edges
+                second_left_position = position_per_type[base_type_per_edge[second_edge_index]]
+                second_right_position = position_per_type[type_per_edge[second_edge_index]]
+                if (first_left_position - second_left_position) * (first_right_position - second_right_position) < 0
+                    total_crossings += first_n_cells * n_cells_per_edge[second_edge_index]
+                end
+            end
+        end
+    end
+    return total_crossings
+end
+
+# Fill `position_per_type` with the inverse of the `type_per_position` order (the position holding each type).
+function fill_position_per_type!(
+    position_per_type::AbstractVector{<:Integer},
+    type_per_position::AbstractVector{<:Integer},
+)::Nothing
+    @inbounds for position in eachindex(type_per_position)
+        position_per_type[type_per_position[position]] = position
+    end
+    return nothing
+end
+
+# Fill `target_per_position` with the order obtained from `source_per_position` by moving the type at `from_position` to
+# `to_position`, shifting the types in between by one place.
+function fill_type_flow_insertion!(
+    target_per_position::AbstractVector{<:Integer},
+    source_per_position::AbstractVector{<:Integer},
+    from_position::Integer,
+    to_position::Integer,
+)::Nothing
+    copyto!(target_per_position, source_per_position)
+    moved_type = target_per_position[from_position]
+    if from_position < to_position
+        for position in from_position:(to_position - 1)
+            target_per_position[position] = target_per_position[position + 1]
+        end
+    else
+        for position in from_position:-1:(to_position + 1)
+            target_per_position[position] = target_per_position[position - 1]
+        end
+    end
+    target_per_position[to_position] = moved_type
+    return nothing
+end
+
+# Improve the `type_per_position` order in place by repeatedly applying the best crossing-reducing move (exchanging the
+# types at two positions, or moving one type to another position), until reaching a local optimum. Returns the local
+# optimum's total weighted crossings. The other vectors are reused scratch buffers.
+function hill_climb_type_flow_order!(
+    type_per_position::AbstractVector{Int},
+    position_per_type::AbstractVector{Int},
+    candidate_per_position::AbstractVector{Int},
+    best_per_position::AbstractVector{Int},
+    base_type_per_edge_per_transition::AbstractVector{Vector{Int}},
+    type_per_edge_per_transition::AbstractVector{Vector{Int}},
+    n_cells_per_edge_per_transition::AbstractVector{Vector{Float64}},
+)::Float64
+    n_types = length(type_per_position)
+    fill_position_per_type!(position_per_type, type_per_position)
+    current_crossings = total_type_flow_crossings(
+        position_per_type,
+        base_type_per_edge_per_transition,
+        type_per_edge_per_transition,
+        n_cells_per_edge_per_transition,
+    )
+
+    while true
+        best_crossings = current_crossings
+        found_better = false
+
+        for first_position in 1:(n_types - 1)
+            for second_position in (first_position + 1):n_types
+                copyto!(candidate_per_position, type_per_position)
+                candidate_per_position[first_position], candidate_per_position[second_position] =
+                    candidate_per_position[second_position], candidate_per_position[first_position]
+                fill_position_per_type!(position_per_type, candidate_per_position)
+                crossings = total_type_flow_crossings(
+                    position_per_type,
+                    base_type_per_edge_per_transition,
+                    type_per_edge_per_transition,
+                    n_cells_per_edge_per_transition,
+                )
+                if crossings < best_crossings
+                    best_crossings = crossings
+                    copyto!(best_per_position, candidate_per_position)
+                    found_better = true
+                end
+            end
+        end
+
+        for from_position in 1:n_types
+            for to_position in 1:n_types
+                if from_position != to_position
+                    fill_type_flow_insertion!(candidate_per_position, type_per_position, from_position, to_position)
+                    fill_position_per_type!(position_per_type, candidate_per_position)
+                    crossings = total_type_flow_crossings(
+                        position_per_type,
+                        base_type_per_edge_per_transition,
+                        type_per_edge_per_transition,
+                        n_cells_per_edge_per_transition,
+                    )
+                    if crossings < best_crossings
+                        best_crossings = crossings
+                        copyto!(best_per_position, candidate_per_position)
+                        found_better = true
+                    end
+                end
+            end
+        end
+
+        if found_better
+            copyto!(type_per_position, best_per_position)
+            current_crossings = best_crossings
+        else
+            return current_crossings
+        end
+    end
+end
+
+# Compute a global order of the types (the 1-based position of each type) that minimizes the total weighted crossings of
+# the type flow across all the consecutive-round transitions. Each transition is described by an `n_cells` matrix whose
+# `[base_type, type]` entry counts the cells of that base type (left column) and type (right column). Since minimizing
+# crossings is NP-hard, we use random-restart hill climbing using the exact crossing count, seeding one restart with the
+# types ordered by their total number of cells.
+function compute_global_flow_order_per_type(
+    n_cells_per_prev_block_type_per_block_type_per_transition::AbstractVector{<:AbstractMatrix{<:Real}};
+    restarts::Integer,
+    rng::AbstractRNG,
+)::Vector{Int}
+    @assert restarts >= 1
+    @assert !isempty(n_cells_per_prev_block_type_per_block_type_per_transition)
+    n_types = size(n_cells_per_prev_block_type_per_block_type_per_transition[1], 1)
+    n_transitions = length(n_cells_per_prev_block_type_per_block_type_per_transition)
+
+    base_type_per_edge_per_transition = Vector{Vector{Int}}(undef, n_transitions)
+    type_per_edge_per_transition = Vector{Vector{Int}}(undef, n_transitions)
+    n_cells_per_edge_per_transition = Vector{Vector{Float64}}(undef, n_transitions)
+    total_cells_per_type = zeros(Float64, n_types)
+    for transition_index in 1:n_transitions
+        n_cells_per_prev_block_type_per_block_type =
+            n_cells_per_prev_block_type_per_block_type_per_transition[transition_index]
+        @assert size(n_cells_per_prev_block_type_per_block_type) == (n_types, n_types)
+        base_type_per_edge = Int[]
+        type_per_edge = Int[]
+        n_cells_per_edge = Float64[]
+        for type in 1:n_types
+            for base_type in 1:n_types
+                n_cells = Float64(n_cells_per_prev_block_type_per_block_type[base_type, type])
+                if n_cells != 0
+                    push!(base_type_per_edge, base_type)
+                    push!(type_per_edge, type)
+                    push!(n_cells_per_edge, n_cells)
+                    total_cells_per_type[base_type] += n_cells
+                    total_cells_per_type[type] += n_cells
+                end
+            end
+        end
+        base_type_per_edge_per_transition[transition_index] = base_type_per_edge
+        type_per_edge_per_transition[transition_index] = type_per_edge
+        n_cells_per_edge_per_transition[transition_index] = n_cells_per_edge
+    end
+
+    seed_type_per_position = sortperm(total_cells_per_type; rev = true)
+
+    crossings_per_restart = Vector{Float64}(undef, restarts)
+    type_per_position_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
+    position_per_type_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
+    candidate_per_position_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
+    best_per_position_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
+    parallel_loop_with_rng(1:restarts; rng, name = "compute_global_flow_order_per_type") do restart_index, rng
+        type_per_position = type_per_position_per_restart[restart_index]
+        if restart_index == 1
+            copyto!(type_per_position, seed_type_per_position)
+        else
+            randperm!(rng, type_per_position)
+        end
+        crossings_per_restart[restart_index] = hill_climb_type_flow_order!(
+            type_per_position,
+            position_per_type_per_restart[restart_index],
+            candidate_per_position_per_restart[restart_index],
+            best_per_position_per_restart[restart_index],
+            base_type_per_edge_per_transition,
+            type_per_edge_per_transition,
+            n_cells_per_edge_per_transition,
+        )
+        return nothing
+    end
+
+    best_type_per_position = type_per_position_per_restart[argmin(crossings_per_restart)]
+    return invperm(best_type_per_position)
+end
+
+"""
+    compute_vector_of_global_flow_order_per_type!(
+        final_daf::DafWriter,
+        base_daf_per_round::AbstractVector{<:DafReader};
+        restarts::Integer = 20,
+        rng::AbstractRNG = default_rng(),
+        overwrite::Bool = false,
+    )::Nothing
+
+Compute and set [`vector_of_global_flow_order_per_type`](@ref), a global order of the types minimizing the total weighted
+crossings of the type flow across the sharpening rounds.
+
+The `base_daf_per_round` are the repositories of the earlier rounds (rounds 0 to N-1) and `final_daf` is the last round
+(round N); together they form the full sequence of rounds 0 to N, which must all share the same `type` axis. For each
+consecutive pair of rounds we read the [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) (the type flow from the
+previous round) from the later round's repository, that is, from every repository except the first (round 0 has no
+previous round). We minimize the crossings using random-restart hill climbing (`restarts` restarts, since the problem is
+NP-hard) and write the resulting order only into `final_daf`.
+
+The contract below is that of `final_daf`. Each of the other repositories satisfies the same contract, except that the
+[`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) is absent from the first (round 0), and the
+[`vector_of_global_flow_order_per_type`](@ref) output is created only in `final_daf` (the last).
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [type_axis(RequiredInput)],
+    data = [
+        matrix_of_n_cells_per_prev_block_type_per_block_type(RequiredInput),
+        vector_of_global_flow_order_per_type(CreatedOutput),
+    ],
+) function compute_vector_of_global_flow_order_per_type!(
+    final_daf::DafWriter,
+    base_daf_per_round::AbstractVector{<:DafReader};
+    restarts::Integer = 20,
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = false,
+)::Nothing
+    @assert restarts >= 1
+    n_rounds = length(base_daf_per_round)
+    @assert n_rounds > 0
+
+    type_names = axis_vector(final_daf, "type")
+    for base_daf in base_daf_per_round
+        @assert axis_vector(base_daf, "type") == type_names "the types differ between the round repositories"
+    end
+
+    n_cells_per_prev_block_type_per_block_type_per_transition = AbstractMatrix{<:Real}[]
+    for round_index in 2:n_rounds
+        base_daf = base_daf_per_round[round_index]
+        @assert has_matrix(base_daf, "type", "type", "n_cells") "missing the n_cells_per_prev_block_type_per_block_type matrix"
+        push!(
+            n_cells_per_prev_block_type_per_block_type_per_transition,
+            get_matrix(base_daf, "type", "type", "n_cells").array,
+        )
+    end
+    push!(
+        n_cells_per_prev_block_type_per_block_type_per_transition,
+        get_matrix(final_daf, "type", "type", "n_cells").array,
+    )
+
+    global_flow_order_per_type =
+        compute_global_flow_order_per_type(n_cells_per_prev_block_type_per_block_type_per_transition; restarts, rng)
+    set_vector!(final_daf, "type", "global_flow_order", UInt32.(global_flow_order_per_type); overwrite)
+
+    return nothing
 end
 
 end  # module

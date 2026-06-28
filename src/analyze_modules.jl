@@ -6,6 +6,7 @@ module AnalyzeModules
 export compute_matrix_of_cells_dispersion_per_metacell_per_module!
 export compute_matrix_of_n_genes_per_module_per_block!
 export compute_stats_of_euclidean_modules_cells_distance_per_metacell!
+export compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!
 export compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!
 export compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!
 export compute_vector_of_n_modules_per_block!
@@ -31,10 +32,13 @@ import Metacells.Contracts.cell_axis
 import Metacells.Contracts.gene_axis
 import Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module
 import Metacells.Contracts.matrix_of_is_found_per_module_per_block
+import Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
+import Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_module_per_gene_per_block
 import Metacells.Contracts.matrix_of_n_genes_per_module_per_block
+import Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
@@ -395,6 +399,182 @@ $(CONTRACT)
 end
 
 """
+    compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!(
+        daf::DafWriter;
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block`](@ref) and
+and set [`matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block`](@ref).
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(
+    axes = [
+        block_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        module_axis(RequiredInput),
+        gene_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        vector_of_metacell_per_cell(RequiredInput),
+        matrix_of_is_in_environment_per_metacell_per_block(RequiredInput),
+        matrix_of_module_per_gene_per_block(RequiredInput),
+        matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(CreatedOutput),
+        matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(CreatedOutput),
+    ],
+) function compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+    n_blocks = axis_length(daf, "block")
+    n_modules = axis_length(daf, "module")
+    n_metacells = axis_length(daf, "metacell")
+
+    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+
+    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+
+    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
+    metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
+
+    n_cells, n_genes = size(UMIs_per_cell_per_gene)
+    mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
+    std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
+    is_in_environment_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:maxthreadid()]
+    is_in_environment_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
+
+    # Per-block work iterates the cells in the block's environment; weight blocks heaviest-first by that count.
+    n_cells_per_metacell = zeros(Int, n_metacells)
+    for cell_index in 1:n_cells
+        metacell_of_cell = metacell_index_per_cell[cell_index]
+        if metacell_of_cell > 0
+            n_cells_per_metacell[metacell_of_cell] += 1
+        end
+    end
+    n_cells_in_environment_per_block = vec(is_in_environment_per_metacell_per_block' * n_cells_per_metacell)
+    max_n_environment_cells = maximum(n_cells_in_environment_per_block)
+
+    # Channel pool of per-environment-cell Float32 accumulators for the nested parallel-over-modules loop. Each inner
+    # task takes one for its module's gene-outer fill, then puts it back. Sized to `nthreads()` because each take/put
+    # is a single non-yielding scope.
+    module_UMIs_accumulator_pool = Channel{Vector{Float32}}(nthreads())
+    for _ in 1:nthreads()
+        put!(module_UMIs_accumulator_pool, Vector{Float32}(undef, max_n_environment_cells))
+    end
+
+    parallel_loop_wo_rng(
+        1:n_blocks;
+        progress = DebugProgress(
+            sum(n_cells_in_environment_per_block);
+            group = :mcs_loops,
+            desc = "stats_of_linear_fraction_in_environment_cells_per_module_per_block",
+        ),
+        weights = n_cells_in_environment_per_block,
+    ) do block_index
+        is_in_environment_per_metacell = is_in_environment_per_metacell_per_thread[threadid()]
+        @views is_in_environment_per_metacell .= is_in_environment_per_metacell_per_block[:, block_index]
+        is_in_environment_per_cell = is_in_environment_per_cell_per_thread[threadid()]
+        is_in_environment_per_cell .=
+            (metacell_index_per_cell .> 0) .&
+            getindex.(Ref(is_in_environment_per_metacell), max.(metacell_index_per_cell, 1))
+        indices_of_environment_cells = findall(is_in_environment_per_cell)
+        n_environment_cells = length(indices_of_environment_cells)
+        @assert n_environment_cells > 0
+
+        # Invert `module_index_per_gene` once per block: the per-module loop below reads the gene list directly.
+        @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
+        gene_indices_per_module = [Int[] for _ in 1:n_modules]
+        for gene_index in 1:n_genes
+            module_index = module_index_per_gene[gene_index]
+            if module_index > 0
+                push!(gene_indices_per_module[module_index], gene_index)
+            end
+        end
+
+        # Parallel over modules - each writes to its own (module_index, block_index) slot in the output matrices, so
+        # the inner tasks are race-free. Per task: take an accumulator vector, gene-outer / cell-inner `@turbo` fill,
+        # scalar reduction, write mean+std, return accumulator.
+        parallel_loop_wo_rng(
+            1:n_modules;
+            nested = true,
+            policy = :greedy,
+            name = "stats_of_linear_fraction_in_environment_cells_per_module_per_block.modules",
+        ) do module_index
+            gene_indices_in_module = gene_indices_per_module[module_index]
+            if isempty(gene_indices_in_module)
+                mean_linear_fraction_per_module_per_block[module_index, block_index] = 0.0f0
+                std_linear_fraction_per_module_per_block[module_index, block_index] = 0.0f0
+                return nothing
+            end
+            module_UMIs_per_environment_cell = take!(module_UMIs_accumulator_pool)
+            try
+                @views fill!(module_UMIs_per_environment_cell[1:n_environment_cells], 0.0f0)
+                # `UMIs_per_cell_per_gene` is a sparse matrix; `@turbo` can't SIMD the gather, so use a plain
+                # `@inbounds` scalar accumulate.
+                @inbounds for gene_index in gene_indices_in_module
+                    for environment_cell_position in 1:n_environment_cells
+                        cell_index = indices_of_environment_cells[environment_cell_position]
+                        module_UMIs_per_environment_cell[environment_cell_position] +=
+                            UMIs_per_cell_per_gene[cell_index, gene_index]
+                    end
+                end
+                sum_fractions = 0.0
+                sum_squared_fractions = 0.0
+                @inbounds for environment_cell_position in 1:n_environment_cells
+                    cell_index = indices_of_environment_cells[environment_cell_position]
+                    fraction =
+                        module_UMIs_per_environment_cell[environment_cell_position] / total_UMIs_per_cell[cell_index]
+                    sum_fractions += fraction
+                    sum_squared_fractions += fraction * fraction
+                end
+                mean_fraction = sum_fractions / n_environment_cells
+                mean_linear_fraction_per_module_per_block[module_index, block_index] = Float32(mean_fraction)
+                std_linear_fraction_per_module_per_block[module_index, block_index] = if n_environment_cells > 1
+                    Float32(
+                        sqrt(
+                            max(
+                                (sum_squared_fractions - sum_fractions * mean_fraction) / (n_environment_cells - 1),
+                                0.0,
+                            ),
+                        ),
+                    )
+                else
+                    0.0f0
+                end
+            finally
+                put!(module_UMIs_accumulator_pool, module_UMIs_per_environment_cell)
+            end
+            return nothing
+        end
+        return nothing
+    end
+
+    set_matrix!(
+        daf,
+        "module",
+        "block",
+        "mean_linear_fraction_in_environment_cells",
+        bestify(mean_linear_fraction_per_module_per_block);
+        overwrite,
+    )
+    set_matrix!(
+        daf,
+        "module",
+        "block",
+        "std_linear_fraction_in_environment_cells",
+        bestify(std_linear_fraction_per_module_per_block);
+        overwrite,
+    )
+
+    return nothing
+end
+
+"""
     compute_stats_of_euclidean_modules_cells_distance_per_metacell!(
         daf::DafWriter;
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -606,7 +786,6 @@ function maximal_cells_dispersion_of_modules!(;
     end
 
     if max_mean_normalized_module_UMIs <= 0
-        n_found = count(is_found_per_module)
         for module_index in 1:n_modules
             if !is_found_per_module[module_index]
                 continue

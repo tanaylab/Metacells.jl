@@ -87,6 +87,12 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="#Environments">
+<span>Environments
+</span>
+</a>
+</li>
+<li>
 <a class="tocitem" href="#Counts">
 <span>Counts
 </span>
@@ -366,6 +372,248 @@
 </section>
 </details>
 </article>
+<h2 id="Environments">
+<a class="docs-heading-anchor" href="#Environments">Environments
+</a>
+<a id="Environments-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Environments" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set (in 
+<code>daf
+</code>) 
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block">
+<code>matrix_of_is_in_environment_per_metacell_per_block
+</code>
+</a> using each block&#39;s neighborhood as-is as its environment: the environment of each block contains exactly the metacells of the blocks in its neighborhood. This is used for the first round of sharpening, where there is no base (previous, unsharpened) repository to add metacells from. See 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!">
+<code>compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!
+</code>
+</a> for the variant that uses such a repository.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (created): For each block, whether each metacell is in its environment.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!(;
+    daf::DafWriter,
+    base_daf::DafReader,
+    min_environment_metacell_nearby_fraction::AbstractFloat = ```0.8```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set (in 
+<code>daf
+</code>) 
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block">
+<code>matrix_of_is_in_environment_per_metacell_per_block
+</code>
+</a>. The environment of each block starts with all the metacells of the blocks in its neighborhood, exactly as 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!">
+<code>compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!
+</code>
+</a>. We then add metacells using the previous (unsharpened) round&#39;s 
+<code>base_daf
+</code>: two cells are nearby if one&#39;s base block is in the other&#39;s base neighborhood, and a metacell is added to a block&#39;s environment if, for at least one metacell of the block, the fraction of nearby (cell, other cell) pairs out of all of their cell pairs is at least 
+<code>min_environment_metacell_nearby_fraction
+</code>.
+</p>
+<p>
+<strong>Daf
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (created): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Counts">
 <a class="docs-heading-anchor" href="#Counts">Counts
 </a>
@@ -514,6 +762,83 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_n_environment_cells_per_block!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_n_environment_cells_per_block">
+<code>vector_of_n_environment_cells_per_block
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>block @ n
+<em>environment
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of cells in the metacells in each block&#39;s environment.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!">
 <a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!
@@ -645,6 +970,75 @@
 <em>neighborhood
 </em>metacells
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of metacells in the blocks in each block&#39;s neighborhood.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_n_environment_metacells_per_block!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_n_environment_metacells_per_block">
+<code>vector_of_n_environment_metacells_per_block
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>block @ n
+<em>environment
+</em>metacells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of metacells in each block&#39;s environment.
 </p>
 </div>
 </section>
@@ -944,6 +1338,83 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_total_environment_UMIs_per_block!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_total_environment_UMIs_per_block">
+<code>vector_of_total_environment_UMIs_per_block
+</code>
+</a>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>block @ total
+<em>environment
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s environment.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!">
 <a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!
@@ -1137,6 +1608,44 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_is_environment_marker_per_gene_per_block!(
+    daf::DafWriter;
+    min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
+    min_marker_gene_range_fold::Real = 1.0,
+    min_marker_quantile::Real = 0.1,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block">
+<code>matrix_of_is_environment_marker_per_gene_per_block
+</code>
+</a>.
+</p>
+<p>We only consider genes which are markers in the overall population. We then call 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!">
+<code>compute_vector_of_is_marker_per_gene!
+</code>
+</a> but only looking at the metacells in each environment.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
 <a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
@@ -1157,8 +1666,8 @@
 </code>
 </pre>
 <p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block">
-<code>matrix_of_is_in_neighborhood_per_block_per_block
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
+<code>matrix_of_is_neighborhood_distinct_per_gene_per_block
 </code>
 </a>. A gene is distinct in the neighborhood if:
 </p>
@@ -1240,6 +1749,101 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_is_environment_distinct_per_gene_per_block!(
+    daf::DafWriter;
+    min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
+    min_distinct_gene_mean_fold::Real = 2,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block">
+<code>matrix_of_is_environment_distinct_per_gene_per_block
+</code>
+</a>. A gene is distinct in the environment if:
+</p>
+<ul>
+<li>It has a maximal expression level of at least 
+<code>min_distinct_gene_max_fraction
+</code>.
+</li>
+<li>When comparing its fold factor compared to its median expression level in the population, then the mean fold factor in the environment is at least 
+<code>min_distinct_gene_mean_fold
+</code>. This is not the absolute fold, that is, we only look for genes which are stronger than the population as a whole, not weaker.
+</li>
+</ul>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (required): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>gene, metacell @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, gene @ is
+<em>environment
+</em>distinct
+</strong>::Bool (created): A mask of genes that distinguish between cell states of each block&#39;s environment and the rest of the manifold.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!">
 <a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!
@@ -1278,6 +1882,51 @@
 <code>compute_vector_of_is_correlated_with_skeleton_per_gene!
 </code>
 </a> for the metacells in each neighborhood.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!(
+    daf::DafWriter;
+    min_gene_correlation::AbstractFloat = function_default(
+        compute_vector_of_is_correlated_with_skeleton_per_gene!,
+        :min_gene_correlation,
+    ),
+    min_gene_correlation_quantile::AbstractFloat = function_default(
+        compute_vector_of_is_correlated_with_skeleton_per_gene!,
+        :min_gene_correlation_quantile,
+    ),
+    genes_correlation_window::Integer = function_default(
+        compute_vector_of_is_correlated_with_skeleton_per_gene!,
+        :genes_correlation_window,
+    ),
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block">
+<code>matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
+</code>
+</a>. This just invokes 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_correlated_with_skeleton_per_gene!">
+<code>compute_vector_of_is_correlated_with_skeleton_per_gene!
+</code>
+</a> for the metacells in each environment.
 </p>
 </div>
 </section>
@@ -1397,7 +2046,7 @@
 </em>gene
 <em>in
 </em>neighborhood
-</strong>::AbstractString (created): The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block.
+</strong>::AbstractString (created): The most correlated neighborhood marker gene of each neighborhood marker gene per block.
 </p>
 <p>
 <strong>gene, block @ most
@@ -2456,7 +3105,7 @@
 </em>gene
 <em>in
 </em>neighborhood
-</strong>::AbstractString (required): The most correlated neighborhood marker gene of each (base) neighborhood marker gene per block.
+</strong>::AbstractString (required): The most correlated neighborhood marker gene of each neighborhood marker gene per block.
 </p>
 <p>Additional inputs may be used depending on the parameter(s).
 </p>
@@ -2706,8 +3355,38 @@
 </a>
 </li>
 <li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_marker_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!
 </code>
 </a>
 </li>
@@ -2772,6 +3451,18 @@
 </a>
 </li>
 <li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!
+</code>
+</a>
+</li>
+<li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!
 </code>
@@ -2798,6 +3489,12 @@
 <li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_total_UMIs_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_vector_of_total_UMIs_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!
 </code>
 </a>
 </li>
