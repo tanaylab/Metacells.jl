@@ -1126,6 +1126,36 @@
 </section>
 </details>
 </article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_is_environment_specific_per_gene_per_metacell(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of genes specifically expressed in each metacell relative to the median in its block&#39;s environment. Such genes are environment markers that are not correlated with any skeleton gene, and whose expression in the metacell has a significant fold factor (in either direction) from the median expression across the metacells in the block&#39;s environment.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_specific_per_gene_per_metacell!">
+<code>compute_matrix_of_is_environment_specific_per_gene_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h3 id="Metacells-Distances">
 <a class="docs-heading-anchor" href="#Metacells-Distances">Metacells Distances
 </a>
@@ -1694,6 +1724,40 @@
 </h3>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. This includes the metacells inside the block, so reducing it over each block&#39;s metacells gives the 
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
+<code>matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+</code>
+</a>.
+</p>
+<p>This matrix may be computed by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!">
+<code>compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
 <a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
 <code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
@@ -1710,7 +1774,7 @@
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The mean Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a symmetric matrix, and the diagonal is 0.
+<p>The mean Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a symmetric matrix, and the diagonal is the mean distance between the metacells inside each block.
 </p>
 <p>This matrix may be computed by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
@@ -1783,6 +1847,36 @@
 <p>This matrix may be computed by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!">
 <code>compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells which are included in each (row) metacell and are closest to each (column) block.
+</p>
+<p>This matrix may be computed by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!">
+<code>compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!
 </code>
 </a>.
 </p>
@@ -2108,17 +2202,13 @@
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>For each block, whether each metacell is in its environment. The environment of a block contains all the metacells of the blocks in the block&#39;s neighborhood; additional metacells may be added during sharpening based on the state of the previous round. This larger (environment) region of the manifold gives us more metacells for estimating local gene programs (modules).
+<p>For each block, whether each metacell is in its environment. The environment of a block contains all the metacells of the blocks in the block&#39;s neighborhood, plus any metacell whose mean distance to the block&#39;s metacells is close enough to the block&#39;s own (within-block) mean distance. This larger (environment) region of the manifold gives us more metacells for estimating local gene programs (modules).
 </p>
 <p>This matrix is populated by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!">
-<code>compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block!">
+<code>compute_matrix_of_is_in_environment_per_metacell_per_block!
 </code>
-</a> (using the neighborhoods as-is) or 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!">
-<code>compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!
-</code>
-</a> (adding metacells from a base repository).
+</a>.
 </p>
 </div>
 </section>
@@ -3600,6 +3690,42 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type">
+<code>Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The number of cells that were of each metacell type in the previous round and of each metacell type in the new. The metacell type of a cell is the type of the metacell of the cell. Both axes are the (shared) 
+<a href="contracts.html#Metacells.Contracts.type_axis">
+<code>type_axis
+</code>
+</a>; the 
+<code>prev_metacell_type
+</code> naming merely clarifies that the rows refer to the previous-round metacell types and the columns to the new ones.
+</p>
+<p>This matrix is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!">
+<code>compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.base_block_axis">
 <a class="docstring-binding" href="#Metacells.Contracts.base_block_axis">
 <code>Metacells.Contracts.base_block_axis
@@ -3740,6 +3866,12 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
 <code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 </code>
@@ -3790,6 +3922,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell">
+<code>Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell
 </code>
 </a>
 </li>
@@ -3872,6 +4010,12 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block">
 <code>Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 </code>
@@ -3916,6 +4060,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type">
 <code>Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type">
+<code>Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
 </code>
 </a>
 </li>

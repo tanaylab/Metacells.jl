@@ -59,6 +59,7 @@ Metacells.Contracts.vector_of_total_UMIs_per_metacell
 ```@docs
 Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
+Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell
 ```
 
 ### Metacells Distances
@@ -111,6 +112,7 @@ Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
 ### Blocks Distances
 
 ```@docs
+Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
 Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
 ```
 
@@ -119,6 +121,7 @@ Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_bloc
 ```@docs
 Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
+Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block
 ```
 
 ### Blocks Neighborhoods
@@ -215,6 +218,7 @@ Metacells.Contracts.matrix_of_is_strong_per_gene_per_base_block
 Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block
 Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type
+Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
 Metacells.Contracts.base_block_axis
 Metacells.Contracts.prev_block_axis
 ```

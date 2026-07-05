@@ -666,7 +666,9 @@
 </strong>
 </p>
 <p>
-<strong>type, type @ n_cells
+<strong>type, type @ n
+<em>cells
+</em>by_block
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of cells that were of each block type in the previous round and of each block type in the new.
 </p>
 <p>
@@ -719,6 +721,132 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!">
+<a class="docstring-binding" href="#Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!">
+<code>Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!(;
+    other_daf::DafWriter,
+    prev_daf::DafReader,
+    overwrite::Bool = false,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type">
+<code>matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
+</code>
+</a>. This counts, for each pair of a previous-round metacell type and an 
+<code>other_daf
+</code> metacell type, the cells that are of both. The metacell type of a cell is the type of the metacell of the cell. The (shared) 
+<a href="contracts.html#Metacells.Contracts.type_axis">
+<code>type_axis
+</code>
+</a> must be identical between the 
+<code>prev_daf
+</code> and the 
+<code>other_daf
+</code>.
+</p>
+<p>
+<strong>Other
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>type
+</strong> (required): Distinct named biological cell states.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ type
+</strong>::AbstractString (required): The type each metacell belongs to.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>type, type @ n
+<em>cells
+</em>by_metacell
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of cells that were of each metacell type in the previous round and of each metacell type in the new.
+</p>
+<p>
+<strong>Previous
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>type
+</strong> (required): Distinct named biological cell states.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ type
+</strong>::AbstractString (required): The type each metacell belongs to.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.SharpenMetacells.compute_vector_of_global_flow_order_per_type!">
 <a class="docstring-binding" href="#Metacells.SharpenMetacells.compute_vector_of_global_flow_order_per_type!">
 <code>Metacells.SharpenMetacells.compute_vector_of_global_flow_order_per_type!
@@ -751,11 +879,15 @@
 <code>final_daf
 </code> is the last round (round N); together they form the full sequence of rounds 0 to N, which must all share the same 
 <code>type
-</code> axis. For each consecutive pair of rounds we read the 
+</code> axis. For each consecutive pair of rounds we read both the 
 <a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type">
 <code>matrix_of_n_cells_per_prev_block_type_per_block_type
 </code>
-</a> (the type flow from the previous round) from the later round&#39;s repository, that is, from every repository except the first (round 0 has no previous round). We minimize the crossings using random-restart hill climbing (
+</a> and the 
+<a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type">
+<code>matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
+</code>
+</a> (the type flow from the previous round, by block type and by metacell type) from the later round&#39;s repository, that is, from every repository except the first (round 0 has no previous round). We minimize the combined (averaged) crossings of both using random-restart hill climbing (
 <code>restarts
 </code> restarts, since the problem is NP-hard) and write the resulting order only into 
 <code>final_daf
@@ -763,11 +895,9 @@
 </p>
 <p>The contract below is that of 
 <code>final_daf
-</code>. Each of the other repositories satisfies the same contract, except that the 
-<a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type">
-<code>matrix_of_n_cells_per_prev_block_type_per_block_type
-</code>
-</a> is absent from the first (round 0), and the 
+</code>. Each of the other repositories satisfies the same contract, except that the two 
+<code>n_cells
+</code> matrices are absent from the first (round 0), and the 
 <a href="contracts.html#Metacells.Contracts.vector_of_global_flow_order_per_type">
 <code>vector_of_global_flow_order_per_type
 </code>
@@ -792,8 +922,16 @@
 </strong>
 </p>
 <p>
-<strong>type, type @ n_cells
+<strong>type, type @ n
+<em>cells
+</em>by_block
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells that were of each block type in the previous round and of each block type in the new.
+</p>
+<p>
+<strong>type, type @ n
+<em>cells
+</em>by_metacell
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells that were of each metacell type in the previous round and of each metacell type in the new.
 </p>
 <p>
 <strong>Outputs
@@ -837,6 +975,12 @@
 <li>
 <a href="sharpen_metacells.html#Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_type_per_block_type!">
 <code>Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_type_per_block_type!
+</code>
+</a>
+</li>
+<li>
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!">
+<code>Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!
 </code>
 </a>
 </li>

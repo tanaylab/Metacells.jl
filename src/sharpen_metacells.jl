@@ -5,6 +5,7 @@ module SharpenMetacells
 
 export compute_matrix_of_n_cells_per_prev_block_per_block!
 export compute_matrix_of_n_cells_per_prev_block_type_per_block_type!
+export compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!
 export compute_vector_of_global_flow_order_per_type!
 export sharpen_metacells!
 
@@ -39,6 +40,7 @@ import Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_p
 import Metacells.Contracts.matrix_of_module_per_gene_per_block
 import Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block
 import Metacells.Contracts.matrix_of_n_cells_per_prev_block_type_per_block_type
+import Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
 import Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.module_axis
@@ -58,6 +60,7 @@ import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_type_per_block
+import Metacells.Contracts.vector_of_type_per_metacell
 
 struct KmeansSizesBuffers{T <: AbstractFloat}
     max_best_assignments::Vector{Int}
@@ -2883,7 +2886,79 @@ $(CONTRACT2)
         end
     end
 
-    set_matrix!(other_daf, "type", "type", "n_cells", bestify(n_cells_per_prev_block_type_per_block_type); overwrite)
+    set_matrix!(
+        other_daf,
+        "type",
+        "type",
+        "n_cells_by_block",
+        bestify(n_cells_per_prev_block_type_per_block_type);
+        overwrite,
+    )
+
+    return nothing
+end
+
+"""
+    compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!(;
+        other_daf::DafWriter,
+        prev_daf::DafReader,
+        overwrite::Bool = false,
+    )::Nothing
+
+Compute and set [`matrix_of_n_cells_per_prev_metacell_type_per_metacell_type`](@ref). This counts, for each pair of a
+previous-round metacell type and an `other_daf` metacell type, the cells that are of both. The metacell type of a cell is
+the type of the metacell of the cell. The (shared) [`type_axis`](@ref) must be identical between the `prev_daf` and the
+`other_daf`.
+
+# Other
+
+$(CONTRACT1)
+
+# Previous
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "other_daf",
+    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), type_axis(RequiredInput)],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_type_per_metacell(RequiredInput),
+        matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(CreatedOutput),
+    ],
+) Contract(;
+    name = "prev_daf",
+    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), type_axis(RequiredInput)],
+    data = [vector_of_metacell_per_cell(RequiredInput), vector_of_type_per_metacell(RequiredInput)],
+) function compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!(;
+    other_daf::DafWriter,
+    prev_daf::DafReader,
+    overwrite::Bool = false,
+)::Nothing
+    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") "the cells differ between `other_daf` and `prev_daf`"
+    @assert axis_vector(other_daf, "type") == axis_vector(prev_daf, "type") "the types differ between `other_daf` and `prev_daf`"
+
+    n_types = axis_length(other_daf, "type")
+
+    metacell_type_index_per_cell = other_daf["@ cell : metacell ?? 0 : type ?? 0 : index"].array
+    prev_metacell_type_index_per_cell = prev_daf["@ cell : metacell ?? 0 : type ?? 0 : index"].array
+
+    n_cells_per_prev_metacell_type_per_metacell_type = zeros(UInt32, n_types, n_types)
+    for (prev_metacell_type_index, metacell_type_index) in
+        zip(prev_metacell_type_index_per_cell, metacell_type_index_per_cell)
+        if prev_metacell_type_index > 0 && metacell_type_index > 0
+            n_cells_per_prev_metacell_type_per_metacell_type[prev_metacell_type_index, metacell_type_index] += 1
+        end
+    end
+
+    set_matrix!(
+        other_daf,
+        "type",
+        "type",
+        "n_cells_by_metacell",
+        bestify(n_cells_per_prev_metacell_type_per_metacell_type);
+        overwrite,
+    )
 
     return nothing
 end
@@ -3035,22 +3110,21 @@ end
 # crossings is NP-hard, we use random-restart hill climbing using the exact crossing count, seeding one restart with the
 # types ordered by their total number of cells.
 function compute_global_flow_order_per_type(
-    n_cells_per_prev_block_type_per_block_type_per_transition::AbstractVector{<:AbstractMatrix{<:Real}};
+    n_cells_per_prev_type_per_type_per_transition::AbstractVector{<:AbstractMatrix{<:Real}};
     restarts::Integer,
     rng::AbstractRNG,
 )::Vector{Int}
     @assert restarts >= 1
-    @assert !isempty(n_cells_per_prev_block_type_per_block_type_per_transition)
-    n_types = size(n_cells_per_prev_block_type_per_block_type_per_transition[1], 1)
-    n_transitions = length(n_cells_per_prev_block_type_per_block_type_per_transition)
+    @assert !isempty(n_cells_per_prev_type_per_type_per_transition)
+    n_types = size(n_cells_per_prev_type_per_type_per_transition[1], 1)
+    n_transitions = length(n_cells_per_prev_type_per_type_per_transition)
 
     base_type_per_edge_per_transition = Vector{Vector{Int}}(undef, n_transitions)
     type_per_edge_per_transition = Vector{Vector{Int}}(undef, n_transitions)
     n_cells_per_edge_per_transition = Vector{Vector{Float64}}(undef, n_transitions)
     total_cells_per_type = zeros(Float64, n_types)
     for transition_index in 1:n_transitions
-        n_cells_per_prev_block_type_per_block_type =
-            n_cells_per_prev_block_type_per_block_type_per_transition[transition_index]
+        n_cells_per_prev_block_type_per_block_type = n_cells_per_prev_type_per_type_per_transition[transition_index]
         @assert size(n_cells_per_prev_block_type_per_block_type) == (n_types, n_types)
         base_type_per_edge = Int[]
         type_per_edge = Int[]
@@ -3116,14 +3190,15 @@ crossings of the type flow across the sharpening rounds.
 
 The `base_daf_per_round` are the repositories of the earlier rounds (rounds 0 to N-1) and `final_daf` is the last round
 (round N); together they form the full sequence of rounds 0 to N, which must all share the same `type` axis. For each
-consecutive pair of rounds we read the [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) (the type flow from the
-previous round) from the later round's repository, that is, from every repository except the first (round 0 has no
-previous round). We minimize the crossings using random-restart hill climbing (`restarts` restarts, since the problem is
-NP-hard) and write the resulting order only into `final_daf`.
+consecutive pair of rounds we read both the [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) and the
+[`matrix_of_n_cells_per_prev_metacell_type_per_metacell_type`](@ref) (the type flow from the previous round, by block type
+and by metacell type) from the later round's repository, that is, from every repository except the first (round 0 has no
+previous round). We minimize the combined (averaged) crossings of both using random-restart hill climbing (`restarts`
+restarts, since the problem is NP-hard) and write the resulting order only into `final_daf`.
 
-The contract below is that of `final_daf`. Each of the other repositories satisfies the same contract, except that the
-[`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) is absent from the first (round 0), and the
-[`vector_of_global_flow_order_per_type`](@ref) output is created only in `final_daf` (the last).
+The contract below is that of `final_daf`. Each of the other repositories satisfies the same contract, except that the two
+`n_cells` matrices are absent from the first (round 0), and the [`vector_of_global_flow_order_per_type`](@ref) output is
+created only in `final_daf` (the last).
 
 $(CONTRACT)
 """
@@ -3131,6 +3206,7 @@ $(CONTRACT)
     axes = [type_axis(RequiredInput)],
     data = [
         matrix_of_n_cells_per_prev_block_type_per_block_type(RequiredInput),
+        matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(RequiredInput),
         vector_of_global_flow_order_per_type(CreatedOutput),
     ],
 ) function compute_vector_of_global_flow_order_per_type!(
@@ -3149,22 +3225,33 @@ $(CONTRACT)
         @assert axis_vector(base_daf, "type") == type_names "the types differ between the round repositories"
     end
 
-    n_cells_per_prev_block_type_per_block_type_per_transition = AbstractMatrix{<:Real}[]
+    # The order minimizes the total crossings over both the by-block and by-metacell type-flow matrices of each
+    # transition, which (up to a constant factor) is the average of the two.
+    n_cells_per_prev_type_per_type_per_transition = AbstractMatrix{<:Real}[]
     for round_index in 2:n_rounds
         base_daf = base_daf_per_round[round_index]
-        @assert has_matrix(base_daf, "type", "type", "n_cells") "missing the n_cells_per_prev_block_type_per_block_type matrix"
+        @assert has_matrix(base_daf, "type", "type", "n_cells_by_block") "missing the n_cells_by_block matrix"
+        @assert has_matrix(base_daf, "type", "type", "n_cells_by_metacell") "missing the n_cells_by_metacell matrix"
         push!(
-            n_cells_per_prev_block_type_per_block_type_per_transition,
-            get_matrix(base_daf, "type", "type", "n_cells").array,
+            n_cells_per_prev_type_per_type_per_transition,
+            get_matrix(base_daf, "type", "type", "n_cells_by_block").array,
+        )
+        push!(
+            n_cells_per_prev_type_per_type_per_transition,
+            get_matrix(base_daf, "type", "type", "n_cells_by_metacell").array,
         )
     end
     push!(
-        n_cells_per_prev_block_type_per_block_type_per_transition,
-        get_matrix(final_daf, "type", "type", "n_cells").array,
+        n_cells_per_prev_type_per_type_per_transition,
+        get_matrix(final_daf, "type", "type", "n_cells_by_block").array,
+    )
+    push!(
+        n_cells_per_prev_type_per_type_per_transition,
+        get_matrix(final_daf, "type", "type", "n_cells_by_metacell").array,
     )
 
     global_flow_order_per_type =
-        compute_global_flow_order_per_type(n_cells_per_prev_block_type_per_block_type_per_transition; restarts, rng)
+        compute_global_flow_order_per_type(n_cells_per_prev_type_per_type_per_transition; restarts, rng)
     set_vector!(final_daf, "type", "global_flow_order", UInt32.(global_flow_order_per_type); overwrite)
 
     return nothing

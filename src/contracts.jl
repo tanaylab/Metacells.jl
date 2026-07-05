@@ -30,6 +30,7 @@ export cell_axis
 export gene_axis
 export matrix_of_cells_dispersion_per_metacell_per_module
 export matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
+export matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block
 export matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 export matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
 export matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
@@ -39,6 +40,7 @@ export matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 export matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 export matrix_of_is_environment_distinct_per_gene_per_block
 export matrix_of_is_environment_marker_per_gene_per_block
+export matrix_of_is_environment_specific_per_gene_per_metacell
 export matrix_of_is_found_per_module_per_block
 export matrix_of_is_in_environment_per_metacell_per_block
 export matrix_of_is_in_neighborhood_per_block_per_block
@@ -52,6 +54,7 @@ export matrix_of_log_linear_fraction_per_gene_per_block
 export matrix_of_log_linear_fraction_per_gene_per_metacell
 export matrix_of_max_skeleton_fold_distance_between_metacells
 export matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+export matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
 export matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 export matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_module_per_gene_per_block
@@ -60,6 +63,7 @@ export matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
 export matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 export matrix_of_n_cells_per_prev_block_per_block
 export matrix_of_n_cells_per_prev_block_type_per_block_type
+export matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
 export matrix_of_n_genes_per_module_per_block
 export matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 export matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
@@ -613,6 +617,29 @@ function matrix_of_log_linear_fraction_per_gene_per_metacell(
     )
 end
 
+"""
+    matrix_of_is_environment_specific_per_gene_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+A mask of genes specifically expressed in each metacell relative to the median in its block's environment. Such genes
+are environment markers that are not correlated with any skeleton gene, and whose expression in the metacell has a
+significant fold factor (in either direction) from the median expression across the metacells in the block's
+environment.
+
+This matrix is populated by [`compute_matrix_of_is_environment_specific_per_gene_per_metacell!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_specific_per_gene_per_metacell!).
+"""
+function matrix_of_is_environment_specific_per_gene_per_metacell(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "metacell", "is_environment_specific") => (
+        expectation,
+        Bool,
+        "A mask of genes specifically expressed in each metacell relative to the median in its block's environment.",
+    )
+end
+
 ### Metacells Distances
 
 """
@@ -910,7 +937,7 @@ end
     )::Pair{MatrixKey, DataSpecification}
 
 The mean Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a symmetric matrix,
-and the diagonal is 0.
+and the diagonal is the mean distance between the metacells inside each block.
 
 This matrix may be computed by [`compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!).
@@ -922,6 +949,28 @@ function matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(
         expectation,
         StorageFloat,
         "The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.",
+    )
+end
+
+"""
+    matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. This includes
+the metacells inside the block, so reducing it over each block's metacells gives the
+[`matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks`](@ref).
+
+This matrix may be computed by [`compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!).
+"""
+function matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("metacell", "block", "mean_euclidean_skeleton_fold_distance") => (
+        expectation,
+        StorageFloat,
+        "The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.",
     )
 end
 
@@ -965,6 +1014,26 @@ function matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
         expectation,
         StorageUnsigned,
         "The number of cells which are included in each column (block) and are closest to each (row) block.",
+    )
+end
+
+"""
+    matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The number of cells which are included in each (row) metacell and are closest to each (column) block.
+
+This matrix may be computed by [`compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!).
+"""
+function matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("metacell", "block", "confusion_by_closest_by_pertinent_markers") => (
+        expectation,
+        StorageUnsigned,
+        "The number of cells which are included in each (row) metacell and are closest to each (column) block.",
     )
 end
 
@@ -1148,15 +1217,12 @@ end
     )::Pair{MatrixKey, DataSpecification}
 
 For each block, whether each metacell is in its environment. The environment of a block contains all the
-metacells of the blocks in the block's neighborhood; additional metacells may be added during sharpening based on the
-state of the previous round. This larger (environment) region of the manifold gives us more metacells for estimating
-local gene programs (modules).
+metacells of the blocks in the block's neighborhood, plus any metacell whose mean distance to the block's metacells is
+close enough to the block's own (within-block) mean distance. This larger (environment) region of the manifold gives us
+more metacells for estimating local gene programs (modules).
 
-This matrix is populated by [`compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!) (using the neighborhoods
-as-is) or [`compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!) (adding metacells from a
-base repository).
+This matrix is populated by [`compute_matrix_of_is_in_environment_per_metacell_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block!).
 """
 function matrix_of_is_in_environment_per_metacell_per_block(
     expectation::ContractExpectation,
@@ -2058,10 +2124,33 @@ Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_type_per_blo
 function matrix_of_n_cells_per_prev_block_type_per_block_type(
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
-    return ("type", "type", "n_cells") => (
+    return ("type", "type", "n_cells_by_block") => (
         expectation,
         StorageUnsigned,
         "The number of cells that were of each block type in the previous round and of each block type in the new.",
+    )
+end
+
+"""
+    matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The number of cells that were of each metacell type in the previous round and of each metacell type in the new. The
+metacell type of a cell is the type of the metacell of the cell. Both axes are the (shared) [`type_axis`](@ref); the
+`prev_metacell_type` naming merely clarifies that the rows refer to the previous-round metacell types and the columns to
+the new ones.
+
+This matrix is populated by [`compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!`](@ref
+Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!).
+"""
+function matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("type", "type", "n_cells_by_metacell") => (
+        expectation,
+        StorageUnsigned,
+        "The number of cells that were of each metacell type in the previous round and of each metacell type in the new.",
     )
 end
 

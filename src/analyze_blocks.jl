@@ -5,6 +5,7 @@ module AnalyzeBlocks
 
 export compute_correlation_with_most_for_base_block!
 export compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!
+export compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!
 export compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 export compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!
 export compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
@@ -12,8 +13,8 @@ export compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per
 export compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!
 export compute_matrix_of_is_environment_distinct_per_gene_per_block!
 export compute_matrix_of_is_environment_marker_per_gene_per_block!
-export compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!
-export compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!
+export compute_matrix_of_is_environment_specific_per_gene_per_metacell!
+export compute_matrix_of_is_in_environment_per_metacell_per_block!
 export compute_matrix_of_is_in_neighborhood_per_block_per_block!
 export compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
 export compute_matrix_of_is_neighborhood_marker_per_gene_per_block!
@@ -21,6 +22,7 @@ export compute_matrix_of_is_strong_per_gene_per_block!
 export compute_matrix_of_linear_fraction_per_gene_per_block!
 export compute_matrix_of_log_linear_fraction_per_gene_per_block!
 export compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
+export compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!
 export compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
 export compute_matrix_of_UMIs_per_gene_per_block!
 export compute_vector_of_block_closest_by_pertinent_markers_per_cell!
@@ -65,6 +67,7 @@ import Metacells.Contracts.matrix_of_UMIs_per_gene_per_block
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
+import Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block
 import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
 import Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
@@ -73,6 +76,7 @@ import Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_
 import Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block
+import Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
 import Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
@@ -83,6 +87,7 @@ import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
 import Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.metacell_axis
@@ -329,17 +334,60 @@ $(CONTRACT)
 end
 
 """
-    function compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(
+    function compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(
         daf::DafWriter;
         overwrite::Bool = false,
     )::Nothing
 
-The maximal significant skeleton genes fractions fold factor between metacells of the blocks.
+Compute and set [`matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block`](@ref), the mean Euclidean
+skeleton genes fractions distance between each metacell and the metacells of each block. The block's own metacells are
+included, so reducing this over each block's metacells (see
+[`compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!`](@ref)) gives the mean distance between the
+blocks, with the mean distance between the metacells inside each block on the diagonal.
+
+$(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
     axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
         matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(CreatedOutput),
+    ],
+) function compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+    mean_distance_per_metacell_per_block =
+        daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance |/ block =@ >| Mean"].array
+    set_matrix!(
+        daf,
+        "metacell",
+        "block",
+        "mean_euclidean_skeleton_fold_distance",
+        mean_distance_per_metacell_per_block;
+        overwrite,
+    )
+    return nothing
+end
+
+"""
+    function compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(
+        daf::DafWriter;
+        overwrite::Bool = false,
+    )::Nothing
+
+Compute and set [`matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks`](@ref), the mean Euclidean skeleton
+genes fractions distance between the metacells of the blocks, by reducing
+[`matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block`](@ref) over the metacells of each block. The
+diagonal is the mean distance between the metacells inside each block.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
         matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(CreatedOutput),
     ],
@@ -347,56 +395,14 @@ The maximal significant skeleton genes fractions fold factor between metacells o
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
-    n_metacells = axis_length(daf, "metacell")
-    n_blocks = axis_length(daf, "block")
-
-    distances_between_metacells = get_matrix(daf, "metacell", "metacell", "euclidean_skeleton_fold_distance").array
-
-    block_index_per_metacell = get_query(daf, "@ metacell : block : index").array
-    metacell_indices_per_block = collect_group_members(block_index_per_metacell)
-
-    mean_distances_between_blocks = Matrix{Float32}(undef, n_blocks, n_blocks)
-
-    parallel_loop_wo_rng(
-        reverse(1:n_blocks);
-        progress = DebugProgress(
-            n_blocks;
-            group = :mcs_loops,
-            desc = "mean_euclidean_skeleton_fold_distance_between_blocks",
-        ),
-    ) do base_block_index
-        indices_of_base_metacells = metacell_indices_per_block[base_block_index]
-        @views distance_per_metacell_per_base_metacell = distances_between_metacells[:, indices_of_base_metacells]
-
-        mean_distance_from_base_per_metacell = vec(mean(distance_per_metacell_per_base_metacell; dims = 2))  # NOLINT
-        @assert_vector(mean_distance_from_base_per_metacell, n_metacells)
-
-        for other_block_index in 1:base_block_index
-            indices_of_other_metacells = metacell_indices_per_block[other_block_index]
-            n_other_block_metacells = length(indices_of_other_metacells)
-            @assert n_other_block_metacells > 0
-
-            mean_distance_between_base_and_other_block = 0.0
-            for other_metacell_index in 1:n_other_block_metacells
-                mean_distance_between_base_and_other_block += mean_distance_from_base_per_metacell[other_metacell_index]
-            end
-            mean_distance_between_base_and_other_block /= n_other_block_metacells
-
-            mean_distances_between_blocks[base_block_index, other_block_index] =
-                mean_distance_between_base_and_other_block
-            mean_distances_between_blocks[other_block_index, base_block_index] =
-                mean_distance_between_base_and_other_block
-        end
-
-        return nothing
-    end
-
+    mean_distance_per_block_per_block =
+        daf["@ block @ metacell :: mean_euclidean_skeleton_fold_distance |/ block =@ >| Mean"].array
     set_matrix!(
         daf,
         "block",
         "block",
         "mean_euclidean_skeleton_fold_distance",
-        mean_distances_between_blocks;
+        mean_distance_per_block_per_block;
         overwrite,
     )
     return nothing
@@ -544,6 +550,46 @@ $(CONTRACT)
 
     @debug "Stable cells: $(n_stable_cells) ($(percent(n_stable_cells, n_grouped_cells)))" _group = :mcs_results
 
+    return nothing
+end
+
+"""
+    compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!(daf::DafWriter; overwrite::Bool = false)::Nothing
+
+Compute and set [`matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block`](@ref).
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_closest_by_pertinent_markers_per_cell(RequiredInput),
+        matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block(CreatedOutput),
+    ],
+) function compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!(
+    daf::DafWriter;
+    overwrite::Bool = false,
+)::Nothing
+    n_metacells = axis_length(daf, "metacell")
+    n_blocks = axis_length(daf, "block")
+
+    closest_block_index_per_grouped_cell = daf["@ cell [ metacell ] : block.closest_by_pertinent_markers : index"].array
+    metacell_index_per_grouped_cell = daf["@ cell [ metacell ] : metacell : index"].array
+
+    confusion_per_metacell_per_block = zeros(UInt32, n_metacells, n_blocks)
+    for (closest_block_index, metacell_index) in
+        zip(closest_block_index_per_grouped_cell, metacell_index_per_grouped_cell)
+        confusion_per_metacell_per_block[metacell_index, closest_block_index] += 1
+    end
+
+    set_matrix!(
+        daf,
+        "metacell",
+        "block",
+        "confusion_by_closest_by_pertinent_markers",
+        confusion_per_metacell_per_block;
+        overwrite,
+    )
     return nothing
 end
 
@@ -1329,6 +1375,126 @@ $(CONTRACT)
     @debug "Mean distincts in environment: $(sum(is_environment_distinct_per_gene_per_block) / n_blocks)" _group =
         :mcs_results
 
+    return nothing
+end
+
+"""
+    compute_matrix_of_is_environment_specific_per_gene_per_metacell!(
+        daf::DafWriter;
+        min_rare_gene_fold_factor::AbstractFloat = $(DEFAULT.min_rare_gene_fold_factor),
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`matrix_of_is_environment_specific_per_gene_per_metacell`](@ref). A gene is specific in a metacell if:
+
+  - It is a marker in the metacell's block environment which is not correlated with any skeleton gene in that
+    environment. Such genes are not captured by the correlation-based gene modules, so identifying them lets us preserve
+    rare behaviors that are expressed in only a few metacells.
+  - The fold factor (in either direction) between its expression in the metacell and its median expression across the
+    metacells in the block's environment is at least `min_rare_gene_fold_factor`. As usual, we only consider the fold
+    factor if it is based on at least `min_significant_gene_UMIs`, counting the metacell UMIs of the gene plus the
+    environment median normalized to the metacell size.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(
+    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
+        matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
+        matrix_of_is_in_environment_per_metacell_per_block(RequiredInput),
+        matrix_of_is_environment_marker_per_gene_per_block(RequiredInput),
+        matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(RequiredInput),
+        matrix_of_is_environment_specific_per_gene_per_metacell(CreatedOutput),
+    ],
+) function compute_matrix_of_is_environment_specific_per_gene_per_metacell!(
+    daf::DafWriter;
+    min_rare_gene_fold_factor::AbstractFloat = 2.0,
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
+    overwrite::Bool = false,
+)::Nothing
+    @assert min_rare_gene_fold_factor >= 0
+    @assert min_significant_gene_UMIs >= 0
+    @assert gene_fraction_regularization > 0
+
+    n_genes = axis_length(daf, "gene")
+    n_metacells = axis_length(daf, "metacell")
+    n_blocks = axis_length(daf, "block")
+
+    block_index_per_metacell = daf["@ metacell : block : index"].array
+    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
+    UMIs_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "UMIs").array
+    linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "linear_fraction").array
+    log_linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "log_linear_fraction").array
+    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
+    is_environment_marker_per_gene_per_block = get_matrix(daf, "gene", "block", "is_environment_marker").array
+    is_correlated_with_skeleton_in_environment_per_gene_per_block =
+        get_matrix(daf, "gene", "block", "is_correlated_with_skeleton_in_environment").array
+
+    is_environment_specific_per_gene_per_metacell = zeros(Bool, n_genes, n_metacells)
+
+    # Each metacell belongs to a single block, so blocks write disjoint metacell columns; weight blocks heaviest-first
+    # by their environment metacell count (the median is computed over them).
+    n_environment_metacells_per_block = vec(sum(is_in_environment_per_metacell_per_block; dims = 1))
+    parallel_loop_wo_rng(
+        1:n_blocks;
+        weights = n_environment_metacells_per_block,
+        progress = DebugProgress(
+            sum(n_environment_metacells_per_block);
+            group = :mcs_loops,
+            desc = "is_environment_specific_per_gene_per_metacell",
+        ),
+    ) do block_index
+        @views is_in_environment_per_metacell = is_in_environment_per_metacell_per_block[:, block_index]
+        indices_of_environment_metacells = findall(is_in_environment_per_metacell)
+        indices_of_block_metacells = findall(block_index_per_metacell .== block_index)
+
+        @views is_environment_marker_per_gene = is_environment_marker_per_gene_per_block[:, block_index]
+        @views is_correlated_with_skeleton_in_environment_per_gene =
+            is_correlated_with_skeleton_in_environment_per_gene_per_block[:, block_index]
+        is_candidate_per_gene = is_environment_marker_per_gene .& .!is_correlated_with_skeleton_in_environment_per_gene
+        indices_of_candidate_genes = findall(is_candidate_per_gene)
+
+        linear_fraction_per_candidate_gene_per_environment_metacell =
+            linear_fraction_per_gene_per_metacell[indices_of_candidate_genes, indices_of_environment_metacells]
+        median_linear_fraction_per_candidate_gene =
+            vec(median(linear_fraction_per_candidate_gene_per_environment_metacell; dims = 2))  # NOLINT
+
+        UMIs_per_candidate_gene_per_block_metacell =
+            UMIs_per_gene_per_metacell[indices_of_candidate_genes, indices_of_block_metacells]
+        log_fraction_per_candidate_gene_per_block_metacell =
+            log_linear_fraction_per_gene_per_metacell[indices_of_candidate_genes, indices_of_block_metacells]
+        total_UMIs_per_block_metacell = total_UMIs_per_metacell[indices_of_block_metacells]
+
+        fold_per_candidate_gene_per_block_metacell =
+            log_fraction_per_candidate_gene_per_block_metacell .-
+            log2.(median_linear_fraction_per_candidate_gene .+ gene_fraction_regularization)
+        significant_UMIs_per_candidate_gene_per_block_metacell =
+            UMIs_per_candidate_gene_per_block_metacell .+
+            median_linear_fraction_per_candidate_gene .* transpose(total_UMIs_per_block_metacell)
+
+        is_environment_specific_per_gene_per_metacell[indices_of_candidate_genes, indices_of_block_metacells] .=
+            (abs.(fold_per_candidate_gene_per_block_metacell) .>= min_rare_gene_fold_factor) .&
+            (significant_UMIs_per_candidate_gene_per_block_metacell .>= min_significant_gene_UMIs)
+        return nothing
+    end
+
+    set_matrix!(
+        daf,
+        "gene",
+        "metacell",
+        "is_environment_specific",
+        bestify(is_environment_specific_per_gene_per_metacell);
+        overwrite,
+    )
+    @debug "Mean specific genes per metacell: $(sum(is_environment_specific_per_gene_per_metacell) / n_metacells)" _group =
+        :mcs_results
     return nothing
 end
 
@@ -3117,16 +3283,19 @@ $(CONTRACT)
 end
 
 """
-    compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!(
+    compute_matrix_of_is_in_environment_per_metacell_per_block!(
         daf::DafWriter;
+        max_environment_metacell_relative_distance::AbstractFloat = $(DEFAULT.max_environment_metacell_relative_distance),
+        environment_distance_base_quantile::AbstractFloat = $(DEFAULT.environment_distance_base_quantile),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set (in `daf`) [`matrix_of_is_in_environment_per_metacell_per_block`](@ref) using each block's neighborhood
-as-is as its environment: the environment of each block contains exactly the metacells of the blocks in its
-neighborhood. This is used for the first round of sharpening, where there is no base (previous, unsharpened) repository
-to add metacells from. See [`compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!`](@ref) for the variant
-that uses such a repository.
+Compute and set [`matrix_of_is_in_environment_per_metacell_per_block`](@ref). The environment of each block starts with
+all the metacells of the blocks in its neighborhood, and adds any metacell whose mean distance to the block's metacells
+is at most `max_environment_metacell_relative_distance` times the block's basis distance: the
+`environment_distance_base_quantile` quantile of the mean distance of the block's neighborhood metacells to the block
+metacells. This larger (environment) region of the manifold gives us more metacells for estimating local gene programs
+(modules).
 
 $(CONTRACT)
 """
@@ -3134,147 +3303,63 @@ $(CONTRACT)
     axes = [block_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
+        matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
         matrix_of_is_in_environment_per_metacell_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!(
+) function compute_matrix_of_is_in_environment_per_metacell_per_block!(
     daf::DafWriter;
+    max_environment_metacell_relative_distance::AbstractFloat = 0.5,
+    environment_distance_base_quantile::AbstractFloat = 0.95,
     overwrite::Bool = false,
 )::Nothing
+    @assert max_environment_metacell_relative_distance >= 0
+    @assert 0 < environment_distance_base_quantile <= 1
+
     is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    mean_distance_per_metacell_per_block =
+        get_matrix(daf, "metacell", "block", "mean_euclidean_skeleton_fold_distance").array
     block_index_per_metacell = daf["@ metacell : block : index"].array
-    is_in_environment_per_metacell_per_block =
+
+    n_blocks = axis_length(daf, "block")
+
+    is_in_neighborhood_per_metacell_per_block =
         is_in_neighborhood_per_other_block_per_base_block[block_index_per_metacell, :]
-    set_matrix!(daf, "metacell", "block", "is_in_environment", is_in_environment_per_metacell_per_block; overwrite)
-    return nothing
-end
 
-"""
-    compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!(;
-        daf::DafWriter,
-        base_daf::DafReader,
-        min_environment_metacell_nearby_fraction::AbstractFloat = $(DEFAULT.min_environment_metacell_nearby_fraction),
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
+    # Seed each block's environment with the metacells of the blocks in its neighborhood.
+    is_in_environment_per_metacell_per_block = copy(is_in_neighborhood_per_metacell_per_block)
 
-Compute and set (in `daf`) [`matrix_of_is_in_environment_per_metacell_per_block`](@ref). The environment of each block
-starts with all the metacells of the blocks in its neighborhood, exactly as
-[`compute_matrix_of_is_in_environment_per_metacell_per_block_by_self!`](@ref). We then add metacells using the previous
-(unsharpened) round's `base_daf`: two cells are nearby if one's base block is in the other's base neighborhood, and a
-metacell is added to a block's environment if, for at least one metacell of the block, the fraction of nearby (cell,
-other cell) pairs out of all of their cell pairs is at least `min_environment_metacell_nearby_fraction`.
-
-# Daf
-
-$(CONTRACT1)
-
-# Base
-
-$(CONTRACT2)
-"""
-@logged :mcs_ops @computation Contract(;
-    name = "daf",
-    axes = [cell_axis(RequiredInput), block_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        vector_of_metacell_per_cell(RequiredInput),
-        vector_of_block_per_metacell(RequiredInput),
-        vector_of_n_cells_per_metacell(RequiredInput),
-        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
-        matrix_of_is_in_environment_per_metacell_per_block(CreatedOutput),
-    ],
-) Contract(;
-    name = "base_daf",
-    axes = [cell_axis(RequiredInput), block_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        vector_of_metacell_per_cell(RequiredInput),
-        vector_of_block_per_metacell(RequiredInput),
-        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
-    ],
-) function compute_matrix_of_is_in_environment_per_metacell_per_block_by_base!(;
-    daf::DafWriter,
-    base_daf::DafReader,
-    min_environment_metacell_nearby_fraction::AbstractFloat = 0.8,
-    overwrite::Bool = false,
-)::Nothing
-    @assert 0 < min_environment_metacell_nearby_fraction <= 1
-    @assert axis_vector(daf, "cell") == axis_vector(base_daf, "cell") "the cells differ between `daf` and `base_daf`"
-
-    n_cells = axis_length(daf, "cell")
-    n_base_blocks = axis_length(base_daf, "block")
-    n_new_blocks = axis_length(daf, "block")
-    n_new_metacells = axis_length(daf, "metacell")
-
-    base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
-    new_metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
-    new_block_index_per_new_metacell = daf["@ metacell : block : index"].array
-    n_cells_per_new_metacell = Float64.(get_vector(daf, "metacell", "n_cells").array)
-    is_in_neighborhood_per_other_new_block_per_new_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
-    is_in_neighborhood_per_other_base_block_per_base_block =
-        get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
-
-    # n_cells_per_base_block_per_new_metacell[base_block, new_metacell] = cells of the new metacell whose base block is
-    # that base block. Cells with no base metacell or no new metacell (index 0) are skipped.
-    n_cells_per_base_block_per_new_metacell = zeros(Float32, n_base_blocks, n_new_metacells)
-    for cell_index in 1:n_cells
-        base_block_index = base_block_index_per_cell[cell_index]
-        new_metacell_index = new_metacell_index_per_cell[cell_index]
-        if base_block_index > 0 && new_metacell_index > 0
-            n_cells_per_base_block_per_new_metacell[base_block_index, new_metacell_index] += 1
-        end
-    end
-
-    # For each base block and new metacell, the number of the metacell's cells whose base block is in that base block's
-    # neighborhood (a metacell joins a block's environment when its cells fall in the block's neighborhood).
-    n_nearby_cells_per_base_block_per_new_metacell =
-        is_in_neighborhood_per_other_base_block_per_base_block' * n_cells_per_base_block_per_new_metacell
-    n_cells_per_new_metacell_per_base_block = transpose(n_cells_per_base_block_per_new_metacell)
-
-    # Each new metacell's environment membership in each new block, in block-per-metacell layout so that each metacell is
-    # a contiguous column. Start from the neighborhood metacells (as in the `by_self` variant), then add the metacells
-    # whose cells are nearby enough.
-    is_in_environment_per_new_block_per_new_metacell = zeros(Bool, n_new_blocks, n_new_metacells)
-    nearby_pairs_per_other_new_metacell_per_thread = [Vector{Float32}(undef, n_new_metacells) for _ in 1:maxthreadid()]
-
+    # Add any metacell whose mean distance to a block's metacells is within the relative threshold of the block's basis
+    # distance: the `environment_distance_base_quantile` quantile of the mean distance of the block's neighborhood
+    # metacells to the block's metacells. Per-block work scales with the neighborhood metacell count; weight blocks
+    # heaviest-first by that count.
+    n_neighborhood_metacells_per_block = vec(sum(is_in_neighborhood_per_metacell_per_block; dims = 1))
+    basis_distance_per_block = Vector{Float32}(undef, n_blocks)
     parallel_loop_wo_rng(
-        1:n_new_metacells;
+        1:n_blocks;
+        weights = n_neighborhood_metacells_per_block,
         progress = DebugProgress(
-            n_new_metacells;
+            sum(n_neighborhood_metacells_per_block);
             group = :mcs_loops,
-            desc = "is_in_environment_per_metacell_per_block",
+            desc = "basis_distance_per_block",
         ),
-    ) do new_metacell_index
-        nearby_pairs_per_other_new_metacell = nearby_pairs_per_other_new_metacell_per_thread[threadid()]
-        n_nearby_cells_per_base_block = @view n_nearby_cells_per_base_block_per_new_metacell[:, new_metacell_index]
-        mul!(
-            nearby_pairs_per_other_new_metacell,
-            n_cells_per_new_metacell_per_base_block,
-            n_nearby_cells_per_base_block,
-        )
-
-        is_in_environment_per_new_block = @view is_in_environment_per_new_block_per_new_metacell[:, new_metacell_index]
-        new_block_index = new_block_index_per_new_metacell[new_metacell_index]
-        is_in_environment_per_new_block .=
-            @view is_in_neighborhood_per_other_new_block_per_new_block[new_block_index, :]
-
-        n_cells_in_new_metacell = n_cells_per_new_metacell[new_metacell_index]
-        for other_new_metacell_index in 1:n_new_metacells
-            nearby_fraction =
-                nearby_pairs_per_other_new_metacell[other_new_metacell_index] /
-                (n_cells_per_new_metacell[other_new_metacell_index] * n_cells_in_new_metacell)
-            if nearby_fraction >= min_environment_metacell_nearby_fraction
-                is_in_environment_per_new_block[new_block_index_per_new_metacell[other_new_metacell_index]] = true
-            end
-        end
-
+    ) do block_index
+        @views is_in_neighborhood_per_metacell = is_in_neighborhood_per_metacell_per_block[:, block_index]
+        @views mean_distance_per_metacell = mean_distance_per_metacell_per_block[:, block_index]
+        distance_per_neighborhood_metacell = mean_distance_per_metacell[is_in_neighborhood_per_metacell]
+        basis_distance_per_block[block_index] =
+            quantile(distance_per_neighborhood_metacell, environment_distance_base_quantile)  # NOLINT
         return nothing
     end
+    threshold_per_block = max_environment_metacell_relative_distance .* basis_distance_per_block
+    is_in_environment_per_metacell_per_block .|= mean_distance_per_metacell_per_block .<= transpose(threshold_per_block)
 
     set_matrix!(
         daf,
-        "block",
         "metacell",
+        "block",
         "is_in_environment",
-        bestify(is_in_environment_per_new_block_per_new_metacell);
+        bestify(is_in_environment_per_metacell_per_block);
         overwrite,
     )
     return nothing
