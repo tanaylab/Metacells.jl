@@ -50,6 +50,10 @@ import Metacells.Contracts.vector_of_base_block_per_metacell
 import Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_block_per_metacell
+import Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell
+import Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell
+import Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell
+import Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell
 import Metacells.Contracts.vector_of_global_flow_order_per_type
 import Metacells.Contracts.vector_of_is_base_outlier_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
@@ -58,6 +62,9 @@ import Metacells.Contracts.vector_of_n_cells_per_block
 import Metacells.Contracts.vector_of_n_metacells_per_block
 import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
+import Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell
+import Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell
+import Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_type_per_block
 import Metacells.Contracts.vector_of_type_per_metacell
@@ -214,6 +221,8 @@ end
         sharpening_round::Integer,
         improvement_half_life::Maybe{Integer} = $(DEFAULT.improvement_half_life),
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        min_deviant_fold::AbstractFloat = $(DEFAULT.min_deviant_fold),
+        deviant_UMIs_regularization::AbstractFloat = $(DEFAULT.deviant_UMIs_regularization),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
@@ -235,7 +244,7 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     than `min_cells_in_metacell`. A cluster is also considered too-large if it is larger than `max_cells_in_metacell`,
     if its maximal `cells_dispersion` (across the block's modules) is above `max_cells_dispersion_in_metacell`, and
     too-small if its maximal `cells_dispersion` is below `min_cells_dispersion_in_metacell`. In edge cases we dissolve
-    too-small clusters, so this can create new outlier cells. We increase the number of target metacells for every input
+    too-small clusters, so this can create new dissolved outliers. We increase the number of target metacells for every input
     metacell whose maximal `cells_dispersion` is above `max_cells_dispersion_in_metacell`. This still leaves us with
     multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation
     with most-correlated marker genes in the (previous round's) neighborhoods. To stabilize the choice as sharpening
@@ -244,7 +253,20 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     round (`sharpening_round == 1`) applies no cooldown (the plain correlation tie-break), and for each later round the
     margin's distance from its maximum halves every `improvement_half_life` rounds. Passing
     `improvement_half_life == nothing` disables the cooldown entirely.
- 4. The final clusters are the sharp metacells. We name them using the `prefix`, the convention is to advance the letter
+ 4. We detect deviant outlier cells and eject them from their metacell. For each cell in each metacell, and for every
+    found module instance in the previous round's repository (across all blocks, not just the modules of the cell's own region), we
+    compare the actual UMIs of the module's genes in the cell to the expected UMIs. The expectation is punctuated - the
+    module's linear fraction in the cell's metacell excluding the cell itself, times the cell's total UMIs - so a strong
+    outlier cannot inflate its own baseline. The comparison is a fold factor `log2((actual + deviant_UMIs_regularization) / (expected + deviant_UMIs_regularization))`, using a strong UMIs regularization so low-count modules do not trigger.
+    A cell whose maximal fold (across all module instances) exceeds `min_deviant_fold` is a deviant outlier: it loses its
+    metacell, and we record the certificate (the previous round's block and module that flagged it, and the expected and
+    actual UMIs) of the module instance that most deviates. If ejecting deviant cells drops a metacell below
+    `min_cells_in_metacell`, we dissolve it, so its remaining cells also become dissolved outliers. For every outlier -
+    deviant or dissolved - we record the block of the candidate metacell it was grouped into (`outlier_in`) and the
+    nearest surviving metacell in that block's neighborhood (by the module z-score distance that K-means clustered on).
+    For dissolved outliers we also record the worst-offender module (`outlier_by`), the one with the maximal such
+    distance; deviant outliers instead carry the deviant certificate above.
+ 5. The final clusters are the sharp metacells. We name them using the `prefix`, the convention is to advance the letter
     for each sharpening round (`M` to `N` to `O` to ...).
 
 Whenever we call K-means we repeat the call `kmeans_rounds` times and pick the best result.
@@ -260,7 +282,17 @@ $(CONTRACT2)
 @logged :mcs_ops @computation Contract(;
     name = "sharp_daf",
     axes = [cell_axis(RequiredInput), metacell_axis(CreatedOutput)],
-    data = [vector_of_metacell_per_cell(CreatedOutput), vector_of_base_block_per_metacell(CreatedOutput)],
+    data = [
+        vector_of_metacell_per_cell(CreatedOutput),
+        vector_of_base_block_per_metacell(CreatedOutput),
+        vector_of_outlier_in_prev_block_per_cell(CreatedOutput),
+        vector_of_outlier_in_prev_metacell_per_cell(CreatedOutput),
+        vector_of_outlier_by_prev_module_per_cell(CreatedOutput),
+        vector_of_deviant_by_prev_block_per_cell(CreatedOutput),
+        vector_of_deviant_by_prev_module_per_cell(CreatedOutput),
+        vector_of_deviant_expected_UMIs_per_cell(CreatedOutput),
+        vector_of_deviant_actual_UMIs_per_cell(CreatedOutput),
+    ],
 ) Contract(;
     name = "base_daf",
     axes = [
@@ -312,6 +344,8 @@ $(CONTRACT2)
     sharpening_round::Integer,
     improvement_half_life::Maybe{Integer} = 2,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
+    min_deviant_fold::AbstractFloat = 3.0,
+    deviant_UMIs_regularization::AbstractFloat = 2.0,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
@@ -326,6 +360,8 @@ $(CONTRACT2)
     @assert kmeans_rounds > 0
     @assert sharpening_round >= 1
     @assert improvement_half_life === nothing || improvement_half_life > 0
+    @assert min_deviant_fold > 0
+    @assert deviant_UMIs_regularization > 0
 
     n_cells = axis_length(base_daf, "cell")
     n_blocks = axis_length(base_daf, "block")
@@ -573,15 +609,81 @@ $(CONTRACT2)
         n_cells,
     )
 
+    # The block each cell was a candidate member of - the block it was clustered in (`block_index_per_cell`). This covers
+    # every cell that entered the clustering, including cells whose too-small cluster was dissolved during
+    # `combine_local_clusters` (those are absent from `cells_of_sharp_metacells`). Base outliers stay at block 0 and get
+    # the empty string; cells that keep a metacell are blanked below.
+    candidate_block_name_per_cell =
+        [block_index > 0 ? name_per_block[block_index] : "" for block_index in block_index_per_cell]
+
+    deviant_certificates = compute_deviant_outliers(;
+        cells_of_sharp_metacells,
+        UMIs_per_cell_per_gene,
+        total_UMIs_per_cell,
+        is_found_per_module_per_block,
+        module_index_per_gene_per_block,
+        name_per_block,
+        name_per_module = axis_vector(base_daf, "module"),
+        min_deviant_fold,
+        deviant_UMIs_regularization,
+        n_cells,
+    )
+
+    eject_deviant_outliers!(;
+        cells_of_sharp_metacells,
+        block_name_per_sharp_metacell,
+        is_deviant_per_cell = deviant_certificates.is_deviant_per_cell,
+        min_cells_in_metacell,
+    )
+
     name_per_sharp_metacell = group_names(axis_vector(base_daf, "cell"), cells_of_sharp_metacells; prefix)  # NOJET
     sharp_metacell_name_per_cell = fill("", n_cells)
     for (sharp_metacell_name, cells_of_sharp_metacell) in zip(name_per_sharp_metacell, cells_of_sharp_metacells)
         sharp_metacell_name_per_cell[cells_of_sharp_metacell] .= sharp_metacell_name
     end
 
+    # An outlier is a cell that ended up with no metacell; its `outlier_in` is the block it was clustered in, whether it
+    # became a deviant or a dissolved outlier. Blank the cells that kept a metacell (they are not outliers), leaving
+    # `candidate_block_name_per_cell` holding the `prev_block.outlier_in` values.
+    candidate_block_name_per_cell[sharp_metacell_name_per_cell .!= ""] .= ""
+
+    # For each outlier, the nearest surviving metacell of its block and (for dissolved outliers) the worst-offender
+    # module - blame computed in the same module z-score space K-means clustered the cells in.
+    outlier_in_metacell_name_per_cell, outlier_by_module_name_per_cell = compute_outlier_certificates(;
+        cells_of_sharp_metacells,
+        name_per_sharp_metacell,
+        sharp_metacell_name_per_cell,
+        is_deviant_per_cell = deviant_certificates.is_deviant_per_cell,
+        name_per_module = axis_vector(base_daf, "module"),
+        block_index_per_cell,
+        is_found_per_module_per_block,
+        module_index_per_gene_per_block,
+        mean_linear_fraction_in_environment_cells_per_module_per_block,
+        std_linear_fraction_in_environment_cells_per_module_per_block,
+        UMIs_per_cell_per_gene,
+        total_UMIs_per_cell,
+        n_cells,
+        n_genes = axis_length(base_daf, "gene"),
+        n_modules = axis_length(base_daf, "module"),
+        n_blocks,
+    )
+
     add_axis!(sharp_daf, "metacell", name_per_sharp_metacell; overwrite)
     set_vector!(sharp_daf, "cell", "metacell", sharp_metacell_name_per_cell; overwrite)
     set_vector!(sharp_daf, "metacell", "base_block", block_name_per_sharp_metacell; overwrite)
+    set_vector!(sharp_daf, "cell", "prev_block.outlier_in", candidate_block_name_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "prev_metacell.outlier_in", outlier_in_metacell_name_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "prev_module.outlier_by", outlier_by_module_name_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "prev_block.deviant_by", deviant_certificates.by_prev_block_name_per_cell; overwrite)
+    set_vector!(
+        sharp_daf,
+        "cell",
+        "prev_module.deviant_by",
+        deviant_certificates.by_prev_module_name_per_cell;
+        overwrite,
+    )
+    set_vector!(sharp_daf, "cell", "deviant_expected_UMIs", deviant_certificates.expected_UMIs_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "deviant_actual_UMIs", deviant_certificates.actual_UMIs_per_cell; overwrite)
 
     return nothing
 end
@@ -663,42 +765,29 @@ function compute_preferred_block_index_per_cell_per_block(;
         @assert n_neighborhood_cells > 0
 
         is_found_per_module = is_found_per_module_per_thread[threadid()]
-        is_found_per_module .= is_found_per_module_per_block[:, block_index]
         n_block_modules = n_modules_per_block[block_index]
-        @assert n_block_modules == sum(is_found_per_module)
-
-        @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
 
         z_score_per_max_module_per_max_neighborhood_cell =
             z_score_per_max_module_per_max_neighborhood_cell_per_thread[threadid()]
         @views z_score_per_found_module_per_neighborhood_cell =
             z_score_per_max_module_per_max_neighborhood_cell[1:n_block_modules, 1:n_neighborhood_cells]
-        @views mean_linear_fraction_in_environment_cells_per_module =
-            mean_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
-        @views std_linear_fraction_in_environment_cells_per_module =
-            std_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
 
-        # Invert `module_index_per_gene` once per block: parallel-over-found-modules in compute_z_score reads the list
-        # directly instead of rebuilding a per-call `is_gene_in_module` BitVector.
-        gene_indices_per_module = [Int[] for _ in 1:n_modules]
-        for gene_index in 1:n_genes
-            module_index = module_index_per_gene[gene_index]
-            if module_index > 0
-                push!(gene_indices_per_module[module_index], gene_index)
-            end
-        end
-
-        compute_z_score_per_found_module_per_region_cell!(;
+        setup_z_score_per_found_module_per_region_cell!(;
             z_score_per_found_module_per_region_cell = z_score_per_found_module_per_neighborhood_cell,
+            is_found_per_module,
+            block_index,
+            indices_of_region_cells = indices_of_neighborhood_cells,
+            is_found_per_module_per_block,
+            module_index_per_gene_per_block,
+            mean_linear_fraction_in_environment_cells_per_module_per_block,
+            std_linear_fraction_in_environment_cells_per_module_per_block,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            is_found_per_module,
-            indices_of_region_cells = indices_of_neighborhood_cells,
-            gene_indices_per_module,
             z_score_accumulator_pool,
-            mean_linear_fraction_in_environment_cells_per_module,
-            std_linear_fraction_in_environment_cells_per_module,
+            n_genes,
+            n_modules,
         )
+        @assert n_block_modules == sum(is_found_per_module)
 
         n_neighborhood_clusters = max(Int(round(n_neighborhood_cells / mean_metacell_cells_per_block[block_index])), 1)
         kmeans_result = flame_timed("kmeans_in_rounds") do
@@ -971,40 +1060,29 @@ function compute_local_clusters(;
         end
 
         is_found_per_module = is_found_per_module_per_thread[threadid()]
-        is_found_per_module .= is_found_per_module_per_block[:, block_index]
         n_block_modules = n_modules_per_block[block_index]
-        @assert n_block_modules == sum(is_found_per_module)
 
-        @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
         z_score_per_max_module_per_max_block_cell = z_score_per_max_module_per_max_block_cell_per_thread[threadid()]
         @views z_score_per_found_module_per_block_cell =
             z_score_per_max_module_per_max_block_cell[1:n_block_modules, 1:n_block_cells]
-        @views mean_linear_fraction_in_environment_cells_per_module =
-            mean_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
-        @views std_linear_fraction_in_environment_cells_per_module =
-            std_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
 
-        # Invert `module_index_per_gene` once per block: used by Phase 1 K-walk dispersion AND by `compute_z_score`
-        # below for the parallel-over-found-modules z-score fill.
-        gene_indices_per_module = [Int[] for _ in 1:n_modules]
-        for gene_index in 1:n_genes
-            module_index = module_index_per_gene[gene_index]
-            if module_index > 0
-                push!(gene_indices_per_module[module_index], gene_index)
-            end
-        end
-
-        compute_z_score_per_found_module_per_region_cell!(;
+        # The inverted `module_index_per_gene` returned here is reused below by the Phase 1 K-walk dispersion context.
+        gene_indices_per_module = setup_z_score_per_found_module_per_region_cell!(;
             z_score_per_found_module_per_region_cell = z_score_per_found_module_per_block_cell,
+            is_found_per_module,
+            block_index,
+            indices_of_region_cells = block_cell_indices,
+            is_found_per_module_per_block,
+            module_index_per_gene_per_block,
+            mean_linear_fraction_in_environment_cells_per_module_per_block,
+            std_linear_fraction_in_environment_cells_per_module_per_block,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            is_found_per_module,
-            indices_of_region_cells = block_cell_indices,
-            gene_indices_per_module,
             z_score_accumulator_pool,
-            mean_linear_fraction_in_environment_cells_per_module,
-            std_linear_fraction_in_environment_cells_per_module,
+            n_genes,
+            n_modules,
         )
+        @assert n_block_modules == sum(is_found_per_module)
 
         n_block_clusters = max(Int(round(n_block_cells / mean_metacell_cells_per_block[block_index])), 1)
         expected_n_clusters_per_block[block_index] = n_block_clusters
@@ -1481,6 +1559,468 @@ function combine_local_clusters(;
     return (cells_of_new_metacells, block_name_per_new_metacell)
 end
 
+# The flattened enumeration of every found module instance across all blocks in a repository, indexed by
+# `total_found_module_index`. The parallel vectors hold each instance's block and module names and the gene indices of
+# the module in that block.
+struct TotalFoundModules
+    block_name_per_total_found_module::Vector{String}
+    module_name_per_total_found_module::Vector{String}
+    gene_indices_per_total_found_module::Vector{Vector{Int}}
+end
+
+# Collect every found module instance across all blocks into a single flat enumeration.
+function collect_total_found_modules(;
+    is_found_per_module_per_block::AbstractMatrix{Bool},
+    module_index_per_gene_per_block::AbstractMatrix{<:Integer},
+    name_per_block::AbstractVector{<:AbstractString},
+    name_per_module::AbstractVector{<:AbstractString},
+)::TotalFoundModules
+    n_modules = size(is_found_per_module_per_block, 1)
+    n_blocks = size(is_found_per_module_per_block, 2)
+    n_genes = size(module_index_per_gene_per_block, 1)
+
+    block_name_per_total_found_module = String[]
+    module_name_per_total_found_module = String[]
+    gene_indices_per_total_found_module = Vector{Vector{Int}}()
+    for block_index in 1:n_blocks
+        @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
+        @views is_found_per_module = is_found_per_module_per_block[:, block_index]
+        gene_indices_per_module = [Int[] for _ in 1:n_modules]
+        for gene_index in 1:n_genes
+            module_index = module_index_per_gene[gene_index]
+            if module_index > 0
+                push!(gene_indices_per_module[module_index], gene_index)
+            end
+        end
+        for module_index in 1:n_modules
+            if is_found_per_module[module_index]
+                push!(block_name_per_total_found_module, name_per_block[block_index])
+                push!(module_name_per_total_found_module, name_per_module[module_index])
+                push!(gene_indices_per_total_found_module, gene_indices_per_module[module_index])
+            end
+        end
+    end
+
+    return TotalFoundModules(
+        block_name_per_total_found_module,
+        module_name_per_total_found_module,
+        gene_indices_per_total_found_module,
+    )
+end
+
+# The per-cell certificates of the deviant outlier detection. For each deviant cell, the name of the most-deviant
+# previous round's block and module that flagged it, and the expected and actual UMIs of that module's genes in the cell.
+# All entries are the "not a deviant outlier" defaults (empty string / zero) for cells that are not deviant outliers.
+struct DeviantCertificates
+    is_deviant_per_cell::BitVector
+    by_prev_block_name_per_cell::Vector{String}
+    by_prev_module_name_per_cell::Vector{String}
+    expected_UMIs_per_cell::Vector{Float32}
+    actual_UMIs_per_cell::Vector{Float32}
+end
+
+# A single deviant fold factor found for a cell against one found module instance. Collected per thread during the
+# parallel sweep over module instances, then reduced to the per-cell maximal fold in `compute_deviant_outliers`.
+struct DeviantCandidate
+    cell_index::Int
+    total_found_module_index::Int
+    fold::Float32
+    expected_UMIs::Float32
+    actual_UMIs::Float32
+end
+
+# Detect deviant outlier cells: cells whose expression of some base found module wildly exceeds what their metacell
+# predicts. For every found module instance in the previous round's repository (across all blocks, not just the modules of a cell's
+# own region), and for each grouped cell that expresses the module, compare the cell's actual UMIs of the module's genes
+# to the expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's metacell excluding the
+# cell itself, times the cell's total UMIs - so a strong outlier cannot inflate its own baseline. A cell whose maximal
+# fold (across all module instances) exceeds `min_deviant_fold` is a deviant outlier, with the certificate of the
+# most-deviant module instance.
+#
+# The loop is parallel over module instances. `UMIs_per_cell_per_gene` is a CSC sparse matrix whose columns are genes,
+# so each instance walks only the nonzeros of its module's gene columns (the cells that actually express it); cells with
+# no UMIs of the module cannot be deviant for it (their fold is non-positive), so they are never visited. Per thread we
+# reuse a dense `actual_per_cell` accumulator and a `is_touched_per_cell` mask, tracking the touched cells (and
+# metacells) in preallocated index vectors so both the per-instance reduction and the reset are O(touched), not
+# O(n_cells). Each instance emits only its fold-exceeding candidates (rare) to a per-thread buffer, reduced serially to
+# the per-cell maximum at the end.
+function compute_deviant_outliers(;
+    cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
+    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    total_UMIs_per_cell::AbstractVector{<:Integer},
+    is_found_per_module_per_block::AbstractMatrix{Bool},
+    module_index_per_gene_per_block::AbstractMatrix{<:Integer},
+    name_per_block::AbstractVector{<:AbstractString},
+    name_per_module::AbstractVector{<:AbstractString},
+    min_deviant_fold::AbstractFloat,
+    deviant_UMIs_regularization::AbstractFloat,
+    n_cells::Integer,
+)::DeviantCertificates
+    n_sharp_metacells = length(cells_of_sharp_metacells)
+
+    # The sparse-column sweep requires a CSC matrix whose columns are genes; unwrap the read-only Daf matrix to its
+    # underlying `SparseMatrixCSC` (no copy).
+    @assert issparse(UMIs_per_cell_per_gene)
+    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
+
+    # Allocated once with the "not a deviant outlier" defaults; the candidate reduction below fills in the deviant cells.
+    is_deviant_per_cell = falses(n_cells)
+    by_prev_block_name_per_cell = fill("", n_cells)
+    by_prev_module_name_per_cell = fill("", n_cells)
+    expected_UMIs_per_cell = zeros(Float32, n_cells)
+    actual_UMIs_per_cell = zeros(Float32, n_cells)
+
+    # Per-cell metacell membership (0 = ungrouped) and per-metacell total UMIs, both read-only inside the parallel loop.
+    metacell_index_per_cell = zeros(Int32, n_cells)
+    metacell_total_UMIs_per_metacell = zeros(Float64, n_sharp_metacells)
+    for (sharp_metacell_index, cell_indices) in enumerate(cells_of_sharp_metacells)
+        for cell_index in cell_indices
+            metacell_index_per_cell[cell_index] = sharp_metacell_index
+            metacell_total_UMIs_per_metacell[sharp_metacell_index] += total_UMIs_per_cell[cell_index]
+        end
+    end
+
+    base_total_modules = collect_total_found_modules(;
+        is_found_per_module_per_block,
+        module_index_per_gene_per_block,
+        name_per_block,
+        name_per_module,
+    )
+    n_total_found_modules = length(base_total_modules.gene_indices_per_total_found_module)
+
+    # Weight each instance by the total nonzeros of its module's gene columns, so the heaviest instances are dispatched
+    # first for load balance.
+    weight_per_total_found_module = [
+        sum(gene_index -> length(nzrange(sparse_UMIs_per_cell_per_gene, gene_index)), gene_indices_in_module; init = 0) for gene_indices_in_module in base_total_modules.gene_indices_per_total_found_module
+    ]
+
+    row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
+    UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
+
+    actual_per_cell_per_thread = [zeros(Float32, n_cells) for _ in 1:maxthreadid()]
+    is_touched_per_cell_per_thread = [falses(n_cells) for _ in 1:maxthreadid()]
+    touched_cells_per_thread = [Vector{Int32}(undef, n_cells) for _ in 1:maxthreadid()]
+    module_total_UMIs_per_metacell_per_thread = [zeros(Float64, n_sharp_metacells) for _ in 1:maxthreadid()]
+    touched_metacells_per_thread = [Vector{Int32}(undef, n_sharp_metacells) for _ in 1:maxthreadid()]
+    candidates_per_thread = [DeviantCandidate[] for _ in 1:maxthreadid()]
+
+    regularization = Float64(deviant_UMIs_regularization)
+
+    parallel_loop_wo_rng(
+        1:n_total_found_modules;
+        name = "compute_deviant_outliers",
+        weights = weight_per_total_found_module,
+        progress = DebugProgress(sum(weight_per_total_found_module); group = :mcs_loops, desc = "deviant_outliers"),
+    ) do total_found_module_index
+        actual_per_cell = actual_per_cell_per_thread[threadid()]
+        is_touched_per_cell = is_touched_per_cell_per_thread[threadid()]
+        touched_cells = touched_cells_per_thread[threadid()]
+        module_total_UMIs_per_metacell = module_total_UMIs_per_metacell_per_thread[threadid()]
+        touched_metacells = touched_metacells_per_thread[threadid()]
+        candidates = candidates_per_thread[threadid()]
+
+        gene_indices_in_module = base_total_modules.gene_indices_per_total_found_module[total_found_module_index]
+
+        # Gather the module's UMIs into `actual_per_cell` for every grouped cell that expresses it, walking only the
+        # nonzeros of the module's gene columns and recording each cell once in `touched_cells`.
+        n_touched_cells = 0
+        @inbounds for gene_index in gene_indices_in_module
+            for stored_index in nzrange(sparse_UMIs_per_cell_per_gene, gene_index)
+                cell_index = row_index_per_stored[stored_index]
+                if metacell_index_per_cell[cell_index] > 0
+                    if !is_touched_per_cell[cell_index]
+                        is_touched_per_cell[cell_index] = true
+                        n_touched_cells += 1
+                        touched_cells[n_touched_cells] = cell_index
+                    end
+                    actual_per_cell[cell_index] += UMIs_per_stored[stored_index]
+                end
+            end
+        end
+
+        # Sum the module's UMIs per metacell (each touched cell counted once), recording each metacell once.
+        n_touched_metacells = 0
+        @inbounds for touched_index in 1:n_touched_cells
+            cell_index = touched_cells[touched_index]
+            metacell_index = metacell_index_per_cell[cell_index]
+            if module_total_UMIs_per_metacell[metacell_index] == 0.0
+                n_touched_metacells += 1
+                touched_metacells[n_touched_metacells] = metacell_index
+            end
+            module_total_UMIs_per_metacell[metacell_index] += actual_per_cell[cell_index]
+        end
+
+        # Punctuated fold per touched cell; emit the fold-exceeding ones as candidates.
+        @inbounds for touched_index in 1:n_touched_cells
+            cell_index = touched_cells[touched_index]
+            metacell_index = metacell_index_per_cell[cell_index]
+            actual_UMIs = actual_per_cell[cell_index]
+            cell_total_UMIs = total_UMIs_per_cell[cell_index]
+            punctuated_total_UMIs = metacell_total_UMIs_per_metacell[metacell_index] - cell_total_UMIs
+            @assert punctuated_total_UMIs > 0
+            punctuated_module_UMIs = module_total_UMIs_per_metacell[metacell_index] - actual_UMIs
+            module_linear_fraction = punctuated_module_UMIs / punctuated_total_UMIs
+            expected_UMIs = module_linear_fraction * cell_total_UMIs
+            fold = log2((actual_UMIs + regularization) / (expected_UMIs + regularization))
+            if fold > min_deviant_fold
+                push!(
+                    candidates,
+                    DeviantCandidate(
+                        cell_index,
+                        total_found_module_index,
+                        Float32(fold),
+                        Float32(expected_UMIs),
+                        Float32(actual_UMIs),
+                    ),
+                )
+            end
+        end
+
+        # Reset only the touched scratch entries for the next instance on this thread.
+        @inbounds for touched_index in 1:n_touched_cells
+            cell_index = touched_cells[touched_index]
+            actual_per_cell[cell_index] = 0.0f0
+            is_touched_per_cell[cell_index] = false
+        end
+        @inbounds for touched_index in 1:n_touched_metacells
+            module_total_UMIs_per_metacell[touched_metacells[touched_index]] = 0.0
+        end
+        return nothing
+    end
+
+    # Reduce the per-thread candidates to the per-cell maximal fold. Only fold-exceeding candidates exist, so every cell
+    # that appears is a deviant outlier, recording the certificate of the module instance that flagged it most strongly.
+    max_fold_per_cell = fill(-Inf32, n_cells)
+    for candidates in candidates_per_thread
+        for candidate in candidates
+            cell_index = candidate.cell_index
+            if candidate.fold > max_fold_per_cell[cell_index]
+                max_fold_per_cell[cell_index] = candidate.fold
+                is_deviant_per_cell[cell_index] = true
+                by_prev_block_name_per_cell[cell_index] =
+                    base_total_modules.block_name_per_total_found_module[candidate.total_found_module_index]
+                by_prev_module_name_per_cell[cell_index] =
+                    base_total_modules.module_name_per_total_found_module[candidate.total_found_module_index]
+                expected_UMIs_per_cell[cell_index] = candidate.expected_UMIs
+                actual_UMIs_per_cell[cell_index] = candidate.actual_UMIs
+            end
+        end
+    end
+
+    n_deviant_cells = sum(is_deviant_per_cell)
+    n_grouped_cells = sum(length(cell_indices) for cell_indices in cells_of_sharp_metacells; init = 0)
+    @debug (
+        "Deviant outlier cells: $(n_deviant_cells)" *
+        " ($(percent(n_deviant_cells, n_grouped_cells)) of grouped, $(percent(n_deviant_cells, n_cells)) of all)"
+    ) _group = :mcs_results
+
+    return DeviantCertificates(
+        is_deviant_per_cell,
+        by_prev_block_name_per_cell,
+        by_prev_module_name_per_cell,
+        expected_UMIs_per_cell,
+        actual_UMIs_per_cell,
+    )
+end
+
+# Remove deviant outlier cells from their sharp metacells in place. A metacell that drops below `min_cells_in_metacell`
+# after removal is dissolved entirely, so its remaining cells also become dissolved outliers. Both
+# `cells_of_sharp_metacells` and the parallel `block_name_per_sharp_metacell` are compacted to match.
+function eject_deviant_outliers!(;
+    cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
+    block_name_per_sharp_metacell::AbstractVector{<:AbstractString},
+    is_deviant_per_cell::AbstractVector{Bool},
+    min_cells_in_metacell::Integer,
+)::Nothing
+    n_ejected_cells = 0
+    n_dissolved_cells = 0
+    write_position = 0
+    for read_position in eachindex(cells_of_sharp_metacells)
+        cell_indices = cells_of_sharp_metacells[read_position]
+        kept_cell_indices = filter(cell_index -> !is_deviant_per_cell[cell_index], cell_indices)
+        n_ejected_cells += length(cell_indices) - length(kept_cell_indices)
+        if length(kept_cell_indices) < min_cells_in_metacell
+            n_dissolved_cells += length(kept_cell_indices)
+            continue
+        end
+        write_position += 1
+        cells_of_sharp_metacells[write_position] = kept_cell_indices
+        block_name_per_sharp_metacell[write_position] = block_name_per_sharp_metacell[read_position]
+    end
+    resize!(cells_of_sharp_metacells, write_position)
+    resize!(block_name_per_sharp_metacell, write_position)
+
+    @debug (
+        "Ejected deviant cells: $(n_ejected_cells)" *
+        " Dissolved metacell cells: $(n_dissolved_cells)" *
+        " Remaining metacells: $(write_position)"
+    ) _group = :mcs_results
+    return nothing
+end
+
+# For each outlier cell, find the nearest surviving metacell of its block and (for dissolved outliers only) the
+# worst-offender module. We recompute the block's environment-normalized module z-scores (the same space K-means
+# clustered its cells in, via the shared `setup_z_score_per_found_module_per_region_cell!`), take each surviving
+# metacell's z-score center as the mean over its cells, and for each outlier cell pick the nearest center (its
+# `outlier_in` metacell) and the module with the maximal absolute z-score difference to it (its `outlier_by` module).
+# Returns the per-cell nearest metacell name (set for every outlier) and worst-offender module name (set only when the
+# cell is not a deviant outlier - deviant outliers carry the deviant certificate instead). Both are the empty string for
+# cells that kept a metacell, base outliers, and cells whose block has no surviving metacell.
+function compute_outlier_certificates(;
+    cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
+    name_per_sharp_metacell::AbstractVector{<:AbstractString},
+    sharp_metacell_name_per_cell::AbstractVector{<:AbstractString},
+    is_deviant_per_cell::Union{AbstractVector{Bool}, BitVector},
+    name_per_module::AbstractVector{<:AbstractString},
+    block_index_per_cell::AbstractVector{<:Integer},
+    is_found_per_module_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    module_index_per_gene_per_block::AbstractMatrix{<:Integer},
+    mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    total_UMIs_per_cell::AbstractVector{<:Integer},
+    n_cells::Integer,
+    n_genes::Integer,
+    n_modules::Integer,
+    n_blocks::Integer,
+)::Tuple{Vector{String}, Vector{String}}
+    sharp_metacell_index_per_cell = zeros(Int, n_cells)
+    for (sharp_metacell_index, cell_indices) in enumerate(cells_of_sharp_metacells)
+        sharp_metacell_index_per_cell[cell_indices] .= sharp_metacell_index
+    end
+
+    # A cell of block b (`block_index_per_cell == b > 0`) with no sharp metacell is an outlier of block b (it was
+    # clustered there but ejected or its cluster dissolved); base outliers stay at block 0 and are excluded.
+    is_outlier_per_cell = (block_index_per_cell .> 0) .& (sharp_metacell_name_per_cell .== "")
+    n_block_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
+    has_outlier_per_block = falses(n_blocks)
+    for cell_index in 1:n_cells
+        is_outlier_per_cell[cell_index] && (has_outlier_per_block[block_index_per_cell[cell_index]] = true)
+    end
+
+    outlier_in_metacell_name_per_cell = fill("", n_cells)
+    outlier_by_module_name_per_cell = fill("", n_cells)
+
+    weight_per_block =
+        [has_outlier_per_block[block_index] ? n_block_cells_per_block[block_index] : 0 for block_index in 1:n_blocks]
+    max_n_block_cells = maximum(weight_per_block; init = 0)
+    if max_n_block_cells == 0
+        return (outlier_in_metacell_name_per_cell, outlier_by_module_name_per_cell)
+    end
+
+    z_score_accumulator_pool = Channel{Vector{Float32}}(nthreads())
+    for _ in 1:nthreads()
+        put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_block_cells))
+    end
+
+    # Parallel over the blocks that have outliers (each writes only its own cells, so the shared output vectors are not
+    # contended). The inner z-score fill is nested-parallel over the block's found modules.
+    parallel_loop_wo_rng(
+        1:n_blocks;
+        weights = weight_per_block,
+        name = "compute_outlier_certificates",
+        progress = DebugProgress(sum(weight_per_block); group = :mcs_loops, desc = "compute_outlier_certificates"),
+    ) do block_index
+        has_outlier_per_block[block_index] || return nothing
+
+        block_cell_indices = findall(==(block_index), block_index_per_cell)
+        n_block_modules = count(@view is_found_per_module_per_block[:, block_index])
+        n_block_modules == 0 && return nothing
+
+        is_found_per_module = falses(n_modules)
+        z_score_per_found_module_per_block_cell = Matrix{Float32}(undef, n_block_modules, length(block_cell_indices))
+        setup_z_score_per_found_module_per_region_cell!(;
+            z_score_per_found_module_per_region_cell = z_score_per_found_module_per_block_cell,
+            is_found_per_module,
+            block_index,
+            indices_of_region_cells = block_cell_indices,
+            is_found_per_module_per_block,
+            module_index_per_gene_per_block,
+            mean_linear_fraction_in_environment_cells_per_module_per_block,
+            std_linear_fraction_in_environment_cells_per_module_per_block,
+            UMIs_per_cell_per_gene,
+            total_UMIs_per_cell,
+            z_score_accumulator_pool,
+            n_genes,
+            n_modules,
+        )
+        found_module_indices = findall(is_found_per_module)
+
+        # The z-score center of each surviving metacell that holds cells of this block - the mean z-score over its cells.
+        local_ref_per_sharp_metacell = Dict{Int, Int}()
+        center_accumulator_per_ref = Vector{Vector{Float64}}()
+        n_cells_per_ref = Int[]
+        sharp_metacell_index_per_ref = Int[]
+        for (block_cell_position, cell_index) in enumerate(block_cell_indices)
+            sharp_metacell_index = sharp_metacell_index_per_cell[cell_index]
+            sharp_metacell_index == 0 && continue
+            local_ref = get!(local_ref_per_sharp_metacell, sharp_metacell_index) do
+                push!(center_accumulator_per_ref, zeros(Float64, n_block_modules))
+                push!(n_cells_per_ref, 0)
+                push!(sharp_metacell_index_per_ref, sharp_metacell_index)
+                return length(sharp_metacell_index_per_ref)
+            end
+            @views center_accumulator_per_ref[local_ref] .+=
+                z_score_per_found_module_per_block_cell[:, block_cell_position]
+            n_cells_per_ref[local_ref] += 1
+        end
+        n_refs = length(sharp_metacell_index_per_ref)
+        n_refs == 0 && return nothing
+
+        center_per_found_module_per_ref = Matrix{Float32}(undef, n_block_modules, n_refs)
+        for ref in 1:n_refs
+            @views center_per_found_module_per_ref[:, ref] .= center_accumulator_per_ref[ref] ./ n_cells_per_ref[ref]
+        end
+
+        for (block_cell_position, cell_index) in enumerate(block_cell_indices)
+            is_outlier_per_cell[cell_index] || continue
+            @views z_score_per_found_module = z_score_per_found_module_per_block_cell[:, block_cell_position]
+
+            nearest_ref = 0
+            nearest_distance = Inf
+            for ref in 1:n_refs
+                distance = 0.0
+                @inbounds for module_position in 1:n_block_modules
+                    difference =
+                        z_score_per_found_module[module_position] -
+                        center_per_found_module_per_ref[module_position, ref]
+                    distance += difference * difference
+                end
+                if distance < nearest_distance
+                    nearest_distance = distance
+                    nearest_ref = ref
+                end
+            end
+
+            outlier_in_metacell_name_per_cell[cell_index] =
+                name_per_sharp_metacell[sharp_metacell_index_per_ref[nearest_ref]]
+
+            # The worst-offender module is recorded only for dissolved outliers; deviant outliers carry the deviant
+            # certificate instead.
+            if !is_deviant_per_cell[cell_index]
+                worst_module_position = 1
+                worst_z_distance = -1.0
+                @inbounds for module_position in 1:n_block_modules
+                    z_distance = abs(
+                        z_score_per_found_module[module_position] -
+                        center_per_found_module_per_ref[module_position, nearest_ref],
+                    )
+                    if z_distance > worst_z_distance
+                        worst_z_distance = z_distance
+                        worst_module_position = module_position
+                    end
+                end
+                outlier_by_module_name_per_cell[cell_index] =
+                    name_per_module[found_module_indices[worst_module_position]]
+            end
+        end
+
+        return nothing
+    end
+
+    return (outlier_in_metacell_name_per_cell, outlier_by_module_name_per_cell)
+end
+
 # Build one base block's baseline `GroupedSeriesCorrelations{Float32}`. Each group corresponds to one block whose
 # cells contribute to the base block's neighborhood; the points within a group are the contributing cells laid out
 # contiguously, preserving the per-block cell order. Per (point, base-block series) we store the cell's
@@ -1807,6 +2347,60 @@ function precompute_walkable_indirection(
         friend_position_per_series_per_base_block_per_walkable_block,
         block_cell_position_per_point_per_base_block_per_walkable_block,
     )
+end
+
+# Fill `z_score_per_found_module_per_region_cell` (rows = the block's found modules in `findall(is_found_per_module)`
+# order, columns = the given region cells) with the environment-normalized z-score of each found module's linear
+# fraction - the space cells are clustered in. Fills the caller's `is_found_per_module` buffer from the block, and
+# returns the per-module gene index lists (the inverted `module_index_per_gene`, reused by callers). This is the shared
+# setup around [`compute_z_score_per_found_module_per_region_cell!`](@ref); the caller owns (and sizes) the reused
+# buffers.
+function setup_z_score_per_found_module_per_region_cell!(;
+    z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
+    is_found_per_module::BitVector,
+    block_index::Integer,
+    indices_of_region_cells::AbstractVector{<:Integer},
+    is_found_per_module_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    module_index_per_gene_per_block::AbstractMatrix{<:Integer},
+    mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    total_UMIs_per_cell::AbstractVector{<:Integer},
+    z_score_accumulator_pool::Channel{Vector{Float32}},
+    n_genes::Integer,
+    n_modules::Integer,
+)::Vector{Vector{Int}}
+    is_found_per_module .= @view is_found_per_module_per_block[:, block_index]
+
+    # Invert `module_index_per_gene` once per block: parallel-over-found-modules in compute_z_score reads the list
+    # directly instead of rebuilding a per-call `is_gene_in_module` BitVector.
+    @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
+    gene_indices_per_module = [Int[] for _ in 1:n_modules]
+    for gene_index in 1:n_genes
+        module_index = module_index_per_gene[gene_index]
+        if module_index > 0
+            push!(gene_indices_per_module[module_index], gene_index)
+        end
+    end
+
+    @views mean_linear_fraction_in_environment_cells_per_module =
+        mean_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
+    @views std_linear_fraction_in_environment_cells_per_module =
+        std_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
+
+    compute_z_score_per_found_module_per_region_cell!(;
+        z_score_per_found_module_per_region_cell,
+        UMIs_per_cell_per_gene,
+        total_UMIs_per_cell,
+        is_found_per_module,
+        indices_of_region_cells,
+        gene_indices_per_module,
+        z_score_accumulator_pool,
+        mean_linear_fraction_in_environment_cells_per_module,
+        std_linear_fraction_in_environment_cells_per_module,
+    )
+
+    return gene_indices_per_module
 end
 
 function compute_z_score_per_found_module_per_region_cell!(;

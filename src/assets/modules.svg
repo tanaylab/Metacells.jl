@@ -93,47 +93,17 @@
 <path fill="none" stroke="#000000" d="M52.4449,-164.9197C57.4761,-157.4409 64.6143,-146.8301 70.7261,-137.745"/>
 <polygon fill="#000000" stroke="#000000" points="73.702,-139.5917 76.3798,-129.3408 67.894,-135.6844 73.702,-139.5917"/>
 </g>
-<!-- Defaults -->
-<g id="node4" class="node">
-<title>Defaults</title>
-<g id="a_node4"><a xlink:href="../defaults.html" xlink:title="Defaults" target="_top">
-<polygon fill="none" stroke="#ffffff" points="218,-239 164,-239 164,-220 218,-220 218,-239"/>
-<text text-anchor="middle" x="191" y="-225.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Defaults</text>
-</a>
-</g>
-</g>
-<!-- Defaults&#45;&gt;AnalyzeMetacells -->
-<g id="edge3" class="edge">
-<title>Defaults&#45;&gt;AnalyzeMetacells</title>
-<path fill="none" stroke="#000000" d="M199.1868,-219.9197C205.7109,-212.2851 215.0241,-201.3867 222.8923,-192.1792"/>
-<polygon fill="#000000" stroke="#000000" points="225.7548,-194.217 229.5906,-184.3408 220.4332,-189.6694 225.7548,-194.217"/>
-</g>
-<!-- ProjectCells -->
-<g id="node7" class="node">
-<title>ProjectCells</title>
-<g id="a_node7"><a xlink:href="../project_cells.html" xlink:title="ProjectCells" target="_top">
-<polygon fill="none" stroke="#ffffff" points="164.5,-184 87.5,-184 87.5,-165 164.5,-165 164.5,-184"/>
-<text text-anchor="middle" x="126" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">ProjectCells</text>
-</a>
-</g>
-</g>
-<!-- Defaults&#45;&gt;ProjectCells -->
-<g id="edge6" class="edge">
-<title>Defaults&#45;&gt;ProjectCells</title>
-<path fill="none" stroke="#000000" d="M179.6779,-219.9197C170.2868,-211.9735 156.7173,-200.4916 145.5715,-191.0605"/>
-<polygon fill="#000000" stroke="#000000" points="147.5248,-188.1284 137.6301,-184.3408 143.0031,-193.4721 147.5248,-188.1284"/>
-</g>
 <!-- Contracts -->
-<g id="node5" class="node">
+<g id="node4" class="node">
 <title>Contracts</title>
-<g id="a_node5"><a xlink:href="../contracts.html" xlink:title="Contracts" target="_top">
+<g id="a_node4"><a xlink:href="../contracts.html" xlink:title="Contracts" target="_top">
 <polygon fill="none" stroke="#ffffff" points="316,-239 254,-239 254,-220 316,-220 316,-239"/>
 <text text-anchor="middle" x="285" y="-225.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Contracts</text>
 </a>
 </g>
 </g>
 <!-- Contracts&#45;&gt;AnalyzeMetacells -->
-<g id="edge4" class="edge">
+<g id="edge3" class="edge">
 <title>Contracts&#45;&gt;AnalyzeMetacells</title>
 <path fill="none" stroke="#000000" d="M276.8132,-219.9197C270.2891,-212.2851 260.9759,-201.3867 253.1077,-192.1792"/>
 <polygon fill="#000000" stroke="#000000" points="255.5668,-189.6694 246.4094,-184.3408 250.2452,-194.217 255.5668,-189.6694"/>
@@ -153,8 +123,17 @@
 <path fill="none" stroke="#000000" d="M316.3737,-220.7851C349.3655,-211.6207 401.5509,-197.1248 438.7252,-186.7986"/>
 <polygon fill="#000000" stroke="#000000" points="440.0854,-190.0533 448.7838,-184.0045 438.2118,-183.3087 440.0854,-190.0533"/>
 </g>
+<!-- ProjectCells -->
+<g id="node7" class="node">
+<title>ProjectCells</title>
+<g id="a_node7"><a xlink:href="../project_cells.html" xlink:title="ProjectCells" target="_top">
+<polygon fill="none" stroke="#ffffff" points="164.5,-184 87.5,-184 87.5,-165 164.5,-165 164.5,-184"/>
+<text text-anchor="middle" x="126" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">ProjectCells</text>
+</a>
+</g>
+</g>
 <!-- Contracts&#45;&gt;ProjectCells -->
-<g id="edge7" class="edge">
+<g id="edge6" class="edge">
 <title>Contracts&#45;&gt;ProjectCells</title>
 <path fill="none" stroke="#000000" d="M257.3043,-219.9197C231.2785,-210.9171 192.133,-197.3762 163.3535,-187.421"/>
 <polygon fill="#000000" stroke="#000000" points="164.2394,-184.024 153.6446,-184.0626 161.951,-190.6394 164.2394,-184.024"/>
@@ -173,6 +152,27 @@
 <title>Contracts&#45;&gt;ComputeModules</title>
 <path fill="none" stroke="#000000" d="M299.2833,-219.9197C311.6711,-211.6109 329.8222,-199.4363 344.2147,-189.7828"/>
 <polygon fill="#000000" stroke="#000000" points="346.25,-192.6321 352.6052,-184.155 342.3507,-186.8187 346.25,-192.6321"/>
+</g>
+<!-- Defaults -->
+<g id="node5" class="node">
+<title>Defaults</title>
+<g id="a_node5"><a xlink:href="../defaults.html" xlink:title="Defaults" target="_top">
+<polygon fill="none" stroke="#ffffff" points="218,-239 164,-239 164,-220 218,-220 218,-239"/>
+<text text-anchor="middle" x="191" y="-225.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Defaults</text>
+</a>
+</g>
+</g>
+<!-- Defaults&#45;&gt;AnalyzeMetacells -->
+<g id="edge4" class="edge">
+<title>Defaults&#45;&gt;AnalyzeMetacells</title>
+<path fill="none" stroke="#000000" d="M199.1868,-219.9197C205.7109,-212.2851 215.0241,-201.3867 222.8923,-192.1792"/>
+<polygon fill="#000000" stroke="#000000" points="225.7548,-194.217 229.5906,-184.3408 220.4332,-189.6694 225.7548,-194.217"/>
+</g>
+<!-- Defaults&#45;&gt;ProjectCells -->
+<g id="edge7" class="edge">
+<title>Defaults&#45;&gt;ProjectCells</title>
+<path fill="none" stroke="#000000" d="M179.6779,-219.9197C170.2868,-211.9735 156.7173,-200.4916 145.5715,-191.0605"/>
+<polygon fill="#000000" stroke="#000000" points="147.5248,-188.1284 137.6301,-184.3408 143.0031,-193.4721 147.5248,-188.1284"/>
 </g>
 <!-- AnnDataFormat -->
 <g id="node9" class="node">
@@ -193,7 +193,7 @@
 </g>
 </g>
 <!-- AnalyzeModules&#45;&gt;SharpenMetacells -->
-<g id="edge12" class="edge">
+<g id="edge11" class="edge">
 <title>AnalyzeModules&#45;&gt;SharpenMetacells</title>
 <path fill="none" stroke="#000000" d="M237.3396,-109.7508C235.967,-96.1724 231.7692,-71.3926 219,-55 208.3547,-41.334 192.3643,-30.9379 177.7092,-23.5572"/>
 <polygon fill="#000000" stroke="#000000" points="178.8786,-20.239 168.3411,-19.1383 175.8923,-26.57 178.8786,-20.239"/>
@@ -208,7 +208,7 @@
 </g>
 </g>
 <!-- AnalyzeBlocks&#45;&gt;SharpenMetacells -->
-<g id="edge11" class="edge">
+<g id="edge12" class="edge">
 <title>AnalyzeBlocks&#45;&gt;SharpenMetacells</title>
 <path fill="none" stroke="#000000" d="M62.7219,-54.9197C77.4983,-46.4541 99.279,-33.9755 116.2735,-24.2391"/>
 <polygon fill="#000000" stroke="#000000" points="118.2106,-27.1631 125.1476,-19.155 114.7308,-21.0893 118.2106,-27.1631"/>

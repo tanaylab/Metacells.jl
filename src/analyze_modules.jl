@@ -581,7 +581,7 @@ end
     )::Nothing
 
 Compute and set [`vector_of_mean_euclidean_modules_cells_distance_per_metacell`](@ref) and
-and set [`vector_of_std_euclidean_modules_cells_distance_per_metacell`](@ref).
+[`vector_of_std_euclidean_modules_cells_distance_per_metacell`](@ref).
 
 $(CONTRACT)
 """
@@ -786,19 +786,6 @@ function maximal_cells_dispersion_of_modules!(;
     end
 
     if max_mean_normalized_module_UMIs <= 0
-        for module_index in 1:n_modules
-            if !is_found_per_module[module_index]
-                continue
-            end
-            gene_indices_in_module = gene_indices_per_module[module_index]
-            raw_module_UMIs = 0
-            for cell_position in 1:n_cells
-                cell_index = indices_of_cells[cell_position]
-                for gene_index in gene_indices_in_module
-                    raw_module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]
-                end
-            end
-        end
         return 0.0f0
     end
 

@@ -44,6 +44,18 @@ Metacells.Contracts.vector_of_is_excluded_per_cell
 Metacells.Contracts.vector_of_is_base_outlier_per_cell
 ```
 
+### Deviant Cells
+
+```@docs
+Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell
+Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell
+Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell
+Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell
+Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell
+Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell
+Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell
+```
+
 ## Metacells
 
 ```@docs

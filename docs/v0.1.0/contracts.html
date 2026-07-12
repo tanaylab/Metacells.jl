@@ -904,6 +904,244 @@
 </section>
 </details>
 </article>
+<h3 id="Deviant-Cells">
+<a class="docs-heading-anchor" href="#Deviant-Cells">Deviant Cells
+</a>
+<a id="Deviant-Cells-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Deviant-Cells" title="Permalink">
+</a>
+</h3>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell">
+<code>Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_outlier_in_prev_block_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The previous round&#39;s block each outlier cell was a candidate member of - the block of the sharp metacell the cell was in before it lost that metacell. It is set for both deviant outliers (which became outliers because they mismatch their metacell) and dissolved outliers (which became outliers because their metacell dissolved). This is the empty string for any cell that kept its metacell, and for base outliers (which never enter the clustering). A cell is a deviant outlier if, for some found module instance in the previous round&#39;s repository, its actual UMIs of the module&#39;s genes exceed the expected UMIs by a high fold factor - see 
+<a href="contracts.html#Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell">
+<code>vector_of_deviant_by_prev_block_per_cell
+</code>
+</a>.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_outlier_in_prev_metacell_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The previous round&#39;s metacell each outlier cell is closest to, in the environment-normalized module z-score space its candidate block&#39;s neighborhood was clustered in. This is the nearest surviving metacell. It is set for both dissolved outliers (whose metacell dissolved) and deviant outliers (for a deviant outlier whose metacell survives, this may be that same metacell). In contrast, 
+<a href="contracts.html#Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell">
+<code>vector_of_outlier_by_prev_module_per_cell
+</code>
+</a> is set only for dissolved outliers (deviant outliers describe their outlier module via the deviant certificate). This is the empty string for any cell that kept its metacell, for base outliers, and for cells that had no surviving neighborhood metacell to compare against.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell">
+<code>Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_outlier_by_prev_module_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The found module that most sets each dissolved outlier apart from its nearest metacell (see 
+<a href="contracts.html#Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell">
+<code>vector_of_outlier_in_prev_metacell_per_cell
+</code>
+</a>) - the module with the maximal environment-normalized z-score distance, the worst offender in the L2 distance that K-means clustered on. It is set only for dissolved outliers; deviant outliers describe their outlier module via the deviant certificate. This is the empty string for any cell that is not a dissolved outlier.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_deviant_by_prev_block_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The previous round&#39;s block whose found module most strongly deviates in each cell that was ejected from its metacell as a deviant outlier, in contrast to the 
+<a href="contracts.html#Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell">
+<code>vector_of_outlier_in_prev_block_per_cell
+</code>
+</a> which is the block the cell was a candidate member of. This is the empty string for any cell that is not a deviant outlier.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_deviant_by_prev_module_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The found module that most strongly deviates in each cell that was ejected from its metacell as a deviant outlier. This module belongs to the 
+<a href="contracts.html#Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell">
+<code>vector_of_deviant_by_prev_block_per_cell
+</code>
+</a> of the cell. This is the empty string for any cell that is not a deviant outlier.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_deviant_expected_UMIs_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The expected UMIs of the deviant module&#39;s genes in each cell that was ejected from its metacell as a deviant outlier. This is the module&#39;s linear fraction in the cell&#39;s metacell excluding the cell itself, times the cell&#39;s total UMIs. This is zero for any cell that is not a deviant outlier.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_deviant_actual_UMIs_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The actual UMIs of the deviant module&#39;s genes in each cell that was ejected from its metacell as a deviant outlier. This is zero for any cell that is not a deviant outlier.
+</p>
+<p>This vector is populated by 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Metacells">
 <a class="docs-heading-anchor" href="#Metacells">Metacells
 </a>
@@ -1144,7 +1382,7 @@
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>A mask of genes specifically expressed in each metacell relative to the median in its block&#39;s environment. Such genes are environment markers that are not correlated with any skeleton gene, and whose expression in the metacell has a significant fold factor (in either direction) from the median expression across the metacells in the block&#39;s environment.
+<p>A mask of non-lateral genes specifically expressed in each metacell relative to the median in its block&#39;s environment. Such genes are environment markers that are not correlated with any skeleton gene, and whose expression in the metacell has a significant fold factor (in either direction) from the median expression across the metacells in the block&#39;s environment.
 </p>
 <p>This matrix is populated by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_specific_per_gene_per_metacell!">
@@ -4166,6 +4404,30 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell">
+<code>Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.vector_of_excluded_UMIs_per_cell">
 <code>Metacells.Contracts.vector_of_excluded_UMIs_per_cell
 </code>
@@ -4324,6 +4586,24 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block">
 <code>Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell">
+<code>Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell">
+<code>Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell">
+<code>Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell
 </code>
 </a>
 </li>

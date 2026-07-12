@@ -1389,6 +1389,7 @@ end
 
 Compute and set [`matrix_of_is_environment_specific_per_gene_per_metacell`](@ref). A gene is specific in a metacell if:
 
+  - It is not a lateral gene.
   - It is a marker in the metacell's block environment which is not correlated with any skeleton gene in that
     environment. Such genes are not captured by the correlation-based gene modules, so identifying them lets us preserve
     rare behaviors that are expressed in only a few metacells.
@@ -1402,6 +1403,7 @@ $(CONTRACT)
 @logged :mcs_ops @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
+        vector_of_is_lateral_per_gene(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
         vector_of_total_UMIs_per_metacell(RequiredInput),
         matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
@@ -1427,6 +1429,7 @@ $(CONTRACT)
     n_metacells = axis_length(daf, "metacell")
     n_blocks = axis_length(daf, "block")
 
+    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
     block_index_per_metacell = daf["@ metacell : block : index"].array
     total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
     UMIs_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "UMIs").array
@@ -1458,7 +1461,8 @@ $(CONTRACT)
         @views is_environment_marker_per_gene = is_environment_marker_per_gene_per_block[:, block_index]
         @views is_correlated_with_skeleton_in_environment_per_gene =
             is_correlated_with_skeleton_in_environment_per_gene_per_block[:, block_index]
-        is_candidate_per_gene = is_environment_marker_per_gene .& .!is_correlated_with_skeleton_in_environment_per_gene
+        is_candidate_per_gene =
+            is_environment_marker_per_gene .& .!is_correlated_with_skeleton_in_environment_per_gene .& .!is_lateral_per_gene
         indices_of_candidate_genes = findall(is_candidate_per_gene)
 
         linear_fraction_per_candidate_gene_per_environment_metacell =

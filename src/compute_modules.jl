@@ -17,6 +17,7 @@ using Serialization
 
 using ..Contracts
 
+import Base.Threads.maxthreadid
 import Random.default_rng
 
 # Needed because of JET:
@@ -136,6 +137,33 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
 
     # Per-block work dominates on the environment metacells (k-means + correlations); weight blocks heaviest-first.
     n_environment_metacells_per_block = vec(sum(is_in_environment_per_metacell_per_block; dims = 1))
+
+    # Reusable per-thread K-means buffers (a swap pair each), sized to the per-block maxima, so the per-block gene
+    # clustering runs allocation-free instead of the allocating `Clustering.kmeans` fallback. The clustered points are
+    # the block's lateral-environment-marker genes or local genes (over the environment metacell dimensions).
+    max_n_environment_metacells = maximum(n_environment_metacells_per_block)
+    n_lateral_environment_marker_genes_per_block =
+        vec(sum(is_environment_marker_per_gene_per_block .& is_lateral_per_gene; dims = 1))
+    n_local_genes_per_block =
+        vec(sum(is_correlated_with_skeletons_in_environment_per_gene_per_block .& .!is_lateral_per_gene; dims = 1))
+    max_n_kmeans_gene_points =
+        max(maximum(n_lateral_environment_marker_genes_per_block), maximum(n_local_genes_per_block))
+    kmeans_float_type = eltype(log_fraction_per_metacell_per_gene)
+    kmeans_buffers_per_thread = [
+        (
+            KMeansBuffers{kmeans_float_type}(;
+                n_dims = max_n_environment_metacells,
+                max_k = max_clusters,
+                n_points = max_n_kmeans_gene_points,
+            ),
+            KMeansBuffers{kmeans_float_type}(;
+                n_dims = max_n_environment_metacells,
+                max_k = max_clusters,
+                n_points = max_n_kmeans_gene_points,
+            ),
+        ) for _ in 1:maxthreadid()
+    ]
+
     parallel_loop_with_rng(
         1:n_blocks;
         rng,
@@ -160,6 +188,7 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
             min_strong_UMIs,
             min_strong_cells,
             kmeans_rounds,
+            kmeans_buffers = kmeans_buffers_per_thread[threadid()],
             rng,
             module_status_per_gene,
             UMIs_per_cell_per_gene,
@@ -226,6 +255,7 @@ function compute_block_modules!(
     min_strong_UMIs::Integer,
     min_strong_cells::Integer,
     kmeans_rounds::Integer,
+    kmeans_buffers::Tuple{KMeansBuffers, KMeansBuffers},
     rng::AbstractRNG,
     module_status_per_gene::Maybe{AbstractVector{<:AbstractString}},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
@@ -290,6 +320,7 @@ function compute_block_modules!(
             return kmeans_in_rounds(
                 z_score_per_environment_metacell_per_lateral_environment_marker_gene,
                 min(n_lateral_environment_marker_genes, max_clusters);
+                buffers = kmeans_buffers,
                 rounds = kmeans_rounds,
                 rng,
             )
@@ -297,7 +328,9 @@ function compute_block_modules!(
 
         lateral_cluster_per_gene[indices_of_lateral_environment_markers] .= kmeans_results.assignments
 
-        z_score_per_environment_metacell_per_lateral_cluster = kmeans_results.centers
+        # The buffered k-means result aliases the reusable `kmeans_buffers`, which the local-gene k-means below
+        # overwrites; copy the lateral cluster centers so they survive for the lateral-ish detection later.
+        z_score_per_environment_metacell_per_lateral_cluster = Matrix(kmeans_results.centers)
         return nothing
     end
 
@@ -349,6 +382,7 @@ function compute_block_modules!(
             return kmeans_in_rounds(
                 z_score_per_environment_metacell_per_local_gene,
                 min(n_local_genes, max_clusters);
+                buffers = kmeans_buffers,
                 rounds = kmeans_rounds,
                 rng,
             )
@@ -517,7 +551,11 @@ function compute_block_modules!(
     end
 
     flame_timed("migrate_between_gene_modules") do
-        @views UMIs_per_environment_cell_per_gene = UMIs_per_cell_per_gene[indices_of_environment_cells, :]
+        # Materialize the environment sub-matrix as a concrete sparse matrix rather than a `@views` sub-array: a
+        # sub-array of a sparse matrix is not itself a `SparseMatrixCSC`, so the `sum(...; dims = 2)` below would fall
+        # back to a dense per-element scan instead of the non-zero-only sparse reduction. The single row-subset copy is
+        # amortized across every cluster and every iteration of the loop below.
+        UMIs_per_environment_cell_per_gene = UMIs_per_cell_per_gene[indices_of_environment_cells, :]
 
         while true
             local_positions_of_anchors = collect(keys(cluster_index_of_anchor_local_position))
@@ -559,7 +597,9 @@ function compute_block_modules!(
             for (anchor_local_position, cluster_index) in cluster_index_of_anchor_local_position  # NOLINT
                 is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
                 @assert any(is_in_cluster_per_local_gene)
-                @views UMIs_per_environment_cell_per_cluster_local_gene =
+                # Concrete sparse column-subset (not a `@views` sub-array) so the `sum(...; dims = 2)` uses the
+                # non-zero-only sparse reduction; column selection on a `SparseMatrixCSC` is a cheap column gather.
+                UMIs_per_environment_cell_per_cluster_local_gene =
                     UMIs_per_environment_cell_per_gene[:, indices_of_local_genes[is_in_cluster_per_local_gene]]
                 cluster_UMIs_per_environment_cell = vec(sum(UMIs_per_environment_cell_per_cluster_local_gene; dims = 2))
                 cluster_strong_UMIs = quantile(  # NOLINT

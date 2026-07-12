@@ -1728,6 +1728,8 @@
 </a>. A gene is specific in a metacell if:
 </p>
 <ul>
+<li>It is not a lateral gene.
+</li>
 <li>It is a marker in the metacell&#39;s block environment which is not correlated with any skeleton gene in that environment. Such genes are not captured by the correlation-based gene modules, so identifying them lets us preserve rare behaviors that are expressed in only a few metacells.
 </li>
 <li>The fold factor (in either direction) between its expression in the metacell and its median expression across the metacells in the block&#39;s environment is at least 
@@ -1760,6 +1762,10 @@
 <p>
 <strong>Vectors
 </strong>
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
 </p>
 <p>
 <strong>metacell @ block
@@ -1819,7 +1825,7 @@
 <strong>gene, metacell @ is
 <em>environment
 </em>specific
-</strong>::Bool (created): A mask of genes specifically expressed in each metacell relative to the median in its block&#39;s environment.
+</strong>::Bool (created): A mask of non-lateral genes specifically expressed in each metacell relative to the median in its block&#39;s environment.
 </p>
 </div>
 </section>

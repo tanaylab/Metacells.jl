@@ -82,6 +82,10 @@ export vector_of_block_per_metacell
 export vector_of_color_per_type
 export vector_of_correlation_between_cells_and_projected_metacells_per_gene
 export vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
+export vector_of_deviant_actual_UMIs_per_cell
+export vector_of_deviant_by_prev_block_per_cell
+export vector_of_deviant_by_prev_module_per_cell
+export vector_of_deviant_expected_UMIs_per_cell
 export vector_of_excluded_UMIs_per_cell
 export vector_of_global_flow_order_per_type
 export vector_of_is_base_outlier_per_cell
@@ -109,6 +113,9 @@ export vector_of_n_modules_per_block
 export vector_of_n_neighborhood_blocks_per_block
 export vector_of_n_neighborhood_cells_per_block
 export vector_of_n_neighborhood_metacells_per_block
+export vector_of_outlier_by_prev_module_per_cell
+export vector_of_outlier_in_prev_block_per_cell
+export vector_of_outlier_in_prev_metacell_per_cell
 export vector_of_projected_block_per_cell
 export vector_of_projected_metacell_per_cell
 export vector_of_projected_modules_z_score_per_cell
@@ -490,6 +497,135 @@ function vector_of_is_base_outlier_per_cell(expectation::ContractExpectation)::P
         (expectation, Bool, "A mask of cells that were outliers at the original input.")
 end
 
+### Deviant Cells
+
+"""
+    vector_of_outlier_in_prev_block_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The previous round's block each outlier cell was a candidate member of - the block of the sharp metacell the cell was in
+before it lost that metacell. It is set for both deviant outliers (which became outliers because they mismatch their
+metacell) and dissolved outliers (which became outliers because their metacell dissolved). This is the empty string for
+any cell that kept its metacell, and for base outliers (which never enter the clustering). A cell is a deviant outlier
+if, for some found module instance in the previous round's repository, its actual UMIs of the module's genes exceed the
+expected UMIs by a high fold factor - see [`vector_of_deviant_by_prev_block_per_cell`](@ref).
+
+This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+"""
+function vector_of_outlier_in_prev_block_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "prev_block.outlier_in") =>
+        (expectation, AbstractString, "The previous round's block each outlier cell was a candidate member of.")
+end
+
+"""
+    vector_of_outlier_in_prev_metacell_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The previous round's metacell each outlier cell is closest to, in the environment-normalized module z-score space its
+candidate block's neighborhood was clustered in. This is the nearest surviving metacell. It is set for both dissolved
+outliers (whose metacell dissolved) and deviant outliers (for a deviant outlier whose metacell survives, this may be
+that same metacell). In contrast, [`vector_of_outlier_by_prev_module_per_cell`](@ref) is set only for dissolved outliers
+(deviant outliers describe their outlier module via the deviant certificate). This is the empty string for any cell that
+kept its metacell, for base outliers, and for cells that had no surviving neighborhood metacell to compare against.
+
+This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+"""
+function vector_of_outlier_in_prev_metacell_per_cell(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "prev_metacell.outlier_in") =>
+        (expectation, AbstractString, "The previous round's metacell each outlier cell is closest to.")
+end
+
+"""
+    vector_of_outlier_by_prev_module_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The found module that most sets each dissolved outlier apart from its nearest metacell (see
+[`vector_of_outlier_in_prev_metacell_per_cell`](@ref)) - the module with the maximal environment-normalized z-score
+distance, the worst offender in the L2 distance that K-means clustered on. It is set only for dissolved outliers; deviant
+outliers describe their outlier module via the deviant certificate. This is the empty string for any cell that is not a
+dissolved outlier.
+
+This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+"""
+function vector_of_outlier_by_prev_module_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "prev_module.outlier_by") => (
+        expectation,
+        AbstractString,
+        "The found module that most sets each outlier cell apart from its nearest metacell.",
+    )
+end
+
+"""
+    vector_of_deviant_by_prev_block_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The previous round's block whose found module most strongly deviates in each cell that was ejected from its metacell as a
+deviant outlier, in contrast to the [`vector_of_outlier_in_prev_block_per_cell`](@ref) which is the block the cell was a
+candidate member of. This is the empty string for any cell that is not a deviant outlier.
+
+This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+"""
+function vector_of_deviant_by_prev_block_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "prev_block.deviant_by") => (
+        expectation,
+        AbstractString,
+        "The previous round's block whose found module most strongly deviates in each deviant cell.",
+    )
+end
+
+"""
+    vector_of_deviant_by_prev_module_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The found module that most strongly deviates in each cell that was ejected from its metacell as a deviant outlier. This
+module belongs to the [`vector_of_deviant_by_prev_block_per_cell`](@ref) of the cell. This is the empty string for any
+cell that is not a deviant outlier.
+
+This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+"""
+function vector_of_deviant_by_prev_module_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "prev_module.deviant_by") =>
+        (expectation, AbstractString, "The found module that most strongly deviates in each deviant cell.")
+end
+
+"""
+    vector_of_deviant_expected_UMIs_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The expected UMIs of the deviant module's genes in each cell that was ejected from its metacell as a deviant outlier.
+This is the module's linear fraction in the cell's metacell excluding the cell itself, times the cell's total UMIs. This
+is zero for any cell that is not a deviant outlier.
+
+This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+"""
+function vector_of_deviant_expected_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "deviant_expected_UMIs") =>
+        (expectation, StorageFloat, "The expected UMIs of the deviant module's genes in each deviant cell.")
+end
+
+"""
+    vector_of_deviant_actual_UMIs_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The actual UMIs of the deviant module's genes in each cell that was ejected from its metacell as a deviant outlier. This
+is zero for any cell that is not a deviant outlier.
+
+This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+"""
+function vector_of_deviant_actual_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "deviant_actual_UMIs") =>
+        (expectation, StorageFloat, "The actual UMIs of the deviant module's genes in each deviant cell.")
+end
+
 ## Metacells
 
 """
@@ -622,9 +758,9 @@ end
         expectation::ContractExpectation
     )::Pair{MatrixKey, DataSpecification}
 
-A mask of genes specifically expressed in each metacell relative to the median in its block's environment. Such genes
-are environment markers that are not correlated with any skeleton gene, and whose expression in the metacell has a
-significant fold factor (in either direction) from the median expression across the metacells in the block's
+A mask of non-lateral genes specifically expressed in each metacell relative to the median in its block's environment.
+Such genes are environment markers that are not correlated with any skeleton gene, and whose expression in the metacell
+has a significant fold factor (in either direction) from the median expression across the metacells in the block's
 environment.
 
 This matrix is populated by [`compute_matrix_of_is_environment_specific_per_gene_per_metacell!`](@ref
@@ -636,7 +772,7 @@ function matrix_of_is_environment_specific_per_gene_per_metacell(
     return ("gene", "metacell", "is_environment_specific") => (
         expectation,
         Bool,
-        "A mask of genes specifically expressed in each metacell relative to the median in its block's environment.",
+        "A mask of non-lateral genes specifically expressed in each metacell relative to the median in its block's environment.",
     )
 end
 
