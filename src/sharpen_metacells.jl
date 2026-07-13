@@ -56,6 +56,7 @@ import Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell
 import Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell
 import Metacells.Contracts.vector_of_global_flow_order_per_type
 import Metacells.Contracts.vector_of_is_base_outlier_per_cell
+import Metacells.Contracts.vector_of_is_excluded_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_block
@@ -65,6 +66,7 @@ import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell
 import Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell
 import Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell
+import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_type_per_block
 import Metacells.Contracts.vector_of_type_per_metacell
@@ -221,6 +223,7 @@ end
         sharpening_round::Integer,
         improvement_half_life::Maybe{Integer} = $(DEFAULT.improvement_half_life),
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        std_UMIs_regularization::AbstractFloat = $(DEFAULT.std_UMIs_regularization),
         min_deviant_fold::AbstractFloat = $(DEFAULT.min_deviant_fold),
         deviant_UMIs_regularization::AbstractFloat = $(DEFAULT.deviant_UMIs_regularization),
         rng::AbstractRNG = default_rng(),
@@ -231,7 +234,13 @@ Given an `base_daf` metacells repository with a blocks structure and local gene 
 manifold, compute a `sharp_daf` metacells repository, which hopefully more faithfully captures this manifold.
 
  1. We cluster using K-means all the cells in each neighborhood using the z-score of the expression of the modules of
-    that neighborhood. The number of clusters is the number of base metacells in that neighborhood.
+    that neighborhood. The z-score compares the module's linear fraction in the cell to the mean and the standard
+    deviation of the module's linear fraction in the cells of the block's environment. It is regularized - we move the
+    difference from the mean away from zero by `std_fraction_regularization`, and increase the standard deviation by
+    it - so that modules with a tiny standard deviation will not turn single-UMI noise into a large z-score. This
+    regularization is specified in UMIs (`std_UMIs_regularization`) and is converted to a linear fraction by dividing
+    it by the mean total UMIs of a cell in the block's neighborhood. The number of clusters is the number of base
+    metacells in that neighborhood.
  2. We assign to each cluster the base block which is most frequent in the cluster cells.
     Cells of the base base block of the neighborhood, which belong to a cluster that is assigned to a different
     block, and which also belong to a cluster of that block in the neighborhood of that block, are migrated to that
@@ -306,6 +315,7 @@ $(CONTRACT2)
         matrix_of_UMIs_per_gene_per_cell(RequiredInput),
         vector_of_total_UMIs_per_cell(RequiredInput),
         vector_of_is_base_outlier_per_cell(RequiredInput),
+        vector_of_is_excluded_per_cell(RequiredInput),
         vector_of_metacell_per_cell(RequiredInput),
         vector_of_block_closest_by_pertinent_markers_per_cell(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
@@ -316,6 +326,7 @@ $(CONTRACT2)
         vector_of_n_modules_per_block(RequiredInput),
         matrix_of_is_found_per_module_per_block(RequiredInput),
         vector_of_n_neighborhood_cells_per_block(RequiredInput),
+        vector_of_total_neighborhood_UMIs_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(RequiredInput),
         matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
@@ -344,6 +355,7 @@ $(CONTRACT2)
     sharpening_round::Integer,
     improvement_half_life::Maybe{Integer} = 2,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
+    std_UMIs_regularization::AbstractFloat = 2.0,
     min_deviant_fold::AbstractFloat = 3.0,
     deviant_UMIs_regularization::AbstractFloat = 2.0,
     rng::AbstractRNG = default_rng(),
@@ -360,6 +372,7 @@ $(CONTRACT2)
     @assert kmeans_rounds > 0
     @assert sharpening_round >= 1
     @assert improvement_half_life === nothing || improvement_half_life > 0
+    @assert std_UMIs_regularization > 0
     @assert min_deviant_fold > 0
     @assert deviant_UMIs_regularization > 0
 
@@ -376,6 +389,14 @@ $(CONTRACT2)
     std_linear_fraction_in_environment_cells_per_module_per_block =
         get_matrix(base_daf, "module", "block", "std_linear_fraction_in_environment_cells").array
 
+    # The z-score regularization is specified in UMIs; convert it to a linear fraction using the mean total UMIs of a
+    # cell in each block's neighborhood.
+    mean_total_UMIs_in_neighborhood_cells_per_block =
+        get_vector(base_daf, "block", "total_neighborhood_UMIs").array ./
+        get_vector(base_daf, "block", "n_neighborhood_cells").array
+    std_fraction_regularization_per_block =
+        Float32.(std_UMIs_regularization ./ mean_total_UMIs_in_neighborhood_cells_per_block)
+
     is_in_neighborhood_per_other_block_per_base_block =
         get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
     is_found_per_module_per_block = get_matrix(base_daf, "module", "block", "is_found").array
@@ -383,11 +404,13 @@ $(CONTRACT2)
 
     block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
     is_base_outlier_per_cell = get_vector(base_daf, "cell", "is_base_outlier").array
+    is_excluded_per_cell = get_vector(base_daf, "cell", "is_excluded").array
     closest_block_index_per_cell = base_daf["@ cell : block.closest_by_pertinent_markers : index"].array
-    # Grouped cells use their metacell's block; round outliers (lost their metacell in a previous sharpening round)
-    # use the closest pertinent-markers block as a synthetic base; permanent (base) outliers stay at 0 and are skipped.
+    # Base outliers and excluded cells are never clustered. Every other cell gets a block: grouped cells use their
+    # metacell's block; round outliers (lost their metacell in a previous sharpening round) use the closest block by
+    # pertinent markers as a synthetic base.
     block_index_per_cell = ifelse.(
-        is_base_outlier_per_cell,
+        is_base_outlier_per_cell .| is_excluded_per_cell,
         zero(eltype(block_index_per_cell)),
         ifelse.(block_index_per_cell .> 0, block_index_per_cell, closest_block_index_per_cell),
     )
@@ -492,6 +515,7 @@ $(CONTRACT2)
         module_index_per_gene_per_block,
         mean_linear_fraction_in_environment_cells_per_module_per_block,
         std_linear_fraction_in_environment_cells_per_module_per_block,
+        std_fraction_regularization_per_block,
         min_migration_likelihood,
         kmeans_buffer_pool,
         rng,
@@ -590,6 +614,7 @@ $(CONTRACT2)
         mean_metacell_cells_per_block,
         mean_linear_fraction_in_environment_cells_per_module_per_block,
         std_linear_fraction_in_environment_cells_per_module_per_block,
+        std_fraction_regularization_per_block,
         base_block_index_per_cell,
         is_in_base_neighborhood_per_other_base_block_per_base_block,
         correlated_gene_indices_per_base_block,
@@ -660,6 +685,7 @@ $(CONTRACT2)
         module_index_per_gene_per_block,
         mean_linear_fraction_in_environment_cells_per_module_per_block,
         std_linear_fraction_in_environment_cells_per_module_per_block,
+        std_fraction_regularization_per_block,
         UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         n_cells,
@@ -704,6 +730,7 @@ function compute_preferred_block_index_per_cell_per_block(;
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     mean_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     std_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
     kmeans_buffer_pool::Channel{KMeansBuffers{Float32}},
     rng::AbstractRNG,
 )::Vector{Maybe{SparseVector{<:Integer}}}
@@ -781,6 +808,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             module_index_per_gene_per_block,
             mean_linear_fraction_in_environment_cells_per_module_per_block,
             std_linear_fraction_in_environment_cells_per_module_per_block,
+            std_fraction_regularization_per_block,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
@@ -992,6 +1020,7 @@ function compute_local_clusters(;
     mean_metacell_cells_per_block::AbstractVector{<:AbstractFloat},
     mean_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     std_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
+    std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
     base_block_index_per_cell::AbstractVector{<:Integer},
     is_in_base_neighborhood_per_other_base_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
     correlated_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
@@ -1076,6 +1105,7 @@ function compute_local_clusters(;
             module_index_per_gene_per_block,
             mean_linear_fraction_in_environment_cells_per_module_per_block,
             std_linear_fraction_in_environment_cells_per_module_per_block,
+            std_fraction_regularization_per_block,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
@@ -1877,6 +1907,7 @@ function compute_outlier_certificates(;
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     n_cells::Integer,
@@ -1938,6 +1969,7 @@ function compute_outlier_certificates(;
             module_index_per_gene_per_block,
             mean_linear_fraction_in_environment_cells_per_module_per_block,
             std_linear_fraction_in_environment_cells_per_module_per_block,
+            std_fraction_regularization_per_block,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
@@ -2364,6 +2396,7 @@ function setup_z_score_per_found_module_per_region_cell!(;
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     z_score_accumulator_pool::Channel{Vector{Float32}},
@@ -2398,6 +2431,7 @@ function setup_z_score_per_found_module_per_region_cell!(;
         z_score_accumulator_pool,
         mean_linear_fraction_in_environment_cells_per_module,
         std_linear_fraction_in_environment_cells_per_module,
+        std_fraction_regularization = std_fraction_regularization_per_block[block_index],
     )
 
     return gene_indices_per_module
@@ -2413,6 +2447,7 @@ function compute_z_score_per_found_module_per_region_cell!(;
     z_score_accumulator_pool::Channel{Vector{Float32}},
     mean_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
+    std_fraction_regularization::AbstractFloat,
 )::Nothing
     n_region_cells = length(indices_of_region_cells)
     found_module_indices = findall(is_found_per_module)
@@ -2454,9 +2489,11 @@ function compute_z_score_per_found_module_per_region_cell!(;
             @check_turbo_matrix(z_score_per_found_module_per_region_cell)
             @turbo for region_cell_position in 1:n_region_cells
                 cell_index = indices_of_region_cells[region_cell_position]
+                delta_fraction =
+                    accumulator[region_cell_position] / total_UMIs_per_cell[cell_index] - mean_linear_fraction
                 z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] =
-                    (accumulator[region_cell_position] / total_UMIs_per_cell[cell_index] - mean_linear_fraction) /
-                    std_linear_fraction
+                    (delta_fraction + copysign(std_fraction_regularization, delta_fraction)) /
+                    (std_linear_fraction + std_fraction_regularization)
             end
         finally
             put!(z_score_accumulator_pool, accumulator)
