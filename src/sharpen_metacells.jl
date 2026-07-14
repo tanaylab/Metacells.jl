@@ -50,10 +50,6 @@ import Metacells.Contracts.vector_of_base_block_per_metacell
 import Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_block_per_metacell
-import Metacells.Contracts.vector_of_deviant_actual_UMIs_per_cell
-import Metacells.Contracts.vector_of_deviant_by_prev_block_per_cell
-import Metacells.Contracts.vector_of_deviant_by_prev_module_per_cell
-import Metacells.Contracts.vector_of_deviant_expected_UMIs_per_cell
 import Metacells.Contracts.vector_of_global_flow_order_per_type
 import Metacells.Contracts.vector_of_is_base_outlier_per_cell
 import Metacells.Contracts.vector_of_is_excluded_per_cell
@@ -63,9 +59,12 @@ import Metacells.Contracts.vector_of_n_cells_per_block
 import Metacells.Contracts.vector_of_n_metacells_per_block
 import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
+import Metacells.Contracts.vector_of_outlier_actual_UMIs_per_cell
+import Metacells.Contracts.vector_of_outlier_by_prev_block_per_cell
 import Metacells.Contracts.vector_of_outlier_by_prev_module_per_cell
+import Metacells.Contracts.vector_of_outlier_expected_UMIs_per_cell
+import Metacells.Contracts.vector_of_outlier_in_metacell_per_cell
 import Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell
-import Metacells.Contracts.vector_of_outlier_in_prev_metacell_per_cell
 import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_type_per_block
@@ -153,7 +152,6 @@ end
     n_clusters::Int
     block_cell_indices::AbstractVector{<:Integer}
     cluster_index_per_block_cell::AbstractVector{<:Integer}
-    is_too_small_per_cluster::BitVector
 end
 
 @kwdef struct DispersionContext
@@ -197,7 +195,6 @@ struct SolutionCandidate
     counts::Vector{Int}
     weight_per_cluster::Vector{Float64}
     assignments::Vector{Int}
-    is_perfect::Bool
 end
 
 struct SolutionCandidates
@@ -224,8 +221,8 @@ end
         improvement_half_life::Maybe{Integer} = $(DEFAULT.improvement_half_life),
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         std_UMIs_regularization::AbstractFloat = $(DEFAULT.std_UMIs_regularization),
-        min_deviant_fold::AbstractFloat = $(DEFAULT.min_deviant_fold),
-        deviant_UMIs_regularization::AbstractFloat = $(DEFAULT.deviant_UMIs_regularization),
+        min_outlier_fold::AbstractFloat = $(DEFAULT.min_outlier_fold),
+        outlier_UMIs_regularization::AbstractFloat = $(DEFAULT.outlier_UMIs_regularization),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
@@ -253,7 +250,9 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     than `min_cells_in_metacell`. A cluster is also considered too-large if it is larger than `max_cells_in_metacell`,
     if its maximal `cells_dispersion` (across the block's modules) is above `max_cells_dispersion_in_metacell`, and
     too-small if its maximal `cells_dispersion` is below `min_cells_dispersion_in_metacell`. In edge cases we dissolve
-    too-small clusters, so this can create new dissolved outliers. We increase the number of target metacells for every input
+    too-small clusters, relocating each of their cells to the nearest surviving cluster, by the distance to the cluster's
+    center in the same module z-score space K-means clustered them in. A block's last cluster is never dissolved, so
+    every clustered cell always ends up in some cluster. We increase the number of target metacells for every input
     metacell whose maximal `cells_dispersion` is above `max_cells_dispersion_in_metacell`. This still leaves us with
     multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation
     with most-correlated marker genes in the (previous round's) neighborhoods. To stabilize the choice as sharpening
@@ -262,19 +261,18 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     round (`sharpening_round == 1`) applies no cooldown (the plain correlation tie-break), and for each later round the
     margin's distance from its maximum halves every `improvement_half_life` rounds. Passing
     `improvement_half_life == nothing` disables the cooldown entirely.
- 4. We detect deviant outlier cells and eject them from their metacell. For each cell in each metacell, and for every
+ 4. We detect the outlier cells and eject them from their metacell. For each cell in each metacell, and for every
     found module instance in the previous round's repository (across all blocks, not just the modules of the cell's own region), we
     compare the actual UMIs of the module's genes in the cell to the expected UMIs. The expectation is punctuated - the
     module's linear fraction in the cell's metacell excluding the cell itself, times the cell's total UMIs - so a strong
-    outlier cannot inflate its own baseline. The comparison is a fold factor `log2((actual + deviant_UMIs_regularization) / (expected + deviant_UMIs_regularization))`, using a strong UMIs regularization so low-count modules do not trigger.
-    A cell whose maximal fold (across all module instances) exceeds `min_deviant_fold` is a deviant outlier: it loses its
-    metacell, and we record the certificate (the previous round's block and module that flagged it, and the expected and
-    actual UMIs) of the module instance that most deviates. If ejecting deviant cells drops a metacell below
-    `min_cells_in_metacell`, we dissolve it, so its remaining cells also become dissolved outliers. For every outlier -
-    deviant or dissolved - we record the block of the candidate metacell it was grouped into (`outlier_in`) and the
-    nearest surviving metacell in that block's neighborhood (by the module z-score distance that K-means clustered on).
-    For dissolved outliers we also record the worst-offender module (`outlier_by`), the one with the maximal such
-    distance; deviant outliers instead carry the deviant certificate above.
+    outlier cannot inflate its own baseline. The comparison is a fold factor `log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization))`, using a strong UMIs regularization so low-count modules do not trigger.
+    A cell whose maximal fold (across all module instances) exceeds `min_outlier_fold` is an outlier: it loses its
+    metacell, and we record the certificate (the metacell it was ejected from, the previous round's block and module that
+    flagged it, and the expected and actual UMIs) of the module instance that most deviates. Ejecting the outliers can
+    drop a metacell below `min_cells_in_metacell`; we dissolve such a metacell, relocate all its cells to the nearest
+    surviving metacell of its block (by the same module z-score distance used above), and detect the outliers again - so
+    a cell forced into a metacell it does not fit is caught. This repeats until no metacell is dissolved. A block's last
+    metacell is never dissolved, so every outlier's certificate names a metacell that survives.
  5. The final clusters are the sharp metacells. We name them using the `prefix`, the convention is to advance the letter
     for each sharpening round (`M` to `N` to `O` to ...).
 
@@ -295,12 +293,11 @@ $(CONTRACT2)
         vector_of_metacell_per_cell(CreatedOutput),
         vector_of_base_block_per_metacell(CreatedOutput),
         vector_of_outlier_in_prev_block_per_cell(CreatedOutput),
-        vector_of_outlier_in_prev_metacell_per_cell(CreatedOutput),
+        vector_of_outlier_in_metacell_per_cell(CreatedOutput),
+        vector_of_outlier_by_prev_block_per_cell(CreatedOutput),
         vector_of_outlier_by_prev_module_per_cell(CreatedOutput),
-        vector_of_deviant_by_prev_block_per_cell(CreatedOutput),
-        vector_of_deviant_by_prev_module_per_cell(CreatedOutput),
-        vector_of_deviant_expected_UMIs_per_cell(CreatedOutput),
-        vector_of_deviant_actual_UMIs_per_cell(CreatedOutput),
+        vector_of_outlier_expected_UMIs_per_cell(CreatedOutput),
+        vector_of_outlier_actual_UMIs_per_cell(CreatedOutput),
     ],
 ) Contract(;
     name = "base_daf",
@@ -356,8 +353,8 @@ $(CONTRACT2)
     improvement_half_life::Maybe{Integer} = 2,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     std_UMIs_regularization::AbstractFloat = 2.0,
-    min_deviant_fold::AbstractFloat = 3.0,
-    deviant_UMIs_regularization::AbstractFloat = 2.0,
+    min_outlier_fold::AbstractFloat = 3.0,
+    outlier_UMIs_regularization::AbstractFloat = 2.0,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
@@ -373,8 +370,8 @@ $(CONTRACT2)
     @assert sharpening_round >= 1
     @assert improvement_half_life === nothing || improvement_half_life > 0
     @assert std_UMIs_regularization > 0
-    @assert min_deviant_fold > 0
-    @assert deviant_UMIs_regularization > 0
+    @assert min_outlier_fold > 0
+    @assert outlier_UMIs_regularization > 0
 
     n_cells = axis_length(base_daf, "cell")
     n_blocks = axis_length(base_daf, "block")
@@ -626,60 +623,15 @@ $(CONTRACT2)
         rng,
     )
 
-    cells_of_sharp_metacells, block_name_per_sharp_metacell = combine_local_clusters(;
+    cells_of_sharp_metacells, block_index_per_sharp_metacell =
+        combine_local_clusters(; local_clusters_per_block, n_base_metacells)
+
+    outlier_certificates = eject_outliers!(;
+        cells_of_sharp_metacells,
+        block_index_per_sharp_metacell,
         min_cells_in_metacell,
-        local_clusters_per_block,
-        name_per_block,
-        n_base_metacells,
-        n_cells,
-    )
-
-    # The block each cell was a candidate member of - the block it was clustered in (`block_index_per_cell`). This covers
-    # every cell that entered the clustering, including cells whose too-small cluster was dissolved during
-    # `combine_local_clusters` (those are absent from `cells_of_sharp_metacells`). Base outliers stay at block 0 and get
-    # the empty string; cells that keep a metacell are blanked below.
-    candidate_block_name_per_cell =
-        [block_index > 0 ? name_per_block[block_index] : "" for block_index in block_index_per_cell]
-
-    deviant_certificates = compute_deviant_outliers(;
-        cells_of_sharp_metacells,
-        UMIs_per_cell_per_gene,
-        total_UMIs_per_cell,
-        is_found_per_module_per_block,
-        module_index_per_gene_per_block,
-        name_per_block,
-        name_per_module = axis_vector(base_daf, "module"),
-        min_deviant_fold,
-        deviant_UMIs_regularization,
-        n_cells,
-    )
-
-    eject_deviant_outliers!(;
-        cells_of_sharp_metacells,
-        block_name_per_sharp_metacell,
-        is_deviant_per_cell = deviant_certificates.is_deviant_per_cell,
-        min_cells_in_metacell,
-    )
-
-    name_per_sharp_metacell = group_names(axis_vector(base_daf, "cell"), cells_of_sharp_metacells; prefix)  # NOJET
-    sharp_metacell_name_per_cell = fill("", n_cells)
-    for (sharp_metacell_name, cells_of_sharp_metacell) in zip(name_per_sharp_metacell, cells_of_sharp_metacells)
-        sharp_metacell_name_per_cell[cells_of_sharp_metacell] .= sharp_metacell_name
-    end
-
-    # An outlier is a cell that ended up with no metacell; its `outlier_in` is the block it was clustered in, whether it
-    # became a deviant or a dissolved outlier. Blank the cells that kept a metacell (they are not outliers), leaving
-    # `candidate_block_name_per_cell` holding the `prev_block.outlier_in` values.
-    candidate_block_name_per_cell[sharp_metacell_name_per_cell .!= ""] .= ""
-
-    # For each outlier, the nearest surviving metacell of its block and (for dissolved outliers) the worst-offender
-    # module - blame computed in the same module z-score space K-means clustered the cells in.
-    outlier_in_metacell_name_per_cell, outlier_by_module_name_per_cell = compute_outlier_certificates(;
-        cells_of_sharp_metacells,
-        name_per_sharp_metacell,
-        sharp_metacell_name_per_cell,
-        is_deviant_per_cell = deviant_certificates.is_deviant_per_cell,
-        name_per_module = axis_vector(base_daf, "module"),
+        min_outlier_fold,
+        outlier_UMIs_regularization,
         block_index_per_cell,
         is_found_per_module_per_block,
         module_index_per_gene_per_block,
@@ -688,28 +640,48 @@ $(CONTRACT2)
         std_fraction_regularization_per_block,
         UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
+        name_per_block,
+        name_per_module = axis_vector(base_daf, "module"),
         n_cells,
-        n_genes = axis_length(base_daf, "gene"),
+        n_genes,
         n_modules = axis_length(base_daf, "module"),
         n_blocks,
     )
 
+    name_per_sharp_metacell = group_names(axis_vector(base_daf, "cell"), cells_of_sharp_metacells; prefix)  # NOJET
+    sharp_metacell_name_per_cell = fill("", n_cells)
+    for (sharp_metacell_name, cells_of_sharp_metacell) in zip(name_per_sharp_metacell, cells_of_sharp_metacells)
+        sharp_metacell_name_per_cell[cells_of_sharp_metacell] .= sharp_metacell_name
+    end
+
+    # Each outlier cell names the block it was clustered in, and the metacell it was ejected from (the metacell whose
+    # punctuated expectation flagged it, which always survives). Both are the empty string for a cell that kept its
+    # metacell, and for base outliers and excluded cells (which are never clustered).
+    outlier_in_block_name_per_cell = fill("", n_cells)
+    outlier_in_metacell_name_per_cell = fill("", n_cells)
+    for cell_index in 1:n_cells
+        if outlier_certificates.is_outlier_per_cell[cell_index]
+            outlier_in_block_name_per_cell[cell_index] = name_per_block[block_index_per_cell[cell_index]]
+            outlier_in_metacell_name_per_cell[cell_index] =
+                name_per_sharp_metacell[outlier_certificates.in_metacell_index_per_cell[cell_index]]
+        end
+    end
+
     add_axis!(sharp_daf, "metacell", name_per_sharp_metacell; overwrite)
     set_vector!(sharp_daf, "cell", "metacell", sharp_metacell_name_per_cell; overwrite)
-    set_vector!(sharp_daf, "metacell", "base_block", block_name_per_sharp_metacell; overwrite)
-    set_vector!(sharp_daf, "cell", "prev_block.outlier_in", candidate_block_name_per_cell; overwrite)
-    set_vector!(sharp_daf, "cell", "prev_metacell.outlier_in", outlier_in_metacell_name_per_cell; overwrite)
-    set_vector!(sharp_daf, "cell", "prev_module.outlier_by", outlier_by_module_name_per_cell; overwrite)
-    set_vector!(sharp_daf, "cell", "prev_block.deviant_by", deviant_certificates.by_prev_block_name_per_cell; overwrite)
+    set_vector!(sharp_daf, "metacell", "base_block", name_per_block[block_index_per_sharp_metacell]; overwrite)
+    set_vector!(sharp_daf, "cell", "prev_block.outlier_in", outlier_in_block_name_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "metacell.outlier_in", outlier_in_metacell_name_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "prev_block.outlier_by", outlier_certificates.by_prev_block_name_per_cell; overwrite)
     set_vector!(
         sharp_daf,
         "cell",
-        "prev_module.deviant_by",
-        deviant_certificates.by_prev_module_name_per_cell;
+        "prev_module.outlier_by",
+        outlier_certificates.by_prev_module_name_per_cell;
         overwrite,
     )
-    set_vector!(sharp_daf, "cell", "deviant_expected_UMIs", deviant_certificates.expected_UMIs_per_cell; overwrite)
-    set_vector!(sharp_daf, "cell", "deviant_actual_UMIs", deviant_certificates.actual_UMIs_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "outlier_expected_UMIs", outlier_certificates.expected_UMIs_per_cell; overwrite)
+    set_vector!(sharp_daf, "cell", "outlier_actual_UMIs", outlier_certificates.actual_UMIs_per_cell; overwrite)
 
     return nothing
 end
@@ -1132,15 +1104,12 @@ function compute_local_clusters(;
             min_cluster_size = min_cells_in_metacell,
         )
 
+        # The block's single cluster is also its last one, so it is kept even if it is too small.
         if n_block_clusters == 1
-            weight_total = sum(weight_per_block_cell)
             local_clusters_per_block[block_index] = LocalClusters(;
                 n_clusters = 1,
                 block_cell_indices,
                 cluster_index_per_block_cell = fill(1, n_block_cells),
-                is_too_small_per_cluster = BitVector([
-                    n_block_cells < min_cells_in_metacell || weight_total < min_metacell_total_UMIs,
-                ]),
             )
             return nothing
         end
@@ -1164,12 +1133,8 @@ function compute_local_clusters(;
         end
         solution_candidates_per_block[block_index] = candidates
         # Tentative LocalClusters from the baseline (candidates[1]); Phase 2 may overwrite for walkable blocks.
-        local_clusters_per_block[block_index] = build_local_clusters_from_candidate(
-            candidates.candidates[1],
-            block_cell_indices,
-            min_cells_in_metacell,
-            min_metacell_total_UMIs,
-        )
+        local_clusters_per_block[block_index] =
+            build_local_clusters_from_candidate(candidates.candidates[1], block_cell_indices)
         return nothing
     end
 
@@ -1474,12 +1439,8 @@ function compute_local_clusters(;
             chosen = candidates[best_candidate_index]
             Threads.atomic_add!(n_changes, 1)
             chosen_candidate_index_per_walkable_block[walkable_position] = best_candidate_index
-            local_clusters_per_block[block_index] = build_local_clusters_from_candidate(
-                chosen,
-                block_cell_indices_per_block[block_index],
-                min_cells_in_metacell,
-                min_metacell_total_UMIs,
-            )
+            local_clusters_per_block[block_index] =
+                build_local_clusters_from_candidate(chosen, block_cell_indices_per_block[block_index])
 
             # Populate this walkable's persistent variable + mask scratch under the chosen candidate.
             delta_context = delta_context_per_thread[threadid()]
@@ -1543,50 +1504,30 @@ function compute_local_clusters(;
     return local_clusters_per_block
 end
 
+# Collect the clusters of all the blocks into a single flat list of the candidate sharp metacells (every clustered cell
+# is in exactly one of them), and the block each was clustered in.
 function combine_local_clusters(;
     local_clusters_per_block::AbstractVector{Maybe{LocalClusters}},
-    name_per_block::AbstractVector{<:AbstractString},
-    min_cells_in_metacell::Integer,
     n_base_metacells::Integer,
-    n_cells::Integer,
-)::Tuple{AbstractVector{<:AbstractVector{<:Integer}}, <:AbstractVector{<:AbstractString}}
-    n_total_new_metacells = 0
-    n_new_outlier_cells = 0
-    for local_clusters in local_clusters_per_block
-        if local_clusters !== nothing
-            n_total_new_metacells += local_clusters.n_clusters
-            @foreach_true_index local_clusters.is_too_small_per_cluster cluster_index begin  # NOLINT
-                n_new_outlier_cells += count(==(cluster_index), local_clusters.cluster_index_per_block_cell)  # NOLINT
-            end
-        end
-    end
-
-    cells_of_new_metacells = Vector{AbstractVector{<:Integer}}()
-    block_name_per_new_metacell = Vector{AbstractString}()
+)::Tuple{Vector{Vector{Int}}, Vector{Int}}
+    cells_of_new_metacells = Vector{Vector{Int}}()
+    block_index_per_new_metacell = Vector{Int}()
 
     for (block_index, local_clusters) in enumerate(local_clusters_per_block)
         if local_clusters !== nothing
-            block_name = name_per_block[block_index]
             for cluster_index in 1:local_clusters.n_clusters
-                if !local_clusters.is_too_small_per_cluster[cluster_index]
-                    @views cell_indices_of_new_metacell =
-                        local_clusters.block_cell_indices[local_clusters.cluster_index_per_block_cell .== cluster_index]
-                    @assert length(cell_indices_of_new_metacell) >= min_cells_in_metacell
-                    push!(cells_of_new_metacells, cell_indices_of_new_metacell)
-                    push!(block_name_per_new_metacell, block_name)
-                end
+                cell_indices_of_new_metacell =
+                    local_clusters.block_cell_indices[local_clusters.cluster_index_per_block_cell .== cluster_index]
+                push!(cells_of_new_metacells, Vector{Int}(cell_indices_of_new_metacell))
+                push!(block_index_per_new_metacell, block_index)
             end
         end
     end
 
-    @debug (
-        "Metacells Original: $(n_base_metacells)" *
-        " Sharpened: $(length(block_name_per_new_metacell))" *
-        " Outlier cells: $(n_new_outlier_cells)" *
-        " ($(percent(n_new_outlier_cells, n_cells)))"
-    ) _group = :mcs_results
+    @debug ("Metacells Original: $(n_base_metacells) Sharpened: $(length(block_index_per_new_metacell))") _group =
+        :mcs_results
 
-    return (cells_of_new_metacells, block_name_per_new_metacell)
+    return (cells_of_new_metacells, block_index_per_new_metacell)
 end
 
 # The flattened enumeration of every found module instance across all blocks in a repository, indexed by
@@ -1638,20 +1579,21 @@ function collect_total_found_modules(;
     )
 end
 
-# The per-cell certificates of the deviant outlier detection. For each deviant cell, the name of the most-deviant
-# previous round's block and module that flagged it, and the expected and actual UMIs of that module's genes in the cell.
-# All entries are the "not a deviant outlier" defaults (empty string / zero) for cells that are not deviant outliers.
-struct DeviantCertificates
-    is_deviant_per_cell::BitVector
+# The per-cell certificates of the outlier detection. For each outlier cell, the metacell it was ejected from, the name of
+# the most-deviant previous round's block and module that flagged it, and the expected and actual UMIs of that module's
+# genes in the cell. All entries are the "not an outlier" defaults (zero / empty string) for cells that are not outliers.
+struct OutlierCertificates
+    is_outlier_per_cell::BitVector
+    in_metacell_index_per_cell::Vector{Int}
     by_prev_block_name_per_cell::Vector{String}
     by_prev_module_name_per_cell::Vector{String}
     expected_UMIs_per_cell::Vector{Float32}
     actual_UMIs_per_cell::Vector{Float32}
 end
 
-# A single deviant fold factor found for a cell against one found module instance. Collected per thread during the
-# parallel sweep over module instances, then reduced to the per-cell maximal fold in `compute_deviant_outliers`.
-struct DeviantCandidate
+# A single outlier fold factor found for a cell against one found module instance. Collected per thread during the
+# parallel sweep over module instances, then reduced to the per-cell maximal fold in `compute_outlier_certificates`.
+struct OutlierCandidate
     cell_index::Int
     total_found_module_index::Int
     fold::Float32
@@ -1659,13 +1601,14 @@ struct DeviantCandidate
     actual_UMIs::Float32
 end
 
-# Detect deviant outlier cells: cells whose expression of some base found module wildly exceeds what their metacell
+# Detect the outlier cells: cells whose expression of some base found module wildly exceeds what their metacell
 # predicts. For every found module instance in the previous round's repository (across all blocks, not just the modules of a cell's
 # own region), and for each grouped cell that expresses the module, compare the cell's actual UMIs of the module's genes
 # to the expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's metacell excluding the
 # cell itself, times the cell's total UMIs - so a strong outlier cannot inflate its own baseline. A cell whose maximal
-# fold (across all module instances) exceeds `min_deviant_fold` is a deviant outlier, with the certificate of the
-# most-deviant module instance.
+# fold (across all module instances) exceeds `min_outlier_fold` is an outlier, with the certificate of the most-deviant
+# module instance. A metacell is never emptied - every outlier names the metacell it was ejected from, so if all the
+# cells of a metacell are outliers, none of them is.
 #
 # The loop is parallel over module instances. `UMIs_per_cell_per_gene` is a CSC sparse matrix whose columns are genes,
 # so each instance walks only the nonzeros of its module's gene columns (the cells that actually express it); cells with
@@ -1674,7 +1617,7 @@ end
 # metacells) in preallocated index vectors so both the per-instance reduction and the reset are O(touched), not
 # O(n_cells). Each instance emits only its fold-exceeding candidates (rare) to a per-thread buffer, reduced serially to
 # the per-cell maximum at the end.
-function compute_deviant_outliers(;
+function compute_outlier_certificates(;
     cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -1682,10 +1625,10 @@ function compute_deviant_outliers(;
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     name_per_block::AbstractVector{<:AbstractString},
     name_per_module::AbstractVector{<:AbstractString},
-    min_deviant_fold::AbstractFloat,
-    deviant_UMIs_regularization::AbstractFloat,
+    min_outlier_fold::AbstractFloat,
+    outlier_UMIs_regularization::AbstractFloat,
     n_cells::Integer,
-)::DeviantCertificates
+)::OutlierCertificates
     n_sharp_metacells = length(cells_of_sharp_metacells)
 
     # The sparse-column sweep requires a CSC matrix whose columns are genes; unwrap the read-only Daf matrix to its
@@ -1693,20 +1636,25 @@ function compute_deviant_outliers(;
     @assert issparse(UMIs_per_cell_per_gene)
     sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
 
-    # Allocated once with the "not a deviant outlier" defaults; the candidate reduction below fills in the deviant cells.
-    is_deviant_per_cell = falses(n_cells)
+    # Allocated once with the "not an outlier" defaults; the candidate reduction below fills in the outlier cells.
+    is_outlier_per_cell = falses(n_cells)
+    in_metacell_index_per_cell = zeros(Int, n_cells)
     by_prev_block_name_per_cell = fill("", n_cells)
     by_prev_module_name_per_cell = fill("", n_cells)
     expected_UMIs_per_cell = zeros(Float32, n_cells)
     actual_UMIs_per_cell = zeros(Float32, n_cells)
 
     # Per-cell metacell membership (0 = ungrouped) and per-metacell total UMIs, both read-only inside the parallel loop.
+    # The single cell of a single-cell metacell has no punctuated baseline to compare against, so it is left ungrouped -
+    # it can never be an outlier.
     metacell_index_per_cell = zeros(Int32, n_cells)
     metacell_total_UMIs_per_metacell = zeros(Float64, n_sharp_metacells)
     for (sharp_metacell_index, cell_indices) in enumerate(cells_of_sharp_metacells)
-        for cell_index in cell_indices
-            metacell_index_per_cell[cell_index] = sharp_metacell_index
-            metacell_total_UMIs_per_metacell[sharp_metacell_index] += total_UMIs_per_cell[cell_index]
+        if length(cell_indices) > 1
+            for cell_index in cell_indices
+                metacell_index_per_cell[cell_index] = sharp_metacell_index
+                metacell_total_UMIs_per_metacell[sharp_metacell_index] += total_UMIs_per_cell[cell_index]
+            end
         end
     end
 
@@ -1732,15 +1680,15 @@ function compute_deviant_outliers(;
     touched_cells_per_thread = [Vector{Int32}(undef, n_cells) for _ in 1:maxthreadid()]
     module_total_UMIs_per_metacell_per_thread = [zeros(Float64, n_sharp_metacells) for _ in 1:maxthreadid()]
     touched_metacells_per_thread = [Vector{Int32}(undef, n_sharp_metacells) for _ in 1:maxthreadid()]
-    candidates_per_thread = [DeviantCandidate[] for _ in 1:maxthreadid()]
+    candidates_per_thread = [OutlierCandidate[] for _ in 1:maxthreadid()]
 
-    regularization = Float64(deviant_UMIs_regularization)
+    regularization = Float64(outlier_UMIs_regularization)
 
     parallel_loop_wo_rng(
         1:n_total_found_modules;
-        name = "compute_deviant_outliers",
+        name = "compute_outlier_certificates",
         weights = weight_per_total_found_module,
-        progress = DebugProgress(sum(weight_per_total_found_module); group = :mcs_loops, desc = "deviant_outliers"),
+        progress = DebugProgress(sum(weight_per_total_found_module); group = :mcs_loops, desc = "outlier_certificates"),
     ) do total_found_module_index
         actual_per_cell = actual_per_cell_per_thread[threadid()]
         is_touched_per_cell = is_touched_per_cell_per_thread[threadid()]
@@ -1792,10 +1740,10 @@ function compute_deviant_outliers(;
             module_linear_fraction = punctuated_module_UMIs / punctuated_total_UMIs
             expected_UMIs = module_linear_fraction * cell_total_UMIs
             fold = log2((actual_UMIs + regularization) / (expected_UMIs + regularization))
-            if fold > min_deviant_fold
+            if fold > min_outlier_fold
                 push!(
                     candidates,
-                    DeviantCandidate(
+                    OutlierCandidate(
                         cell_index,
                         total_found_module_index,
                         Float32(fold),
@@ -1819,14 +1767,15 @@ function compute_deviant_outliers(;
     end
 
     # Reduce the per-thread candidates to the per-cell maximal fold. Only fold-exceeding candidates exist, so every cell
-    # that appears is a deviant outlier, recording the certificate of the module instance that flagged it most strongly.
+    # that appears is an outlier, recording the certificate of the module instance that flagged it most strongly.
     max_fold_per_cell = fill(-Inf32, n_cells)
     for candidates in candidates_per_thread
         for candidate in candidates
             cell_index = candidate.cell_index
             if candidate.fold > max_fold_per_cell[cell_index]
                 max_fold_per_cell[cell_index] = candidate.fold
-                is_deviant_per_cell[cell_index] = true
+                is_outlier_per_cell[cell_index] = true
+                in_metacell_index_per_cell[cell_index] = metacell_index_per_cell[cell_index]
                 by_prev_block_name_per_cell[cell_index] =
                     base_total_modules.block_name_per_total_found_module[candidate.total_found_module_index]
                 by_prev_module_name_per_cell[cell_index] =
@@ -1837,15 +1786,31 @@ function compute_deviant_outliers(;
         end
     end
 
-    n_deviant_cells = sum(is_deviant_per_cell)
+    # Every outlier names the metacell it was ejected from, so a metacell must keep at least one cell. If all the cells of
+    # a metacell are outliers, none of them is.
+    for cell_indices in cells_of_sharp_metacells
+        if all(cell_index -> is_outlier_per_cell[cell_index], cell_indices)
+            for cell_index in cell_indices
+                is_outlier_per_cell[cell_index] = false
+                in_metacell_index_per_cell[cell_index] = 0
+                by_prev_block_name_per_cell[cell_index] = ""
+                by_prev_module_name_per_cell[cell_index] = ""
+                expected_UMIs_per_cell[cell_index] = 0
+                actual_UMIs_per_cell[cell_index] = 0
+            end
+        end
+    end
+
+    n_outlier_cells = sum(is_outlier_per_cell)
     n_grouped_cells = sum(length(cell_indices) for cell_indices in cells_of_sharp_metacells; init = 0)
     @debug (
-        "Deviant outlier cells: $(n_deviant_cells)" *
-        " ($(percent(n_deviant_cells, n_grouped_cells)) of grouped, $(percent(n_deviant_cells, n_cells)) of all)"
+        "Outlier cells: $(n_outlier_cells)" *
+        " ($(percent(n_outlier_cells, n_grouped_cells)) of grouped, $(percent(n_outlier_cells, n_cells)) of all)"
     ) _group = :mcs_results
 
-    return DeviantCertificates(
-        is_deviant_per_cell,
+    return OutlierCertificates(
+        is_outlier_per_cell,
+        in_metacell_index_per_cell,
         by_prev_block_name_per_cell,
         by_prev_module_name_per_cell,
         expected_UMIs_per_cell,
@@ -1853,57 +1818,136 @@ function compute_deviant_outliers(;
     )
 end
 
-# Remove deviant outlier cells from their sharp metacells in place. A metacell that drops below `min_cells_in_metacell`
-# after removal is dissolved entirely, so its remaining cells also become dissolved outliers. Both
-# `cells_of_sharp_metacells` and the parallel `block_name_per_sharp_metacell` are compacted to match.
-function eject_deviant_outliers!(;
-    cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
-    block_name_per_sharp_metacell::AbstractVector{<:AbstractString},
-    is_deviant_per_cell::AbstractVector{Bool},
+# Eject the outlier cells from the sharp metacells. Ejecting the outliers can drop a metacell below
+# `min_cells_in_metacell` cells; such a metacell is dissolved, all its cells (outliers included) are relocated to the
+# nearest surviving metacell of its block, and the outliers are detected again - so a cell relocated into a metacell it
+# does not fit is caught. This repeats until no metacell is dissolved. Mutates `cells_of_sharp_metacells` (and the
+# parallel `block_index_per_sharp_metacell`) into the final metacells, and returns the certificates of the cells ejected
+# from them.
+function eject_outliers!(;
+    cells_of_sharp_metacells::Vector{Vector{Int}},
+    block_index_per_sharp_metacell::Vector{Int},
     min_cells_in_metacell::Integer,
-)::Nothing
-    n_ejected_cells = 0
-    n_dissolved_cells = 0
-    write_position = 0
-    for read_position in eachindex(cells_of_sharp_metacells)
-        cell_indices = cells_of_sharp_metacells[read_position]
-        kept_cell_indices = filter(cell_index -> !is_deviant_per_cell[cell_index], cell_indices)
-        n_ejected_cells += length(cell_indices) - length(kept_cell_indices)
-        if length(kept_cell_indices) < min_cells_in_metacell
-            n_dissolved_cells += length(kept_cell_indices)
-            continue
-        end
-        write_position += 1
-        cells_of_sharp_metacells[write_position] = kept_cell_indices
-        block_name_per_sharp_metacell[write_position] = block_name_per_sharp_metacell[read_position]
-    end
-    resize!(cells_of_sharp_metacells, write_position)
-    resize!(block_name_per_sharp_metacell, write_position)
+    min_outlier_fold::AbstractFloat,
+    outlier_UMIs_regularization::AbstractFloat,
+    block_index_per_cell::AbstractVector{<:Integer},
+    is_found_per_module_per_block::AbstractMatrix{Bool},
+    module_index_per_gene_per_block::AbstractMatrix{<:Integer},
+    mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
+    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    total_UMIs_per_cell::AbstractVector{<:Integer},
+    name_per_block::AbstractVector{<:AbstractString},
+    name_per_module::AbstractVector{<:AbstractString},
+    n_cells::Integer,
+    n_genes::Integer,
+    n_modules::Integer,
+    n_blocks::Integer,
+)::OutlierCertificates
+    while true
+        outlier_certificates = compute_outlier_certificates(;
+            cells_of_sharp_metacells,
+            UMIs_per_cell_per_gene,
+            total_UMIs_per_cell,
+            is_found_per_module_per_block,
+            module_index_per_gene_per_block,
+            name_per_block,
+            name_per_module,
+            min_outlier_fold,
+            outlier_UMIs_regularization,
+            n_cells,
+        )
+        is_outlier_per_cell = outlier_certificates.is_outlier_per_cell
 
-    @debug (
-        "Ejected deviant cells: $(n_ejected_cells)" *
-        " Dissolved metacell cells: $(n_dissolved_cells)" *
-        " Remaining metacells: $(write_position)"
-    ) _group = :mcs_results
-    return nothing
+        is_dissolved_per_sharp_metacell = pick_dissolved_metacells(;
+            cells_of_sharp_metacells,
+            block_index_per_sharp_metacell,
+            is_outlier_per_cell,
+            min_cells_in_metacell,
+            n_blocks,
+        )
+
+        if !any(is_dissolved_per_sharp_metacell)
+            n_ejected_cells = 0
+            for (sharp_metacell_index, cell_indices) in enumerate(cells_of_sharp_metacells)
+                kept_cell_indices = filter(cell_index -> !is_outlier_per_cell[cell_index], cell_indices)
+                n_ejected_cells += length(cell_indices) - length(kept_cell_indices)
+                cells_of_sharp_metacells[sharp_metacell_index] = kept_cell_indices
+            end
+            @debug (
+                "Ejected outlier cells: $(n_ejected_cells)" *
+                " Remaining metacells: $(length(cells_of_sharp_metacells))"
+            ) _group = :mcs_results
+            return outlier_certificates
+        end
+
+        relocate_dissolved_metacell_cells!(;
+            cells_of_sharp_metacells,
+            block_index_per_sharp_metacell,
+            is_dissolved_per_sharp_metacell,
+            is_outlier_per_cell,
+            block_index_per_cell,
+            is_found_per_module_per_block,
+            module_index_per_gene_per_block,
+            mean_linear_fraction_in_environment_cells_per_module_per_block,
+            std_linear_fraction_in_environment_cells_per_module_per_block,
+            std_fraction_regularization_per_block,
+            UMIs_per_cell_per_gene,
+            total_UMIs_per_cell,
+            n_cells,
+            n_genes,
+            n_modules,
+            n_blocks,
+        )
+    end
 end
 
-# For each outlier cell, find the nearest surviving metacell of its block and (for dissolved outliers only) the
-# worst-offender module. We recompute the block's environment-normalized module z-scores (the same space K-means
-# clustered its cells in, via the shared `setup_z_score_per_found_module_per_region_cell!`), take each surviving
-# metacell's z-score center as the mean over its cells, and for each outlier cell pick the nearest center (its
-# `outlier_in` metacell) and the module with the maximal absolute z-score difference to it (its `outlier_by` module).
-# Returns the per-cell nearest metacell name (set for every outlier) and worst-offender module name (set only when the
-# cell is not a deviant outlier - deviant outliers carry the deviant certificate instead). Both are the empty string for
-# cells that kept a metacell, base outliers, and cells whose block has no surviving metacell.
-function compute_outlier_certificates(;
+# The metacells to dissolve: those left with fewer than `min_cells_in_metacell` cells once their outliers are ejected. A
+# block's last metacell is never dissolved - there would be nowhere to relocate its cells to - so if all the metacells of
+# a block would be dissolved, the one that keeps the most cells survives to absorb the rest.
+function pick_dissolved_metacells(;
     cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
-    name_per_sharp_metacell::AbstractVector{<:AbstractString},
-    sharp_metacell_name_per_cell::AbstractVector{<:AbstractString},
-    is_deviant_per_cell::Union{AbstractVector{Bool}, BitVector},
-    name_per_module::AbstractVector{<:AbstractString},
+    block_index_per_sharp_metacell::AbstractVector{<:Integer},
+    is_outlier_per_cell::Union{AbstractVector{Bool}, BitVector},
+    min_cells_in_metacell::Integer,
+    n_blocks::Integer,
+)::BitVector
+    n_kept_cells_per_sharp_metacell = [
+        count(cell_index -> !is_outlier_per_cell[cell_index], cell_indices) for cell_indices in cells_of_sharp_metacells
+    ]
+    is_dissolved_per_sharp_metacell = BitVector(n_kept_cells_per_sharp_metacell .< min_cells_in_metacell)
+
+    sharp_metacell_indices_per_block = [Int[] for _ in 1:n_blocks]
+    for (sharp_metacell_index, block_index) in enumerate(block_index_per_sharp_metacell)
+        push!(sharp_metacell_indices_per_block[block_index], sharp_metacell_index)
+    end
+
+    for sharp_metacell_indices in sharp_metacell_indices_per_block
+        if !isempty(sharp_metacell_indices) &&
+           all(sharp_metacell_index -> is_dissolved_per_sharp_metacell[sharp_metacell_index], sharp_metacell_indices)
+            surviving_sharp_metacell_index =
+                sharp_metacell_indices[argmax(n_kept_cells_per_sharp_metacell[sharp_metacell_indices])]
+            is_dissolved_per_sharp_metacell[surviving_sharp_metacell_index] = false
+        end
+    end
+
+    return is_dissolved_per_sharp_metacell
+end
+
+# Relocate all the cells of each dissolved metacell to the nearest surviving metacell of its block, in the
+# environment-normalized module z-score space K-means clustered the block's cells in (recomputed here via the shared
+# `setup_z_score_per_found_module_per_region_cell!`). A surviving metacell's center is the mean z-score of the cells it
+# keeps (its outliers are exactly the cells that do not belong in it, so they do not contribute), and it is updated as it
+# absorbs cells. Compacts `cells_of_sharp_metacells` and the parallel `block_index_per_sharp_metacell` to the surviving
+# metacells.
+function relocate_dissolved_metacell_cells!(;
+    cells_of_sharp_metacells::Vector{Vector{Int}},
+    block_index_per_sharp_metacell::Vector{Int},
+    is_dissolved_per_sharp_metacell::BitVector,
+    is_outlier_per_cell::Union{AbstractVector{Bool}, BitVector},
     block_index_per_cell::AbstractVector{<:Integer},
-    is_found_per_module_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    is_found_per_module_per_block::AbstractMatrix{Bool},
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
@@ -1914,49 +1958,48 @@ function compute_outlier_certificates(;
     n_genes::Integer,
     n_modules::Integer,
     n_blocks::Integer,
-)::Tuple{Vector{String}, Vector{String}}
+)::Nothing
+    n_sharp_metacells = length(cells_of_sharp_metacells)
+
     sharp_metacell_index_per_cell = zeros(Int, n_cells)
     for (sharp_metacell_index, cell_indices) in enumerate(cells_of_sharp_metacells)
         sharp_metacell_index_per_cell[cell_indices] .= sharp_metacell_index
     end
 
-    # A cell of block b (`block_index_per_cell == b > 0`) with no sharp metacell is an outlier of block b (it was
-    # clustered there but ejected or its cluster dissolved); base outliers stay at block 0 and are excluded.
-    is_outlier_per_cell = (block_index_per_cell .> 0) .& (sharp_metacell_name_per_cell .== "")
+    sharp_metacell_indices_per_block = [Int[] for _ in 1:n_blocks]
+    for (sharp_metacell_index, block_index) in enumerate(block_index_per_sharp_metacell)
+        push!(sharp_metacell_indices_per_block[block_index], sharp_metacell_index)
+    end
+    has_dissolved_per_block = [
+        any(sharp_metacell_index -> is_dissolved_per_sharp_metacell[sharp_metacell_index], sharp_metacell_indices)
+        for sharp_metacell_indices in sharp_metacell_indices_per_block
+    ]
+
     n_block_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
-    has_outlier_per_block = falses(n_blocks)
-    for cell_index in 1:n_cells
-        is_outlier_per_cell[cell_index] && (has_outlier_per_block[block_index_per_cell[cell_index]] = true)
-    end
-
-    outlier_in_metacell_name_per_cell = fill("", n_cells)
-    outlier_by_module_name_per_cell = fill("", n_cells)
-
     weight_per_block =
-        [has_outlier_per_block[block_index] ? n_block_cells_per_block[block_index] : 0 for block_index in 1:n_blocks]
-    max_n_block_cells = maximum(weight_per_block; init = 0)
-    if max_n_block_cells == 0
-        return (outlier_in_metacell_name_per_cell, outlier_by_module_name_per_cell)
-    end
+        [has_dissolved_per_block[block_index] ? n_block_cells_per_block[block_index] : 0 for block_index in 1:n_blocks]
+    max_n_block_cells = maximum(weight_per_block)
 
     z_score_accumulator_pool = Channel{Vector{Float32}}(nthreads())
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_block_cells))
     end
 
-    # Parallel over the blocks that have outliers (each writes only its own cells, so the shared output vectors are not
-    # contended). The inner z-score fill is nested-parallel over the block's found modules.
+    # Parallel over the blocks that dissolved a metacell (each writes only its own cells, so the shared
+    # `sharp_metacell_index_per_cell` is not contended). The inner z-score fill is nested-parallel over the block's
+    # found modules.
     parallel_loop_wo_rng(
         1:n_blocks;
         weights = weight_per_block,
-        name = "compute_outlier_certificates",
-        progress = DebugProgress(sum(weight_per_block); group = :mcs_loops, desc = "compute_outlier_certificates"),
+        name = "relocate_dissolved_metacell_cells",
+        progress = DebugProgress(sum(weight_per_block); group = :mcs_loops, desc = "relocate_dissolved_metacell_cells"),
     ) do block_index
-        has_outlier_per_block[block_index] || return nothing
+        if !has_dissolved_per_block[block_index]
+            return nothing
+        end
 
         block_cell_indices = findall(==(block_index), block_index_per_cell)
         n_block_modules = count(@view is_found_per_module_per_block[:, block_index])
-        n_block_modules == 0 && return nothing
 
         is_found_per_module = falses(n_modules)
         z_score_per_found_module_per_block_cell = Matrix{Float32}(undef, n_block_modules, length(block_cell_indices))
@@ -1976,81 +2019,65 @@ function compute_outlier_certificates(;
             n_genes,
             n_modules,
         )
-        found_module_indices = findall(is_found_per_module)
 
-        # The z-score center of each surviving metacell that holds cells of this block - the mean z-score over its cells.
-        local_ref_per_sharp_metacell = Dict{Int, Int}()
-        center_accumulator_per_ref = Vector{Vector{Float64}}()
-        n_cells_per_ref = Int[]
-        sharp_metacell_index_per_ref = Int[]
-        for (block_cell_position, cell_index) in enumerate(block_cell_indices)
-            sharp_metacell_index = sharp_metacell_index_per_cell[cell_index]
-            sharp_metacell_index == 0 && continue
-            local_ref = get!(local_ref_per_sharp_metacell, sharp_metacell_index) do
-                push!(center_accumulator_per_ref, zeros(Float64, n_block_modules))
-                push!(n_cells_per_ref, 0)
-                push!(sharp_metacell_index_per_ref, sharp_metacell_index)
-                return length(sharp_metacell_index_per_ref)
-            end
-            @views center_accumulator_per_ref[local_ref] .+=
-                z_score_per_found_module_per_block_cell[:, block_cell_position]
-            n_cells_per_ref[local_ref] += 1
-        end
-        n_refs = length(sharp_metacell_index_per_ref)
-        n_refs == 0 && return nothing
+        # The block's metacells, as clusters of its cells - `relocate_dissolved_points!` works in the block's local
+        # numbering, so map back to the global metacell indices when writing the results.
+        sharp_metacell_indices = sharp_metacell_indices_per_block[block_index]
+        local_index_per_sharp_metacell = Dict(
+            sharp_metacell_index => local_index for
+            (local_index, sharp_metacell_index) in enumerate(sharp_metacell_indices)
+        )
+        local_index_per_block_cell = [
+            local_index_per_sharp_metacell[sharp_metacell_index_per_cell[cell_index]] for
+            cell_index in block_cell_indices
+        ]
 
-        center_per_found_module_per_ref = Matrix{Float32}(undef, n_block_modules, n_refs)
-        for ref in 1:n_refs
-            @views center_per_found_module_per_ref[:, ref] .= center_accumulator_per_ref[ref] ./ n_cells_per_ref[ref]
-        end
+        relocate_dissolved_points!(;
+            cluster_index_per_point = local_index_per_block_cell,
+            value_per_dim_per_point = z_score_per_found_module_per_block_cell,
+            is_dissolved_per_cluster = is_dissolved_per_sharp_metacell[sharp_metacell_indices],
+            is_center_per_point = [!is_outlier_per_cell[cell_index] for cell_index in block_cell_indices],
+        )
 
         for (block_cell_position, cell_index) in enumerate(block_cell_indices)
-            is_outlier_per_cell[cell_index] || continue
-            @views z_score_per_found_module = z_score_per_found_module_per_block_cell[:, block_cell_position]
-
-            nearest_ref = 0
-            nearest_distance = Inf
-            for ref in 1:n_refs
-                distance = 0.0
-                @inbounds for module_position in 1:n_block_modules
-                    difference =
-                        z_score_per_found_module[module_position] -
-                        center_per_found_module_per_ref[module_position, ref]
-                    distance += difference * difference
-                end
-                if distance < nearest_distance
-                    nearest_distance = distance
-                    nearest_ref = ref
-                end
-            end
-
-            outlier_in_metacell_name_per_cell[cell_index] =
-                name_per_sharp_metacell[sharp_metacell_index_per_ref[nearest_ref]]
-
-            # The worst-offender module is recorded only for dissolved outliers; deviant outliers carry the deviant
-            # certificate instead.
-            if !is_deviant_per_cell[cell_index]
-                worst_module_position = 1
-                worst_z_distance = -1.0
-                @inbounds for module_position in 1:n_block_modules
-                    z_distance = abs(
-                        z_score_per_found_module[module_position] -
-                        center_per_found_module_per_ref[module_position, nearest_ref],
-                    )
-                    if z_distance > worst_z_distance
-                        worst_z_distance = z_distance
-                        worst_module_position = module_position
-                    end
-                end
-                outlier_by_module_name_per_cell[cell_index] =
-                    name_per_module[found_module_indices[worst_module_position]]
-            end
+            sharp_metacell_index_per_cell[cell_index] =
+                sharp_metacell_indices[local_index_per_block_cell[block_cell_position]]
         end
-
         return nothing
     end
 
-    return (outlier_in_metacell_name_per_cell, outlier_by_module_name_per_cell)
+    # Compact the metacells, keeping the cells of each in ascending order.
+    new_sharp_metacell_index_per_sharp_metacell = zeros(Int, n_sharp_metacells)
+    n_new_sharp_metacells = 0
+    for sharp_metacell_index in 1:n_sharp_metacells
+        if !is_dissolved_per_sharp_metacell[sharp_metacell_index]
+            n_new_sharp_metacells += 1
+            new_sharp_metacell_index_per_sharp_metacell[sharp_metacell_index] = n_new_sharp_metacells
+        end
+    end
+
+    cells_of_new_sharp_metacells = [Int[] for _ in 1:n_new_sharp_metacells]
+    for cell_index in 1:n_cells
+        sharp_metacell_index = sharp_metacell_index_per_cell[cell_index]
+        if sharp_metacell_index > 0
+            push!(
+                cells_of_new_sharp_metacells[new_sharp_metacell_index_per_sharp_metacell[sharp_metacell_index]],
+                cell_index,
+            )
+        end
+    end
+    block_index_per_new_sharp_metacell = block_index_per_sharp_metacell[.!is_dissolved_per_sharp_metacell]
+
+    resize!(cells_of_sharp_metacells, n_new_sharp_metacells)
+    cells_of_sharp_metacells .= cells_of_new_sharp_metacells
+    resize!(block_index_per_sharp_metacell, n_new_sharp_metacells)
+    block_index_per_sharp_metacell .= block_index_per_new_sharp_metacell
+
+    @debug (
+        "Dissolved metacells: $(n_sharp_metacells - n_new_sharp_metacells)" *
+        " Remaining metacells: $(n_new_sharp_metacells)"
+    ) _group = :mcs_results
+    return nothing
 end
 
 # Build one base block's baseline `GroupedSeriesCorrelations{Float32}`. Each group corresponds to one block whose
@@ -2176,8 +2203,8 @@ end
 
 # Given the per-block Phase-1 `LocalClusters`, compute the per-baseline-metacell aggregates
 # (`total_UMIs_per_baseline_metacell` and `UMIs_per_gene_per_baseline_metacell`), the per-cell
-# `baseline_metacell_index_per_cell` (the cell's baseline metacell index in the global array, or 0 if the cell's
-# Phase 1 cluster is too-small), and `first_baseline_metacell_per_block` indicating where each block's baseline
+# `baseline_metacell_index_per_cell` (the cell's baseline metacell index in the global array, or 0 if the cell was not
+# clustered), and `first_baseline_metacell_per_block` indicating where each block's baseline
 # metacells begin in the global array. For a cell in some block whose Phase 1 cluster is `cluster_index`, the
 # baseline metacell index is `first_baseline_metacell_per_block[block_index] + cluster_index - 1`. Blocks with
 # `local_clusters === nothing` contribute no baseline metacells.
@@ -2216,8 +2243,7 @@ function compute_baseline_metacell_aggregates(
             cell_index = local_clusters.block_cell_indices[block_cell_position]
             baseline_metacell_index = block_first_baseline_metacell + cluster_index - 1
             push!(cell_indices_per_baseline_metacell[baseline_metacell_index], cell_index)
-            baseline_metacell_index_per_cell[cell_index] =
-                local_clusters.is_too_small_per_cluster[cluster_index] ? UInt32(0) : UInt32(baseline_metacell_index)
+            baseline_metacell_index_per_cell[cell_index] = UInt32(baseline_metacell_index)
         end
     end
 
@@ -2645,7 +2671,7 @@ function compute_changed_dispersions!(
 end
 
 # Fill `variable_per_block_cell_per_friend` and `is_active_per_block_cell` with `candidate`'s punctuated
-# cluster-mean log-fractions over the walkable block's cells × friend genes; cells in too-small or zero-punctuated-
+# cluster-mean log-fractions over the walkable block's cells × friend genes; cells in single-cell or zero-punctuated-
 # total clusters are masked off and their variable values zeroed. Uses `delta_context`'s per-thread cluster-aggregate
 # scratches and reads the walkable block's UMIs out of the pre-filled per-walkable
 # `UMI_per_friend_per_block_cell` cache (Float32, friend-position-major) - no scattered indexing into the
@@ -3036,7 +3062,16 @@ function rerun_kmeans!(
     end
     update_size_statistics!(rerun_solution, min_cluster_size, max_cluster_size, min_cluster_weight, dispersion_context)
     if is_perfect(rerun_solution)
-        push!(perfect_candidates, build_candidate_from_solution(rerun_solution))
+        push!(
+            perfect_candidates,
+            build_candidate_from_solution(
+                rerun_solution,
+                values_of_points,
+                weight_per_point,
+                min_cluster_size,
+                min_cluster_weight,
+            ),
+        )
     end
     return nothing
 end
@@ -3108,16 +3143,136 @@ function walk_directions!(
 end
 
 # Allocate and return a `SolutionCandidate` whose arrays are sized exactly to `solution`'s active `k` (no aliasing of
-# the per-thread max-k buffers). Called by Phase 1 every time it encounters a perfect K so that the candidate survives
-# subsequent `rerun_kmeans!` overwrites of the working buffers.
-function build_candidate_from_solution(solution::KmeansSolution)::SolutionCandidate
-    return SolutionCandidate(
-        solution.k,
-        copy(@view(solution.counts[1:solution.k])),
-        copy(@view(solution.weight_per_cluster[1:solution.k])),
-        copy(@view(solution.assignments[1:solution.n_points])),
-        is_perfect(solution),
+# the per-thread max-k buffers), so that the candidate survives subsequent `rerun_kmeans!` overwrites of the working
+# buffers. The solution's too-small clusters are dissolved into the surviving ones, so a candidate never contains a
+# too-small cluster. A perfect solution has none to dissolve; only the imperfect compromise solution does.
+function build_candidate_from_solution(
+    solution::KmeansSolution,
+    values_of_points::AbstractMatrix{<:AbstractFloat},
+    weight_per_point::AbstractVector{<:Real},
+    min_cluster_size::Real,
+    min_cluster_weight::Real,
+)::SolutionCandidate
+    k = solution.k
+    n_points = solution.n_points
+
+    @views is_dissolved_per_cluster = pick_dissolved_clusters(
+        solution.counts[1:k],
+        solution.weight_per_cluster[1:k],
+        min_cluster_size,
+        min_cluster_weight,
     )
+    if !any(is_dissolved_per_cluster)
+        return SolutionCandidate(
+            k,
+            copy(@view(solution.counts[1:k])),
+            copy(@view(solution.weight_per_cluster[1:k])),
+            copy(@view(solution.assignments[1:n_points])),
+        )
+    end
+
+    cluster_index_per_point = copy(@view(solution.assignments[1:n_points]))
+    relocate_dissolved_points!(;
+        cluster_index_per_point,
+        value_per_dim_per_point = values_of_points,
+        is_dissolved_per_cluster,
+        is_center_per_point = trues(n_points),
+    )
+
+    # Renumber the assignments to the surviving clusters, and recompute their sizes and weights.
+    new_cluster_index_per_cluster = zeros(Int, k)
+    n_new_clusters = 0
+    for cluster_index in 1:k
+        if !is_dissolved_per_cluster[cluster_index]
+            n_new_clusters += 1
+            new_cluster_index_per_cluster[cluster_index] = n_new_clusters
+        end
+    end
+
+    counts = zeros(Int, n_new_clusters)
+    weight_per_cluster = zeros(Float64, n_new_clusters)
+    for point_index in 1:n_points
+        new_cluster_index = new_cluster_index_per_cluster[cluster_index_per_point[point_index]]
+        cluster_index_per_point[point_index] = new_cluster_index
+        counts[new_cluster_index] += 1
+        weight_per_cluster[new_cluster_index] += weight_per_point[point_index]
+    end
+
+    return SolutionCandidate(n_new_clusters, counts, weight_per_cluster, cluster_index_per_point)
+end
+
+# The clusters to dissolve: the too-small ones, with fewer than `min_cluster_size` points or less than
+# `min_cluster_weight` weight. The last cluster is never dissolved - there would be nowhere to relocate its points to -
+# so if all the clusters are too small, the largest one survives to absorb the rest.
+function pick_dissolved_clusters(
+    counts::AbstractVector{<:Integer},
+    weight_per_cluster::AbstractVector{<:Real},
+    min_cluster_size::Real,
+    min_cluster_weight::Real,
+)::BitVector
+    is_dissolved_per_cluster = (counts .< min_cluster_size) .| (weight_per_cluster .< min_cluster_weight)
+    if all(is_dissolved_per_cluster)
+        is_dissolved_per_cluster[argmax(counts)] = false
+    end
+    return is_dissolved_per_cluster
+end
+
+# Relocate every point of the dissolved clusters into the nearest surviving cluster, in the space
+# `value_per_dim_per_point` (the same space K-means clustered the points in). A cluster's center is the mean value of its
+# center points, kept as a Float64 sum and a count, so absorbing a point immediately updates the center the next point is
+# compared against. The points are visited in order, so the result does not depend on the number of threads. Updates
+# `cluster_index_per_point` in place; the caller recomputes whatever per-cluster aggregates it needs.
+function relocate_dissolved_points!(;
+    cluster_index_per_point::AbstractVector{<:Integer},
+    value_per_dim_per_point::AbstractMatrix{<:AbstractFloat},
+    is_dissolved_per_cluster::Union{AbstractVector{Bool}, BitVector},
+    is_center_per_point::Union{AbstractVector{Bool}, BitVector},
+)::Nothing
+    n_dims, n_points = size(value_per_dim_per_point)
+    n_clusters = length(is_dissolved_per_cluster)
+
+    sum_per_dim_per_cluster = zeros(Float64, n_dims, n_clusters)
+    n_center_points_per_cluster = zeros(Int, n_clusters)
+    for point_index in 1:n_points
+        cluster_index = cluster_index_per_point[point_index]
+        if is_center_per_point[point_index] && !is_dissolved_per_cluster[cluster_index]
+            @views sum_per_dim_per_cluster[:, cluster_index] .+= value_per_dim_per_point[:, point_index]
+            n_center_points_per_cluster[cluster_index] += 1
+        end
+    end
+
+    for point_index in 1:n_points
+        if !is_dissolved_per_cluster[cluster_index_per_point[point_index]]
+            continue
+        end
+
+        nearest_cluster_index = 0
+        nearest_distance = Inf
+        for cluster_index in 1:n_clusters
+            if is_dissolved_per_cluster[cluster_index] || n_center_points_per_cluster[cluster_index] == 0
+                continue
+            end
+            scale = 1.0 / n_center_points_per_cluster[cluster_index]
+            distance = 0.0
+            @inbounds for dim_index in 1:n_dims
+                difference =
+                    value_per_dim_per_point[dim_index, point_index] -
+                    sum_per_dim_per_cluster[dim_index, cluster_index] * scale
+                distance += difference * difference
+            end
+            if distance < nearest_distance
+                nearest_distance = distance
+                nearest_cluster_index = cluster_index
+            end
+        end
+        @assert nearest_cluster_index > 0
+
+        cluster_index_per_point[point_index] = nearest_cluster_index
+        @views sum_per_dim_per_cluster[:, nearest_cluster_index] .+= value_per_dim_per_point[:, point_index]
+        n_center_points_per_cluster[nearest_cluster_index] += 1
+    end
+
+    return nothing
 end
 
 # Repeatedly split the largest non-rejected splittable cluster of `best_solution`, accepting the split if it improves
@@ -3171,7 +3326,16 @@ function walk_split!(
         if penalty(candidate_solution) < penalty(best_solution)
             copy_solution!(best_solution, candidate_solution)
             if is_perfect(best_solution)
-                push!(perfect_candidates, build_candidate_from_solution(best_solution))
+                push!(
+                    perfect_candidates,
+                    build_candidate_from_solution(
+                        best_solution,
+                        values_of_points,
+                        weight_per_point,
+                        min_cluster_size,
+                        min_cluster_weight,
+                    ),
+                )
             end
 
             # We can re-K-means based on the split clusters to try and improve the solution. Pass `candidate_solution`'s
@@ -3356,8 +3520,20 @@ function kmeans_with_sizes_candidates(
     @assert best_solution.is_filled
 
     if isempty(perfect_candidates)
-        # No perfect found - take the best-by-penalty imperfect compromise as the lone candidate.
-        return SolutionCandidates(n_points, [build_candidate_from_solution(best_solution)])
+        # No perfect found - take the best-by-penalty imperfect compromise as the lone candidate. This is the only
+        # candidate that can contain too-small clusters, which are dissolved into the surviving ones.
+        return SolutionCandidates(
+            n_points,
+            [
+                build_candidate_from_solution(
+                    best_solution,
+                    values_of_points,
+                    weight_per_point,
+                    min_cluster_size,
+                    min_cluster_weight,
+                ),
+            ],
+        )
     end
 
     # Sort ascending by K so `candidates[1]` is the minimal-K baseline.
@@ -3365,21 +3541,16 @@ function kmeans_with_sizes_candidates(
     return SolutionCandidates(n_points, perfect_candidates)
 end
 
-# Build a `LocalClusters` from a `SolutionCandidate`. `block_cell_indices` is shared (not copied); the assignment
-# vector and `is_too_small_per_cluster` are owned by the returned `LocalClusters`.
+# Build a `LocalClusters` from a `SolutionCandidate`. `block_cell_indices` is shared (not copied); the assignment vector
+# is owned by the returned `LocalClusters`.
 function build_local_clusters_from_candidate(
     candidate::SolutionCandidate,
     block_cell_indices::AbstractVector{<:Integer},
-    min_cluster_size::Real,
-    min_cluster_weight::Real,
 )::LocalClusters
-    is_too_small_per_cluster =
-        (candidate.counts .< min_cluster_size) .| (candidate.weight_per_cluster .< min_cluster_weight)
     return LocalClusters(;
         n_clusters = candidate.k,
         block_cell_indices,
         cluster_index_per_block_cell = copy(candidate.assignments),
-        is_too_small_per_cluster,
     )
 end
 

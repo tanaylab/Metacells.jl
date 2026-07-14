@@ -214,8 +214,9 @@
     sharpening_round::Integer,
     improvement_half_life::Maybe{Integer} = ```2```,
     gene_fraction_regularization::AbstractFloat = ```0.0001```,
-    min_deviant_fold::AbstractFloat = ```3.0```,
-    deviant_UMIs_regularization::AbstractFloat = ```2.0```,
+    std_UMIs_regularization::AbstractFloat = ```2.0```,
+    min_outlier_fold::AbstractFloat = ```3.0```,
+    outlier_UMIs_regularization::AbstractFloat = ```2.0```,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = ```false```,
 )::Nothing
@@ -228,7 +229,11 @@
 </code> metacells repository, which hopefully more faithfully captures this manifold.
 </p>
 <ol>
-<li>We cluster using K-means all the cells in each neighborhood using the z-score of the expression of the modules of that neighborhood. The number of clusters is the number of base metacells in that neighborhood.
+<li>We cluster using K-means all the cells in each neighborhood using the z-score of the expression of the modules of that neighborhood. The z-score compares the module&#39;s linear fraction in the cell to the mean and the standard deviation of the module&#39;s linear fraction in the cells of the block&#39;s environment. It is regularized - we move the difference from the mean away from zero by 
+<code>std_fraction_regularization
+</code>, and increase the standard deviation by it - so that modules with a tiny standard deviation will not turn single-UMI noise into a large z-score. This regularization is specified in UMIs (
+<code>std_UMIs_regularization
+</code>) and is converted to a linear fraction by dividing it by the mean total UMIs of a cell in the block&#39;s neighborhood. The number of clusters is the number of base metacells in that neighborhood.
 </li>
 <li>We assign to each cluster the base block which is most frequent in the cluster cells. Cells of the base base block of the neighborhood, which belong to a cluster that is assigned to a different block, and which also belong to a cluster of that block in the neighborhood of that block, are migrated to that block, but only if the enrichment of the cells of that block in the cluster is at least 
 <code>min_migration_likelihood
@@ -248,7 +253,7 @@
 <code>cells_dispersion
 </code> is below 
 <code>min_cells_dispersion_in_metacell
-</code>. In edge cases we dissolve too-small clusters, so this can create new dissolved outliers. We increase the number of target metacells for every input metacell whose maximal 
+</code>. In edge cases we dissolve too-small clusters, relocating each of their cells to the nearest surviving cluster, by the distance to the cluster&#39;s center in the same module z-score space K-means clustered them in. A block&#39;s last cluster is never dissolved, so every clustered cell always ends up in some cluster. We increase the number of target metacells for every input metacell whose maximal 
 <code>cells_dispersion
 </code> is above 
 <code>max_cells_dispersion_in_metacell
@@ -264,17 +269,13 @@
 <code>improvement_half_life == nothing
 </code> disables the cooldown entirely.
 </li>
-<li>We detect deviant outlier cells and eject them from their metacell. For each cell in each metacell, and for every found module instance in the previous round&#39;s repository (across all blocks, not just the modules of the cell&#39;s own region), we compare the actual UMIs of the module&#39;s genes in the cell to the expected UMIs. The expectation is punctuated - the module&#39;s linear fraction in the cell&#39;s metacell excluding the cell itself, times the cell&#39;s total UMIs - so a strong outlier cannot inflate its own baseline. The comparison is a fold factor 
-<code>log2((actual + deviant_UMIs_regularization) / (expected + deviant_UMIs_regularization))
+<li>We detect the outlier cells and eject them from their metacell. For each cell in each metacell, and for every found module instance in the previous round&#39;s repository (across all blocks, not just the modules of the cell&#39;s own region), we compare the actual UMIs of the module&#39;s genes in the cell to the expected UMIs. The expectation is punctuated - the module&#39;s linear fraction in the cell&#39;s metacell excluding the cell itself, times the cell&#39;s total UMIs - so a strong outlier cannot inflate its own baseline. The comparison is a fold factor 
+<code>log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization))
 </code>, using a strong UMIs regularization so low-count modules do not trigger. A cell whose maximal fold (across all module instances) exceeds 
-<code>min_deviant_fold
-</code> is a deviant outlier: it loses its metacell, and we record the certificate (the previous round&#39;s block and module that flagged it, and the expected and actual UMIs) of the module instance that most deviates. If ejecting deviant cells drops a metacell below 
+<code>min_outlier_fold
+</code> is an outlier: it loses its metacell, and we record the certificate (the metacell it was ejected from, the previous round&#39;s block and module that flagged it, and the expected and actual UMIs) of the module instance that most deviates. Ejecting the outliers can drop a metacell below 
 <code>min_cells_in_metacell
-</code>, we dissolve it, so its remaining cells also become dissolved outliers. For every outlier - deviant or dissolved - we record the block of the candidate metacell it was grouped into (
-<code>outlier_in
-</code>) and the nearest surviving metacell in that block&#39;s neighborhood (by the module z-score distance that K-means clustered on). For dissolved outliers we also record the worst-offender module (
-<code>outlier_by
-</code>), the one with the maximal such distance; deviant outliers instead carry the deviant certificate above.
+</code>; we dissolve such a metacell, relocate all its cells to the nearest surviving metacell of its block (by the same module z-score distance used above), and detect the outliers again - so a cell forced into a metacell it does not fit is caught. This repeats until no metacell is dissolved. A block&#39;s last metacell is never dissolved, so every outlier&#39;s certificate names a metacell that survives.
 </li>
 <li>The final clusters are the sharp metacells. We name them using the 
 <code>prefix
@@ -335,43 +336,35 @@
 <strong>cell @ prev
 <em>block.outlier
 </em>in
-</strong>::AbstractString (created): The previous round&#39;s block each outlier cell was a candidate member of.
+</strong>::AbstractString (created): The previous round&#39;s block each outlier cell was clustered in.
+</p>
+<p>
+<strong>cell @ metacell.outlier_in
+</strong>::AbstractString (created): The metacell each outlier cell was ejected from.
 </p>
 <p>
 <strong>cell @ prev
-<em>metacell.outlier
-</em>in
-</strong>::AbstractString (created): The previous round&#39;s metacell each outlier cell is closest to.
+<em>block.outlier
+</em>by
+</strong>::AbstractString (created): The previous round&#39;s block whose found module most strongly deviates in each outlier cell.
 </p>
 <p>
 <strong>cell @ prev
 <em>module.outlier
 </em>by
-</strong>::AbstractString (created): The found module that most sets each outlier cell apart from its nearest metacell.
+</strong>::AbstractString (created): The found module that most strongly deviates in each outlier cell.
 </p>
 <p>
-<strong>cell @ prev
-<em>block.deviant
-</em>by
-</strong>::AbstractString (created): The previous round&#39;s block whose found module most strongly deviates in each deviant cell.
-</p>
-<p>
-<strong>cell @ prev
-<em>module.deviant
-</em>by
-</strong>::AbstractString (created): The found module that most strongly deviates in each deviant cell.
-</p>
-<p>
-<strong>cell @ deviant
+<strong>cell @ outlier
 <em>expected
 </em>UMIs
-</strong>::Union{Float32, Float64} (created): The expected UMIs of the deviant module&#39;s genes in each deviant cell.
+</strong>::Union{Float32, Float64} (created): The expected UMIs of the outlier module&#39;s genes in each outlier cell.
 </p>
 <p>
-<strong>cell @ deviant
+<strong>cell @ outlier
 <em>actual
 </em>UMIs
-</strong>::Union{Float32, Float64} (created): The actual UMIs of the deviant module&#39;s genes in each deviant cell.
+</strong>::Union{Float32, Float64} (created): The actual UMIs of the outlier module&#39;s genes in each outlier cell.
 </p>
 <p>
 <strong>Original Metacells
@@ -454,6 +447,12 @@
 <em>neighborhood
 </em>cells
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ total
+<em>neighborhood
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
 </p>
 <p>
 <strong>Matrices

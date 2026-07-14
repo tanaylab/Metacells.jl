@@ -193,7 +193,7 @@
 </g>
 </g>
 <!-- AnalyzeModules&#45;&gt;SharpenMetacells -->
-<g id="edge12" class="edge">
+<g id="edge11" class="edge">
 <title>AnalyzeModules&#45;&gt;SharpenMetacells</title>
 <path fill="none" stroke="#000000" d="M237.3396,-109.7508C235.967,-96.1724 231.7692,-71.3926 219,-55 208.3547,-41.334 192.3643,-30.9379 177.7092,-23.5572"/>
 <polygon fill="#000000" stroke="#000000" points="178.8786,-20.239 168.3411,-19.1383 175.8923,-26.57 178.8786,-20.239"/>
@@ -208,7 +208,7 @@
 </g>
 </g>
 <!-- AnalyzeBlocks&#45;&gt;SharpenMetacells -->
-<g id="edge11" class="edge">
+<g id="edge12" class="edge">
 <title>AnalyzeBlocks&#45;&gt;SharpenMetacells</title>
 <path fill="none" stroke="#000000" d="M62.7219,-54.9197C77.4983,-46.4541 99.279,-33.9755 116.2735,-24.2391"/>
 <polygon fill="#000000" stroke="#000000" points="118.2106,-27.1631 125.1476,-19.155 114.7308,-21.0893 118.2106,-27.1631"/>
