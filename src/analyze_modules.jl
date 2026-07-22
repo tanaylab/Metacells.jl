@@ -16,14 +16,17 @@ using DataAxesFormats
 using Distances
 using LoopVectorization
 using Random
+using SparseArrays
 using StatsBase
 using TanayLabUtilities
 
+using ..AnalyzeCells
 using ..AnalyzeMetacells
 using ..Contracts
 using ..Defaults
 
 import Base.Threads.maxthreadid
+import Metacells.AnalyzeCells.sum_sparse_UMIs_per_gene_group_per_cell!
 import Random.default_rng
 
 # Needed because of JET:
@@ -644,7 +647,9 @@ $(CONTRACT)
         end
     end
 
-    # TODO: This does a lot of memory allocations in the parallel loop.
+    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
+    cell_position_per_cell_per_thread = [zeros(Int32, n_cells) for _ in 1:maxthreadid()]
+
     parallel_loop_wo_rng(
         1:n_metacells;
         progress = DebugProgress(
@@ -670,23 +675,18 @@ $(CONTRACT)
         total_UMIs_per_metacell_cell = total_UMIs_per_cell[indices_of_metacell_cells]
         total_UMIs_of_metacell = sum(total_UMIs_per_metacell_cell)
 
-        fraction_per_module_per_cell = zeros(Float32, n_modules, n_metacell_cells)
-        mean_fraction_per_module = zeros(Float32, n_modules)
-
         gene_indices_per_module = gene_indices_per_module_per_block[block_index]
-        for module_index in 1:n_modules
-            indices_of_module_genes = gene_indices_per_module[module_index]
-            n_module_genes = length(indices_of_module_genes)
-            if n_module_genes > 0
-                module_UMIs_per_metacell_cell =
-                    vec(sum(UMIs_per_cell_per_gene[indices_of_metacell_cells, indices_of_module_genes]; dims = 2))
-                @assert_vector(module_UMIs_per_metacell_cell, n_metacell_cells)
-                fraction_per_module_per_cell[module_index, :] =
-                    module_UMIs_per_metacell_cell ./ total_UMIs_per_metacell_cell
-                module_total_UMIs_of_metacell = sum(module_UMIs_per_metacell_cell)
-                mean_fraction_per_module[module_index] = module_total_UMIs_of_metacell ./ total_UMIs_of_metacell
-            end
-        end
+        module_UMIs_per_module_per_cell = zeros(Float32, n_modules, n_metacell_cells)
+        sum_sparse_UMIs_per_gene_group_per_cell!(
+            module_UMIs_per_module_per_cell,
+            sparse_UMIs_per_cell_per_gene,
+            indices_of_metacell_cells,
+            gene_indices_per_module,
+            cell_position_per_cell_per_thread[threadid()],
+        )
+        fraction_per_module_per_cell =
+            module_UMIs_per_module_per_cell ./ reshape(total_UMIs_per_metacell_cell, 1, n_metacell_cells)
+        mean_fraction_per_module = vec(sum(module_UMIs_per_module_per_cell; dims = 2)) ./ total_UMIs_of_metacell
 
         distance_per_cell = flame_timed("pairwise.Euclidean") do
             return pairwise(Euclidean(), Ref(mean_fraction_per_module), eachcol(fraction_per_module_per_cell))

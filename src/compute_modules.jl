@@ -15,9 +15,11 @@ using Random
 using StatsBase
 using Serialization
 
+using ..AnalyzeCells
 using ..Contracts
 
 import Base.Threads.maxthreadid
+import Metacells.AnalyzeCells.sum_sparse_UMIs_per_gene_group_per_cell!
 import Random.default_rng
 
 # Needed because of JET:
@@ -551,11 +553,11 @@ function compute_block_modules!(
     end
 
     flame_timed("migrate_between_gene_modules") do
-        # Materialize the environment sub-matrix as a concrete sparse matrix rather than a `@views` sub-array: a
-        # sub-array of a sparse matrix is not itself a `SparseMatrixCSC`, so the `sum(...; dims = 2)` below would fall
-        # back to a dense per-element scan instead of the non-zero-only sparse reduction. The single row-subset copy is
-        # amortized across every cluster and every iteration of the loop below.
+        # Materialize the environment sub-matrix as a concrete `SparseMatrixCSC` (row-subset copy) rather than a `@views`
+        # sub-array: `sum_sparse_UMIs_per_gene_group_per_cell!` walks its gene columns, and a sparse sub-array is not
+        # itself a `SparseMatrixCSC`. The single row-subset copy is amortized across every cluster and every iteration.
         UMIs_per_environment_cell_per_gene = UMIs_per_cell_per_gene[indices_of_environment_cells, :]
+        cell_position_per_environment_cell = zeros(Int32, n_environment_cells)
 
         while true
             local_positions_of_anchors = collect(keys(cluster_index_of_anchor_local_position))
@@ -592,16 +594,30 @@ function compute_block_modules!(
                 break
             end
 
+            # Sum each active cluster's genes' UMIs per environment cell in one sparse pass (over the cluster genes'
+            # columns) instead of a per-cluster column-subset reduction.
+            active_anchor_local_positions = collect(keys(cluster_index_of_anchor_local_position))
+            active_cluster_indices =
+                [cluster_index_of_anchor_local_position[position] for position in active_anchor_local_positions]
+            gene_indices_per_active_cluster = [
+                indices_of_local_genes[cluster_index_per_local_gene .== cluster_index] for
+                cluster_index in active_cluster_indices
+            ]
+            cluster_UMIs_per_active_cluster_per_environment_cell =
+                zeros(Float32, length(active_cluster_indices), n_environment_cells)
+            sum_sparse_UMIs_per_gene_group_per_cell!(
+                cluster_UMIs_per_active_cluster_per_environment_cell,
+                UMIs_per_environment_cell_per_gene,
+                1:n_environment_cells,
+                gene_indices_per_active_cluster,
+                cell_position_per_environment_cell,
+            )
+
             weakest_cluster_index = nothing
             weakest_cluster_strong_UMIs = nothing
-            for (anchor_local_position, cluster_index) in cluster_index_of_anchor_local_position  # NOLINT
-                is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
-                @assert any(is_in_cluster_per_local_gene)
-                # Concrete sparse column-subset (not a `@views` sub-array) so the `sum(...; dims = 2)` uses the
-                # non-zero-only sparse reduction; column selection on a `SparseMatrixCSC` is a cheap column gather.
-                UMIs_per_environment_cell_per_cluster_local_gene =
-                    UMIs_per_environment_cell_per_gene[:, indices_of_local_genes[is_in_cluster_per_local_gene]]
-                cluster_UMIs_per_environment_cell = vec(sum(UMIs_per_environment_cell_per_cluster_local_gene; dims = 2))
+            for (active_position, cluster_index) in enumerate(active_cluster_indices)
+                cluster_UMIs_per_environment_cell =
+                    cluster_UMIs_per_active_cluster_per_environment_cell[active_position, :]
                 cluster_strong_UMIs = quantile(  # NOLINT
                     cluster_UMIs_per_environment_cell,
                     1 - (min_strong_cells - 1) / (n_environment_cells - 1),

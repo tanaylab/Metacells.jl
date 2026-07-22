@@ -732,6 +732,7 @@ function compute_preferred_block_index_per_cell_per_block(;
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_neighborhood_cells))
     end
+    region_position_per_cell_per_thread = [zeros(Int, n_cells) for _ in 1:maxthreadid()]
 
     max_n_neighborhood_clusters = maximum(
         max(Int(round(n_neighborhood_cells_per_block[block_index] / mean_metacell_cells_per_block[block_index])), 1) for block_index in 1:n_blocks
@@ -784,6 +785,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
+            region_position_per_cell_per_thread,
             n_genes,
             n_modules,
         )
@@ -1033,6 +1035,7 @@ function compute_local_clusters(;
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_block_cells))
     end
+    region_position_per_cell_per_thread = [zeros(Int, n_cells) for _ in 1:maxthreadid()]
 
     # `DispersionScratches` channel pool for the nested parallel dispersion loops (compute_all_dispersions! /
     # compute_changed_dispersions!) and the serial split-then-disperse path in `split_one_cluster!`. Sized to
@@ -1081,6 +1084,7 @@ function compute_local_clusters(;
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
+            region_position_per_cell_per_thread,
             n_genes,
             n_modules,
         )
@@ -1984,6 +1988,7 @@ function relocate_dissolved_metacell_cells!(;
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_block_cells))
     end
+    region_position_per_cell_per_thread = [zeros(Int, n_cells) for _ in 1:maxthreadid()]
 
     # Parallel over the blocks that dissolved a metacell (each writes only its own cells, so the shared
     # `sharp_metacell_index_per_cell` is not contended). The inner z-score fill is nested-parallel over the block's
@@ -2016,6 +2021,7 @@ function relocate_dissolved_metacell_cells!(;
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
+            region_position_per_cell_per_thread,
             n_genes,
             n_modules,
         )
@@ -2426,6 +2432,7 @@ function setup_z_score_per_found_module_per_region_cell!(;
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     z_score_accumulator_pool::Channel{Vector{Float32}},
+    region_position_per_cell_per_thread::AbstractVector{<:AbstractVector{<:Integer}},
     n_genes::Integer,
     n_modules::Integer,
 )::Vector{Vector{Int}}
@@ -2455,6 +2462,7 @@ function setup_z_score_per_found_module_per_region_cell!(;
         indices_of_region_cells,
         gene_indices_per_module,
         z_score_accumulator_pool,
+        region_position_per_cell_per_thread,
         mean_linear_fraction_in_environment_cells_per_module,
         std_linear_fraction_in_environment_cells_per_module,
         std_fraction_regularization = std_fraction_regularization_per_block[block_index],
@@ -2471,6 +2479,7 @@ function compute_z_score_per_found_module_per_region_cell!(;
     indices_of_region_cells::AbstractVector{<:Integer},
     gene_indices_per_module::AbstractVector{<:AbstractVector{<:Integer}},
     z_score_accumulator_pool::Channel{Vector{Float32}},
+    region_position_per_cell_per_thread::AbstractVector{<:AbstractVector{<:Integer}},
     mean_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
     std_fraction_regularization::AbstractFloat,
@@ -2478,6 +2487,19 @@ function compute_z_score_per_found_module_per_region_cell!(;
     n_region_cells = length(indices_of_region_cells)
     found_module_indices = findall(is_found_per_module)
     n_found_modules = length(found_module_indices)
+
+    # A module's UMIs are accumulated per region cell by walking the nonzeros of each of its gene columns (no random
+    # `[cell, gene]` access); `region_position_per_cell` maps each cell to its position among the region cells (0
+    # otherwise). Owned by this outer (block) task and captured read-only by the nested found-module loop, so it is
+    # indexed by the outer task's thread and reset once that loop is done.
+    @assert issparse(UMIs_per_cell_per_gene)
+    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
+    row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
+    UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
+    region_position_per_cell = region_position_per_cell_per_thread[threadid()]
+    for (region_cell_position, cell_index) in enumerate(indices_of_region_cells)
+        region_position_per_cell[cell_index] = region_cell_position
+    end
 
     # Parallel over found modules - each fills its own row of the z-score matrix (disjoint writes). Per task, take an
     # accumulator vector from the pool (contiguous Float32, sized to max region cells), do gene-outer / cell-inner
@@ -2497,13 +2519,14 @@ function compute_z_score_per_found_module_per_region_cell!(;
         accumulator = take!(z_score_accumulator_pool)
         try
             @views fill!(accumulator[1:n_region_cells], 0.0f0)
-            # `UMIs_per_cell_per_gene` is a sparse matrix; `@turbo` can't SIMD the gather, so use a plain `@inbounds`
-            # scalar accumulate. The downstream z-score normalization below operates on dense buffers and stays
-            # `@turbo`.
+            # Walk only the nonzeros of the module's gene columns, mapping each to its region cell; the downstream
+            # z-score normalization below operates on dense buffers and stays `@turbo`.
             @inbounds for gene_index in gene_indices_in_module
-                for region_cell_position in 1:n_region_cells
-                    cell_index = indices_of_region_cells[region_cell_position]
-                    accumulator[region_cell_position] += UMIs_per_cell_per_gene[cell_index, gene_index]
+                for stored_index in nzrange(sparse_UMIs_per_cell_per_gene, gene_index)
+                    region_position = region_position_per_cell[row_index_per_stored[stored_index]]
+                    if region_position > 0
+                        accumulator[region_position] += UMIs_per_stored[stored_index]
+                    end
                 end
             end
             mean_linear_fraction = mean_linear_fraction_in_environment_cells_per_module[module_index]
@@ -2525,6 +2548,10 @@ function compute_z_score_per_found_module_per_region_cell!(;
             put!(z_score_accumulator_pool, accumulator)
         end
         return nothing
+    end
+
+    for cell_index in indices_of_region_cells
+        region_position_per_cell[cell_index] = 0
     end
     return nothing
 end

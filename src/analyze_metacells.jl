@@ -25,13 +25,16 @@ using LoopVectorization
 using MultipleTesting
 using TanayLabUtilities
 using Random
+using SparseArrays
 using StatsBase
 using UMAP
 
+using ..AnalyzeCells
 using ..Defaults
 using ..Contracts
 
 import Base.Threads.maxthreadid
+import Metacells.AnalyzeCells.gather_gene_UMIs_per_region_cell!
 import Random.default_rng
 
 # Needed because of JET:
@@ -506,7 +509,6 @@ $(CONTRACT)
 @logged :mcs_ops @computation Contract(;
     axes = [metacell_axis(RequiredInput), gene_axis(RequiredInput), cell_axis(RequiredInput)],
     data = [
-        vector_of_is_excluded_per_gene(RequiredInput),
         vector_of_is_marker_per_gene(RequiredInput),
         vector_of_is_lateral_per_gene(RequiredInput),
         vector_of_metacell_per_cell(RequiredInput),
@@ -524,7 +526,8 @@ $(CONTRACT)
     gene_fraction_regularization = Float32(gene_fraction_regularization)
     n_genes = axis_length(daf, "gene")
 
-    index_per_included_gene = get_query(daf, "@ gene [ ! is_excluded ] : index").array
+    # Only marker genes are correlated (every consumer uses a subset of the markers); zero for non-marker genes.
+    index_per_included_gene = get_query(daf, "@ gene [ is_marker ] : index").array
     n_included_genes = length(index_per_included_gene)
 
     indices_of_grouped_cells = get_query(daf, "@ cell [ metacell ] : index").array
@@ -549,6 +552,16 @@ $(CONTRACT)
     gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread =
         [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
 
+    # Cell UMIs are gathered per gene via `gather_gene_UMIs_per_region_cell!` (a CSC column walk) rather than random
+    # `[cell, gene]` access; `region_position_per_cell` maps each cell to its position among the grouped cells (0 for
+    # ungrouped cells). It is read-only during the parallel gene loop.
+    @assert issparse(UMIs_per_cell_per_gene)
+    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
+    region_position_per_cell = zeros(Int, axis_length(daf, "cell"))
+    for (grouped_cell_position, cell_index) in enumerate(indices_of_grouped_cells)
+        region_position_per_cell[cell_index] = grouped_cell_position
+    end
+
     parallel_loop_wo_rng(
         1:n_included_genes;
         progress = DebugProgress(
@@ -564,23 +577,24 @@ $(CONTRACT)
         gene_punctuated_metacell_log_fraction_per_grouped_cell =
             gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread[threadid()]
 
-        all_zero_grouped_cell_UMIs = true
-        for grouped_cell_position in 1:n_grouped_cells
-            if UMIs_per_cell_per_gene[indices_of_grouped_cells[grouped_cell_position], gene_index] > 0
-                all_zero_grouped_cell_UMIs = false
-                break
-            end
-        end
-        if all_zero_grouped_cell_UMIs
+        # Gather this gene's cell UMIs (CSC column walk) into the cell buffer; all-zero => correlation 0.
+        any_grouped_cell_UMIs = gather_gene_UMIs_per_region_cell!(
+            gene_cell_log_fraction_per_grouped_cell,
+            n_grouped_cells,
+            sparse_UMIs_per_cell_per_gene,
+            gene_index,
+            region_position_per_cell,
+        )
+        if !any_grouped_cell_UMIs
             correlation_between_cells_and_punctuated_metacells_per_gene[gene_index] = 0.0f0
             return nothing
         end
 
         all_zero_grouped_punctuated_metacell_UMIs = true
         for grouped_cell_position in 1:n_grouped_cells
-            cell_index = indices_of_grouped_cells[grouped_cell_position]
             metacell_index = metacell_index_per_grouped_cell[grouped_cell_position]
-            if UMIs_per_metacell_per_gene[metacell_index, gene_index] > UMIs_per_cell_per_gene[cell_index, gene_index]
+            if UMIs_per_metacell_per_gene[metacell_index, gene_index] >
+               gene_cell_log_fraction_per_grouped_cell[grouped_cell_position]
                 all_zero_grouped_punctuated_metacell_UMIs = false
                 break
             end
@@ -590,13 +604,12 @@ $(CONTRACT)
             return nothing
         end
 
-        for (grouped_cell_position, cell_index) in enumerate(indices_of_grouped_cells)
+        # `gene_cell_log_fraction` holds the gathered cell UMIs; derive the punctuated metacell from the metacell total.
+        for grouped_cell_position in 1:n_grouped_cells
             metacell_index = metacell_index_per_grouped_cell[grouped_cell_position]
-            gene_cell_UMIs = UMIs_per_cell_per_gene[cell_index, gene_index]
-            gene_metacell_UMIs = UMIs_per_metacell_per_gene[metacell_index, gene_index]
-            gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] = gene_cell_UMIs
             gene_punctuated_metacell_log_fraction_per_grouped_cell[grouped_cell_position] =
-                gene_metacell_UMIs - gene_cell_UMIs
+                UMIs_per_metacell_per_gene[metacell_index, gene_index] -
+                gene_cell_log_fraction_per_grouped_cell[grouped_cell_position]
         end
         @check_turbo_vector(gene_cell_log_fraction_per_grouped_cell)
         @check_turbo_vector(total_UMIs_per_grouped_cell)

@@ -1458,7 +1458,7 @@
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The correlation between cells and their metacells (minus the correlated cell) of each gene expression levels. This is zero for excluded genes. This reflects the quality of the grouping of cells into metacells, and verifying that all relevant genes are properly described by the metacell model.
+<p>The correlation between cells and their metacells (minus the correlated cell) of each gene expression levels. This is zero for non-marker genes. This reflects the quality of the grouping of cells into metacells, and verifying that all relevant genes are properly described by the metacell model.
 </p>
 <p>This vector may be populated by 
 <a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!">
@@ -2372,7 +2372,7 @@
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each block&#39;s neighborhood. This is zero for excluded genes. This reflects the overall quality of the neighborhood model.
+<p>The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each block&#39;s neighborhood. This is zero for non-marker genes. This reflects the overall quality of the neighborhood model.
 </p>
 <p>This matrix is populated by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!">
@@ -3562,7 +3562,7 @@
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The correlation between query cells and their projected atlas metacells of each gene expression levels. This is zero for excluded genes. This reflects the overall quality of the projection of the query cells to the atlas, and verifying that all relevant genes are properly described by the atlas metacell model.
+<p>The correlation between query cells and their projected atlas metacells of each gene expression levels. This is zero for non-marker genes. This reflects the overall quality of the projection of the query cells to the atlas, and verifying that all relevant genes are properly described by the atlas metacell model.
 </p>
 <p>This vector may be populated by 
 <a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!">
@@ -3592,7 +3592,7 @@
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The correlation between query cells and their projected atlas metacells of each gene&#39;s expression levels in each atlas block&#39;s neighborhood. This is zero for excluded genes. This reflects the quality of the projection of the query cells to the atlas in each region of the manifold.
+<p>The correlation between query cells and their projected atlas metacells of each gene&#39;s expression levels in each atlas block&#39;s neighborhood. This is zero for non-marker genes. This reflects the quality of the projection of the query cells to the atlas in each region of the manifold.
 </p>
 <p>This matrix is populated by 
 <a href="project_cells.html#Metacells.ProjectCells.compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!">
@@ -3818,11 +3818,71 @@
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood. This is zero for excluded genes. This allows comparing the correlation between alternative and base metacells in different locations of the manifold.
+<p>The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood. This is zero for non-marker genes. This allows comparing the correlation between alternative and base metacells in different locations of the manifold.
 </p>
 <p>This matrix is populated by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
 <code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood. This is zero for non-marker genes. This allows comparing the correlation between projected and base metacells in different locations of the manifold.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood, punctuating (leaving out the cell&#39;s own UMIs) only where the cell is a member of the metacell it was projected onto. This is zero for non-marker genes.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!
 </code>
 </a>.
 </p>
@@ -4076,6 +4136,18 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block">
 <code>Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block">
+<code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block
 </code>
 </a>
 </li>

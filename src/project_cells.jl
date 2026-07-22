@@ -13,13 +13,19 @@ using Distances
 using LinearAlgebra
 using LoopVectorization
 using ProgressMeter
+using SparseArrays
 using StatsBase
 using TanayLabUtilities
 
+using ..AnalyzeCells
 using ..Contracts
 using ..Defaults
 
 import Base.Threads.maxthreadid
+import Metacells.AnalyzeCells.cell_group_membership_from_block_neighborhoods
+import Metacells.AnalyzeCells.gather_gene_UMIs_per_region_cell!
+import Metacells.AnalyzeCells.sparse_cell_reference_correlation_per_gene_per_group!
+import Metacells.AnalyzeCells.sum_sparse_UMIs_per_gene_group_per_cell!
 
 # Needed because of JET:
 import Metacells.Contracts.block_axis
@@ -319,6 +325,11 @@ function compute_final_projection_per_query_cell(;
     next_indices_of_undetermined_query_cells_per_block =
         [findall(provisional_block_index_per_query_cell .== block_index) for block_index in 1:n_blocks]
 
+    # Per-thread scratch for summing each found module's UMIs per cell (a sparse column walk scattered into the cell's
+    # slot) rather than gathering a dense per-module submatrix.
+    sparse_UMIs_per_query_cell_per_query_gene = mutable_array(UMIs_per_query_cell_per_query_gene)::SparseMatrixCSC
+    cell_position_per_query_cell_per_thread = [zeros(Int32, n_query_cells) for _ in 1:maxthreadid()]
+
     spin_lock_per_block = [SpinLock() for _ in 1:n_blocks]
 
     n_determined_query_cells = Atomic{Int}(0)
@@ -378,31 +389,25 @@ function compute_final_projection_per_query_cell(;
                     @views module_index_per_atlas_gene = module_index_per_atlas_gene_per_block[:, block_index]
                     total_UMIs_per_undetermined_query_cell =
                         total_UMIs_per_query_cell[indices_of_undetermined_query_cells]
-                    linear_fraction_per_found_module_per_undetermined_query_cell =
-                        Matrix{Float32}(undef, n_found_modules, n_undetermined_query_cells)
 
-                    for (found_module_position, found_module_index) in enumerate(indices_of_found_modules)
+                    query_gene_indices_per_found_module = map(indices_of_found_modules) do found_module_index
                         indices_of_found_module_atlas_genes =
                             findall(module_index_per_atlas_gene .== found_module_index)
-                        indices_of_found_module_query_genes =
-                            query_gene_index_per_atlas_gene[indices_of_found_module_atlas_genes]
-                        @assert !any(indices_of_found_module_atlas_genes .== 0)
-
-                        n_found_module_genes = length(indices_of_found_module_query_genes)
-                        @assert n_found_module_genes > 0
-                        found_module_UMIs_per_undetermined_query_cell = vec(
-                            sum(
-                                UMIs_per_query_cell_per_query_gene[
-                                    indices_of_undetermined_query_cells,
-                                    indices_of_found_module_query_genes,
-                                ];
-                                dims = 2,
-                            ),
-                        )
-                        @assert_vector(found_module_UMIs_per_undetermined_query_cell, n_undetermined_query_cells)
-                        linear_fraction_per_found_module_per_undetermined_query_cell[found_module_position, :] .=
-                            found_module_UMIs_per_undetermined_query_cell ./ total_UMIs_per_undetermined_query_cell
+                        @assert !isempty(indices_of_found_module_atlas_genes)
+                        return query_gene_index_per_atlas_gene[indices_of_found_module_atlas_genes]
                     end
+
+                    linear_fraction_per_found_module_per_undetermined_query_cell =
+                        zeros(Float32, n_found_modules, n_undetermined_query_cells)
+                    sum_sparse_UMIs_per_gene_group_per_cell!(
+                        linear_fraction_per_found_module_per_undetermined_query_cell,
+                        sparse_UMIs_per_query_cell_per_query_gene,
+                        indices_of_undetermined_query_cells,
+                        query_gene_indices_per_found_module,
+                        cell_position_per_query_cell_per_thread[threadid()],
+                    )
+                    linear_fraction_per_found_module_per_undetermined_query_cell ./=
+                        reshape(total_UMIs_per_undetermined_query_cell, 1, n_undetermined_query_cells)
 
                     mean_linear_fraction_in_environment_cells_per_found_module =
                         mean_linear_fraction_in_environment_cells_per_module_per_block[
@@ -574,8 +579,9 @@ $(CONTRACT2)
     n_genes_in_atlas = axis_length(atlas_daf, "gene")
     n_genes_in_query = axis_length(query_daf, "gene")
 
+    # Only the atlas marker genes are correlated (the consumed mean uses a subset); zero for non-marker genes.
     query_included_genes = query_daf["@ gene [ ! is_excluded ]"]
-    atlas_included_genes = atlas_daf["@ gene [ ! is_excluded ]"]
+    atlas_included_genes = atlas_daf["@ gene [ is_marker ]"]
     common_included_genes = intersect(query_included_genes, atlas_included_genes)
     n_common_included_genes = length(common_included_genes)
 
@@ -588,99 +594,51 @@ $(CONTRACT2)
     indices_of_common_included_query_genes = axis_indices(query_daf, "gene", common_included_genes)
 
     indices_of_included_query_cells = query_daf["@ cell [ ! is_excluded ] : index"].array
-    n_included_query_cells = length(indices_of_included_query_cells)
 
     UMIs_per_query_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
+    @assert issparse(UMIs_per_query_cell_per_gene)
+    sparse_UMIs_per_query_cell_per_gene = mutable_array(UMIs_per_query_cell_per_gene)::SparseMatrixCSC
     total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
 
     projected_metacell_per_query_cell = get_vector(query_daf, "cell", "projected_metacell").array
-    projected_metacell_per_included_query_cell = projected_metacell_per_query_cell[indices_of_included_query_cells]
-    atlas_metacell_index_per_included_query_cell =
-        axis_indices(atlas_daf, "metacell", projected_metacell_per_included_query_cell)
+    atlas_metacell_index_per_query_cell =
+        axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell; allow_missing = true)
 
     UMIs_per_atlas_metacell_per_gene = get_matrix(atlas_daf, "metacell", "gene", "UMIs").array
     total_UMIs_per_atlas_metacell = get_vector(atlas_daf, "metacell", "total_UMIs").array
 
-    correlation_between_cells_and_projected_metacells_per_query_gene = zeros(Float32, n_genes_in_query)
+    # All included query cells form a single group, each mapped to its projected atlas metacell (cells without one do not
+    # participate); the sparse kernel then correlates each gene over these cells against their projected metacells.
+    n_query_cells = axis_length(query_daf, "cell")
+    is_participating_per_query_cell = falses(n_query_cells)
+    is_participating_per_query_cell[indices_of_included_query_cells] .= true
+    is_participating_per_query_cell .&= atlas_metacell_index_per_query_cell .> 0
+    participating_query_cell_indices = findall(is_participating_per_query_cell)
+    is_member_per_group_per_query_cell = sparse(
+        ones(Int32, length(participating_query_cell_indices)),
+        participating_query_cell_indices,
+        trues(length(participating_query_cell_indices)),
+        1,
+        n_query_cells,
+    )
 
-    gene_cell_log_fraction_per_included_query_cell_per_thread =
-        [Vector{Float32}(undef, n_included_query_cells) for _ in 1:maxthreadid()]
-    gene_metacell_log_fraction_per_included_query_cell_per_thread =
-        [Vector{Float32}(undef, n_included_query_cells) for _ in 1:maxthreadid()]
+    correlation_between_cells_and_projected_metacells_per_query_gene_per_group = zeros(Float32, n_genes_in_query, 1)
 
-    parallel_loop_wo_rng(
-        1:n_common_included_genes;
-        progress = DebugProgress(
-            n_common_included_genes;
-            group = :mcs_loops,
-            desc = "correlation_between_cells_and_projected_metacells",
-        ),
-        progress_chunk = 100,
-    ) do common_included_gene_position
-        atlas_gene_index = indices_of_common_included_atlas_genes[common_included_gene_position]
-        query_gene_index = indices_of_common_included_query_genes[common_included_gene_position]
-
-        gene_cell_log_fraction_per_included_query_cell =
-            gene_cell_log_fraction_per_included_query_cell_per_thread[threadid()]
-        gene_metacell_log_fraction_per_included_query_cell =
-            gene_metacell_log_fraction_per_included_query_cell_per_thread[threadid()]
-
-        all_zero_included_query_cell_UMIs = true
-        for included_query_cell_position in 1:n_included_query_cells
-            if UMIs_per_query_cell_per_gene[
-                indices_of_included_query_cells[included_query_cell_position],
-                query_gene_index,
-            ] > 0
-                all_zero_included_query_cell_UMIs = false
-                break
-            end
-        end
-        if all_zero_included_query_cell_UMIs
-            correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = 0.0f0
-            return nothing
-        end
-
-        all_zero_included_atlas_metacell_UMIs = true
-        for included_query_cell_position in 1:n_included_query_cells
-            if UMIs_per_atlas_metacell_per_gene[
-                atlas_metacell_index_per_included_query_cell[included_query_cell_position],
-                atlas_gene_index,
-            ] > 0
-                all_zero_included_atlas_metacell_UMIs = false
-                break
-            end
-        end
-        if all_zero_included_atlas_metacell_UMIs
-            correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = 0.0f0
-            return nothing
-        end
-
-        for included_query_cell_position in 1:n_included_query_cells
-            atlas_metacell_index = atlas_metacell_index_per_included_query_cell[included_query_cell_position]
-            query_cell_index = indices_of_included_query_cells[included_query_cell_position]
-            atlas_metacell_UMIs = UMIs_per_atlas_metacell_per_gene[atlas_metacell_index, atlas_gene_index]
-            query_cell_UMIs = UMIs_per_query_cell_per_gene[query_cell_index, query_gene_index]
-            gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position] =
-                atlas_metacell_UMIs / total_UMIs_per_atlas_metacell[atlas_metacell_index] + gene_fraction_regularization
-            gene_cell_log_fraction_per_included_query_cell[included_query_cell_position] =
-                query_cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization
-        end
-        @check_turbo_vector(gene_metacell_log_fraction_per_included_query_cell)
-        @check_turbo_vector(gene_cell_log_fraction_per_included_query_cell)
-        @turbo for included_query_cell_position in 1:n_included_query_cells
-            gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position] =
-                log2(gene_metacell_log_fraction_per_included_query_cell[included_query_cell_position])
-            gene_cell_log_fraction_per_included_query_cell[included_query_cell_position] =
-                log2(gene_cell_log_fraction_per_included_query_cell[included_query_cell_position])
-        end
-
-        correlation_between_cells_and_projected_metacells_per_query_gene[query_gene_index] = zero_cor_between_vectors(
-            gene_cell_log_fraction_per_included_query_cell,
-            gene_metacell_log_fraction_per_included_query_cell,
-        )
-
-        return nothing
-    end
+    sparse_cell_reference_correlation_per_gene_per_group!(
+        correlation_between_cells_and_projected_metacells_per_query_gene_per_group,
+        is_member_per_group_per_query_cell,
+        sparse_UMIs_per_query_cell_per_gene,
+        total_UMIs_per_query_cell,
+        atlas_metacell_index_per_query_cell,
+        UMIs_per_atlas_metacell_per_gene,
+        total_UMIs_per_atlas_metacell,
+        indices_of_common_included_query_genes,
+        indices_of_common_included_atlas_genes,
+        gene_fraction_regularization;
+        name = "correlation_between_cells_and_projected_metacells",
+    )
+    correlation_between_cells_and_projected_metacells_per_query_gene =
+        vec(correlation_between_cells_and_projected_metacells_per_query_gene_per_group)
 
     set_vector!(
         query_daf,
@@ -777,15 +735,14 @@ $(CONTRACT2)
         copy_axis!(source = atlas_daf, destination = query_daf, axis = "block", rename = "projected_block"; overwrite)
     end
 
-    n_query_cells = axis_length(query_daf, "cell")
-
     n_atlas_blocks = axis_length(atlas_daf, "block")
     n_genes_in_atlas = axis_length(atlas_daf, "gene")
     n_genes_in_query = axis_length(query_daf, "gene")
 
     name_per_atlas_block = axis_vector(atlas_daf, "block")
+    # Only the atlas marker genes are correlated (the consumed mean uses a subset); zero for non-marker genes.
     query_included_genes = query_daf["@ gene [ ! is_excluded ]"]
-    atlas_included_genes = atlas_daf["@ gene [ ! is_excluded ]"]
+    atlas_included_genes = atlas_daf["@ gene [ is_marker ]"]
     common_included_genes = intersect(query_included_genes, atlas_included_genes)
     n_common_included_genes = length(common_included_genes)
 
@@ -798,6 +755,8 @@ $(CONTRACT2)
     indices_of_common_included_query_genes = axis_indices(query_daf, "gene", common_included_genes)
 
     UMIs_per_query_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
+    @assert issparse(UMIs_per_query_cell_per_gene)
+    sparse_UMIs_per_query_cell_per_gene = mutable_array(UMIs_per_query_cell_per_gene)::SparseMatrixCSC
     total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
 
     projected_metacell_per_query_cell = get_vector(query_daf, "cell", "projected_metacell").array
@@ -877,28 +836,33 @@ $(CONTRACT2)
         end
     end
 
-    progress = DebugProgress(
-        n_atlas_blocks * n_common_included_genes;
-        group = :mcs_loops,
-        desc = "correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block",
+    # Correlate each query gene's expression across each atlas block's neighborhood query cells against those cells'
+    # projected metacells, filling the (gene, block) matrix. Each query cell (in the atlas block it projected onto)
+    # belongs to the neighborhoods (groups) of the atlas blocks whose neighborhood includes that block; a cell without a
+    # projected metacell or block participates in no group.
+    is_participating_per_query_cell =
+        (atlas_block_index_per_query_cell .> 0) .& (atlas_metacell_index_per_query_cell .> 0)
+    is_member_per_atlas_block_per_query_cell = cell_group_membership_from_block_neighborhoods(
+        atlas_block_index_per_query_cell,
+        is_in_neighborhood_per_other_block_per_base_block,
+        is_participating_per_query_cell,
     )
+    n_neighborhood_query_cells_per_atlas_block = vec(sum(is_member_per_atlas_block_per_query_cell; dims = 2))
 
-    is_of_neighborhood_per_query_cell = BitVector(undef, n_query_cells)
-
-    max_n_neighborhood_cells = 0
-    for atlas_block_index in 1:n_atlas_blocks
-        @views is_in_neighborhood_per_other_block =
-            is_in_neighborhood_per_other_block_per_base_block[:, atlas_block_index]
-        is_of_neighborhood_per_query_cell .=
-            (atlas_block_index_per_query_cell .> 0) .&
-            getindex.(Ref(is_in_neighborhood_per_other_block), max.(atlas_block_index_per_query_cell, 1))
-        max_n_neighborhood_cells = max(max_n_neighborhood_cells, sum(is_of_neighborhood_per_query_cell))
-    end
-
-    cell_log_fraction_per_max_neighborhood_query_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
-    projected_metacell_log_fraction_per_max_neighborhood_query_cell_per_thread =
-        [Vector{Float32}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
+    sparse_cell_reference_correlation_per_gene_per_group!(
+        correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block,
+        is_member_per_atlas_block_per_query_cell,
+        sparse_UMIs_per_query_cell_per_gene,
+        total_UMIs_per_query_cell,
+        atlas_metacell_index_per_query_cell,
+        UMIs_per_atlas_metacell_per_gene,
+        total_UMIs_per_atlas_metacell,
+        indices_of_common_included_query_genes,
+        indices_of_common_included_atlas_genes,
+        gene_fraction_regularization;
+        min_group_cells = min_neighborhood_query_cells,
+        name = "correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block",
+    )
 
     if mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing &&
        in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing
@@ -920,118 +884,13 @@ $(CONTRACT2)
     end
 
     for atlas_block_index in 1:n_atlas_blocks
-        @views is_in_neighborhood_per_other_block =
-            is_in_neighborhood_per_other_block_per_base_block[:, atlas_block_index]
-        is_of_neighborhood_per_query_cell .=
-            (atlas_block_index_per_query_cell .> 0) .&
-            getindex.(Ref(is_in_neighborhood_per_other_block), max.(atlas_block_index_per_query_cell, 1))
-
-        indices_of_neighborhood_query_cells = findall(is_of_neighborhood_per_query_cell)
-
-        n_neighborhood_query_cells = length(indices_of_neighborhood_query_cells)
+        n_neighborhood_query_cells = n_neighborhood_query_cells_per_atlas_block[atlas_block_index]
         if n_neighborhood_query_cells < min_neighborhood_query_cells
             if n_neighborhood_query_cells > 0
                 @warn "Ignoring too few query cells: $(n_neighborhood_query_cells) for the neighborhood of the atlas block: $(name_per_atlas_block[atlas_block_index])"
             end
-            next!(progress; step = n_common_included_genes)  # NOJET
 
         else
-            atlas_metacell_index_per_neighborhood_query_cell =
-                atlas_metacell_index_per_query_cell[indices_of_neighborhood_query_cells]
-
-            total_atlas_metacell_UMIs_per_neighborhood_query_cell =
-                total_UMIs_per_atlas_metacell[atlas_metacell_index_per_neighborhood_query_cell]
-
-            parallel_loop_wo_rng(
-                1:n_common_included_genes;
-                progress,
-                progress_chunk = 100,
-            ) do common_included_gene_position
-                atlas_gene_index = indices_of_common_included_atlas_genes[common_included_gene_position]
-                query_gene_index = indices_of_common_included_query_genes[common_included_gene_position]
-
-                cell_log_fraction_per_max_neighborhood_query_cell =
-                    cell_log_fraction_per_max_neighborhood_query_cell_per_thread[threadid()]
-                @views cell_log_fraction_per_neighborhood_query_cell =
-                    cell_log_fraction_per_max_neighborhood_query_cell[1:n_neighborhood_query_cells]
-
-                projected_metacell_log_fraction_per_max_neighborhood_query_cell =
-                    projected_metacell_log_fraction_per_max_neighborhood_query_cell_per_thread[threadid()]
-                @views projected_metacell_log_fraction_per_neighborhood_query_cell =
-                    projected_metacell_log_fraction_per_max_neighborhood_query_cell[1:n_neighborhood_query_cells]
-
-                all_zero_neighborhood_query_cell_UMIs = true
-                for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
-                    if UMIs_per_query_cell_per_gene[
-                        indices_of_neighborhood_query_cells[neighborhood_query_cell_position],
-                        query_gene_index,
-                    ] > 0
-                        all_zero_neighborhood_query_cell_UMIs = false
-                        break
-                    end
-                end
-                if all_zero_neighborhood_query_cell_UMIs
-                    correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
-                        query_gene_index,
-                        atlas_block_index,
-                    ] = 0.0f0
-                    return nothing
-                end
-
-                all_zero_neighborhood_projected_metacell_UMIs = true
-                for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
-                    if UMIs_per_atlas_metacell_per_gene[
-                        atlas_metacell_index_per_neighborhood_query_cell[neighborhood_query_cell_position],
-                        atlas_gene_index,
-                    ] > 0
-                        all_zero_neighborhood_projected_metacell_UMIs = false
-                        break
-                    end
-                end
-                if all_zero_neighborhood_projected_metacell_UMIs
-                    correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
-                        query_gene_index,
-                        atlas_block_index,
-                    ] = 0.0f0
-                    return nothing
-                end
-
-                for (neighborhood_query_cell_position, query_cell_index) in
-                    enumerate(indices_of_neighborhood_query_cells)
-                    cell_UMIs = UMIs_per_query_cell_per_gene[query_cell_index, query_gene_index]
-                    atlas_metacell_index =
-                        atlas_metacell_index_per_neighborhood_query_cell[neighborhood_query_cell_position]
-                    projected_metacell_UMIs = UMIs_per_atlas_metacell_per_gene[atlas_metacell_index, atlas_gene_index]
-                    cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
-                        cell_UMIs / total_UMIs_per_query_cell[query_cell_index] + gene_fraction_regularization
-                    projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
-                        projected_metacell_UMIs
-                end
-                @check_turbo_vector(cell_log_fraction_per_neighborhood_query_cell)
-                @check_turbo_vector(projected_metacell_log_fraction_per_neighborhood_query_cell)
-                @check_turbo_vector(total_atlas_metacell_UMIs_per_neighborhood_query_cell)
-                @turbo for neighborhood_query_cell_position in 1:n_neighborhood_query_cells
-                    cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
-                        log2(cell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position])
-                    projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] =
-                        log2(
-                            projected_metacell_log_fraction_per_neighborhood_query_cell[neighborhood_query_cell_position] /
-                            total_atlas_metacell_UMIs_per_neighborhood_query_cell[neighborhood_query_cell_position] +
-                            gene_fraction_regularization,
-                        )
-                end
-
-                correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block[
-                    query_gene_index,
-                    atlas_block_index,
-                ] = zero_cor_between_vectors(
-                    cell_log_fraction_per_neighborhood_query_cell,
-                    projected_metacell_log_fraction_per_neighborhood_query_cell,
-                )
-
-                return nothing
-            end
-
             if mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing &&
                in_bin_mean_neighborhood_pertinent_markers_correlation_per_atlas_block === nothing
                 is_neighborhood_pertinent_marker_per_common_included_gene = nothing

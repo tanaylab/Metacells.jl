@@ -2862,8 +2862,8 @@
 </strong>
 </p>
 <p>
-<strong>gene @ is_excluded
-</strong>::Bool (required): A mask of genes that are excluded from consideration.
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
 </p>
 <p>
 <strong>cell @ total_UMIs
@@ -3000,11 +3000,11 @@
 </p>
 <p>
 <strong>gene @ is_excluded
-</strong>::Bool (required): A mask of genes that are excluded from consideration.
+</strong>::Bool (optional): A mask of genes that are excluded from consideration.
 </p>
 <p>
 <strong>gene @ is_lateral
-</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</strong>::Bool (optional): A mask of genes that are lateral to the biological behaviors of interest.
 </p>
 <p>
 <strong>cell @ total_UMIs
@@ -3083,8 +3083,394 @@
 </strong>
 </p>
 <p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, block @ is
+<em>neighborhood
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!(;
+    other_daf::DafWriter,
+    base_daf::DafReader,
+    gene_fraction_regularization::AbstractFloat = ```0.0001```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<code>[matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block
+</code>](@ref). This is the projected-metacells counterpart of 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
+</code>
+</a>: each cell is correlated against the metacell it was projected onto (never a member of, so the metacell is not punctuated). This will also copy 
+<a href="contracts.html#Metacells.Contracts.base_block_axis">
+<code>base_block_axis
+</code>
+</a> from the 
+<code>base_daf
+</code> into the 
+<code>other_daf
+</code> if needed.
+</p>
+<p>
+<strong>Other
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
 <strong>gene @ is_excluded
-</strong>::Bool (required): A mask of genes that are excluded from consideration.
+</strong>::Bool (optional): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (optional): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>cell @ projected_metacell
+</strong>::AbstractString (required): The projected atlas metacell for each cell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>projected
+</em>metacells
+</strong>::Union{Float32, Float64} (created): The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, block @ is
+<em>neighborhood
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!(;
+    other_daf::DafWriter,
+    base_daf::DafReader,
+    gene_fraction_regularization::AbstractFloat = ```0.0001```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<code>[matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block
+</code>](@ref). This is the projected counterpart of 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!">
+<code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!
+</code>
+</a> that punctuates (leaves out the cell&#39;s own UMIs) only where the cell is a member of the metacell it was projected onto (its own metacell equals its projected metacell); the rest use the full metacell as in the plain projected case. This will also copy 
+<a href="contracts.html#Metacells.Contracts.base_block_axis">
+<code>base_block_axis
+</code>
+</a> from the 
+<code>base_daf
+</code> into the 
+<code>other_daf
+</code> if needed.
+</p>
+<p>
+<strong>Other
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_excluded
+</strong>::Bool (optional): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (optional): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>cell @ projected_metacell
+</strong>::AbstractString (required): The projected atlas metacell for each cell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>projected
+</em>punctuated_metacells
+</strong>::Union{Float32, Float64} (created): The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood, punctuated where the cell is a member of its projected metacell.
+</p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
 </p>
 <p>
 <strong>gene @ is_lateral
@@ -3141,6 +3527,7 @@
     other_daf::DafWriter,
     base_daf::DafReader;
     gene_fraction_regularization::AbstractFloat = ```0.0001```,
+    is_relevant_gene_per_base_block::Maybe{Union{AbstractMatrix{Bool}, BitMatrix}} = nothing,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -3158,6 +3545,10 @@
 </code> into the 
 <code>other_daf
 </code> if needed.
+</p>
+<p>If 
+<code>is_relevant_gene_per_base_block
+</code> is given, each base block&#39;s correlated genes are restricted to it, and the sanity assertion that the mean correlation is positive is skipped (for scoring a held-out subset of the cells, whose per-block mean may be non-positive).
 </p>
 <p>The 
 <code>cell
@@ -3547,6 +3938,18 @@
 <li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!
 </code>
 </a>
 </li>
