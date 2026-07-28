@@ -1061,13 +1061,92 @@
 )::Nothing
 </code>
 </pre>
-<p>Correlate the marker genes in an arbitrary 
+<p>Correlate the marker genes by their log expression across a subset of the metacells (all of them when 
 <code>metacells_subset
-</code>. This subset can be either an explicit mask or a query that masks the 
+</code> is 
+<code>nothing
+</code>). The subset can be either an explicit mask or a query that masks the 
 <code>metacell
 </code> axis. The result is stored in a per-gene-per-gene 
 <code>matrix_name
 </code>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_matrix_of_correlation_between_markers_per_gene_per_gene!(
+    daf::DafWriter;
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene">
+<code>matrix_of_correlation_between_markers_per_gene_per_gene
+</code>
+</a> - the correlation between the log expression of pairs of marker genes across all the metacells.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, gene @ correlation
+<em>between
+</em>markers
+</strong>::Union{Float32, Float64} (created): The correlation between the log expression of pairs of marker genes across the metacells.
 </p>
 </div>
 </section>
@@ -1253,6 +1332,12 @@
 <li>
 <a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!">
 <code>Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!
 </code>
 </a>
 </li>

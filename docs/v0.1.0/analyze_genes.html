@@ -619,10 +619,6 @@
 </strong> (required): Sequenced genes.
 </p>
 <p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
-</p>
-<p>
 <strong>Vectors
 </strong>
 </p>
@@ -639,10 +635,10 @@
 </strong>
 </p>
 <p>
-<strong>gene, metacell @ log
-<em>linear
-</em>fraction
-</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+<strong>gene, gene @ correlation
+<em>between
+</em>markers
+</strong>::Union{Float32, Float64} (required): The correlation between the log expression of pairs of marker genes across the metacells.
 </p>
 <p>
 <strong>Outputs
@@ -657,6 +653,388 @@
 <em>correlated
 </em>with_skeleton
 </strong>::Bool (created): A mask of (marker) genes that have significant correlation with any of the skeleton genes.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeGenes.compute_gene_report">
+<a class="docstring-binding" href="#Metacells.AnalyzeGenes.compute_gene_report">
+<code>Metacells.AnalyzeGenes.compute_gene_report
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_gene_report(;
+    daf::DafReader,
+    base_daf::Maybe{DafReader} = nothing,
+)::DataFrame
+</code>
+</pre>
+<p>Return a per-marker-gene report as a 
+<code>DataFrame
+</code>, one row per marker gene, sorted by 
+<code>marker_rank
+</code>. Its columns are:
+</p>
+<ul>
+<li>
+<code>gene
+</code> - the gene name.
+</li>
+<li>
+<code>marker_rank
+</code> - the gene&#39;s rank as a marker (
+<code>1
+</code> being the most significant; see 
+<a href="contracts.html#Metacells.Contracts.vector_of_marker_rank_per_gene">
+<code>vector_of_marker_rank_per_gene
+</code>
+</a>).
+</li>
+<li>
+<code>is_lateral
+</code>, 
+<code>is_tf
+</code>, 
+<code>is_regulator
+</code>, 
+<code>is_skeleton
+</code> - whether the gene is lateral, a transcription factor, a regulator, or a skeleton gene.
+</li>
+<li>
+<code>top_marker
+</code> and 
+<code>top_marker_cor
+</code>, 
+<code>top_lateral
+</code> and 
+<code>top_lateral_cor
+</code>, 
+<code>top_regulator
+</code> and 
+<code>top_regulator_cor
+</code>, 
+<code>top_skeleton
+</code> and 
+<code>top_skeleton_cor
+</code> - the most correlated marker / lateral / regulator / skeleton gene (other than the gene itself) and that correlation, from 
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene">
+<code>matrix_of_correlation_between_markers_per_gene_per_gene
+</code>
+</a>. Since only markers are correlated, e.g. 
+<code>top_lateral
+</code> is the most correlated lateral 
+<em>marker
+</em>. An empty set (e.g. no regulators) yields an empty name and a zero correlation.
+</li>
+</ul>
+<p>When 
+<code>base_daf
+</code> (the round-0 model) is given, six more columns compare each gene&#39;s base-neighborhood correlation in 
+<code>daf
+</code> against 
+<code>base_daf
+</code>, over the base blocks where the gene is scored (has a non-zero correlation) at round 0, for the punctuated (
+<code>punct_*
+</code>) and projected-punctuated (
+<code>proj_punct_*
+</code>) correlations:
+</p>
+<ul>
+<li>
+<code>punct_Δ
+</code>, 
+<code>proj_punct_Δ
+</code> - the mean change (
+<code>Δ
+</code>) in the correlation from 
+<code>base_daf
+</code>.
+</li>
+<li>
+<code>punct_++
+</code>, 
+<code>proj_punct_++
+</code> - the fraction of the base blocks where the correlation significantly improved (increased by at least 
+<code>0.05
+</code>).
+</li>
+<li>
+<code>punct_--
+</code>, 
+<code>proj_punct_--
+</code> - the fraction of the base blocks where the correlation significantly degraded (decreased by at least 
+<code>0.05
+</code>).
+</li>
+</ul>
+<p>These six columns are omitted when 
+<code>base_daf
+</code> is 
+<code>nothing
+</code> (that is, when 
+<code>daf
+</code> is itself the round-0 model).
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>base_block
+</strong> (optional): A copy of the base 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ marker_rank
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The relative ranks of the marker genes.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>gene @ is
+<em>transcription
+</em>factor
+</strong>::Bool (required): A mask of genes that regulate the expression level of other genes.
+</p>
+<p>
+<strong>gene @ is_regulator
+</strong>::Bool (required): A mask of genes that regulate the expression level of other genes.
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, gene @ correlation
+<em>between
+</em>markers
+</strong>::Union{Float32, Float64} (required): The correlation between the log expression of pairs of marker genes across the metacells.
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (optional): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>projected
+</em>punctuated_metacells
+</strong>::Union{Float32, Float64} (optional): The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood, punctuated where the cell is a member of its projected metacell.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeGenes.compute_skeleton_report">
+<a class="docstring-binding" href="#Metacells.AnalyzeGenes.compute_skeleton_report">
+<code>Metacells.AnalyzeGenes.compute_skeleton_report
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_skeleton_report(;
+    daf::DafReader,
+    base_daf::Maybe{DafReader} = nothing,
+)::DataFrame
+</code>
+</pre>
+<p>Return a per-skeleton-gene report as a 
+<code>DataFrame
+</code>, one row per skeleton gene, sorted by the total number of markers most correlated with it (descending). Each marker gene is assigned to the single skeleton gene it is most correlated with (from 
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene">
+<code>matrix_of_correlation_between_markers_per_gene_per_gene
+</code>
+</a>, excluding itself), and split into lateral (
+<code>lat
+</code>) markers and pertinent (
+<code>pert
+</code>, non-lateral) markers. Apart from the 
+<code>gene
+</code> (skeleton name) column, every statistic is emitted as a 
+<code>lat_&lt;name&gt;
+</code>, 
+<code>lat_&lt;name&gt;_f
+</code>, 
+<code>pert_&lt;name&gt;
+</code> trio - the lateral value, its fraction of the lateral-plus-pertinent total, and the pertinent value. The statistics are:
+</p>
+<ul>
+<li>
+<code>#
+</code> - the number of markers most correlated with this skeleton.
+</li>
+</ul>
+<p>When 
+<code>base_daf
+</code> (the round-0 model) is given, four more statistics per each of the punctuated (
+<code>punct
+</code>) and projected-punctuated (
+<code>proj_punct
+</code>) base-neighborhood correlations aggregate the 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_gene_report">
+<code>compute_gene_report
+</code>
+</a> values of those markers - where each marker&#39;s delta correlation (
+<code>Δ
+</code>) is the mean over its base blocks (with a non-zero round-0 correlation) of 
+<code>round_N - round_0
+</code>, and 
+<code>++
+</code> / 
+<code>--
+</code> are the fractions of its base blocks that significantly improved / degraded (by at least 
+<code>0.05
+</code>):
+</p>
+<ul>
+<li>
+<code>&lt;corr&gt;_++
+</code> - the mean (
+<code>μ
+</code>) of the markers&#39; improved fractions.
+</li>
+<li>
+<code>&lt;corr&gt;_--
+</code> - the mean of the markers&#39; degraded fractions.
+</li>
+<li>
+<code>&lt;corr&gt;_μΔ
+</code> - the mean of the markers&#39; delta correlations.
+</li>
+<li>
+<code>&lt;corr&gt;_ΣΔ
+</code> - the sum (
+<code>Σ
+</code>) of the markers&#39; delta correlations.
+</li>
+</ul>
+<p>These comparison statistics are omitted when 
+<code>base_daf
+</code> is 
+<code>nothing
+</code>.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>base_block
+</strong> (optional): A copy of the base 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, gene @ correlation
+<em>between
+</em>markers
+</strong>::Union{Float32, Float64} (required): The correlation between the log expression of pairs of marker genes across the metacells.
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (optional): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>projected
+</em>punctuated_metacells
+</strong>::Union{Float32, Float64} (optional): The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood, punctuated where the cell is a member of its projected metacell.
 </p>
 </div>
 </section>
@@ -718,6 +1096,18 @@
 <li>
 <a href="analyze_genes.html#Metacells.AnalyzeGenes">
 <code>Metacells.AnalyzeGenes
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_gene_report">
+<code>Metacells.AnalyzeGenes.compute_gene_report
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_skeleton_report">
+<code>Metacells.AnalyzeGenes.compute_skeleton_report
 </code>
 </a>
 </li>

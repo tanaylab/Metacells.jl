@@ -3892,6 +3892,36 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene">
+<code>Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_correlation_between_markers_per_gene_per_gene(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between the log expression of pairs of marker genes across the metacells. This is zero for non-marker genes. This is a symmetric matrix.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!">
+<code>compute_matrix_of_correlation_between_markers_per_gene_per_gene!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block">
 <a class="docstring-binding" href="#Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block">
 <code>Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block
@@ -4154,6 +4184,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
 <code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene">
+<code>Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
 </code>
 </a>
 </li>

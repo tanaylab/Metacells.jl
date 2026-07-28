@@ -34,6 +34,7 @@ export matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_bloc
 export matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block
 export matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block
 export matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
+export matrix_of_correlation_between_markers_per_gene_per_gene
 export matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
 export matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
 export matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
@@ -769,6 +770,27 @@ function matrix_of_euclidean_skeleton_fold_distance_between_metacells(
         expectation,
         StorageFloat,
         "The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.",
+    )
+end
+
+"""
+    matrix_of_correlation_between_markers_per_gene_per_gene(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+The correlation between the log expression of pairs of marker genes across the metacells. This is zero for non-marker
+genes. This is a symmetric matrix.
+
+This matrix is populated by [`compute_matrix_of_correlation_between_markers_per_gene_per_gene!`](@ref
+Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!).
+"""
+function matrix_of_correlation_between_markers_per_gene_per_gene(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "gene", "correlation_between_markers") => (
+        expectation,
+        StorageFloat,
+        "The correlation between the log expression of pairs of marker genes across the metacells.",
     )
 end
 
