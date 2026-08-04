@@ -812,34 +812,125 @@ $(CONTRACT)
     return nothing
 end
 
+# An explicit initial embedding for `UMAP.fit`, instead of its spectral initialization.
+struct PriorInitialization <: UMAP.AbstractInitialization
+    position_per_point::AbstractVector{<:AbstractVector{<:AbstractFloat}}
+end
+
+# `UMAP.optimize_embedding!` mutates the embedding in place, so hand it a copy of the prior positions.
+function UMAP.initialize_embedding(
+    ::AbstractMatrix{T},
+    ::UMAP._EuclideanManifold{N},
+    initialization::PriorInitialization,
+)::Vector{Vector{T}} where {T, N}
+    @assert length(first(initialization.position_per_point)) == N
+    return [T.(position) for position in initialization.position_per_point]
+end
+
+# The initial 2D position of each metacell of `daf` - the mean position of the `prev_daf` metacells of its cells. A
+# metacell all of whose cells were outliers in `prev_daf` has no position to inherit, and is placed at the origin with a
+# slight random offset (as `UMAP` itself does) so such metacells do not coincide.
+function compute_prior_position_per_metacell(;
+    daf::DafReader,
+    prev_daf::DafReader,
+    rng::AbstractRNG,
+)::Vector{Vector{Float32}}
+    n_metacells = axis_length(daf, "metacell")
+
+    umap_x_per_prev_metacell = get_vector(prev_daf, "metacell", "umap_x").array
+    umap_y_per_prev_metacell = get_vector(prev_daf, "metacell", "umap_y").array
+    prev_metacell_index_per_cell = prev_daf["@ cell : metacell ?? 0 : index"].array
+
+    metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
+
+    sum_x_per_metacell = zeros(Float32, n_metacells)
+    sum_y_per_metacell = zeros(Float32, n_metacells)
+    n_positioned_cells_per_metacell = zeros(Int, n_metacells)
+
+    for cell_index in eachindex(metacell_index_per_cell)
+        metacell_index = metacell_index_per_cell[cell_index]
+        prev_metacell_index = prev_metacell_index_per_cell[cell_index]
+        if metacell_index == 0 || prev_metacell_index == 0
+            continue
+        end
+        sum_x_per_metacell[metacell_index] += umap_x_per_prev_metacell[prev_metacell_index]
+        sum_y_per_metacell[metacell_index] += umap_y_per_prev_metacell[prev_metacell_index]
+        n_positioned_cells_per_metacell[metacell_index] += 1
+    end
+
+    n_unpositioned_metacells = count(==(0), n_positioned_cells_per_metacell)
+    if n_unpositioned_metacells > 0
+        @debug "Metacells with no previous position: $(n_unpositioned_metacells)" _group = :mcs_results
+    end
+
+    position_per_metacell = Vector{Vector{Float32}}(undef, n_metacells)
+    for metacell_index in 1:n_metacells
+        n_cells = n_positioned_cells_per_metacell[metacell_index]
+        if n_cells > 0
+            position_per_metacell[metacell_index] =
+                [sum_x_per_metacell[metacell_index] / n_cells, sum_y_per_metacell[metacell_index] / n_cells]
+        else
+            position_per_metacell[metacell_index] = Float32[randn(rng) / 10000, randn(rng) / 10000]
+        end
+    end
+
+    return position_per_metacell
+end
+
 """
     function compute_metacells_2d_umap!(
         daf::DafWriter;
+        prev_daf::Maybe{DafReader} = nothing,
         min_dist::AbstractFloat = $(DEFAULT.min_dist),
         n_neighbors::Integer = $(DEFAULT.n_neighbors),
+        rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Compute and set [`vector_of_umap_x_per_metacell`](@ref) and [`vector_of_umap_y_per_metacell`](@ref) by computing a 2D
 UMAP projection from the Euclidean skeleton fold distance between metacells.
 
+If `prev_daf` (the previous round's repository over the same cells) is given, the projection is seeded with each
+metacell's mean position of the `prev_daf` metacells of its cells, instead of UMAP's spectral initialization, so
+successive rounds produce comparable layouts. A metacell all of whose cells were outliers in `prev_daf` has no position
+to inherit, and is placed at the origin with a slight random offset. The seeded projection is optimized for half as
+many epochs, since the seed already places the metacells. This requires [`vector_of_metacell_per_cell`](@ref) in `daf`,
+and [`vector_of_metacell_per_cell`](@ref), [`vector_of_umap_x_per_metacell`](@ref) and
+[`vector_of_umap_y_per_metacell`](@ref) in `prev_daf`.
+
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
-    axes = [metacell_axis(RequiredInput)],
+    axes = [metacell_axis(RequiredInput), cell_axis(OptionalInput)],
     data = [
         matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
+        vector_of_metacell_per_cell(OptionalInput),
         vector_of_umap_x_per_metacell(CreatedOutput),
         vector_of_umap_y_per_metacell(CreatedOutput),
     ],
 ) function compute_metacells_2d_umap!(  # UNTESTED
     daf::DafWriter;
+    prev_daf::Maybe{DafReader} = nothing,
     min_dist::AbstractFloat = 0.5,
     n_neighbors::Integer = 15,
+    rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
     distances_between_metacells = daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"].array
-    result = UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
+    if prev_daf === nothing
+        result = UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
+    else
+        init = PriorInitialization(compute_prior_position_per_metacell(; daf, prev_daf, rng))
+        result = UMAP.fit(  # NOJET
+            distances_between_metacells,
+            2;
+            metric = :precomputed,
+            min_dist,
+            n_neighbors,
+            init,
+            n_epochs = 150,
+        )
+    end
     set_vector!(daf, "metacell", "umap_x", Float32[point[1] for point in result.embedding]; overwrite)
     set_vector!(daf, "metacell", "umap_y", Float32[point[2] for point in result.embedding]; overwrite)
     return nothing

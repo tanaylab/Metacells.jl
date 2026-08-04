@@ -918,8 +918,9 @@
 <div>
 <pre>
 <code class="language-julia hljs">compute_vector_of_global_flow_order_per_type!(
-    final_daf::DafWriter,
+    final_daf::DafReader,
     base_daf_per_round::AbstractVector{&lt;:DafReader};
+    output_daf::DafWriter,
     restarts::Integer = 20,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
@@ -946,23 +947,21 @@
 <a href="contracts.html#Metacells.Contracts.matrix_of_n_cells_per_prev_metacell_type_per_metacell_type">
 <code>matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
 </code>
-</a> (the type flow from the previous round, by block type and by metacell type) from the later round&#39;s repository, that is, from every repository except the first (round 0 has no previous round). We minimize the combined (averaged) crossings of both using random-restart hill climbing (
+</a> (the type flow from the previous round, by block type and by metacell type) from the later round&#39;s repository, that is, from every repository except the first (round 0 has no previous round). Each matrix is normalized by its total number of cells, so that the finer by-metacell flow, which has many more edges, does not dominate the by-block flow. We minimize the combined (averaged) crossings of both using random-restart hill climbing (
 <code>restarts
-</code> restarts, since the problem is NP-hard) and write the resulting order only into 
-<code>final_daf
-</code>.
+</code> restarts, since the problem is NP-hard) and write the resulting order into 
+<code>output_daf
+</code>, which is typically the base repository shared by all the rounds, so that they all see the same order.
+</p>
+<p>
+<strong>Rounds
+</strong>
 </p>
 <p>The contract below is that of 
 <code>final_daf
 </code>. Each of the other repositories satisfies the same contract, except that the two 
 <code>n_cells
-</code> matrices are absent from the first (round 0), and the 
-<a href="contracts.html#Metacells.Contracts.vector_of_global_flow_order_per_type">
-<code>vector_of_global_flow_order_per_type
-</code>
-</a> output is created only in 
-<code>final_daf
-</code> (the last).
+</code> matrices are absent from the first (round 0).
 </p>
 <p>
 <strong>Inputs
@@ -991,6 +990,22 @@
 <em>cells
 </em>by_metacell
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells that were of each metacell type in the previous round and of each metacell type in the new.
+</p>
+<p>
+<strong>Order
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>type
+</strong> (required): Distinct named biological cell states.
 </p>
 <p>
 <strong>Outputs

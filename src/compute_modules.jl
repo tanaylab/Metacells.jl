@@ -12,6 +12,7 @@ using DataAxesFormats
 using Distances
 using TanayLabUtilities
 using Random
+using SparseArrays
 using StatsBase
 using Serialization
 
@@ -42,6 +43,26 @@ import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
 import Metacells.Contracts.vector_of_metacell_per_cell
 
+# Reusable masks over a block's local genes, for the per-cluster membership tests. The `is_selected` mask serves the
+# lateral-ish and the skeleton tests, which are never needed at the same time.
+struct ClusterMasks
+    is_in_cluster_per_local_gene::Vector{Bool}
+    is_selected_in_cluster_per_local_gene::Vector{Bool}
+    is_pertinent_in_cluster_per_local_gene::Vector{Bool}
+    is_correlated_pertinent_in_cluster_per_local_gene::Vector{Bool}
+    is_uncorrelated_pertinent_in_cluster_per_local_gene::Vector{Bool}
+end
+
+function ClusterMasks(; n_genes::Integer)
+    return ClusterMasks(
+        Vector{Bool}(undef, n_genes),
+        Vector{Bool}(undef, n_genes),
+        Vector{Bool}(undef, n_genes),
+        Vector{Bool}(undef, n_genes),
+        Vector{Bool}(undef, n_genes),
+    )
+end
+
 """
     compute_blocks_modules!(
         daf::DafWriter;
@@ -64,7 +85,8 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
     gene expression levels (z-score using the mean and standard deviation in the environment).
  2. We similarly cluster all the non-lateral genes which are correlated with a skeleton in the environment.
  3. We identify as lateral-ish any of these genes which are more correlated to a center of some lateral cluster than to
-    the center of their own cluster.
+    the center of their own cluster. Such a gene is spared (stays in its cluster) if it is a skeleton or is distinct in
+    the environment.
  4. We then only keep in each cluster the non-lateral-ish genes whose correlation with the center of the cluster is at
     least `min_member_correlation`. Some clusters may be dissolved as a result.
  5. We pick an anchor for each cluster - the skeleton gene closest to its center (if any).
@@ -166,6 +188,22 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         ) for _ in 1:maxthreadid()
     ]
 
+    # Reusable per-thread scratch for the rest of the per-block work, sized to the same per-block maxima. The z-scores
+    # are used first for the block's lateral environment marker genes and then for its local genes; the two are never
+    # needed at the same time.
+    n_cells = length(metacell_index_per_cell)
+    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
+    cell_position_per_cell_per_thread = [zeros(Int32, n_cells) for _ in 1:maxthreadid()]
+    is_in_environment_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
+    cluster_masks_per_thread = [ClusterMasks(; n_genes = max_n_kmeans_gene_points) for _ in 1:maxthreadid()]
+    is_selected_per_gene_per_thread = [Vector{Bool}(undef, n_genes) for _ in 1:maxthreadid()]
+    lateral_cluster_per_gene_per_thread = [Vector{UInt32}(undef, n_genes) for _ in 1:maxthreadid()]
+    z_score_per_max_environment_metacell_per_max_gene_per_thread = [
+        Matrix{kmeans_float_type}(undef, max_n_environment_metacells, max_n_kmeans_gene_points) for _ in 1:maxthreadid()
+    ]
+
+    name_per_block = axis_vector(daf, "block")
+
     parallel_loop_with_rng(
         1:n_blocks;
         rng,
@@ -181,9 +219,10 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         else
             @views module_status_per_gene = module_status_per_gene_per_block[:, block_index]
         end
-        genes_indices_of_anchor_index_per_block[block_index] = compute_block_modules!(
-            daf;
+        genes_indices_of_anchor_index_per_block[block_index] = compute_block_modules!(;
             block_index,
+            name_per_gene,
+            name_per_block,
             max_clusters,
             min_member_correlation,
             min_orphan_correlation,
@@ -191,9 +230,15 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
             min_strong_cells,
             kmeans_rounds,
             kmeans_buffers = kmeans_buffers_per_thread[threadid()],
+            cell_position_per_cell = cell_position_per_cell_per_thread[threadid()],
+            cluster_masks = cluster_masks_per_thread[threadid()],
+            is_in_environment_per_cell = is_in_environment_per_cell_per_thread[threadid()],
+            is_selected_per_gene = is_selected_per_gene_per_thread[threadid()],
+            lateral_cluster_per_gene = lateral_cluster_per_gene_per_thread[threadid()],
+            z_score_per_max_environment_metacell_per_max_gene = z_score_per_max_environment_metacell_per_max_gene_per_thread[threadid()],
             rng,
             module_status_per_gene,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             is_lateral_per_gene,
             is_skeleton_per_gene,
             is_in_environment_per_metacell_per_block,
@@ -248,9 +293,10 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
     return nothing
 end
 
-function compute_block_modules!(
-    daf::DafWriter;
+function compute_block_modules!(;
     block_index::Integer,
+    name_per_gene::AbstractVector{<:AbstractString},
+    name_per_block::AbstractVector{<:AbstractString},
     max_clusters::Integer,
     min_member_correlation::AbstractFloat,
     min_orphan_correlation::AbstractFloat,
@@ -258,9 +304,15 @@ function compute_block_modules!(
     min_strong_cells::Integer,
     kmeans_rounds::Integer,
     kmeans_buffers::Tuple{KMeansBuffers, KMeansBuffers},
+    cell_position_per_cell::AbstractVector{<:Integer},
+    cluster_masks::ClusterMasks,
+    is_in_environment_per_cell::BitVector,
+    is_selected_per_gene::AbstractVector{Bool},
+    lateral_cluster_per_gene::AbstractVector{UInt32},
+    z_score_per_max_environment_metacell_per_max_gene::AbstractMatrix{<:AbstractFloat},
     rng::AbstractRNG,
     module_status_per_gene::Maybe{AbstractVector{<:AbstractString}},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC,
     is_lateral_per_gene::Union{AbstractVector{Bool}, BitVector},
     is_skeleton_per_gene::Union{AbstractVector{Bool}, BitVector},
     is_in_environment_per_metacell_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
@@ -270,10 +322,7 @@ function compute_block_modules!(
     log_fraction_per_metacell_per_gene::AbstractMatrix{<:AbstractFloat},
     metacell_index_per_cell::AbstractVector{<:Integer},
 )::Dict{Int, Vector{Int}}
-    n_genes = axis_length(daf, "gene")
-    name_per_gene = axis_vector(daf, "gene")
-
-    lateral_cluster_per_gene = zeros(UInt32, n_genes)
+    fill!(lateral_cluster_per_gene, 0)
 
     local z_score_per_environment_metacell_per_lateral_cluster
     local is_in_environment_per_metacell
@@ -285,11 +334,11 @@ function compute_block_modules!(
 
         @views is_environment_marker_per_gene = is_environment_marker_per_gene_per_block[:, block_index]
         @assert any(is_environment_marker_per_gene)
-        is_lateral_environment_marker_per_gene = is_environment_marker_per_gene .& is_lateral_per_gene
-        indices_of_lateral_environment_markers = findall(is_lateral_environment_marker_per_gene)
+        is_selected_per_gene .= is_environment_marker_per_gene .& is_lateral_per_gene
+        indices_of_lateral_environment_markers = findall(is_selected_per_gene)
         n_lateral_environment_marker_genes = length(indices_of_lateral_environment_markers)
         if n_lateral_environment_marker_genes == 0
-            block_name = axis_vector(daf, "block")[block_index]
+            block_name = name_per_block[block_index]
             @warn "no lateral environment markers for block $(block_name); not ruling out gene clusters as lateral"
             z_score_per_environment_metacell_per_lateral_cluster =
                 Matrix{Float32}(undef, length(indices_of_environment_metacells), 0)
@@ -312,7 +361,12 @@ function compute_block_modules!(
         )
         @assert_vector(std_log_fraction_per_lateral_environment_marker_gene, n_lateral_environment_marker_genes)
 
-        z_score_per_environment_metacell_per_lateral_environment_marker_gene =
+        @views z_score_per_environment_metacell_per_lateral_environment_marker_gene =
+            z_score_per_max_environment_metacell_per_max_gene[
+                1:length(indices_of_environment_metacells),
+                1:n_lateral_environment_marker_genes,
+            ]
+        z_score_per_environment_metacell_per_lateral_environment_marker_gene .=
             (
                 log_fraction_per_environment_metacell_per_lateral_environment_marker_gene .-
                 transpose(mean_log_fraction_per_lateral_environment_marker_gene)
@@ -346,22 +400,22 @@ function compute_block_modules!(
     local z_score_per_environment_metacell_per_local_gene
 
     flame_timed("local_clusters") do
-        indices_of_environment_cells = findall(
+        is_in_environment_per_cell .=
             (metacell_index_per_cell .> 0) .&
-            getindex.(Ref(is_in_environment_per_metacell), max.(metacell_index_per_cell, 1)),
-        )
+            getindex.(Ref(is_in_environment_per_metacell), max.(metacell_index_per_cell, 1))
+        indices_of_environment_cells = findall(is_in_environment_per_cell)
         n_environment_cells = length(indices_of_environment_cells)
         @assert n_environment_cells > min_strong_cells
 
         @views is_correlated_with_skeletons_in_environment_per_gene =
             is_correlated_with_skeletons_in_environment_per_gene_per_block[:, block_index]
-        is_local_per_gene = is_correlated_with_skeletons_in_environment_per_gene .& .!is_lateral_per_gene
-        indices_of_local_genes = findall(is_local_per_gene)
+        is_selected_per_gene .= is_correlated_with_skeletons_in_environment_per_gene .& .!is_lateral_per_gene
+        indices_of_local_genes = findall(is_selected_per_gene)
         n_local_genes = length(indices_of_local_genes)
 
         is_skeleton_per_local_gene = is_skeleton_per_gene[indices_of_local_genes]  # NOLINT
 
-        log_fraction_per_environment_metacell_per_local_gene =
+        @views log_fraction_per_environment_metacell_per_local_gene =
             log_fraction_per_metacell_per_gene[indices_of_environment_metacells, indices_of_local_genes]
 
         mean_log_fraction_per_local_gene = vec(mean(log_fraction_per_environment_metacell_per_local_gene; dims = 1))  # NOLINT
@@ -376,7 +430,11 @@ function compute_block_modules!(
         )
         @assert_vector(std_log_fraction_per_local_gene, n_local_genes)
 
-        z_score_per_environment_metacell_per_local_gene =
+        @views z_score_per_environment_metacell_per_local_gene = z_score_per_max_environment_metacell_per_max_gene[
+            1:length(indices_of_environment_metacells),
+            1:n_local_genes,
+        ]
+        z_score_per_environment_metacell_per_local_gene .=
             (log_fraction_per_environment_metacell_per_local_gene .- transpose(mean_log_fraction_per_local_gene)) ./
             transpose(std_log_fraction_per_local_gene)
 
@@ -422,10 +480,10 @@ function compute_block_modules!(
             )
             qualifier = ""
             if is_environment_distinct_per_local_gene[local_gene_position]
-                qualifier *= " distinct"
+                qualifier *= ",distinct"
             end
             if is_skeleton_per_local_gene[local_gene_position]
-                qualifier *= " skeleton"
+                qualifier *= ",skeleton"
             end
             if n_lateral_clusters > 0
                 correlation_per_lateral_cluster = zero_cor_between_vector_and_matrix_columns(
@@ -438,9 +496,12 @@ function compute_block_modules!(
                     if qualifier == ""
                         is_lateral_ish_per_local_gene[local_gene_position] = true
                     else
-                        qualifier *= " kept"
+                        qualifier *= ",spared"
                     end
                 end
+            end
+            if module_status_per_gene !== nothing
+                module_status_per_gene[indices_of_local_genes[local_gene_position]] *= qualifier
             end
         end
 
@@ -461,23 +522,33 @@ function compute_block_modules!(
         anchor_local_position_per_cluster = fill(UInt32(0), n_clusters)
         cluster_index_of_anchor_local_position = Dict{UInt32, UInt32}()
 
+        @views is_in_cluster_per_local_gene = cluster_masks.is_in_cluster_per_local_gene[1:n_local_genes]
+        @views is_selected_in_cluster_per_local_gene =
+            cluster_masks.is_selected_in_cluster_per_local_gene[1:n_local_genes]
+        @views is_pertinent_in_cluster_per_local_gene =
+            cluster_masks.is_pertinent_in_cluster_per_local_gene[1:n_local_genes]
+        @views is_correlated_pertinent_in_cluster_per_local_gene =
+            cluster_masks.is_correlated_pertinent_in_cluster_per_local_gene[1:n_local_genes]
+        @views is_uncorrelated_pertinent_in_cluster_per_local_gene =
+            cluster_masks.is_uncorrelated_pertinent_in_cluster_per_local_gene[1:n_local_genes]
+
         for cluster_index in 1:n_clusters
             @views z_score_per_environment_metacell_of_cluster =
                 z_score_per_environment_metacell_per_cluster[:, cluster_index]
-            is_in_cluster_per_local_gene = cluster_index_per_local_gene .== cluster_index
+            is_in_cluster_per_local_gene .= cluster_index_per_local_gene .== cluster_index
             n_cluster_genes = sum(is_in_cluster_per_local_gene)
             if n_cluster_genes == 0
                 # K-means returned a center with no assigned genes; nothing to do for this cluster.
                 continue
             end
-            is_lateral_ish_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_lateral_ish_per_local_gene
+            is_selected_in_cluster_per_local_gene .= is_in_cluster_per_local_gene .& is_lateral_ish_per_local_gene
 
-            cluster_index_per_local_gene[is_lateral_ish_in_cluster_per_local_gene] .= -1
-            is_pertinent_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& .!is_lateral_ish_per_local_gene
+            cluster_index_per_local_gene[is_selected_in_cluster_per_local_gene] .= -1
+            is_pertinent_in_cluster_per_local_gene .= is_in_cluster_per_local_gene .& .!is_lateral_ish_per_local_gene
             n_pertinent_in_cluster_local_genes = sum(is_pertinent_in_cluster_per_local_gene)
 
-            is_skeleton_in_cluster_per_local_gene = is_in_cluster_per_local_gene .& is_skeleton_per_local_gene
-            local_positions_of_skeletons_in_cluster = findall(is_skeleton_in_cluster_per_local_gene)
+            is_selected_in_cluster_per_local_gene .= is_in_cluster_per_local_gene .& is_skeleton_per_local_gene
+            local_positions_of_skeletons_in_cluster = findall(is_selected_in_cluster_per_local_gene)
             n_cluster_skeletons = length(local_positions_of_skeletons_in_cluster)
 
             if n_cluster_skeletons == 0
@@ -488,7 +559,7 @@ function compute_block_modules!(
                 continue
             end
 
-            z_score_per_environment_metacell_per_pertinent_local_gene =
+            @views z_score_per_environment_metacell_per_pertinent_local_gene =
                 z_score_per_environment_metacell_per_local_gene[:, is_pertinent_in_cluster_per_local_gene]
             correlation_with_cluster_per_pertinent_local_gene = zero_cor_between_vector_and_matrix_columns(
                 z_score_per_environment_metacell_of_cluster,
@@ -496,11 +567,11 @@ function compute_block_modules!(
             )
             @assert_vector(correlation_with_cluster_per_pertinent_local_gene, n_pertinent_in_cluster_local_genes)
 
-            is_correlated_pertinent_in_cluster_per_local_gene = zeros(Bool, n_local_genes)
+            is_correlated_pertinent_in_cluster_per_local_gene .= false
             is_correlated_pertinent_in_cluster_per_local_gene[is_pertinent_in_cluster_per_local_gene] .=
                 correlation_with_cluster_per_pertinent_local_gene .>= min_member_correlation
 
-            is_uncorrelated_pertinent_in_cluster_per_local_gene =
+            is_uncorrelated_pertinent_in_cluster_per_local_gene .=
                 is_pertinent_in_cluster_per_local_gene .& .!is_correlated_pertinent_in_cluster_per_local_gene
             cluster_index_per_local_gene[is_uncorrelated_pertinent_in_cluster_per_local_gene] .= 0
 
@@ -553,12 +624,6 @@ function compute_block_modules!(
     end
 
     flame_timed("migrate_between_gene_modules") do
-        # Materialize the environment sub-matrix as a concrete `SparseMatrixCSC` (row-subset copy) rather than a `@views`
-        # sub-array: `sum_sparse_UMIs_per_gene_group_per_cell!` walks its gene columns, and a sparse sub-array is not
-        # itself a `SparseMatrixCSC`. The single row-subset copy is amortized across every cluster and every iteration.
-        UMIs_per_environment_cell_per_gene = UMIs_per_cell_per_gene[indices_of_environment_cells, :]
-        cell_position_per_environment_cell = zeros(Int32, n_environment_cells)
-
         while true
             local_positions_of_anchors = collect(keys(cluster_index_of_anchor_local_position))
             cluster_indices_of_anchors = [
@@ -607,10 +672,10 @@ function compute_block_modules!(
                 zeros(Float32, length(active_cluster_indices), n_environment_cells)
             sum_sparse_UMIs_per_gene_group_per_cell!(
                 cluster_UMIs_per_active_cluster_per_environment_cell,
-                UMIs_per_environment_cell_per_gene,
-                1:n_environment_cells,
+                sparse_UMIs_per_cell_per_gene,
+                indices_of_environment_cells,
                 gene_indices_per_active_cluster,
-                cell_position_per_environment_cell,
+                cell_position_per_cell,
             )
 
             weakest_cluster_index = nothing

@@ -238,7 +238,7 @@
 </li>
 <li>We similarly cluster all the non-lateral genes which are correlated with a skeleton in the environment.
 </li>
-<li>We identify as lateral-ish any of these genes which are more correlated to a center of some lateral cluster than to the center of their own cluster.
+<li>We identify as lateral-ish any of these genes which are more correlated to a center of some lateral cluster than to the center of their own cluster. Such a gene is spared (stays in its cluster) if it is a skeleton or is distinct in the environment.
 </li>
 <li>We then only keep in each cluster the non-lateral-ish genes whose correlation with the center of the cluster is at least 
 <code>min_member_correlation

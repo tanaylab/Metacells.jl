@@ -1175,8 +1175,10 @@
 <pre>
 <code class="language-julia hljs">function compute_metacells_2d_umap!(
     daf::DafWriter;
+    prev_daf::Maybe{DafReader} = nothing,
     min_dist::AbstractFloat = ```0.5```,
     n_neighbors::Integer = ```15```,
+    rng::AbstractRNG = default_rng(),
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -1191,6 +1193,34 @@
 </code>
 </a> by computing a 2D UMAP projection from the Euclidean skeleton fold distance between metacells.
 </p>
+<p>If 
+<code>prev_daf
+</code> (the previous round&#39;s repository over the same cells) is given, the projection is seeded with each metacell&#39;s mean position of the 
+<code>prev_daf
+</code> metacells of its cells, instead of UMAP&#39;s spectral initialization, so successive rounds produce comparable layouts. A metacell all of whose cells were outliers in 
+<code>prev_daf
+</code> has no position to inherit, and is placed at the origin with a slight random offset. The seeded projection is optimized for half as many epochs, since the seed already places the metacells. This requires 
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_per_cell">
+<code>vector_of_metacell_per_cell
+</code>
+</a> in 
+<code>daf
+</code>, and 
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_per_cell">
+<code>vector_of_metacell_per_cell
+</code>
+</a>, 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_x_per_metacell">
+<code>vector_of_umap_x_per_metacell
+</code>
+</a> and 
+<a href="contracts.html#Metacells.Contracts.vector_of_umap_y_per_metacell">
+<code>vector_of_umap_y_per_metacell
+</code>
+</a> in 
+<code>prev_daf
+</code>.
+</p>
 <p>
 <strong>Inputs
 </strong>
@@ -1202,6 +1232,18 @@
 <p>
 <strong>metacell
 </strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (optional): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (optional): The unique metacell each cell belongs to.
 </p>
 <p>
 <strong>Matrices

@@ -26,6 +26,8 @@ using ..Defaults
 import ..AnalyzeModules.maximal_cells_dispersion_of_modules!
 
 import Base.Threads.maxthreadid
+import ProgressMeter.next!
+import ProgressMeter.ProgressUnknown  # NOLINT
 import Random.default_rng
 
 # Needed because of JET:
@@ -3859,17 +3861,19 @@ function fill_type_flow_insertion!(
     return nothing
 end
 
+# How many evaluated moves to lump into a single advance of the progress of the type order search.
+MOVES_PROGRESS_CHUNK = 100
+
 # Improve the `type_per_position` order in place by repeatedly applying the best crossing-reducing move (exchanging the
 # types at two positions, or moving one type to another position), until reaching a local optimum. Returns the local
 # optimum's total weighted crossings. The other vectors are reused scratch buffers.
 function hill_climb_type_flow_order!(
     type_per_position::AbstractVector{Int},
     position_per_type::AbstractVector{Int},
-    candidate_per_position::AbstractVector{Int},
-    best_per_position::AbstractVector{Int},
     base_type_per_edge_per_transition::AbstractVector{Vector{Int}},
     type_per_edge_per_transition::AbstractVector{Vector{Int}},
     n_cells_per_edge_per_transition::AbstractVector{Vector{Float64}},
+    progress::Maybe{ProgressUnknown},
 )::Float64
     n_types = length(type_per_position)
     fill_position_per_type!(position_per_type, type_per_position)
@@ -3880,56 +3884,86 @@ function hill_climb_type_flow_order!(
         n_cells_per_edge_per_transition,
     )
 
+    # The moves to consider, in a fixed order: first exchanging the types at each pair of positions, then moving the
+    # type at each position to each other position.
+    n_swaps = div(n_types * (n_types - 1), 2)
+    n_moves = n_swaps + n_types * (n_types - 1)
+    is_swap_per_move = Vector{Bool}(undef, n_moves)
+    from_position_per_move = Vector{Int}(undef, n_moves)
+    to_position_per_move = Vector{Int}(undef, n_moves)
+    move_index = 0
+    for first_position in 1:(n_types - 1)
+        for second_position in (first_position + 1):n_types
+            move_index += 1
+            is_swap_per_move[move_index] = true
+            from_position_per_move[move_index] = first_position
+            to_position_per_move[move_index] = second_position
+        end
+    end
+    for from_position in 1:n_types
+        for to_position in 1:n_types
+            if from_position != to_position
+                move_index += 1
+                is_swap_per_move[move_index] = false
+                from_position_per_move[move_index] = from_position
+                to_position_per_move[move_index] = to_position
+            end
+        end
+    end
+    @assert move_index == n_moves
+
+    # Each move gets scratch of its own, which is much faster than repeatedly overwriting a single shared buffer.
+    crossings_per_move = Vector{Float64}(undef, n_moves)
+    candidate_per_position_per_move = Matrix{Int}(undef, n_types, n_moves)
+    position_per_type_per_move = Matrix{Int}(undef, n_types, n_moves)
+
     while true
+        # Each move has scratch of its own rather than per-thread scratch, so the threads need not be sticky; this also
+        # avoids the `@threads :static` of the default policy, which may not be nested in the loop over the restarts.
+        parallel_loop_wo_rng(1:n_moves; nested = true, policy = :dynamic) do move_index
+            @views candidate_per_position_of_move = candidate_per_position_per_move[:, move_index]
+            @views position_per_type_of_move = position_per_type_per_move[:, move_index]
+
+            from_position = from_position_per_move[move_index]
+            to_position = to_position_per_move[move_index]
+            if is_swap_per_move[move_index]
+                copyto!(candidate_per_position_of_move, type_per_position)
+                candidate_per_position_of_move[from_position], candidate_per_position_of_move[to_position] =
+                    candidate_per_position_of_move[to_position], candidate_per_position_of_move[from_position]
+            else
+                fill_type_flow_insertion!(candidate_per_position_of_move, type_per_position, from_position, to_position)
+            end
+
+            fill_position_per_type!(position_per_type_of_move, candidate_per_position_of_move)
+            crossings_per_move[move_index] = total_type_flow_crossings(
+                position_per_type_of_move,
+                base_type_per_edge_per_transition,
+                type_per_edge_per_transition,
+                n_cells_per_edge_per_transition,
+            )
+            # Advance the progress in chunks, to avoid locking it for every single evaluated move.
+            if progress !== nothing && move_index % MOVES_PROGRESS_CHUNK == 0
+                next!(progress; step = MOVES_PROGRESS_CHUNK)
+            end
+            return nothing
+        end
+
+        # Pick the best move by scanning them in their fixed order, so ties are broken by the order of the moves.
         best_crossings = current_crossings
-        found_better = false
-
-        for first_position in 1:(n_types - 1)
-            for second_position in (first_position + 1):n_types
-                copyto!(candidate_per_position, type_per_position)
-                candidate_per_position[first_position], candidate_per_position[second_position] =
-                    candidate_per_position[second_position], candidate_per_position[first_position]
-                fill_position_per_type!(position_per_type, candidate_per_position)
-                crossings = total_type_flow_crossings(
-                    position_per_type,
-                    base_type_per_edge_per_transition,
-                    type_per_edge_per_transition,
-                    n_cells_per_edge_per_transition,
-                )
-                if crossings < best_crossings
-                    best_crossings = crossings
-                    copyto!(best_per_position, candidate_per_position)
-                    found_better = true
-                end
+        best_move_index = 0
+        for move_index in 1:n_moves
+            if crossings_per_move[move_index] < best_crossings
+                best_crossings = crossings_per_move[move_index]
+                best_move_index = move_index
             end
         end
 
-        for from_position in 1:n_types
-            for to_position in 1:n_types
-                if from_position != to_position
-                    fill_type_flow_insertion!(candidate_per_position, type_per_position, from_position, to_position)
-                    fill_position_per_type!(position_per_type, candidate_per_position)
-                    crossings = total_type_flow_crossings(
-                        position_per_type,
-                        base_type_per_edge_per_transition,
-                        type_per_edge_per_transition,
-                        n_cells_per_edge_per_transition,
-                    )
-                    if crossings < best_crossings
-                        best_crossings = crossings
-                        copyto!(best_per_position, candidate_per_position)
-                        found_better = true
-                    end
-                end
-            end
-        end
-
-        if found_better
-            copyto!(type_per_position, best_per_position)
-            current_crossings = best_crossings
-        else
+        if best_move_index == 0
             return current_crossings
         end
+
+        @views copyto!(type_per_position, candidate_per_position_per_move[:, best_move_index])
+        current_crossings = best_crossings
     end
 end
 
@@ -3980,8 +4014,11 @@ function compute_global_flow_order_per_type(
     crossings_per_restart = Vector{Float64}(undef, restarts)
     type_per_position_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
     position_per_type_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
-    candidate_per_position_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
-    best_per_position_per_restart = [Vector{Int}(undef, n_types) for _ in 1:restarts]
+
+    # The hill climbing runs for an unknown number of rounds, so the progress is of the moves evaluated so far rather
+    # than of a known total. It is shared by all the restarts, giving a single fine-grained view of the whole search.
+    progress = DebugProgressUnknown(; group = :mcs_loops, desc = "global_flow_order_moves")
+
     parallel_loop_with_rng(1:restarts; rng, name = "compute_global_flow_order_per_type") do restart_index, rng
         type_per_position = type_per_position_per_restart[restart_index]
         if restart_index == 1
@@ -3992,11 +4029,10 @@ function compute_global_flow_order_per_type(
         crossings_per_restart[restart_index] = hill_climb_type_flow_order!(
             type_per_position,
             position_per_type_per_restart[restart_index],
-            candidate_per_position_per_restart[restart_index],
-            best_per_position_per_restart[restart_index],
             base_type_per_edge_per_transition,
             type_per_edge_per_transition,
             n_cells_per_edge_per_transition,
+            progress,
         )
         return nothing
     end
@@ -4007,8 +4043,9 @@ end
 
 """
     compute_vector_of_global_flow_order_per_type!(
-        final_daf::DafWriter,
+        final_daf::DafReader,
         base_daf_per_round::AbstractVector{<:DafReader};
+        output_daf::DafWriter,
         restarts::Integer = 20,
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = false,
@@ -4022,25 +4059,36 @@ The `base_daf_per_round` are the repositories of the earlier rounds (rounds 0 to
 consecutive pair of rounds we read both the [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) and the
 [`matrix_of_n_cells_per_prev_metacell_type_per_metacell_type`](@ref) (the type flow from the previous round, by block type
 and by metacell type) from the later round's repository, that is, from every repository except the first (round 0 has no
-previous round). We minimize the combined (averaged) crossings of both using random-restart hill climbing (`restarts`
-restarts, since the problem is NP-hard) and write the resulting order only into `final_daf`.
+previous round). Each matrix is normalized by its total number of cells, so that the finer by-metacell flow, which has
+many more edges, does not dominate the by-block flow. We minimize the combined (averaged) crossings of both using
+random-restart hill climbing (`restarts` restarts, since the problem is NP-hard) and write the resulting order into
+`output_daf`, which is typically the base repository shared by all the rounds, so that they all see the same order.
 
-The contract below is that of `final_daf`. Each of the other repositories satisfies the same contract, except that the two
-`n_cells` matrices are absent from the first (round 0), and the [`vector_of_global_flow_order_per_type`](@ref) output is
-created only in `final_daf` (the last).
+# Rounds
 
-$(CONTRACT)
+The contract below is that of `final_daf`. Each of the other repositories satisfies the same contract, except that the
+two `n_cells` matrices are absent from the first (round 0).
+
+$(CONTRACT1)
+
+# Order
+
+$(CONTRACT2)
 """
 @logged :mcs_ops @computation Contract(;
     axes = [type_axis(RequiredInput)],
     data = [
         matrix_of_n_cells_per_prev_block_type_per_block_type(RequiredInput),
         matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(RequiredInput),
-        vector_of_global_flow_order_per_type(CreatedOutput),
     ],
+) Contract(;
+    name = "output_daf",
+    axes = [type_axis(RequiredInput)],
+    data = [vector_of_global_flow_order_per_type(CreatedOutput)],
 ) function compute_vector_of_global_flow_order_per_type!(
-    final_daf::DafWriter,
+    final_daf::DafReader,
     base_daf_per_round::AbstractVector{<:DafReader};
+    output_daf::DafWriter,
     restarts::Integer = 20,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
@@ -4053,35 +4101,31 @@ $(CONTRACT)
     for base_daf in base_daf_per_round
         @assert axis_vector(base_daf, "type") == type_names "the types differ between the round repositories"
     end
+    @assert axis_vector(output_daf, "type") == type_names "the types differ between the rounds and the output"
 
     # The order minimizes the total crossings over both the by-block and by-metacell type-flow matrices of each
     # transition, which (up to a constant factor) is the average of the two.
+    #
+    # Both matrices of a transition count all the same cells, so they contribute crossings at the same scale and
+    # neither needs to be weighted against the other.
     n_cells_per_prev_type_per_type_per_transition = AbstractMatrix{<:Real}[]
-    for round_index in 2:n_rounds
-        base_daf = base_daf_per_round[round_index]
-        @assert has_matrix(base_daf, "type", "type", "n_cells_by_block") "missing the n_cells_by_block matrix"
-        @assert has_matrix(base_daf, "type", "type", "n_cells_by_metacell") "missing the n_cells_by_metacell matrix"
-        push!(
-            n_cells_per_prev_type_per_type_per_transition,
-            get_matrix(base_daf, "type", "type", "n_cells_by_block").array,
-        )
-        push!(
-            n_cells_per_prev_type_per_type_per_transition,
-            get_matrix(base_daf, "type", "type", "n_cells_by_metacell").array,
-        )
+
+    function push_type_flow!(daf::DafReader, name::AbstractString)::Nothing
+        @assert has_matrix(daf, "type", "type", name) "missing the $(name) matrix"
+        push!(n_cells_per_prev_type_per_type_per_transition, get_matrix(daf, "type", "type", name).array)
+        return nothing
     end
-    push!(
-        n_cells_per_prev_type_per_type_per_transition,
-        get_matrix(final_daf, "type", "type", "n_cells_by_block").array,
-    )
-    push!(
-        n_cells_per_prev_type_per_type_per_transition,
-        get_matrix(final_daf, "type", "type", "n_cells_by_metacell").array,
-    )
+
+    for round_index in 2:n_rounds
+        push_type_flow!(base_daf_per_round[round_index], "n_cells_by_block")
+        push_type_flow!(base_daf_per_round[round_index], "n_cells_by_metacell")
+    end
+    push_type_flow!(final_daf, "n_cells_by_block")
+    push_type_flow!(final_daf, "n_cells_by_metacell")
 
     global_flow_order_per_type =
         compute_global_flow_order_per_type(n_cells_per_prev_type_per_type_per_transition; restarts, rng)
-    set_vector!(final_daf, "type", "global_flow_order", UInt32.(global_flow_order_per_type); overwrite)
+    set_vector!(output_daf, "type", "global_flow_order", UInt32.(global_flow_order_per_type); overwrite)
 
     return nothing
 end

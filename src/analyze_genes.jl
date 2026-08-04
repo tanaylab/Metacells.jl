@@ -32,7 +32,6 @@ import Random.default_rng
 import Metacells.Contracts.base_block_axis
 import Metacells.Contracts.gene_axis
 import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block
-import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
@@ -576,30 +575,28 @@ end
         base_daf::Maybe{DafReader} = nothing,
     )::DataFrame
 
-Return a per-marker-gene report as a `DataFrame`, one row per marker gene, sorted by `marker_rank`. Its columns are:
+Return a per-marker-gene report as a `DataFrame`, one row per marker gene, sorted by `rank`. Its columns are:
 
   - `gene` - the gene name.
-  - `marker_rank` - the gene's rank as a marker (`1` being the most significant; see
+  - `rank` - the gene's rank as a marker (`1` being the most significant; see
     [`vector_of_marker_rank_per_gene`](@ref)).
-  - `is_lateral`, `is_tf`, `is_regulator`, `is_skeleton` - whether the gene is lateral, a transcription factor, a
-    regulator, or a skeleton gene.
-  - `top_marker` and `top_marker_cor`, `top_lateral` and `top_lateral_cor`, `top_regulator` and `top_regulator_cor`,
-    `top_skeleton` and `top_skeleton_cor` - the most correlated marker / lateral / regulator / skeleton gene (other than
-    the gene itself) and that correlation, from [`matrix_of_correlation_between_markers_per_gene_per_gene`](@ref). Since
-    only markers are correlated, e.g. `top_lateral` is the most correlated lateral *marker*. An empty set (e.g. no
-    regulators) yields an empty name and a zero correlation.
+  - `lat?`, `tf?`, `reg?`, `skl?` - whether the gene is lateral, a transcription factor, a regulator, or a skeleton gene.
+  - `mrk` and `mrk_c`, `lat` and `lat_c`, `reg` and `reg_c`, `skl` and `skl_c` - the most correlated marker / lateral /
+    regulator / skeleton gene (other than the gene itself) and that correlation, from
+    [`matrix_of_correlation_between_markers_per_gene_per_gene`](@ref). Since only markers are correlated, e.g. `lat` is
+    the most correlated lateral *marker*. An empty set (e.g. no regulators) yields an empty name and a zero correlation.
 
-When `base_daf` (the round-0 model) is given, six more columns compare each gene's base-neighborhood correlation in `daf`
-against `base_daf`, over the base blocks where the gene is scored (has a non-zero correlation) at round 0, for the
-punctuated (`punct_*`) and projected-punctuated (`proj_punct_*`) correlations:
+When `base_daf` (the round-0 model) is given, three more columns compare each gene's projected-punctuated
+base-neighborhood correlation in `daf` against `base_daf`, over the base blocks where the gene is scored (has a non-zero
+correlation) at round 0:
 
-  - `punct_Δ`, `proj_punct_Δ` - the mean change (`Δ`) in the correlation from `base_daf`.
-  - `punct_++`, `proj_punct_++` - the fraction of the base blocks where the correlation significantly improved
-    (increased by at least `0.05`).
-  - `punct_--`, `proj_punct_--` - the fraction of the base blocks where the correlation significantly degraded
-    (decreased by at least `0.05`).
+  - `delta` - the mean change in the correlation from `base_daf`.
+  - `imp_f` - the fraction of the base blocks where the correlation significantly improved (increased by at least
+    `0.05`).
+  - `deg_f` - the fraction of the base blocks where the correlation significantly degraded (decreased by at least
+    `0.05`).
 
-These six columns are omitted when `base_daf` is `nothing` (that is, when `daf` is itself the round-0 model).
+These three columns are omitted when `base_daf` is `nothing` (that is, when `daf` is itself the round-0 model).
 
 $(CONTRACT)
 """
@@ -614,9 +611,6 @@ $(CONTRACT)
         vector_of_is_regulator_per_gene(RequiredInput),
         vector_of_is_skeleton_per_gene(RequiredInput),
         matrix_of_correlation_between_markers_per_gene_per_gene(RequiredInput),
-        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
-            OptionalInput,
-        ),
         matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block(
             OptionalInput,
         ),
@@ -636,70 +630,61 @@ $(CONTRACT)
     correlation_per_marker_per_marker =
         Matrix{Float32}(correlation_per_gene_per_gene[indices_of_markers, indices_of_markers])
 
-    top_marker, top_marker_cor = most_correlated_gene_in_set_per_marker(
+    top_marker, top_marker_correlation = most_correlated_gene_in_set_per_marker(
         correlation_per_marker_per_marker,
         gene_name_per_marker,
         indices_of_markers,
         is_marker_per_gene,
     )
-    top_lateral, top_lateral_cor = most_correlated_gene_in_set_per_marker(
+    top_lateral, top_lateral_correlation = most_correlated_gene_in_set_per_marker(
         correlation_per_marker_per_marker,
         gene_name_per_marker,
         indices_of_markers,
         is_lateral_per_gene,
     )
-    top_regulator, top_regulator_cor = most_correlated_gene_in_set_per_marker(
+    top_regulator, top_regulator_correlation = most_correlated_gene_in_set_per_marker(
         correlation_per_marker_per_marker,
         gene_name_per_marker,
         indices_of_markers,
         is_regulator_per_gene,
     )
-    top_skeleton, top_skeleton_cor = most_correlated_gene_in_set_per_marker(
+    top_skeleton, top_skeleton_correlation = most_correlated_gene_in_set_per_marker(
         correlation_per_marker_per_marker,
         gene_name_per_marker,
         indices_of_markers,
         is_skeleton_per_gene,
     )
 
-    data_frame = DataFrame(;
-        gene = gene_name_per_marker,
-        marker_rank = get_vector(daf, "gene", "marker_rank").array[indices_of_markers],
-        is_lateral = is_lateral_per_gene[indices_of_markers],
-        is_tf = is_transcription_factor_per_gene[indices_of_markers],
-        is_regulator = is_regulator_per_gene[indices_of_markers],
-        is_skeleton = is_skeleton_per_gene[indices_of_markers],
-        top_marker,
-        top_marker_cor,
-        top_lateral,
-        top_lateral_cor,
-        top_regulator,
-        top_regulator_cor,
-        top_skeleton,
-        top_skeleton_cor,
+    data_frame = DataFrame(
+        "gene" => gene_name_per_marker,
+        "rank" => get_vector(daf, "gene", "marker_rank").array[indices_of_markers],
+        "lat?" => is_lateral_per_gene[indices_of_markers],
+        "tf?" => is_transcription_factor_per_gene[indices_of_markers],
+        "reg?" => is_regulator_per_gene[indices_of_markers],
+        "skl?" => is_skeleton_per_gene[indices_of_markers],
+        "mrk" => top_marker,
+        "mrk_c" => top_marker_correlation,
+        "lat" => top_lateral,
+        "lat_c" => top_lateral_correlation,
+        "reg" => top_regulator,
+        "reg_c" => top_regulator_correlation,
+        "skl" => top_skeleton,
+        "skl_c" => top_skeleton_correlation,
     )
 
     if base_daf !== nothing
-        punct_delta, punct_better, punct_worse = correlation_change_per_marker(
-            daf,
-            base_daf,
-            "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
-            indices_of_markers,
-        )
-        data_frame[!, "punct_Δ"] = punct_delta
-        data_frame[!, "punct_++"] = punct_better
-        data_frame[!, "punct_--"] = punct_worse
-        proj_punct_delta, proj_punct_better, proj_punct_worse = correlation_change_per_marker(
+        delta_per_marker, improved_per_marker, degraded_per_marker = correlation_change_per_marker(
             daf,
             base_daf,
             "correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells",
             indices_of_markers,
         )
-        data_frame[!, "proj_punct_Δ"] = proj_punct_delta
-        data_frame[!, "proj_punct_++"] = proj_punct_better
-        data_frame[!, "proj_punct_--"] = proj_punct_worse
+        data_frame[!, "delta"] = delta_per_marker
+        data_frame[!, "imp_f"] = improved_per_marker
+        data_frame[!, "deg_f"] = degraded_per_marker
     end
 
-    sort!(data_frame, :marker_rank)
+    sort!(data_frame, "rank")
     return data_frame
 end
 
@@ -797,21 +782,19 @@ Return a per-skeleton-gene report as a `DataFrame`, one row per skeleton gene, s
 correlated with it (descending). Each marker gene is assigned to the single skeleton gene it is most correlated with
 (from [`matrix_of_correlation_between_markers_per_gene_per_gene`](@ref), excluding itself), and split into lateral
 (`lat`) markers and pertinent (`pert`, non-lateral) markers. Apart from the `gene` (skeleton name) column, every
-statistic is emitted as a `lat_<name>`, `lat_<name>_f`, `pert_<name>` trio - the lateral value, its fraction of the
+statistic is emitted as a `lat_<name>`, `lat_<name>_r`, `pert_<name>` trio - the lateral value, its ratio out of the
 lateral-plus-pertinent total, and the pertinent value. The statistics are:
 
   - `#` - the number of markers most correlated with this skeleton.
 
-When `base_daf` (the round-0 model) is given, four more statistics per each of the punctuated (`punct`) and
-projected-punctuated (`proj_punct`) base-neighborhood correlations aggregate the [`compute_gene_report`](@ref) values of
-those markers - where each marker's delta correlation (`Δ`) is the mean over its base blocks (with a non-zero round-0
-correlation) of `round_N - round_0`, and `++` / `--` are the fractions of its base blocks that significantly improved /
-degraded (by at least `0.05`):
+When `base_daf` (the round-0 model) is given, three more statistics aggregate the [`compute_gene_report`](@ref)
+projected-punctuated values of those markers - where each marker's `delta` correlation is the mean over its base blocks
+(with a non-zero round-0 correlation) of `round_N - round_0`, and `imp_f` / `deg_f` are the fractions of its base blocks
+that significantly improved / degraded (by at least `0.05`):
 
-  - `<corr>_++` - the mean (`μ`) of the markers' improved fractions.
-  - `<corr>_--` - the mean of the markers' degraded fractions.
-  - `<corr>_μΔ` - the mean of the markers' delta correlations.
-  - `<corr>_ΣΔ` - the sum (`Σ`) of the markers' delta correlations.
+  - `imp_f` - the mean of the markers' improved fractions.
+  - `deg_f` - the mean of the markers' degraded fractions.
+  - `delta` - the mean of the markers' delta correlations.
 
 These comparison statistics are omitted when `base_daf` is `nothing`.
 
@@ -825,9 +808,6 @@ $(CONTRACT)
         vector_of_is_skeleton_per_gene(RequiredInput),
         vector_of_is_lateral_per_gene(RequiredInput),
         matrix_of_correlation_between_markers_per_gene_per_gene(RequiredInput),
-        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
-            OptionalInput,
-        ),
         matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block(
             OptionalInput,
         ),
@@ -870,24 +850,14 @@ $(CONTRACT)
         top_skeleton_per_marker[marker_position] = best_skeleton_position
     end
 
-    change_per_marker_per_correlation = nothing
+    change_per_marker = nothing
     if base_daf !== nothing
-        punct_delta, punct_imp, punct_deg = correlation_change_per_marker(
-            daf,
-            base_daf,
-            "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
-            indices_of_markers,
-        )
-        proj_punct_delta, proj_punct_imp, proj_punct_deg = correlation_change_per_marker(
+        change_per_marker = correlation_change_per_marker(
             daf,
             base_daf,
             "correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells",
             indices_of_markers,
         )
-        change_per_marker_per_correlation = [
-            ("punct", punct_delta, punct_imp, punct_deg),
-            ("proj_punct", proj_punct_delta, proj_punct_imp, proj_punct_deg),
-        ]
     end
 
     lateral_count_per_skeleton = zeros(Int, n_skeletons)
@@ -905,44 +875,23 @@ $(CONTRACT)
     data_frame = DataFrame(; gene = gene_name_per_gene[indices_of_skeletons])
     add_skeleton_trio!(data_frame, "#", lateral_count_per_skeleton, pertinent_count_per_skeleton)
 
-    # Each statistic is a `lat_<name>`, `lat_<name>_f`, `pert_<name>` trio (the lateral value, its fraction of the total,
-    # and the pertinent value). Over the grouped markers it aggregates the gene report's per-marker values: the mean
-    # (`μ`) of the improved (`++`) and degraded (`--`) base-block fractions and of the delta correlation (`μΔ`), and the
-    # sum (`Σ`) of the delta correlations (`ΣΔ`).
-    if change_per_marker_per_correlation !== nothing
-        for (correlation_name, delta_per_marker, imp_per_marker, deg_per_marker) in change_per_marker_per_correlation
-            lateral_sum_imp =
-                sum_per_skeleton(top_skeleton_per_marker, is_lateral_per_marker, imp_per_marker, n_skeletons)
-            pertinent_sum_imp =
-                sum_per_skeleton(top_skeleton_per_marker, .!is_lateral_per_marker, imp_per_marker, n_skeletons)
-            lateral_sum_deg =
-                sum_per_skeleton(top_skeleton_per_marker, is_lateral_per_marker, deg_per_marker, n_skeletons)
-            pertinent_sum_deg =
-                sum_per_skeleton(top_skeleton_per_marker, .!is_lateral_per_marker, deg_per_marker, n_skeletons)
-            lateral_sum_delta =
-                sum_per_skeleton(top_skeleton_per_marker, is_lateral_per_marker, delta_per_marker, n_skeletons)
-            pertinent_sum_delta =
-                sum_per_skeleton(top_skeleton_per_marker, .!is_lateral_per_marker, delta_per_marker, n_skeletons)
-
+    # Each statistic is a `lat_<name>`, `lat_<name>_r`, `pert_<name>` trio (the lateral value, its ratio out of the
+    # total, and the pertinent value). Over the grouped markers it aggregates the gene report's per-marker values: the
+    # mean of the improved (`imp_f`) and degraded (`deg_f`) base-block fractions and of the `delta` correlation.
+    if change_per_marker !== nothing
+        delta_per_marker, improved_per_marker, degraded_per_marker = change_per_marker
+        for (statistic_name, value_per_marker) in
+            (("imp_f", improved_per_marker), ("deg_f", degraded_per_marker), ("delta", delta_per_marker))
+            lateral_sum_per_skeleton =
+                sum_per_skeleton(top_skeleton_per_marker, is_lateral_per_marker, value_per_marker, n_skeletons)
+            pertinent_sum_per_skeleton =
+                sum_per_skeleton(top_skeleton_per_marker, .!is_lateral_per_marker, value_per_marker, n_skeletons)
             add_skeleton_trio!(
                 data_frame,
-                "$(correlation_name)_++",
-                mean_per_skeleton(lateral_sum_imp, lateral_count_per_skeleton),
-                mean_per_skeleton(pertinent_sum_imp, pertinent_count_per_skeleton),
+                statistic_name,
+                mean_per_skeleton(lateral_sum_per_skeleton, lateral_count_per_skeleton),
+                mean_per_skeleton(pertinent_sum_per_skeleton, pertinent_count_per_skeleton),
             )
-            add_skeleton_trio!(
-                data_frame,
-                "$(correlation_name)_--",
-                mean_per_skeleton(lateral_sum_deg, lateral_count_per_skeleton),
-                mean_per_skeleton(pertinent_sum_deg, pertinent_count_per_skeleton),
-            )
-            add_skeleton_trio!(
-                data_frame,
-                "$(correlation_name)_μΔ",
-                mean_per_skeleton(lateral_sum_delta, lateral_count_per_skeleton),
-                mean_per_skeleton(pertinent_sum_delta, pertinent_count_per_skeleton),
-            )
-            add_skeleton_trio!(data_frame, "$(correlation_name)_ΣΔ", lateral_sum_delta, pertinent_sum_delta)
         end
     end
 
@@ -978,7 +927,7 @@ function mean_per_skeleton(
     ]
 end
 
-# Add a `lat_<name>`, `lat_<name>_f` (the lateral value's fraction of the lateral-plus-pertinent total), `pert_<name>`
+# Add a `lat_<name>`, `lat_<name>_r` (the lateral value's ratio out of the lateral-plus-pertinent total), `pert_<name>`
 # trio of columns to the report.
 function add_skeleton_trio!(
     data_frame::DataFrame,
@@ -988,7 +937,7 @@ function add_skeleton_trio!(
 )::Nothing
     n_skeletons = length(lateral_per_skeleton)
     data_frame[!, "lat_$(name)"] = lateral_per_skeleton
-    data_frame[!, "lat_$(name)_f"] = [
+    data_frame[!, "lat_$(name)_r"] = [
         if lateral_per_skeleton[skeleton] + pertinent_per_skeleton[skeleton] != 0
             lateral_per_skeleton[skeleton] / (lateral_per_skeleton[skeleton] + pertinent_per_skeleton[skeleton])
         else

@@ -68,6 +68,11 @@ METACELL_VECTORS_DATA = CopyAnnData([
     "similar" => ("is_similar", false),
     "grouped" => ("n_cell", UInt32(0)),
     "type" => ("type", nothing),
+    "u" => ("umap_u", nothing),
+    "v" => ("umap_v", nothing),
+    "w" => ("umap_w", nothing),
+    "x" => ("umap_x", nothing),
+    "y" => ("umap_y", nothing),
     "*" => ("=", nothing),
 ])
 
@@ -268,6 +273,7 @@ Per-metacell:
 
   - The `metacells_level` property is renamed to `level`.
   - The `similar` property is renamed to `is_similar`.
+  - The `u`, `v`, `w`, `x` and `y` UMAP coordinates are renamed to `umap_u`, `umap_v`, `umap_w`, `umap_x` and `umap_y`.
   - The `type` property is copied. If "the" type property of the metacells is different, use `copy_data` to rename
     it to `type` to match the `Daf` naming convention.
   - All other vectors are copied as-is.
@@ -416,9 +422,17 @@ aren't actually used in the data, you will have to specify a default value for a
         data_frame = CSV.read(type_colors_csv, DataFrame)  # NOJET
         names = data_frame[:, type_property]
         colors = data_frame[:, "color"]
-        add_axis!(daf, type_axis, names)
+        if has_axis(daf, "type")
+            @assert Set(axis_vector(daf, "type")) == Set(names)
+        else
+            add_axis!(daf, type_axis, names)
+        end
         @debug "set $(type_axis) vector: color" _group = :mcs_details
-        set_vector!(daf, type_axis, "color", colors)
+        if has_vector(daf, type_axis, "color")
+            @assert get_vector(daf, type_axis, "color").array == colors
+        else
+            set_vector!(daf, type_axis, "color", colors)
+        end
         delete_vector!(daf, "metacell", "color"; must_exist = false)
         delete_vector!(daf, "cell", "color"; must_exist = false)
     end
