@@ -665,7 +665,7 @@
     base_axis::AbstractString = ```&quot;metacell&quot;```,
     type_property::AbstractString = ```&quot;type&quot;```,
     type_axis::AbstractString = ```&quot;type&quot;```,
-    empty_type::Maybe{AbstractString} = ```nothing```,
+    empty_type::Maybe{EmptyImplicit} = ```nothing```,
     type_colors_csv::Maybe{AbstractString} = ```nothing```,
     implicit_properties::Maybe{AbstractSet{&lt;:AbstractString}} = ```nothing```,
     skipped_properties::Maybe{AbstractSet{&lt;:AbstractString}} = ```2 x Str (Set)```,
@@ -683,11 +683,15 @@
 <code>type_axis
 </code> parameters.
 </p>
-<p>If the type is equal to 
+<p>If the type is one of the 
 <code>empty_type
-</code> it is replaced with the empty string to match the 
+</code> values it is replaced with the empty string to match the 
 <code>Daf
-</code> conventions for &quot;no value&quot; for string properties. Any set of per-gene properties named 
+</code> conventions for &quot;no value&quot; for string properties. This may be a single value or any collection of them, since data often spells &quot;there is no type here&quot; in more than one way (e.g., both 
+<code>Outliers
+</code> and 
+<code>Doublet
+</code> may appear where a type is expected). Any set of per-gene properties named 
 <code>something_gene_of_type
 </code> is converted to a per-gene-per-type matrix called 
 <code>is_something

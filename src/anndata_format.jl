@@ -376,7 +376,7 @@ end
         base_axis::AbstractString = $(DEFAULT.base_axis),
         type_property::AbstractString = $(DEFAULT.type_property),
         type_axis::AbstractString = $(DEFAULT.type_axis),
-        empty_type::Maybe{AbstractString} = $(DEFAULT.empty_type),
+        empty_type::Maybe{EmptyImplicit} = $(DEFAULT.empty_type),
         type_colors_csv::Maybe{AbstractString} = $(DEFAULT.type_colors_csv),
         implicit_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.implicit_properties),
         skipped_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.skipped_properties),
@@ -391,8 +391,9 @@ By default this assumes that you have imported "the" type annotation to a proper
 like the new type axis to be called "type" as well. If you want to import secondary types (or per-cell types), change
 these via the `type_property` and `type_axis` parameters.
 
-If the type is equal to `empty_type` it is replaced with the empty string to match the `Daf` conventions for "no value"
-for string properties. Any set of per-gene properties named `something_gene_of_type` is converted to a per-gene-per-type
+If the type is one of the `empty_type` values it is replaced with the empty string to match the `Daf` conventions for
+"no value" for string properties. This may be a single value or any collection of them, since data often spells "there
+is no type here" in more than one way (e.g., both `Outliers` and `Doublet` may appear where a type is expected). Any set of per-gene properties named `something_gene_of_type` is converted to a per-gene-per-type
 matrix called `is_something` (with a default of `false`).
 
 Otherwise, this is mostly just a wrapper for `reconstruct_axis!`. It can be further enhanced by specifying a
@@ -412,7 +413,7 @@ aren't actually used in the data, you will have to specify a default value for a
     base_axis::AbstractString = "metacell",
     type_property::AbstractString = "type",
     type_axis::AbstractString = "type",
-    empty_type::Maybe{AbstractString} = nothing,
+    empty_type::Maybe{EmptyImplicit} = nothing,
     type_colors_csv::Maybe{AbstractString} = nothing,
     implicit_properties::Maybe{AbstractSet{<:AbstractString}} = nothing,
     skipped_properties::Maybe{AbstractSet{<:AbstractString}} = Set(["rare_gene_module", "is_rare"]),
