@@ -19,14 +19,15 @@ The expected flow is as follows:
     data typically goes into the metacells `h5ad`), import it into the chained (metacells) repository using
     [`import_cells_h5ad!`](@ref).
 
-  - Create a type axis in the chained metacells `Daf` repository using [`reconstruct_type_axis!`](@ref).
+  - Any per-gene masks which name a type, which a metacells `h5ad` may hold, become a per-gene-per-type matrix
+    using [`import_gene_masks_per_type!`](@ref).
 """
 module AnnDataFormat
 
 export CopyAnnData
 export import_cells_h5ad!
+export import_gene_masks_per_type!
 export import_metacells_h5ad!
-export reconstruct_type_axis!
 
 using CSV
 using DataAxesFormats
@@ -98,6 +99,8 @@ METACELL_SQUARE_DATA = CopyAnnData(["obs_outgoing_weights" => ("outgoing_weights
         daf::DafWriter;
         cells_h5ad::AbstractString,
         copy_data::Maybe{CopyAnnData} = $(DEFAULT.copy_data),
+        type_colors_csv::Maybe{AbstractString} = $(DEFAULT.type_colors_csv),
+        empty_type::Maybe{EmptyImplicit} = $(DEFAULT.empty_type),
         bestify::Bool = $(DEFAULT.bestify),
         min_sparse_saving_fraction::AbstractFloat = $(DEFAULT.min_sparse_saving_fraction),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -155,6 +158,18 @@ Per-cell:
     not copied. To import these, use [`import_metacells_h5ad!`](@ref).
   - All other vectors are copied as-is.
 
+If a `type_colors_csv` is given, a `type` axis is created from it. The file must have exactly two columns: the types,
+under whatever name, and then a column named `color`. The types are taken in the order they are listed in, which is
+typically a meaningful one, and their colors are stored as a per-type `color` property. The file is the authority on
+which types exist: it may list types no cell has, but a cell whose type it does not list is an error, in one or the
+other of them.
+
+This needs a per-cell `type` property to have been imported, which usually means saying so in the `copy_data`, the
+column holding it rarely being called `type`. Data often spells "this cell has no type" as a value of its own -
+`Outliers`, `Doublet`, and the like - and which values those are depends on the data set; list them as the
+`empty_type` and they become the empty string, which is how `Daf` spells "no value". They are the only values exempt
+from having to appear in the CSV.
+
 !!! note
 
     It is common to manually call `reconstruct_axis!` on the result to create additional axes (e.g., if the cells were
@@ -164,11 +179,17 @@ Per-cell:
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = nothing,
+    type_colors_csv::Maybe{AbstractString} = nothing,
+    empty_type::Maybe{EmptyImplicit} = nothing,
     bestify::Bool = true,
     min_sparse_saving_fraction::AbstractFloat = function_default(copy_matrix!, :min_sparse_saving_fraction),
     overwrite::Bool = false,
     insist::Bool = false,
 )::Nothing
+    if empty_type !== nothing && type_colors_csv === nothing
+        error("specified an empty_type without a type_colors_csv, so there are no types for it to be empty of")
+    end
+
     cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")  # NOJET
 
     copy_axis!(; destination = daf, source = cells_daf, axis = "cell", overwrite, insist)
@@ -223,6 +244,10 @@ Per-cell:
         overwrite,
         insist,
     )
+
+    if type_colors_csv !== nothing
+        import_type_colors_csv(daf, type_colors_csv, empty_type, overwrite)
+    end
 
     return nothing
 end
@@ -371,83 +396,23 @@ Per-metacell-per-metacell:
 end
 
 """
-    reconstruct_type!(
+    import_gene_masks_per_type!(
         daf::DafWriter;
-        base_axis::AbstractString = $(DEFAULT.base_axis),
-        type_property::AbstractString = $(DEFAULT.type_property),
         type_axis::AbstractString = $(DEFAULT.type_axis),
-        empty_type::Maybe{EmptyImplicit} = $(DEFAULT.empty_type),
-        type_colors_csv::Maybe{AbstractString} = $(DEFAULT.type_colors_csv),
-        implicit_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.implicit_properties),
-        skipped_properties::Maybe{AbstractSet{<:AbstractString}} = $(DEFAULT.skipped_properties),
-        properties_defaults::Maybe{Dict} = $(DEFAULT.properties_defaults),
     )::Nothing
 
-Create a type axis after importing data containing type annotations. By default this will look for a type per metacell,
-but if you have type annotation per cell (which is **not** simply the type of the metacell they belong to), you can also
-use this for the cells.
+Convert per-gene masks which name a type in their own name into a per-gene-per-type matrix. `AnnData` has only the two
+axes, so a mask of genes per type has to be spelled as one property per type: `something_gene_of_Bcell`,
+`something_gene_of_Tcell`, and so on. Each such set becomes a single `is_something` matrix of genes by types (with a
+default of `false`), which is what it was all along.
 
-By default this assumes that you have imported "the" type annotation to a property called "type", and that you would
-like the new type axis to be called "type" as well. If you want to import secondary types (or per-cell types), change
-these via the `type_property` and `type_axis` parameters.
-
-If the type is one of the `empty_type` values it is replaced with the empty string to match the `Daf` conventions for
-"no value" for string properties. This may be a single value or any collection of them, since data often spells "there
-is no type here" in more than one way (e.g., both `Outliers` and `Doublet` may appear where a type is expected). Any set of per-gene properties named `something_gene_of_type` is converted to a per-gene-per-type
-matrix called `is_something` (with a default of `false`).
-
-Otherwise, this is mostly just a wrapper for `reconstruct_axis!`. It can be further enhanced by specifying a
-`type_colors_csv` file mapping type names to colors. This should be a comma or tab separated file containing at least
-two columns, one named "color" and one with the same name as the `type_property`. If this CSV file contains types that
-aren't actually used in the data, you will have to specify a default value for any other per-type property in
-`properties_defaults`.
-
-!!! note
-
-    Most metacells data has type annotations and colors associated with types, so it is highly recommended you invoke
-    this to capture these into the `Daf` repository. This will enable all types (:-) of downstream processing, coloring
-    graphs, etc.
+The `type_axis` must exist, since it says which types there are; a type with no mask property simply has no genes in
+it. In practice these masks come in a metacells `h5ad` rather than a cells one.
 """
-@logged :mcs_ops @documented function reconstruct_type_axis!(
+@logged :mcs_ops @documented function import_gene_masks_per_type!(
     daf::DafWriter;
-    base_axis::AbstractString = "metacell",
-    type_property::AbstractString = "type",
     type_axis::AbstractString = "type",
-    empty_type::Maybe{EmptyImplicit} = nothing,
-    type_colors_csv::Maybe{AbstractString} = nothing,
-    implicit_properties::Maybe{AbstractSet{<:AbstractString}} = nothing,
-    skipped_properties::Maybe{AbstractSet{<:AbstractString}} = Set(["rare_gene_module", "is_rare"]),
-    properties_defaults::Maybe{Dict} = nothing,
 )::Nothing
-    if type_colors_csv !== nothing
-        data_frame = CSV.read(type_colors_csv, DataFrame)  # NOJET
-        names = data_frame[:, type_property]
-        colors = data_frame[:, "color"]
-        if has_axis(daf, "type")
-            @assert Set(axis_vector(daf, "type")) == Set(names)
-        else
-            add_axis!(daf, type_axis, names)
-        end
-        @debug "set $(type_axis) vector: color" _group = :mcs_details
-        if has_vector(daf, type_axis, "color")
-            @assert get_vector(daf, type_axis, "color").array == colors
-        else
-            set_vector!(daf, type_axis, "color", colors)
-        end
-        delete_vector!(daf, "metacell", "color"; must_exist = false)
-        delete_vector!(daf, "cell", "color"; must_exist = false)
-    end
-
-    reconstruct_axis!(
-        daf;
-        existing_axis = base_axis,
-        implicit_axis = type_axis,
-        empty_implicit = empty_type,
-        implicit_properties,
-        skipped_properties,
-        properties_defaults,
-    )
-
     type_names = axis_vector(daf, type_axis)
 
     prefixes = Set{AbstractString}()
@@ -485,6 +450,68 @@ function import_mask_matrix(
     mask_matrix::SparseMatrixCSC{Bool} = hcat(mask_vectors...)  # NOJET
     @debug "reconstruct gene-$(type_axis) matrix: is_$(prefix)" _group = :mcs_details
     set_matrix!(daf, "gene", type_axis, "is_$(prefix)", bestify(mask_matrix); relayout = true, overwrite = true)  # NOJET
+
+    return nothing
+end
+
+# Create the type axis out of the CSV, which is the authority on which types there are, what they are called and in
+# what order they are listed. The data only says which cells have which type, and is checked against the CSV rather
+# than allowed to add to it: a type in the data and not in the CSV is a mistake in one of them, and saying which is
+# more useful than silently accepting either.
+function import_type_colors_csv(
+    daf::DafWriter,
+    type_colors_csv::AbstractString,
+    empty_type::Maybe{EmptyImplicit},
+    overwrite::Bool,
+)::Nothing
+    data_frame = CSV.read(type_colors_csv, DataFrame)  # NOJET
+    column_names = names(data_frame)
+    if length(column_names) != 2 || column_names[2] != "color"
+        error(chomp("""
+            expected two columns, the types and then "color": $(join(column_names, ", "))
+            in the type colors csv: $(type_colors_csv)
+            """))
+    end
+
+    type_names = string.(data_frame[:, 1])
+    colors = string.(data_frame[:, 2])
+
+    seen_type_names = Set{AbstractString}()
+    repeated_type_names = AbstractString[]
+    for type_name in type_names
+        if type_name in seen_type_names
+            push!(repeated_type_names, type_name)
+        else
+            push!(seen_type_names, type_name)
+        end
+    end
+    if !isempty(repeated_type_names)
+        error(chomp("""
+            repeated type(s): $(join(unique(repeated_type_names), ", "))
+            in the type colors csv: $(type_colors_csv)
+            """))
+    end
+
+    # Whatever the data spells "this cell has no type" as - `Outliers`, `Doublet`, and so on - becomes the empty string
+    # `Daf` uses for "no value". Which values those are is a property of the data set, so it has to be said rather than
+    # guessed at, and they are the only values exempt from being listed in the CSV.
+    empty_types = Reconstruction.set_of_empty_implicit(empty_type)
+    type_per_cell =
+        [type_name in empty_types ? "" : string(type_name) for type_name in get_vector(daf, "cell", "type").array]
+
+    unlisted_type_names =
+        [type_name for type_name in unique(type_per_cell) if type_name != "" && !(type_name in seen_type_names)]
+    if !isempty(unlisted_type_names)
+        error(chomp("""
+            type(s) of cells: $(join(unlisted_type_names, ", "))
+            missing from the type colors csv: $(type_colors_csv)
+            """))
+    end
+
+    # Nothing is written until everything above has been verified, so a rejected CSV leaves the data as it was.
+    add_axis!(daf, "type", type_names; overwrite)
+    set_vector!(daf, "type", "color", colors; overwrite)
+    set_vector!(daf, "cell", "type", type_per_cell; overwrite = true)
 
     return nothing
 end

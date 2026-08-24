@@ -48,32 +48,17 @@
 <path fill="none" stroke="#000000" d="M107.936,-109.9197C96.8195,-101.7677 80.6287,-89.8944 67.589,-80.3319"/>
 <polygon fill="#000000" stroke="#000000" points="69.2998,-77.2463 59.1659,-74.155 65.1602,-82.8911 69.2998,-77.2463"/>
 </g>
-<!-- Gmara -->
-<g id="node2" class="node">
-<title>Gmara</title>
-<g id="a_node2"><a xlink:href="../gmara.html" xlink:title="Gmara" target="_top">
-<polygon fill="none" stroke="#ffffff" points="144.5,-184 97.5,-184 97.5,-165 144.5,-165 144.5,-184"/>
-<text text-anchor="middle" x="121" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Gmara</text>
-</a>
-</g>
-</g>
-<!-- Gmara&#45;&gt;AnalyzeGenes -->
-<g id="edge1" class="edge">
-<title>Gmara&#45;&gt;AnalyzeGenes</title>
-<path fill="none" stroke="#000000" d="M121,-164.9197C121,-157.9083 121,-148.1442 121,-139.4652"/>
-<polygon fill="#000000" stroke="#000000" points="124.5001,-139.3408 121,-129.3408 117.5001,-139.3409 124.5001,-139.3408"/>
-</g>
 <!-- AnalyzeMetacells -->
-<g id="node3" class="node">
+<g id="node2" class="node">
 <title>AnalyzeMetacells</title>
-<g id="a_node3"><a xlink:href="../analyze_metacells.html" xlink:title="AnalyzeMetacells" target="_top">
+<g id="a_node2"><a xlink:href="../analyze_metacells.html" xlink:title="AnalyzeMetacells" target="_top">
 <polygon fill="none" stroke="#ffffff" points="283,-184 173,-184 173,-165 283,-165 283,-184"/>
 <text text-anchor="middle" x="228" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeMetacells</text>
 </a>
 </g>
 </g>
 <!-- AnalyzeMetacells&#45;&gt;AnalyzeGenes -->
-<g id="edge2" class="edge">
+<g id="edge1" class="edge">
 <title>AnalyzeMetacells&#45;&gt;AnalyzeGenes</title>
 <path fill="none" stroke="#000000" d="M209.362,-164.9197C192.6638,-156.3365 167.9402,-143.6281 148.8882,-133.8351"/>
 <polygon fill="#000000" stroke="#000000" points="150.2773,-130.6138 139.7834,-129.155 147.0772,-136.8395 150.2773,-130.6138"/>
@@ -92,6 +77,21 @@
 <title>AnalyzeMetacells&#45;&gt;AnalyzeModules</title>
 <path fill="none" stroke="#000000" d="M229.7419,-164.9197C231.0167,-157.9083 232.792,-148.1442 234.37,-139.4652"/>
 <polygon fill="#000000" stroke="#000000" points="237.8654,-139.8057 236.2108,-129.3408 230.9783,-138.5534 237.8654,-139.8057"/>
+</g>
+<!-- Gmara -->
+<g id="node3" class="node">
+<title>Gmara</title>
+<g id="a_node3"><a xlink:href="../gmara.html" xlink:title="Gmara" target="_top">
+<polygon fill="none" stroke="#ffffff" points="144.5,-184 97.5,-184 97.5,-165 144.5,-165 144.5,-184"/>
+<text text-anchor="middle" x="121" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Gmara</text>
+</a>
+</g>
+</g>
+<!-- Gmara&#45;&gt;AnalyzeGenes -->
+<g id="edge2" class="edge">
+<title>Gmara&#45;&gt;AnalyzeGenes</title>
+<path fill="none" stroke="#000000" d="M121,-164.9197C121,-157.9083 121,-148.1442 121,-139.4652"/>
+<polygon fill="#000000" stroke="#000000" points="124.5001,-139.3408 121,-129.3408 117.5001,-139.3409 124.5001,-139.3408"/>
 </g>
 <!-- AnalyzeCells -->
 <g id="node4" class="node">

@@ -232,11 +232,11 @@
 </p>
 </li>
 <li>
-<p>Create a type axis in the chained metacells 
-<code>Daf
-</code> repository using 
-<a href="anndata_format.html#Metacells.AnnDataFormat.reconstruct_type_axis!">
-<code>reconstruct_type_axis!
+<p>Any per-gene masks which name a type, which a metacells 
+<code>h5ad
+</code> may hold, become a per-gene-per-type matrix using 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_gene_masks_per_type!">
+<code>import_gene_masks_per_type!
 </code>
 </a>.
 </p>
@@ -263,6 +263,8 @@
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = ```nothing```,
+    type_colors_csv::Maybe{AbstractString} = ```nothing```,
+    empty_type::Maybe{EmptyImplicit} = ```nothing```,
     bestify::Bool = ```true```,
     min_sparse_saving_fraction::AbstractFloat = ```0.25```,
     overwrite::Bool = ```false```,
@@ -420,6 +422,32 @@
 <li>All other vectors are copied as-is.
 </li>
 </ul>
+<p>If a 
+<code>type_colors_csv
+</code> is given, a 
+<code>type
+</code> axis is created from it. The file must have exactly two columns: the types, under whatever name, and then a column named 
+<code>color
+</code>. The types are taken in the order they are listed in, which is typically a meaningful one, and their colors are stored as a per-type 
+<code>color
+</code> property. The file is the authority on which types exist: it may list types no cell has, but a cell whose type it does not list is an error, in one or the other of them.
+</p>
+<p>This needs a per-cell 
+<code>type
+</code> property to have been imported, which usually means saying so in the 
+<code>copy_data
+</code>, the column holding it rarely being called 
+<code>type
+</code>. Data often spells &quot;this cell has no type&quot; as a value of its own - 
+<code>Outliers
+</code>, 
+<code>Doublet
+</code>, and the like - and which values those are depends on the data set; list them as the 
+<code>empty_type
+</code> and they become the empty string, which is how 
+<code>Daf
+</code> spells &quot;no value&quot;. They are the only values exempt from having to appear in the CSV.
+</p>
 <div class="admonition is-info" id="Note-75fc7469a30546a5">
 <header class="admonition-header">Note
 <a class="admonition-anchor" href="#Note-75fc7469a30546a5" title="Permalink">
@@ -649,9 +677,9 @@
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.AnnDataFormat.reconstruct_type_axis!">
-<a class="docstring-binding" href="#Metacells.AnnDataFormat.reconstruct_type_axis!">
-<code>Metacells.AnnDataFormat.reconstruct_type_axis!
+<summary id="Metacells.AnnDataFormat.import_gene_masks_per_type!">
+<a class="docstring-binding" href="#Metacells.AnnDataFormat.import_gene_masks_per_type!">
+<code>Metacells.AnnDataFormat.import_gene_masks_per_type!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -660,67 +688,30 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">reconstruct_type!(
+<code class="language-julia hljs">import_gene_masks_per_type!(
     daf::DafWriter;
-    base_axis::AbstractString = ```&quot;metacell&quot;```,
-    type_property::AbstractString = ```&quot;type&quot;```,
     type_axis::AbstractString = ```&quot;type&quot;```,
-    empty_type::Maybe{EmptyImplicit} = ```nothing```,
-    type_colors_csv::Maybe{AbstractString} = ```nothing```,
-    implicit_properties::Maybe{AbstractSet{&lt;:AbstractString}} = ```nothing```,
-    skipped_properties::Maybe{AbstractSet{&lt;:AbstractString}} = ```2 x Str (Set)```,
-    properties_defaults::Maybe{Dict} = ```nothing```,
 )::Nothing
 </code>
 </pre>
-<p>Create a type axis after importing data containing type annotations. By default this will look for a type per metacell, but if you have type annotation per cell (which is 
-<strong>not
-</strong> simply the type of the metacell they belong to), you can also use this for the cells.
-</p>
-<p>By default this assumes that you have imported &quot;the&quot; type annotation to a property called &quot;type&quot;, and that you would like the new type axis to be called &quot;type&quot; as well. If you want to import secondary types (or per-cell types), change these via the 
-<code>type_property
-</code> and 
-<code>type_axis
-</code> parameters.
-</p>
-<p>If the type is one of the 
-<code>empty_type
-</code> values it is replaced with the empty string to match the 
-<code>Daf
-</code> conventions for &quot;no value&quot; for string properties. This may be a single value or any collection of them, since data often spells &quot;there is no type here&quot; in more than one way (e.g., both 
-<code>Outliers
-</code> and 
-<code>Doublet
-</code> may appear where a type is expected). Any set of per-gene properties named 
-<code>something_gene_of_type
-</code> is converted to a per-gene-per-type matrix called 
+<p>Convert per-gene masks which name a type in their own name into a per-gene-per-type matrix. 
+<code>AnnData
+</code> has only the two axes, so a mask of genes per type has to be spelled as one property per type: 
+<code>something_gene_of_Bcell
+</code>, 
+<code>something_gene_of_Tcell
+</code>, and so on. Each such set becomes a single 
 <code>is_something
-</code> (with a default of 
+</code> matrix of genes by types (with a default of 
 <code>false
-</code>).
+</code>), which is what it was all along.
 </p>
-<p>Otherwise, this is mostly just a wrapper for 
-<code>reconstruct_axis!
-</code>. It can be further enhanced by specifying a 
-<code>type_colors_csv
-</code> file mapping type names to colors. This should be a comma or tab separated file containing at least two columns, one named &quot;color&quot; and one with the same name as the 
-<code>type_property
-</code>. If this CSV file contains types that aren&#39;t actually used in the data, you will have to specify a default value for any other per-type property in 
-<code>properties_defaults
-</code>.
+<p>The 
+<code>type_axis
+</code> must exist, since it says which types there are; a type with no mask property simply has no genes in it. In practice these masks come in a metacells 
+<code>h5ad
+</code> rather than a cells one.
 </p>
-<div class="admonition is-info" id="Note-4d89917d18d93321">
-<header class="admonition-header">Note
-<a class="admonition-anchor" href="#Note-4d89917d18d93321" title="Permalink">
-</a>
-</header>
-<div class="admonition-body">
-<p>Most metacells data has type annotations and colors associated with types, so it is highly recommended you invoke this to capture these into the 
-<code>Daf
-</code> repository. This will enable all types (:-) of downstream processing, coloring graphs, etc.
-</p>
-</div>
-</div>
 </div>
 </section>
 </details>
@@ -779,14 +770,14 @@
 </a>
 </li>
 <li>
-<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
-<code>Metacells.AnnDataFormat.import_metacells_h5ad!
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_gene_masks_per_type!">
+<code>Metacells.AnnDataFormat.import_gene_masks_per_type!
 </code>
 </a>
 </li>
 <li>
-<a href="anndata_format.html#Metacells.AnnDataFormat.reconstruct_type_axis!">
-<code>Metacells.AnnDataFormat.reconstruct_type_axis!
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>Metacells.AnnDataFormat.import_metacells_h5ad!
 </code>
 </a>
 </li>
