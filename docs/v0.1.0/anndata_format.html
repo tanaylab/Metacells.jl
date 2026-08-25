@@ -232,6 +232,16 @@
 </p>
 </li>
 <li>
+<p>Create a type axis, and give each type its color, using 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_type_colors_csv!">
+<code>import_type_colors_csv!
+</code>
+</a>. If the data spells &quot;no type&quot; as a value of its own, pass the property through 
+<code>unify_empty_vector_values!
+</code> first.
+</p>
+</li>
+<li>
 <p>Any per-gene masks which name a type, which a metacells 
 <code>h5ad
 </code> may hold, become a per-gene-per-type matrix using 
@@ -263,8 +273,6 @@
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = ```nothing```,
-    type_colors_csv::Maybe{AbstractString} = ```nothing```,
-    empty_type::Maybe{EmptyImplicit} = ```nothing```,
     bestify::Bool = ```true```,
     min_sparse_saving_fraction::AbstractFloat = ```0.25```,
     overwrite::Bool = ```false```,
@@ -422,32 +430,6 @@
 <li>All other vectors are copied as-is.
 </li>
 </ul>
-<p>If a 
-<code>type_colors_csv
-</code> is given, a 
-<code>type
-</code> axis is created from it. The file must have exactly two columns: the types, under whatever name, and then a column named 
-<code>color
-</code>. The types are taken in the order they are listed in, which is typically a meaningful one, and their colors are stored as a per-type 
-<code>color
-</code> property. The file is the authority on which types exist: it may list types no cell has, but a cell whose type it does not list is an error, in one or the other of them.
-</p>
-<p>This needs a per-cell 
-<code>type
-</code> property to have been imported, which usually means saying so in the 
-<code>copy_data
-</code>, the column holding it rarely being called 
-<code>type
-</code>. Data often spells &quot;this cell has no type&quot; as a value of its own - 
-<code>Outliers
-</code>, 
-<code>Doublet
-</code>, and the like - and which values those are depends on the data set; list them as the 
-<code>empty_type
-</code> and they become the empty string, which is how 
-<code>Daf
-</code> spells &quot;no value&quot;. They are the only values exempt from having to appear in the CSV.
-</p>
 <div class="admonition is-info" id="Note-75fc7469a30546a5">
 <header class="admonition-header">Note
 <a class="admonition-anchor" href="#Note-75fc7469a30546a5" title="Permalink">
@@ -718,6 +700,59 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnnDataFormat.import_type_colors_csv!">
+<a class="docstring-binding" href="#Metacells.AnnDataFormat.import_type_colors_csv!">
+<code>Metacells.AnnDataFormat.import_type_colors_csv!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">import_type_colors_csv!(
+    daf::DafWriter;
+    type_colors_csv::AbstractString,
+    [axis::AbstractString = ```&quot;cell&quot;```,
+    property::AbstractString = ```&quot;type&quot;```,
+    type_axis::AbstractString = ```&quot;type&quot;```,
+    overwrite::Bool = ```false```]
+)::Nothing
+</code>
+</pre>
+<p>Create a 
+<code>type_axis
+</code> out of a csv file, which is the authority on which types there are, what they are called, and in what order they are listed. The file must have exactly two columns: the types, under whatever name, and then a column named 
+<code>color
+</code>. The colors are stored as a per-type 
+<code>color
+</code> property.
+</p>
+<p>The data only says which entry of 
+<code>axis
+</code> has which type, in its 
+<code>property
+</code>, and is checked against the file rather than allowed to add to it: the file may list types nothing has, but a type of some entry which the file does not list is a mistake in one or the other of them, and saying so is more useful than silently accepting either.
+</p>
+<p>An empty 
+<code>property
+</code> value means the entry has no type, and is the only value exempt from having to appear in the file. Data spelling that some other way - 
+<code>Outliers
+</code>, 
+<code>Doublet
+</code>, and the like - should be passed through 
+<code>unify_empty_vector_values!
+</code> first, which is where that concept lives.
+</p>
+<p>Nothing is written until all of the above has been verified, so a rejected file leaves the data as it was.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnnDataFormat.CopyAnnData">
 <a class="docstring-binding" href="#Metacells.AnnDataFormat.CopyAnnData">
 <code>Metacells.AnnDataFormat.CopyAnnData
@@ -778,6 +813,12 @@
 <li>
 <a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
 <code>Metacells.AnnDataFormat.import_metacells_h5ad!
+</code>
+</a>
+</li>
+<li>
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_type_colors_csv!">
+<code>Metacells.AnnDataFormat.import_type_colors_csv!
 </code>
 </a>
 </li>

@@ -19,6 +19,9 @@ The expected flow is as follows:
     data typically goes into the metacells `h5ad`), import it into the chained (metacells) repository using
     [`import_cells_h5ad!`](@ref).
 
+  - Create a type axis, and give each type its color, using [`import_type_colors_csv!`](@ref). If the data spells "no
+    type" as a value of its own, pass the property through `unify_empty_vector_values!` first.
+
   - Any per-gene masks which name a type, which a metacells `h5ad` may hold, become a per-gene-per-type matrix
     using [`import_gene_masks_per_type!`](@ref).
 """
@@ -28,6 +31,7 @@ export CopyAnnData
 export import_cells_h5ad!
 export import_gene_masks_per_type!
 export import_metacells_h5ad!
+export import_type_colors_csv!
 
 using CSV
 using DataAxesFormats
@@ -99,8 +103,6 @@ METACELL_SQUARE_DATA = CopyAnnData(["obs_outgoing_weights" => ("outgoing_weights
         daf::DafWriter;
         cells_h5ad::AbstractString,
         copy_data::Maybe{CopyAnnData} = $(DEFAULT.copy_data),
-        type_colors_csv::Maybe{AbstractString} = $(DEFAULT.type_colors_csv),
-        empty_type::Maybe{EmptyImplicit} = $(DEFAULT.empty_type),
         bestify::Bool = $(DEFAULT.bestify),
         min_sparse_saving_fraction::AbstractFloat = $(DEFAULT.min_sparse_saving_fraction),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -158,18 +160,6 @@ Per-cell:
     not copied. To import these, use [`import_metacells_h5ad!`](@ref).
   - All other vectors are copied as-is.
 
-If a `type_colors_csv` is given, a `type` axis is created from it. The file must have exactly two columns: the types,
-under whatever name, and then a column named `color`. The types are taken in the order they are listed in, which is
-typically a meaningful one, and their colors are stored as a per-type `color` property. The file is the authority on
-which types exist: it may list types no cell has, but a cell whose type it does not list is an error, in one or the
-other of them.
-
-This needs a per-cell `type` property to have been imported, which usually means saying so in the `copy_data`, the
-column holding it rarely being called `type`. Data often spells "this cell has no type" as a value of its own -
-`Outliers`, `Doublet`, and the like - and which values those are depends on the data set; list them as the
-`empty_type` and they become the empty string, which is how `Daf` spells "no value". They are the only values exempt
-from having to appear in the CSV.
-
 !!! note
 
     It is common to manually call `reconstruct_axis!` on the result to create additional axes (e.g., if the cells were
@@ -179,17 +169,11 @@ from having to appear in the CSV.
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = nothing,
-    type_colors_csv::Maybe{AbstractString} = nothing,
-    empty_type::Maybe{EmptyImplicit} = nothing,
     bestify::Bool = true,
     min_sparse_saving_fraction::AbstractFloat = function_default(copy_matrix!, :min_sparse_saving_fraction),
     overwrite::Bool = false,
     insist::Bool = false,
 )::Nothing
-    if empty_type !== nothing && type_colors_csv === nothing
-        error("specified an empty_type without a type_colors_csv, so there are no types for it to be empty of")
-    end
-
     cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")  # NOJET
 
     copy_axis!(; destination = daf, source = cells_daf, axis = "cell", overwrite, insist)
@@ -244,10 +228,6 @@ from having to appear in the CSV.
         overwrite,
         insist,
     )
-
-    if type_colors_csv !== nothing
-        import_type_colors_csv(daf, type_colors_csv, empty_type, overwrite)
-    end
 
     return nothing
 end
@@ -454,15 +434,37 @@ function import_mask_matrix(
     return nothing
 end
 
-# Create the type axis out of the CSV, which is the authority on which types there are, what they are called and in
-# what order they are listed. The data only says which cells have which type, and is checked against the CSV rather
-# than allowed to add to it: a type in the data and not in the CSV is a mistake in one of them, and saying which is
-# more useful than silently accepting either.
-function import_type_colors_csv(
-    daf::DafWriter,
+"""
+    import_type_colors_csv!(
+        daf::DafWriter;
+        type_colors_csv::AbstractString,
+        [axis::AbstractString = $(DEFAULT.axis),
+        property::AbstractString = $(DEFAULT.property),
+        type_axis::AbstractString = $(DEFAULT.type_axis),
+        overwrite::Bool = $(DEFAULT.overwrite)]
+    )::Nothing
+
+Create a `type_axis` out of a csv file, which is the authority on which types there are, what they are called, and in
+what order they are listed. The file must have exactly two columns: the types, under whatever name, and then a column
+named `color`. The colors are stored as a per-type `color` property.
+
+The data only says which entry of `axis` has which type, in its `property`, and is checked against the file rather than
+allowed to add to it: the file may list types nothing has, but a type of some entry which the file does not list is a
+mistake in one or the other of them, and saying so is more useful than silently accepting either.
+
+An empty `property` value means the entry has no type, and is the only value exempt from having to appear in the file.
+Data spelling that some other way - `Outliers`, `Doublet`, and the like - should be passed through
+`unify_empty_vector_values!` first, which is where that concept lives.
+
+Nothing is written until all of the above has been verified, so a rejected file leaves the data as it was.
+"""
+@logged :mcs_ops @documented function import_type_colors_csv!(
+    daf::DafWriter;
     type_colors_csv::AbstractString,
-    empty_type::Maybe{EmptyImplicit},
-    overwrite::Bool,
+    axis::AbstractString = "cell",
+    property::AbstractString = "type",
+    type_axis::AbstractString = "type",
+    overwrite::Bool = false,
 )::Nothing
     data_frame = CSV.read(type_colors_csv, DataFrame)  # NOJET
     column_names = names(data_frame)
@@ -492,26 +494,19 @@ function import_type_colors_csv(
             """))
     end
 
-    # Whatever the data spells "this cell has no type" as - `Outliers`, `Doublet`, and so on - becomes the empty string
-    # `Daf` uses for "no value". Which values those are is a property of the data set, so it has to be said rather than
-    # guessed at, and they are the only values exempt from being listed in the CSV.
-    empty_types = Reconstruction.set_of_empty_implicit(empty_type)
-    type_per_cell =
-        [type_name in empty_types ? "" : string(type_name) for type_name in get_vector(daf, "cell", "type").array]
-
+    type_per_entry = get_vector(daf, axis, property).array
     unlisted_type_names =
-        [type_name for type_name in unique(type_per_cell) if type_name != "" && !(type_name in seen_type_names)]
+        [type_name for type_name in unique(type_per_entry) if type_name != "" && !(type_name in seen_type_names)]
     if !isempty(unlisted_type_names)
         error(chomp("""
-            type(s) of cells: $(join(unlisted_type_names, ", "))
+            type(s) of the axis: $(axis)
             missing from the type colors csv: $(type_colors_csv)
+            are: $(join(unlisted_type_names, ", "))
             """))
     end
 
-    # Nothing is written until everything above has been verified, so a rejected CSV leaves the data as it was.
-    add_axis!(daf, "type", type_names; overwrite)
-    set_vector!(daf, "type", "color", colors; overwrite)
-    set_vector!(daf, "cell", "type", type_per_cell; overwrite = true)
+    add_axis!(daf, type_axis, type_names; overwrite)
+    set_vector!(daf, type_axis, "color", colors; overwrite)
 
     return nothing
 end
