@@ -49,4 +49,7 @@ include("sharpen_metacells.jl")
 include("project_cells.jl")
 @reexport using .ProjectCells
 
+include("pipeline.jl")
+@reexport using .Pipeline
+
 end # module

@@ -357,9 +357,13 @@
 <ul>
 <li>We do not copy the 
 <code>__name__
-</code> scalar.
+</code> scalar, which is the 
+<code>AnnData
+</code> object&#39;s own name.
 </li>
-<li>All other scalars are copied as-is.
+<li>All other scalars are copied as-is. Name one in the 
+<code>copy_data
+</code> to rename it, or to skip it.
 </li>
 </ul>
 <p>Per-cell-per-gene:
@@ -767,12 +771,94 @@
 <code>AnnData
 </code> to 
 <code>Daf
-</code>. The key is simply a vector or matrix name (ignoring axes), and the value is either 
+</code>. The value is either 
 <code>nothing
 </code> to ignore the data, or a tuple with the name of the destination 
 <code>Daf
 </code> property and an optional value to use for missing entries (raw-only cells and/or genes).
 </p>
+<p>The key is a 
+<code>PropertyKey
+</code>, which says what kind of data it is as well as its name:
+</p>
+<ul>
+<li>A name on its own is a scalar (an 
+<code>AnnData
+</code> 
+<code>uns
+</code> entry).
+</li>
+<li>A 
+<code>(axis, name)
+</code> pair is a vector - 
+<code>(&quot;cell&quot;, &quot;amp_batch_id&quot;)
+</code> or 
+<code>(&quot;gene&quot;, &quot;fitted&quot;)
+</code>.
+</li>
+<li>A 
+<code>(rows_axis, columns_axis, name)
+</code> triple is a matrix - 
+<code>(&quot;cell&quot;, &quot;gene&quot;, &quot;X&quot;)
+</code>. Either order of the axes names the same matrix.
+</li>
+</ul>
+<p>The kind is part of the key because a name alone does not identify the data: an 
+<code>AnnData
+</code> may well have an 
+<code>obs
+</code> column called 
+<code>X
+</code> alongside the 
+<code>X
+</code> matrix, and saying which of them is meant is the whole point.
+</p>
+<div class="admonition is-info" id="Note-95bed4007eb26e8d">
+<header class="admonition-header">Note
+<a class="admonition-anchor" href="#Note-95bed4007eb26e8d" title="Permalink">
+</a>
+</header>
+<div class="admonition-body">
+<p>The axes are named as 
+<code>Daf
+</code> names them - 
+<code>cell
+</code>, 
+<code>gene
+</code>, 
+<code>metacell
+</code> - and 
+<strong>not
+</strong> as 
+<code>AnnData
+</code> names them. There is no 
+<code>obs
+</code> or 
+<code>var
+</code> key. This is deliberate: 
+<code>obs
+</code> is the cells in a cells 
+<code>h5ad
+</code> and the metacells in a metacells one, so an 
+<code>obs
+</code> key would mean different things in the two files 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
+<code>import_metacells_h5ad!
+</code>
+</a> reads.
+</p>
+<p>A key therefore names the axis of the destination and the property of the source, and the value names the property of the destination. That is, 
+<code>(&quot;cell&quot;, &quot;amp_batch_id&quot;) =&gt; (&quot;batch&quot;, nothing)
+</code> reads &quot;the 
+<code>obs
+</code> column called 
+<code>amp_batch_id
+</code>, which is per cell, becomes the per-cell property 
+<code>batch
+</code>&quot;.
+</p>
+</div>
+</div>
 </div>
 </section>
 </details>

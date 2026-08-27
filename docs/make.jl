@@ -45,6 +45,7 @@ makedocs(;
         "analyze_modules.md",
         "sharpen_metacells.md",
         "project_cells.md",
+        "pipeline.md",
         "anndata_format.md",
         "defaults.md",
     ],

@@ -41,13 +41,36 @@ using SparseArrays
 using TanayLabUtilities
 
 """
-Specify how to copy data from `AnnData` to `Daf`. The key is simply a vector or matrix name (ignoring axes), and the
-value is either `nothing` to ignore the data, or a tuple with the name of the destination `Daf` property and an optional
-value to use for missing entries (raw-only cells and/or genes).
-"""
-CopyAnnData = Dict{AbstractString, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
+Specify how to copy data from `AnnData` to `Daf`. The value is either `nothing` to ignore the data, or a tuple with the
+name of the destination `Daf` property and an optional value to use for missing entries (raw-only cells and/or genes).
 
-GENE_VECTORS_DATA = CopyAnnData([
+The key is a `PropertyKey`, which says what kind of data it is as well as its name:
+
+  - A name on its own is a scalar (an `AnnData` `uns` entry).
+  - A `(axis, name)` pair is a vector - `("cell", "amp_batch_id")` or `("gene", "fitted")`.
+  - A `(rows_axis, columns_axis, name)` triple is a matrix - `("cell", "gene", "X")`. Either order of the axes names the
+    same matrix.
+
+The kind is part of the key because a name alone does not identify the data: an `AnnData` may well have an `obs` column
+called `X` alongside the `X` matrix, and saying which of them is meant is the whole point.
+
+!!! note
+
+    The axes are named as `Daf` names them - `cell`, `gene`, `metacell` - and **not** as `AnnData` names them. There is
+    no `obs` or `var` key. This is deliberate: `obs` is the cells in a cells `h5ad` and the metacells in a metacells
+    one, so an `obs` key would mean different things in the two files [`import_metacells_h5ad!`](@ref) reads.
+
+    A key therefore names the axis of the destination and the property of the source, and the value names the property
+    of the destination. That is, `("cell", "amp_batch_id") => ("batch", nothing)` reads "the `obs` column called
+    `amp_batch_id`, which is per cell, becomes the per-cell property `batch`".
+"""
+CopyAnnData = Dict{PropertyKey, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
+
+# What is copied by default, for one kind of data at a time - so these are keyed by name alone, the kind being decided
+# by which import they are handed to.
+BaseCopyAnnData = Dict{AbstractString, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
+
+GENE_VECTORS_DATA = BaseCopyAnnData([
     "correction_factor" => ("correction_factor", Float32(0.0)),
     "full_gene_index" => nothing,
     "fitted" => ("is_fitted", false),
@@ -55,7 +78,7 @@ GENE_VECTORS_DATA = CopyAnnData([
     "*" => ("=", nothing),
 ])
 
-CELL_VECTORS_DATA = CopyAnnData([
+CELL_VECTORS_DATA = BaseCopyAnnData([
     "dissolve" => ("is_dissolved", false),
     "full_cell_index" => nothing,
     "metacell" => nothing,
@@ -66,9 +89,9 @@ CELL_VECTORS_DATA = CopyAnnData([
     "*" => ("=", nothing),
 ])
 
-CELL_MATRICES_DATA = CopyAnnData(["X" => ("UMIs", UInt32(0))])
+CELL_MATRICES_DATA = BaseCopyAnnData(["X" => ("UMIs", UInt32(0))])
 
-METACELL_VECTORS_DATA = CopyAnnData([
+METACELL_VECTORS_DATA = BaseCopyAnnData([
     "metacells_level" => ("level", UInt32(0)),
     "similar" => ("is_similar", false),
     "grouped" => ("n_cell", UInt32(0)),
@@ -81,7 +104,7 @@ METACELL_VECTORS_DATA = CopyAnnData([
     "*" => ("=", nothing),
 ])
 
-METACELL_MATRICES_DATA = CopyAnnData([
+METACELL_MATRICES_DATA = BaseCopyAnnData([
     "X" => ("geomean_fraction", Float32(0.0)),
     "corrected_fraction" => ("corrected_geomean_fraction", Float32(0.0)),
     "essential" => ("is_essential", false),
@@ -96,7 +119,8 @@ METACELL_MATRICES_DATA = CopyAnnData([
     "*" => ("=", nothing),
 ])
 
-METACELL_SQUARE_DATA = CopyAnnData(["obs_outgoing_weights" => ("outgoing_weights", Float32(0)), "*" => ("=", nothing)])
+METACELL_SQUARE_DATA =
+    BaseCopyAnnData(["obs_outgoing_weights" => ("outgoing_weights", Float32(0)), "*" => ("=", nothing)])
 
 """
     function import_cells_h5ad!(
@@ -137,8 +161,8 @@ And we make the following special exceptions:
 
 Scalars:
 
-  - We do not copy the `__name__` scalar.
-  - All other scalars are copied as-is.
+  - We do not copy the `__name__` scalar, which is the `AnnData` object's own name.
+  - All other scalars are copied as-is. Name one in the `copy_data` to rename it, or to skip it.
 
 Per-cell-per-gene:
 
@@ -179,7 +203,7 @@ Per-cell:
     copy_axis!(; destination = daf, source = cells_daf, axis = "cell", overwrite, insist)
     copy_axis!(; destination = daf, source = cells_daf, axis = "gene", overwrite, insist)
 
-    import_scalars_data(daf, cells_daf; overwrite, insist)
+    import_scalars_data(daf, cells_daf; copy_data, overwrite, insist)
 
     import_vectors_data(
         daf,
@@ -309,7 +333,7 @@ Per-metacell-per-metacell:
 
     copy_metacells_of_cells(daf, cells_h5ad; bestify, overwrite, insist)
 
-    import_scalars_data(daf, metacells_daf; overwrite, insist)
+    import_scalars_data(daf, metacells_daf; copy_data, overwrite, insist)
 
     import_vectors_data(
         daf,
@@ -511,14 +535,35 @@ Nothing is written until all of the above has been verified, so a rejected file 
     return nothing
 end
 
-function import_scalars_data(daf::DafWriter, source::DafReader; overwrite::Bool, insist::Bool)::Nothing
+function import_scalars_data(
+    daf::DafWriter,
+    source::DafReader;
+    copy_data::Maybe{CopyAnnData},
+    overwrite::Bool,
+    insist::Bool,
+)::Nothing
     for scalar_name in scalars_set(source)
+        data = ("=", nothing)
+
+        # `__name__` is the `AnnData` object's own name, which the destination has one of already.
         if scalar_name == "__name__"
-            @debug "skip scalar: $(scalar_name)" _group = :mcs_details
-        else
-            @debug "copy scalar: $(scalar_name)" _group = :mcs_details
-            copy_scalar!(; destination = daf, source, name = scalar_name, overwrite, insist)
+            data = nothing
+        elseif copy_data !== nothing && haskey(copy_data, scalar_name)
+            data = copy_data[scalar_name]
         end
+
+        if data === nothing
+            @debug "skip scalar: $(scalar_name)" _group = :mcs_details
+            continue
+        end
+
+        rename, _ = data
+        if rename == "="
+            rename = scalar_name
+        end
+
+        @debug "copy scalar: $(scalar_name) to: $(rename)" _group = :mcs_details
+        copy_scalar!(; destination = daf, source, name = scalar_name, rename, overwrite, insist)
     end
     return nothing
 end
@@ -527,7 +572,7 @@ function import_vectors_data(
     daf::DafWriter,
     source::DafReader,
     axis::AbstractString,
-    base_copy_data::CopyAnnData;
+    base_copy_data::BaseCopyAnnData;
     copy_data::Maybe{CopyAnnData},
     bestify::Bool,
     min_sparse_saving_fraction::AbstractFloat,
@@ -536,12 +581,13 @@ function import_vectors_data(
 )::Nothing
     for vector_name in vectors_set(source, axis)
         data = nothing
+        key = (axis, vector_name)
 
         if copy_data !== nothing
-            data = get(copy_data, vector_name, nothing)
+            data = get(copy_data, key, nothing)
         end
 
-        if data === nothing && (copy_data === nothing || !haskey(copy_data, vector_name))
+        if data === nothing && (copy_data === nothing || !haskey(copy_data, key))
             data = get(base_copy_data, vector_name, nothing)
 
             if data === nothing
@@ -622,7 +668,7 @@ function import_matrices_data(
     source::DafReader,
     rows_axis::AbstractString,
     columns_axis::AbstractString,
-    base_copy_data::CopyAnnData;
+    base_copy_data::BaseCopyAnnData;
     copy_data::Maybe{CopyAnnData},
     bestify::Bool,
     min_sparse_saving_fraction::AbstractFloat,
@@ -632,11 +678,17 @@ function import_matrices_data(
     for matrix_name in matrices_set(source, rows_axis, columns_axis; relayout = false)
         data = nothing
 
-        if copy_data !== nothing
-            data = get(copy_data, matrix_name, nothing)
+        # A matrix is imported in both layouts, so naming it in either order means the same matrix.
+        key = (rows_axis, columns_axis, matrix_name)
+        if copy_data !== nothing && !haskey(copy_data, key)
+            key = (columns_axis, rows_axis, matrix_name)
         end
 
-        if data === nothing && (copy_data === nothing || !haskey(copy_data, matrix_name))
+        if copy_data !== nothing
+            data = get(copy_data, key, nothing)
+        end
+
+        if data === nothing && (copy_data === nothing || !haskey(copy_data, key))
             data = get(base_copy_data, matrix_name, nothing)
 
             if data === nothing && haskey(base_copy_data, "*") && !haskey(base_copy_data, matrix_name)
