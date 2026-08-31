@@ -1,30 +1,78 @@
 """
 Run whole stages of the metacells pipeline.
 
-The functions here compute nothing themselves. Each runs a sequence of the computations of the rest of the package, in
-the order their inputs and outputs demand, which is otherwise something every caller would have to know and repeat.
+The functions here run multiple computation functions in sequence. They allow performing the computational pipeline of
+sharpening metacells with few high-level calls instead of working through each low-level step on its own. None of the
+functions here do anything other than invoking the lower level computations. As such they are purely convenience
+functions. One is free to call the lower level steps directly in case the pipeline needs to be tweaked for some special
+case.
 """
 module Pipeline
 
+export analyze_metacells!
+export import_base_metacells!
 export prepare_markers!
 export prepare_metacells!
-export prepare_skeletons!
 
 using DataAxesFormats
 using Random
 using TanayLabUtilities
 
+using ..AnalyzeBlocks
+using ..AnalyzeCells
 using ..AnalyzeGenes
 using ..AnalyzeMetacells
+using ..AnalyzeModules
+using ..ComputeBlocks
+using ..ComputeModules
 using ..Contracts
+using ..ProjectCells
 
 import Random.default_rng
 
 # Needed because of JET:
+import Metacells.Contracts.block_axis
 import Metacells.Contracts.cell_axis
 import Metacells.Contracts.gene_axis
-import Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
+import Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module
+import Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
 import Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
+import Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
+import Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block
+import Metacells.Contracts.matrix_of_is_environment_marker_per_gene_per_block
+import Metacells.Contracts.matrix_of_is_found_per_module_per_block
+import Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block
+import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
+import Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
+import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
+import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
+import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
+import Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
+import Metacells.Contracts.matrix_of_module_per_gene_per_block
+import Metacells.Contracts.matrix_of_module_status_per_gene_per_block
+import Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+import Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
+import Metacells.Contracts.matrix_of_n_genes_per_module_per_block
+import Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
+import Metacells.Contracts.matrix_of_UMIs_per_gene_per_block
+import Metacells.Contracts.module_axis
+import Metacells.Contracts.vector_of_anchor_per_module
+import Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
+import Metacells.Contracts.vector_of_block_per_metacell
+import Metacells.Contracts.vector_of_n_cells_per_block
+import Metacells.Contracts.vector_of_n_environment_cells_per_block
+import Metacells.Contracts.vector_of_n_environment_metacells_per_block
+import Metacells.Contracts.vector_of_n_metacells_per_block
+import Metacells.Contracts.vector_of_n_modules_per_block
+import Metacells.Contracts.vector_of_n_neighborhood_blocks_per_block
+import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
+import Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block
+import Metacells.Contracts.vector_of_total_environment_UMIs_per_block
+import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
+import Metacells.Contracts.vector_of_total_UMIs_per_block
+import Metacells.Contracts.vector_of_total_UMIs_per_cell
+import Metacells.Contracts.vector_of_type_per_block
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
@@ -39,6 +87,7 @@ import Metacells.Contracts.vector_of_is_marker_per_gene
 import Metacells.Contracts.vector_of_is_regulator_per_gene
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
 import Metacells.Contracts.vector_of_marker_rank_per_gene
+import Metacells.Contracts.vector_of_is_base_outlier_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_metacell
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
@@ -58,11 +107,11 @@ metacells which follows from the cells alone - their UMIs, their sizes, and the 
 each of them.
 
 Types are optional. If the cells have a type, then so does each metacell, by the types of its cells; if they do not,
-then neither do the metacells, and everything else here is computed just the same.
+then neither do the metacells.
 
 Nothing here depends on the gene masks, so a repository this was run on can be shared by several analyses which use
-different masks. Do run it again whenever the assignment of cells to metacells changes, that is, after each round of
-[`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+different masks. It only need to be rerun if assignment of cells to metacells changes. In particular, this needs to be
+done after each round of [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 
 $(CONTRACT)
 """
@@ -99,11 +148,10 @@ end
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Find the marker genes - the genes which distinguish between the metacells - rank them, and correlate each of them with
-every other.
+Find the marker genes - the genes which distinguish between the metacells - and rank them.
 
-Like [`prepare_metacells!`](@ref), and for the same reason, nothing here depends on the gene masks. It does depend on
-the metacells, so run it again whenever they change.
+Like [`prepare_metacells!`](@ref), and for the same reason, nothing here depends on the gene masks. It only depends on
+the metacells.
 
 $(CONTRACT)
 """
@@ -114,68 +162,222 @@ $(CONTRACT)
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         vector_of_is_marker_per_gene(CreatedOutput),
         vector_of_marker_rank_per_gene(CreatedOutput),
-        matrix_of_correlation_between_markers_per_gene_per_gene(CreatedOutput),
     ],
 ) function prepare_markers!(daf::DafWriter; overwrite::Bool = false)::Nothing
     compute_vector_of_is_marker_per_gene!(daf; overwrite)
     compute_vector_of_marker_rank_per_gene!(daf; overwrite)
-    compute_matrix_of_correlation_between_markers_per_gene_per_gene!(daf; overwrite)
     return nothing
 end
 
 """
-    prepare_skeletons!(
+    analyze_metacells!(
         daf::DafWriter;
+        prefix::AbstractString = $(DEFAULT.prefix),
         prev_daf::Maybe{DafReader} = nothing,
+        module_status::Bool = $(DEFAULT.module_status),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Choose the skeleton genes - the genes whose expression is taken to predict the rest - and compute what follows from
-them: which marker genes correlate with them, how far the metacells are from each other, and a 2D layout of the
-metacells based on that distance.
+Work out what a set of metacells says about the manifold: which genes are skeleton, how far the metacells are from each
+other and how they lay out, the blocks they fall into with their neighborhoods and environments, and the gene modules of
+each block.
 
-This is the part which the gene masks decide. Two analyses of the same metacells which differ only in their
-`is_lateral`, `is_forbidden` or `is_regulator` masks differ from here onwards, and only from here onwards, so the
-results of [`prepare_metacells!`](@ref) and [`prepare_markers!`](@ref) can be shared between them.
+This analysis depends on the genes mask, most importantly on the lateral and regulator gene masks, and the forbidden gene
+masks.
 
-Give `prev_daf` to seed the layout from an earlier one, so that a metacell of the same cells is placed close to where
-it was, and successive rounds of [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!) can be
-compared by eye.
+If `prev_daf` is specified, the UMAP is influenced by the UMAP of the previous repository. This is intended to make it easier
+to compare the UMAPs of the manifold across multiple sharpening steps.
+
+Once so analyzed, the metacells can be sharpened again using [`sharpen_metacells!`](@ref
+Metacells.SharpenMetacells.sharpen_metacells!).
 
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), cell_axis(OptionalInput)],
+    axes = [
+        gene_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        block_axis(GuaranteedOutput),
+        module_axis(GuaranteedOutput),
+    ],
     data = [
+        # What this is given: the cells, the metacells they were aggregated into, and the gene masks.
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        vector_of_metacell_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        vector_of_n_cells_per_metacell(RequiredInput),
+        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
+        matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         vector_of_is_excluded_per_gene(RequiredInput),
         vector_of_is_lateral_per_gene(RequiredInput),
         vector_of_is_forbidden_per_gene(RequiredInput),
         vector_of_is_regulator_per_gene(RequiredInput),
         vector_of_is_marker_per_gene(RequiredInput),
-        matrix_of_correlation_between_markers_per_gene_per_gene(RequiredInput),
-        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
-        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
-        vector_of_total_UMIs_per_metacell(RequiredInput),
-        vector_of_metacell_per_cell(OptionalInput),
+
+        # Types are optional throughout, so what is computed from them is optional as well.
+        vector_of_type_per_metacell(OptionalInput),
+        vector_of_type_per_block(OptionalOutput),
+
+        # The skeleton genes, and the geometry of the metacells which follows from them.
         vector_of_is_skeleton_per_gene(CreatedOutput),
-        vector_of_is_correlated_with_skeleton_per_gene(CreatedOutput),
         matrix_of_max_skeleton_fold_distance_between_metacells(CreatedOutput),
         matrix_of_euclidean_skeleton_fold_distance_between_metacells(CreatedOutput),
         vector_of_umap_x_per_metacell(CreatedOutput),
         vector_of_umap_y_per_metacell(CreatedOutput),
+
+        # The blocks, and what each is made of.
+        vector_of_block_per_metacell(CreatedOutput),
+        vector_of_block_closest_by_pertinent_markers_per_cell(CreatedOutput),
+        vector_of_n_metacells_per_block(CreatedOutput),
+        vector_of_n_cells_per_block(CreatedOutput),
+        vector_of_total_UMIs_per_block(CreatedOutput),
+        matrix_of_UMIs_per_gene_per_block(CreatedOutput),
+        matrix_of_linear_fraction_per_gene_per_block(CreatedOutput),
+        matrix_of_log_linear_fraction_per_gene_per_block(CreatedOutput),
+        matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(CreatedOutput),
+        matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(CreatedOutput),
+        matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block(CreatedOutput),
+
+        # The neighborhood of each block.
+        matrix_of_is_in_neighborhood_per_block_per_block(CreatedOutput),
+        vector_of_n_neighborhood_blocks_per_block(CreatedOutput),
+        vector_of_n_neighborhood_metacells_per_block(CreatedOutput),
+        vector_of_n_neighborhood_cells_per_block(CreatedOutput),
+        vector_of_total_neighborhood_UMIs_per_block(CreatedOutput),
+        matrix_of_is_neighborhood_marker_per_gene_per_block(CreatedOutput),
+        matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
+        matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
+
+        # The environment of each block, which the gene modules are estimated over.
+        matrix_of_is_in_environment_per_metacell_per_block(CreatedOutput),
+        vector_of_n_environment_metacells_per_block(CreatedOutput),
+        vector_of_n_environment_cells_per_block(CreatedOutput),
+        vector_of_total_environment_UMIs_per_block(CreatedOutput),
+        matrix_of_is_environment_marker_per_gene_per_block(CreatedOutput),
+        matrix_of_is_environment_distinct_per_gene_per_block(CreatedOutput),
+        matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(CreatedOutput),
+
+        # The gene modules of each block.
+        vector_of_anchor_per_module(CreatedOutput),
+        vector_of_n_modules_per_block(CreatedOutput),
+        matrix_of_module_per_gene_per_block(CreatedOutput),
+        matrix_of_is_found_per_module_per_block(CreatedOutput),
+        matrix_of_module_status_per_gene_per_block(OptionalOutput),
+        matrix_of_n_genes_per_module_per_block(CreatedOutput),
+        matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(CreatedOutput),
+        matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(CreatedOutput),
+        matrix_of_cells_dispersion_per_metacell_per_module(CreatedOutput),
     ],
-) function prepare_skeletons!(
+) function analyze_metacells!(
     daf::DafWriter;
+    prefix::AbstractString = "B",
     prev_daf::Maybe{DafReader} = nothing,
+    module_status::Bool = false,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
+    # Which genes predict the rest, and the geometry of the metacells which follows from them.
     compute_vector_of_is_skeleton_per_gene!(daf; overwrite)
-    compute_vector_of_is_correlated_with_skeleton_per_gene!(daf; overwrite)
     compute_matrix_of_max_skeleton_fold_distance_between_metacells!(daf; overwrite)
     compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(daf; overwrite)
     compute_metacells_2d_umap!(daf; prev_daf, rng, overwrite)
+
+    # The blocks - regions of the manifold the metacells fall into - and what each is made of.
+    compute_metacells_blocks!(daf; prefix)
+    compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(daf; overwrite)
+    compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(daf; overwrite)
+    compute_vector_of_n_metacells_per_block!(daf; overwrite)
+    compute_vector_of_n_cells_per_block!(daf; overwrite)
+    compute_matrix_of_UMIs_per_gene_per_block!(daf; overwrite)
+    compute_vector_of_total_UMIs_per_block!(daf; overwrite)
+    compute_matrix_of_linear_fraction_per_gene_per_block!(daf; overwrite)
+    compute_matrix_of_log_linear_fraction_per_gene_per_block!(daf; overwrite)
+
+    # A block has a type only when the metacells have one, which is optional data.
+    if has_vector(daf, "metacell", "type")
+        compute_vector_of_type_per_block_by_metacells!(daf; overwrite)
+    end
+
+    compute_vector_of_block_closest_by_pertinent_markers_per_cell!(daf; overwrite)
+    compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!(daf; overwrite)
+
+    # The neighborhood of a block is the blocks close enough to it to be describing the same local behavior.
+    compute_matrix_of_is_in_neighborhood_per_block_per_block!(daf; overwrite)
+    compute_vector_of_n_neighborhood_blocks_per_block!(daf; overwrite)
+    compute_vector_of_n_neighborhood_metacells_per_block!(daf; overwrite)
+    compute_vector_of_n_neighborhood_cells_per_block!(daf; overwrite)
+    compute_vector_of_total_neighborhood_UMIs_per_block!(daf; overwrite)
+    compute_matrix_of_is_neighborhood_marker_per_gene_per_block!(daf; overwrite)
+
+    # The environment extends the neighborhood with metacells close enough to the block, which gives the gene modules
+    # below more metacells to be estimated from.
+    compute_matrix_of_is_in_environment_per_metacell_per_block!(daf; overwrite)
+    compute_vector_of_n_environment_metacells_per_block!(daf; overwrite)
+    compute_vector_of_n_environment_cells_per_block!(daf; overwrite)
+    compute_vector_of_total_environment_UMIs_per_block!(daf; overwrite)
+    compute_matrix_of_is_environment_marker_per_gene_per_block!(daf; overwrite)
+    compute_matrix_of_is_environment_distinct_per_gene_per_block!(daf; overwrite)
+    compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!(daf; overwrite)
+
+    # Always recomputed rather than inherited: this describes the metacells of this round, and a repository chained onto
+    # an earlier one would otherwise keep that round's answer.
+    compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!(daf; overwrite = true)
+
+    # The gene modules of each block - the local programs the sharpening clusters cells by.
+    compute_blocks_modules!(daf; module_status, rng, overwrite)
+    compute_vector_of_n_modules_per_block!(daf; overwrite)
+    compute_matrix_of_n_genes_per_module_per_block!(daf; overwrite)
+    compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!(daf; overwrite)
+    compute_matrix_of_cells_dispersion_per_metacell_per_module!(daf; overwrite)
+
+    return nothing
+end
+
+"""
+    function import_base_metacells!(;
+        cells_daf::DafWriter,
+        metacells_daf::DafWriter,
+        metacell_per_cell::AbstractVector{<:AbstractString},
+        empty_metacells::Maybe{EmptyImplicit} = nothing,
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Bring in the base metacells the sharpening pipeline starts with. The cells are expected to have been imported already,
+but their assignment to metacells is supplied explicitly. It is filtered through `empty_metacells` to allow for values
+like `Outliers` to be safely converted to the empty string before being applied.
+
+# Cells
+
+$(CONTRACT1)
+
+# Metacells
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "cells_daf",
+    axes = [cell_axis(RequiredInput)],
+    data = [vector_of_is_base_outlier_per_cell(GuaranteedOutput)],
+) Contract(;
+    name = "metacells_daf",
+    axes = [cell_axis(RequiredInput)],
+    data = [vector_of_metacell_per_cell(GuaranteedOutput)],
+) function import_base_metacells!(;  # UNTESTED
+    cells_daf::DafWriter,
+    metacells_daf::DafWriter,
+    metacell_per_cell::AbstractVector{<:AbstractString},
+    empty_metacells::Maybe{EmptyImplicit} = nothing,
+    overwrite::Bool = false,
+)::Nothing
+    set_vector!(metacells_daf, "cell", "metacell", metacell_per_cell; overwrite)
+    if empty_metacells !== nothing
+        unify_empty_vector_values!(metacells_daf; axis = "cell", property = "metacell", empty_values = empty_metacells)
+    end
+    compute_vector_of_is_base_outlier_per_cell!(; cells_daf, metacells_daf, overwrite)
     return nothing
 end
 

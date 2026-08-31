@@ -894,11 +894,11 @@
 </pre>
 <p>A mask of cells that were not assigned to any metacell at the original (round-0) input. These cells are permanently excluded from any subsequent metacell-based analysis (in contrast to cells that lose their metacell during a sharpening round, which are eligible to be re-assigned in the next round).
 </p>
-<p>This vector is set by 
-<a href="anndata_format.html#Metacells.AnnDataFormat.import_metacells_h5ad!">
-<code>import_metacells_h5ad!
+<p>This vector is populated by 
+<a href="analyze_cells.html#Metacells.AnalyzeCells.compute_vector_of_is_base_outlier_per_cell!">
+<code>compute_vector_of_is_base_outlier_per_cell!
 </code>
-</a> at import time.
+</a>.
 </p>
 </div>
 </section>
@@ -3576,6 +3576,42 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The correlation between cells and the metacells they were projected onto, of each gene expression levels, leaving each cell out of that metacell wherever it is a member of it. This is zero for non-marker genes.
+</p>
+<p>This differs from 
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
+<code>vector_of_correlation_between_cells_and_projected_metacells_per_gene
+</code>
+</a> only when a repository is projected onto itself, where a cell may be projected onto the very metacell it belongs to and would otherwise be correlated partly against its own UMIs. When projecting onto a separate atlas the two are the same, since no cell is a member of any atlas metacell.
+</p>
+<p>This vector may be populated by 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!">
+<code>compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block">
 <a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block">
 <code>Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
@@ -4472,6 +4508,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
 <code>Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene">
+<code>Metacells.Contracts.vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene
 </code>
 </a>
 </li>

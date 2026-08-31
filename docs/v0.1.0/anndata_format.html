@@ -277,9 +277,21 @@
     min_sparse_saving_fraction::AbstractFloat = ```0.25```,
     overwrite::Bool = ```false```,
     insist::Bool = ```false```,
-)::Nothing
+)::Maybe{AbstractVector{&lt;:AbstractString}}
 </code>
 </pre>
+<p>Returns the 
+<code>metacell_name
+</code> per cell of the 
+<code>h5ad
+</code>, or 
+<code>nothing
+</code> if it has none. That is not imported - which metacell a cell belongs to is one analysis of the cells rather than a fact about them, so it belongs in the repository of that analysis. This is where the file is open, though, so it is handed back to pass to 
+<a href="pipeline.html#Metacells.Pipeline.import_base_metacells!">
+<code>import_base_metacells!
+</code>
+</a> rather than read a second time.
+</p>
 <p>Import an 
 <code>AnnData
 </code> based cells dataset into a destination 

@@ -4,6 +4,7 @@ Do simple per-cell analysis.
 module AnalyzeCells
 
 export cell_group_membership_from_block_neighborhoods
+export compute_vector_of_is_base_outlier_per_cell!
 export compute_vector_of_total_UMIs_per_cell!
 export gather_gene_UMIs_per_region_cell!
 export own_block_punctuated_correlation_per_gene_per_block!
@@ -24,7 +25,9 @@ using ..Contracts
 import Metacells.Contracts.cell_axis
 import Metacells.Contracts.gene_axis
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
+import Metacells.Contracts.vector_of_is_base_outlier_per_cell
 import Metacells.Contracts.vector_of_is_excluded_per_gene
+import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 
 """
@@ -51,6 +54,49 @@ $(CONTRACT)
     total_UMIs_per_cell = daf["@ cell @ gene [ ! is_excluded ] :: UMIs >| Sum"].array
     set_vector!(daf, "cell", "total_UMIs", total_UMIs_per_cell; overwrite)
     @debug "Mean (included) UMIs per cell: $(mean(total_UMIs_per_cell))" _group = :mcs_results  # NOLINT
+    return nothing
+end
+
+"""
+    function compute_vector_of_is_base_outlier_per_cell!(;
+        cells_daf::DafWriter,
+        metacells_daf::DafReader,
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_is_base_outlier_per_cell`](@ref), which is the cells the `metacells_daf` assignment has no
+metacell for.
+
+The mask is set in the `cells_daf` rather than beside the assignment it is read from, because it has to outlive it. Each
+sharpening round writes an assignment of its own, and in each of them a cell may have no metacell for either of two
+reasons: the round ejected it, in which case the round after it may place the cell, or the metacells we started from
+never placed it, in which case it stays out for good. Only the cells can still tell the two apart.
+
+# Cells
+
+$(CONTRACT1)
+
+# Metacells
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "cells_daf",
+    axes = [cell_axis(RequiredInput)],
+    data = [vector_of_is_base_outlier_per_cell(GuaranteedOutput)],
+) Contract(;
+    name = "metacells_daf",
+    axes = [cell_axis(RequiredInput)],
+    data = [vector_of_metacell_per_cell(RequiredInput)],
+) function compute_vector_of_is_base_outlier_per_cell!(;  # UNTESTED
+    cells_daf::DafWriter,
+    metacells_daf::DafReader,
+    overwrite::Bool = false,
+)::Nothing
+    is_base_outlier_per_cell = bestify(get_vector(metacells_daf, "cell", "metacell").array .== "")
+    set_vector!(cells_daf, "cell", "is_base_outlier", is_base_outlier_per_cell; overwrite)
+    @debug "Base outlier cells: $(sum(is_base_outlier_per_cell)) out of $(length(is_base_outlier_per_cell))" _group =
+        :mcs_results
     return nothing
 end
 

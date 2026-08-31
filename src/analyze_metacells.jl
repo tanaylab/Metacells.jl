@@ -12,6 +12,7 @@ export compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
 export compute_matrix_of_max_skeleton_fold_distance_between_metacells!
 export compute_metacells_2d_umap!
 export compute_metacells_3d_umap!
+export compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!
 export compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
 export compute_vector_of_n_cells_per_metacell!
 export compute_vector_of_total_UMIs_per_metacell!
@@ -49,6 +50,7 @@ import Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacell
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
 import Metacells.Contracts.metacell_axis
+import Metacells.Contracts.vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene
 import Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
 import Metacells.Contracts.vector_of_is_excluded_per_cell
 import Metacells.Contracts.vector_of_is_excluded_per_gene
@@ -56,6 +58,7 @@ import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_is_marker_per_gene
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
 import Metacells.Contracts.vector_of_metacell_per_cell
+import Metacells.Contracts.vector_of_projected_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_metacell
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
@@ -650,6 +653,186 @@ $(CONTRACT)
     @debug (
         "Mean correlation of pertinent marker genes between cells and their punctuated metacells: " *
         "$(mean(correlation_between_cells_and_punctuated_metacells_per_gene[is_pertinent_marker_per_gene]))"
+    ) _group = :mcs_results
+
+    return nothing
+end
+
+"""
+    function compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!(
+        daf::DafWriter;
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene`](@ref), that is,
+correlate each cell with the metacell it was projected onto rather than with the one it belongs to.
+
+A cell which is a member of the metacell it was projected onto is left out of it, exactly as
+[`compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!`](@ref) does, since otherwise it would
+be correlated partly against its own UMIs. A cell projected onto some other metacell is not a part of it, so there is
+nothing to leave out and the whole metacell is used.
+
+This therefore differs from
+[`compute_vector_of_correlation_between_cells_and_projected_metacells!`](@ref
+Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!) only when a repository was
+projected onto itself - which is also when the difference matters most, since a grouping which placed its cells well
+projects most of them back onto their own metacells.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation Contract(;
+    axes = [metacell_axis(RequiredInput), gene_axis(RequiredInput), cell_axis(RequiredInput)],
+    data = [
+        vector_of_is_marker_per_gene(RequiredInput),
+        vector_of_is_lateral_per_gene(RequiredInput),
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_projected_metacell_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene(CreatedOutput),
+    ],
+) function compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!(  # UNTESTED
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
+    overwrite::Bool = false,
+)::Nothing
+    gene_fraction_regularization = Float32(gene_fraction_regularization)
+    n_genes = axis_length(daf, "gene")
+    n_cells = axis_length(daf, "cell")
+
+    # Only marker genes are correlated (every consumer uses a subset of the markers); zero for non-marker genes.
+    index_per_included_gene = get_query(daf, "@ gene [ is_marker ] : index").array
+    n_included_genes = length(index_per_included_gene)
+
+    # The cells which were projected onto some metacell; one which was not is correlated with nothing.
+    projected_metacell_per_cell = get_vector(daf, "cell", "projected_metacell").array
+    metacell_per_cell = get_vector(daf, "cell", "metacell").array
+    indices_of_grouped_cells = findall(projected_metacell_per_cell .!= "")
+    n_grouped_cells = length(indices_of_grouped_cells)
+
+    projected_metacell_index_per_grouped_cell =
+        axis_indices(daf, "metacell", projected_metacell_per_cell[indices_of_grouped_cells])
+
+    # Where a cell was projected onto the metacell it belongs to, its own UMIs are what have to come out; where it was
+    # projected elsewhere, it is not a part of that metacell to begin with.
+    is_punctuated_per_grouped_cell =
+        metacell_per_cell[indices_of_grouped_cells] .== projected_metacell_per_cell[indices_of_grouped_cells]
+
+    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
+    UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
+
+    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
+    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    total_UMIs_per_grouped_cell = total_UMIs_per_cell[indices_of_grouped_cells]
+
+    total_projected_metacell_UMIs_per_grouped_cell =
+        total_UMIs_per_metacell[projected_metacell_index_per_grouped_cell] .-
+        total_UMIs_per_grouped_cell .* is_punctuated_per_grouped_cell
+
+    correlation_between_cells_and_projected_punctuated_metacells_per_gene = Vector{Float32}(undef, n_genes)
+
+    gene_cell_log_fraction_per_grouped_cell_per_thread =
+        [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
+    gene_projected_metacell_log_fraction_per_grouped_cell_per_thread =
+        [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
+
+    # Cell UMIs are gathered per gene via `gather_gene_UMIs_per_region_cell!` (a CSC column walk) rather than random
+    # `[cell, gene]` access; `region_position_per_cell` maps each cell to its position among the grouped cells (0 for
+    # ungrouped cells). It is read-only during the parallel gene loop.
+    @assert issparse(UMIs_per_cell_per_gene)
+    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
+    region_position_per_cell = zeros(Int, n_cells)
+    for (grouped_cell_position, cell_index) in enumerate(indices_of_grouped_cells)
+        region_position_per_cell[cell_index] = grouped_cell_position
+    end
+
+    parallel_loop_wo_rng(
+        1:n_included_genes;
+        progress = DebugProgress(
+            n_included_genes;
+            group = :mcs_loops,
+            desc = "correlation_between_cells_and_projected_punctuated_metacells_per_gene",
+        ),
+        progress_chunk = 100,
+    ) do included_gene_position
+        gene_index = index_per_included_gene[included_gene_position]
+
+        gene_cell_log_fraction_per_grouped_cell = gene_cell_log_fraction_per_grouped_cell_per_thread[threadid()]
+        gene_projected_metacell_log_fraction_per_grouped_cell =
+            gene_projected_metacell_log_fraction_per_grouped_cell_per_thread[threadid()]
+
+        # Gather this gene's cell UMIs (CSC column walk) into the cell buffer; all-zero => correlation 0.
+        any_grouped_cell_UMIs = gather_gene_UMIs_per_region_cell!(
+            gene_cell_log_fraction_per_grouped_cell,
+            n_grouped_cells,
+            sparse_UMIs_per_cell_per_gene,
+            gene_index,
+            region_position_per_cell,
+        )
+        if !any_grouped_cell_UMIs
+            correlation_between_cells_and_projected_punctuated_metacells_per_gene[gene_index] = 0.0f0
+            return nothing
+        end
+
+        # `gene_cell_log_fraction` holds the gathered cell UMIs; derive the projected metacell from its total, taking
+        # the cell out of it only where the cell is a part of it.
+        all_zero_grouped_projected_metacell_UMIs = true
+        for grouped_cell_position in 1:n_grouped_cells
+            metacell_index = projected_metacell_index_per_grouped_cell[grouped_cell_position]
+            metacell_UMIs = Float32(UMIs_per_metacell_per_gene[metacell_index, gene_index])
+            if is_punctuated_per_grouped_cell[grouped_cell_position]
+                metacell_UMIs -= gene_cell_log_fraction_per_grouped_cell[grouped_cell_position]
+            end
+            gene_projected_metacell_log_fraction_per_grouped_cell[grouped_cell_position] = metacell_UMIs
+            if metacell_UMIs > 0
+                all_zero_grouped_projected_metacell_UMIs = false
+            end
+        end
+        if all_zero_grouped_projected_metacell_UMIs
+            correlation_between_cells_and_projected_punctuated_metacells_per_gene[gene_index] = 0.0f0
+            return nothing
+        end
+
+        @check_turbo_vector(gene_cell_log_fraction_per_grouped_cell)
+        @check_turbo_vector(total_UMIs_per_grouped_cell)
+        @check_turbo_vector(gene_projected_metacell_log_fraction_per_grouped_cell)
+        @check_turbo_vector(total_projected_metacell_UMIs_per_grouped_cell)
+        @turbo for grouped_cell_position in 1:n_grouped_cells
+            gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] = log2(
+                gene_cell_log_fraction_per_grouped_cell[grouped_cell_position] /
+                total_UMIs_per_grouped_cell[grouped_cell_position] + gene_fraction_regularization,
+            )
+            gene_projected_metacell_log_fraction_per_grouped_cell[grouped_cell_position] = log2(
+                gene_projected_metacell_log_fraction_per_grouped_cell[grouped_cell_position] /
+                total_projected_metacell_UMIs_per_grouped_cell[grouped_cell_position] +
+                gene_fraction_regularization,
+            )
+        end
+
+        correlation_between_cells_and_projected_punctuated_metacells_per_gene[gene_index] = zero_cor_between_vectors(
+            gene_cell_log_fraction_per_grouped_cell,
+            gene_projected_metacell_log_fraction_per_grouped_cell,
+        )
+
+        return nothing
+    end
+
+    set_vector!(
+        daf,
+        "gene",
+        "correlation_between_cells_and_projected_punctuated_metacells",
+        correlation_between_cells_and_projected_punctuated_metacells_per_gene;
+        overwrite,
+    )
+
+    is_pertinent_marker_per_gene =
+        get_vector(daf, "gene", "is_marker").array .& .!get_vector(daf, "gene", "is_lateral").array
+    @debug (
+        "Mean correlation of pertinent marker genes between cells and their projected punctuated metacells: " *
+        "$(mean(correlation_between_cells_and_projected_punctuated_metacells_per_gene[is_pertinent_marker_per_gene]))"
     ) _group = :mcs_results
 
     return nothing

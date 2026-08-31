@@ -131,7 +131,12 @@ METACELL_SQUARE_DATA =
         min_sparse_saving_fraction::AbstractFloat = $(DEFAULT.min_sparse_saving_fraction),
         overwrite::Bool = $(DEFAULT.overwrite),
         insist::Bool = $(DEFAULT.insist),
-    )::Nothing
+    )::Maybe{AbstractVector{<:AbstractString}}
+
+Returns the `metacell_name` per cell of the `h5ad`, or `nothing` if it has none. That is not imported - which metacell a
+cell belongs to is one analysis of the cells rather than a fact about them, so it belongs in the repository of that
+analysis. This is where the file is open, though, so it is handed back to pass to
+[`import_base_metacells!`](@ref Metacells.Pipeline.import_base_metacells!) rather than read a second time.
 
 Import an `AnnData` based cells dataset into a destination `daf` data set. Ideally you'd copy the full (raw) cells
 into an empty `Daf` repository. Then, you'd treat this repository as read-only, and copy the metacells data using
@@ -197,7 +202,7 @@ Per-cell:
     min_sparse_saving_fraction::AbstractFloat = function_default(copy_matrix!, :min_sparse_saving_fraction),
     overwrite::Bool = false,
     insist::Bool = false,
-)::Nothing
+)::Maybe{AbstractVector{<:AbstractString}}
     cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")  # NOJET
 
     copy_axis!(; destination = daf, source = cells_daf, axis = "cell", overwrite, insist)
@@ -253,7 +258,7 @@ Per-cell:
         insist,
     )
 
-    return nothing
+    return get_vector(cells_daf, "cell", "metacell_name"; default = nothing)
 end
 
 """

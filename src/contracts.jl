@@ -84,6 +84,7 @@ export vector_of_block_closest_by_pertinent_markers_per_cell
 export vector_of_block_per_metacell
 export vector_of_color_per_type
 export vector_of_correlation_between_cells_and_projected_metacells_per_gene
+export vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene
 export vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
 export vector_of_excluded_UMIs_per_cell
 export vector_of_global_flow_order_per_type
@@ -492,7 +493,8 @@ A mask of cells that were not assigned to any metacell at the original (round-0)
 excluded from any subsequent metacell-based analysis (in contrast to cells that lose their metacell during a sharpening
 round, which are eligible to be re-assigned in the next round).
 
-This vector is set by [`import_metacells_h5ad!`](@ref Metacells.AnnDataFormat.import_metacells_h5ad!) at import time.
+This vector is populated by [`compute_vector_of_is_base_outlier_per_cell!`](@ref
+Metacells.AnalyzeCells.compute_vector_of_is_base_outlier_per_cell!).
 """
 function vector_of_is_base_outlier_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "is_base_outlier") =>
@@ -837,6 +839,34 @@ function vector_of_correlation_between_cells_and_punctuated_metacells_per_gene(
         expectation,
         StorageFloat,
         "The correlation between cells and their metacells (minus the correlated cell) gene expression levels.",
+    )
+end
+
+"""
+    vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The correlation between cells and the metacells they were projected onto, of each gene expression levels, leaving each
+cell out of that metacell wherever it is a member of it. This is zero for non-marker genes.
+
+This differs from [`vector_of_correlation_between_cells_and_projected_metacells_per_gene`](@ref) only when a repository
+is projected onto itself, where a cell may be projected onto the very metacell it belongs to and would otherwise be
+correlated partly against its own UMIs. When projecting onto a separate atlas the two are the same, since no cell is a
+member of any atlas metacell.
+
+This vector may be populated by
+[`compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!`](@ref
+Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!).
+"""
+function vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("gene", "correlation_between_cells_and_projected_punctuated_metacells") => (
+        expectation,
+        StorageFloat,
+        "The correlation between cells and the metacells they were projected onto, minus the correlated cell where it" *
+        " is a member of the metacell it was projected onto.",
     )
 end
 

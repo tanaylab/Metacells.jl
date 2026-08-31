@@ -257,6 +257,82 @@
 </section>
 </details>
 </article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeCells.compute_vector_of_is_base_outlier_per_cell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeCells.compute_vector_of_is_base_outlier_per_cell!">
+<code>Metacells.AnalyzeCells.compute_vector_of_is_base_outlier_per_cell!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_is_base_outlier_per_cell!(;
+    cells_daf::DafWriter,
+    metacells_daf::DafReader,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_is_base_outlier_per_cell">
+<code>vector_of_is_base_outlier_per_cell
+</code>
+</a>, which is the cells the 
+<code>metacells_daf
+</code> assignment has no metacell for.
+</p>
+<p>The mask is set in the 
+<code>cells_daf
+</code> rather than beside the assignment it is read from, because it has to outlive it. Each sharpening round writes an assignment of its own, and in each of them a cell may have no metacell for either of two reasons: the round ejected it, in which case the round after it may place the cell, or the metacells we started from never placed it, in which case it stays out for good. Only the cells can still tell the two apart.
+</p>
+<p>
+<strong>Cells
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Metacells
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -269,6 +345,12 @@
 <li>
 <a href="analyze_cells.html#Metacells.AnalyzeCells">
 <code>Metacells.AnalyzeCells
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_cells.html#Metacells.AnalyzeCells.compute_vector_of_is_base_outlier_per_cell!">
+<code>Metacells.AnalyzeCells.compute_vector_of_is_base_outlier_per_cell!
 </code>
 </a>
 </li>

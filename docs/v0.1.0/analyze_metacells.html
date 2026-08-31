@@ -1042,6 +1042,126 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!(
+    daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```0.0001```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene">
+<code>vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene
+</code>
+</a>, that is, correlate each cell with the metacell it was projected onto rather than with the one it belongs to.
+</p>
+<p>A cell which is a member of the metacell it was projected onto is left out of it, exactly as 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!">
+<code>compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!
+</code>
+</a> does, since otherwise it would be correlated partly against its own UMIs. A cell projected onto some other metacell is not a part of it, so there is nothing to leave out and the whole metacell is used.
+</p>
+<p>This therefore differs from 
+<a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!">
+<code>compute_vector_of_correlation_between_cells_and_projected_metacells!
+</code>
+</a> only when a repository was projected onto itself - which is also when the difference matters most, since a grouping which placed its cells well projects most of them back onto their own metacells.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>cell @ projected_metacell
+</strong>::AbstractString (required): The projected atlas metacell for each cell.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ correlation
+<em>between
+</em>cells
+<em>and
+</em>projected
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (created): The correlation between cells and the metacells they were projected onto, minus the correlated cell where it is a member of the metacell it was projected onto.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!">
 <a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!">
 <code>Metacells.AnalyzeMetacells.compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!
@@ -1422,6 +1542,12 @@
 <li>
 <a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_metacells_3d_umap!">
 <code>Metacells.AnalyzeMetacells.compute_metacells_3d_umap!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!">
+<code>Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!
 </code>
 </a>
 </li>

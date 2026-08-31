@@ -4,17 +4,23 @@
 Metacells.Pipeline
 ```
 
-## Metacells
+## Importing
+
+```@docs
+Metacells.Pipeline.import_base_metacells!
+```
+
+## Preparing
 
 ```@docs
 Metacells.Pipeline.prepare_metacells!
+Metacells.Pipeline.prepare_markers!
 ```
 
-## Genes
+## Analyzing
 
 ```@docs
-Metacells.Pipeline.prepare_markers!
-Metacells.Pipeline.prepare_skeletons!
+Metacells.Pipeline.analyze_metacells!
 ```
 
 ## Index
