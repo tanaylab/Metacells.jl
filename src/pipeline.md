@@ -14,7 +14,6 @@ Metacells.Pipeline.import_base_metacells!
 
 ```@docs
 Metacells.Pipeline.prepare_metacells!
-Metacells.Pipeline.prepare_markers!
 ```
 
 ## Analyzing

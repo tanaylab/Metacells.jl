@@ -11,7 +11,6 @@ module Pipeline
 
 export analyze_metacells!
 export import_base_metacells!
-export prepare_markers!
 export prepare_metacells!
 
 using DataAxesFormats
@@ -103,15 +102,8 @@ import Metacells.Contracts.vector_of_umap_y_per_metacell
     )::Nothing
 
 Aggregate the cells of each metacell, given which cells belong to which metacell. This computes everything about the
-metacells which follows from the cells alone - their UMIs, their sizes, and the fraction of the UMIs of each gene in
-each of them.
-
-Types are optional. If the cells have a type, then so does each metacell, by the types of its cells; if they do not,
-then neither do the metacells.
-
-Nothing here depends on the gene masks, so a repository this was run on can be shared by several analyses which use
-different masks. It only need to be rerun if assignment of cells to metacells changes. In particular, this needs to be
-done after each round of [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
+metacells which follows from the cells alone, per-metacell properties, and basic gene properties derived from metacells
+alone. Gene properties that depend on gene masks (other than exclusion) are not computed here.
 
 $(CONTRACT)
 """
@@ -128,6 +120,8 @@ $(CONTRACT)
         vector_of_n_cells_per_metacell(CreatedOutput),
         matrix_of_linear_fraction_per_gene_per_metacell(CreatedOutput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(CreatedOutput),
+        vector_of_is_marker_per_gene(CreatedOutput),
+        vector_of_marker_rank_per_gene(CreatedOutput),
     ],
 ) function prepare_metacells!(daf::DafWriter; overwrite::Bool = false)::Nothing
     # The types of the metacells come from the types of their cells, so without the one there is not the other.
@@ -139,31 +133,6 @@ $(CONTRACT)
     compute_vector_of_n_cells_per_metacell!(daf; overwrite)
     compute_matrix_of_linear_fraction_per_gene_per_metacell!(daf; overwrite)
     compute_matrix_of_log_linear_fraction_per_gene_per_metacell!(daf; overwrite)
-    return nothing
-end
-
-"""
-    prepare_markers!(
-        daf::DafWriter;
-        overwrite::Bool = $(DEFAULT.overwrite),
-    )::Nothing
-
-Find the marker genes - the genes which distinguish between the metacells - and rank them.
-
-Like [`prepare_metacells!`](@ref), and for the same reason, nothing here depends on the gene masks. It only depends on
-the metacells.
-
-$(CONTRACT)
-"""
-@logged :mcs_ops @computation Contract(;
-    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
-    data = [
-        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
-        matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
-        vector_of_is_marker_per_gene(CreatedOutput),
-        vector_of_marker_rank_per_gene(CreatedOutput),
-    ],
-) function prepare_markers!(daf::DafWriter; overwrite::Bool = false)::Nothing
     compute_vector_of_is_marker_per_gene!(daf; overwrite)
     compute_vector_of_marker_rank_per_gene!(daf; overwrite)
     return nothing
@@ -179,18 +148,10 @@ end
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Work out what a set of metacells says about the manifold: which genes are skeleton, how far the metacells are from each
-other and how they lay out, the blocks they fall into with their neighborhoods and environments, and the gene modules of
-each block.
-
-This analysis depends on the genes mask, most importantly on the lateral and regulator gene masks, and the forbidden gene
-masks.
-
-If `prev_daf` is specified, the UMAP is influenced by the UMAP of the previous repository. This is intended to make it easier
-to compare the UMAPs of the manifold across multiple sharpening steps.
-
-Once so analyzed, the metacells can be sharpened again using [`sharpen_metacells!`](@ref
-Metacells.SharpenMetacells.sharpen_metacells!).
+Compute more advanced properties based on the metacells, taking into account gene masks. Specifically this depends on
+the lateral and regulator gene masks, and the forbidden gene masks. These are used to determine the set of skeleton
+genes which are then used to drive the rest of the analysis, starting with grouping metacells into blocks and ending
+with local gene modules.
 
 $(CONTRACT)
 """

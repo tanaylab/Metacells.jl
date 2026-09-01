@@ -277,15 +277,7 @@
 )::Nothing
 </code>
 </pre>
-<p>Aggregate the cells of each metacell, given which cells belong to which metacell. This computes everything about the metacells which follows from the cells alone - their UMIs, their sizes, and the fraction of the UMIs of each gene in each of them.
-</p>
-<p>Types are optional. If the cells have a type, then so does each metacell, by the types of its cells; if they do not, then neither do the metacells.
-</p>
-<p>Nothing here depends on the gene masks, so a repository this was run on can be shared by several analyses which use different masks. It only need to be rerun if assignment of cells to metacells changes. In particular, this needs to be done after each round of 
-<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
-<code>sharpen_metacells!
-</code>
-</a>.
+<p>Aggregate the cells of each metacell, given which cells belong to which metacell. This computes everything about the metacells which follows from the cells alone, per-metacell properties, and basic gene properties derived from metacells alone. Gene properties that depend on gene masks (other than exclusion) are not computed here.
 </p>
 <p>
 <strong>Inputs
@@ -352,6 +344,14 @@
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of cells in each metacell.
 </p>
 <p>
+<strong>gene @ is_marker
+</strong>::Bool (created): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ marker_rank
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The relative ranks of the marker genes.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -368,83 +368,6 @@
 <em>linear
 </em>fraction
 </strong>::Union{Float32, Float64} (created): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Pipeline.prepare_markers!">
-<a class="docstring-binding" href="#Metacells.Pipeline.prepare_markers!">
-<code>Metacells.Pipeline.prepare_markers!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">prepare_markers!(
-    daf::DafWriter;
-    overwrite::Bool = ```false```,
-)::Nothing
-</code>
-</pre>
-<p>Find the marker genes - the genes which distinguish between the metacells - and rank them.
-</p>
-<p>Like 
-<a href="pipeline.html#Metacells.Pipeline.prepare_metacells!">
-<code>prepare_metacells!
-</code>
-</a>, and for the same reason, nothing here depends on the gene masks. It only depends on the metacells.
-</p>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>gene
-</strong> (required): Sequenced genes.
-</p>
-<p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
-<strong>gene, metacell @ linear_fraction
-</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
-</p>
-<p>
-<strong>gene, metacell @ log
-<em>linear
-</em>fraction
-</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
-</p>
-<p>
-<strong>Outputs
-</strong>
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>gene @ is_marker
-</strong>::Bool (created): A mask of genes that distinguish between cell states.
-</p>
-<p>
-<strong>gene @ marker_rank
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The relative ranks of the marker genes.
 </p>
 </div>
 </section>
@@ -481,19 +404,7 @@
 )::Nothing
 </code>
 </pre>
-<p>Work out what a set of metacells says about the manifold: which genes are skeleton, how far the metacells are from each other and how they lay out, the blocks they fall into with their neighborhoods and environments, and the gene modules of each block.
-</p>
-<p>This analysis depends on the genes mask, most importantly on the lateral and regulator gene masks, and the forbidden gene masks.
-</p>
-<p>If 
-<code>prev_daf
-</code> is specified, the UMAP is influenced by the UMAP of the previous repository. This is intended to make it easier to compare the UMAPs of the manifold across multiple sharpening steps.
-</p>
-<p>Once so analyzed, the metacells can be sharpened again using 
-<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
-<code>sharpen_metacells!
-</code>
-</a>.
+<p>Compute more advanced properties based on the metacells, taking into account gene masks. Specifically this depends on the lateral and regulator gene masks, and the forbidden gene masks. These are used to determine the set of skeleton genes which are then used to drive the rest of the analysis, starting with grouping metacells into blocks and ending with local gene modules.
 </p>
 <p>
 <strong>Inputs
@@ -849,12 +760,6 @@
 <li>
 <a href="pipeline.html#Metacells.Pipeline.import_base_metacells!">
 <code>Metacells.Pipeline.import_base_metacells!
-</code>
-</a>
-</li>
-<li>
-<a href="pipeline.html#Metacells.Pipeline.prepare_markers!">
-<code>Metacells.Pipeline.prepare_markers!
 </code>
 </a>
 </li>
