@@ -655,22 +655,6 @@
 </strong>::Bool (created): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
 </p>
 <p>
-<strong>gene, block @ most
-<em>correlated
-</em>gene
-<em>in
-</em>neighborhood
-</strong>::AbstractString (created): The most correlated neighborhood marker gene of each neighborhood marker gene per block.
-</p>
-<p>
-<strong>gene, block @ most
-<em>correlated
-</em>quantile
-<em>in
-</em>neighborhood
-</strong>::AbstractFloat (created): The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood marker gene per block.
-</p>
-<p>
 <strong>metacell, block @ is
 <em>in
 </em>environment
@@ -736,6 +720,218 @@
 </section>
 </details>
 </article>
+<h2 id="Scoring">
+<a class="docs-heading-anchor" href="#Scoring">Scoring
+</a>
+<a id="Scoring-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Scoring" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.qc_metacells!">
+<a class="docstring-binding" href="#Metacells.Pipeline.qc_metacells!">
+<code>Metacells.Pipeline.qc_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function qc_metacells!(;
+    daf::DafWriter,
+    base_daf::DafReader,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Say how well the metacells describe the cells they were aggregated from, judged in the locations of the manifold a base repository laid out.
+</p>
+<p>Each cell is correlated against its own metacell minus itself, over the cells of each base block&#39;s neighborhood, and the result is averaged over the environment marker genes of that base block. A higher number means the metacells of that location are a better account of the cells there. Only metacells scored against the same 
+<code>base_daf
+</code> can be compared to each other, since it is the 
+<code>base_daf
+</code> which decides both the locations and the genes each of them is read by. A repository is free to be its own base, which is how the metacells the sharpening started from are scored.
+</p>
+<p>
+<strong>Daf
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_excluded
+</strong>::Bool (optional): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (optional): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>base
+<em>block @ mean
+</em>correlation
+<em>between
+</em>base
+<em>neighborhood
+</em>cells
+<em>and
+</em>punctuated_metacells
+</strong>::Union{Float32, Float64} (created): The mean correlation between cells and their metacells (minus the correlated cell) over the environment marker genes of each base block.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (created): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, block @ is
+<em>neighborhood
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>gene, block @ is
+<em>environment
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s environment.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -766,6 +962,12 @@
 <li>
 <a href="pipeline.html#Metacells.Pipeline.prepare_metacells!">
 <code>Metacells.Pipeline.prepare_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="pipeline.html#Metacells.Pipeline.qc_metacells!">
+<code>Metacells.Pipeline.qc_metacells!
 </code>
 </a>
 </li>

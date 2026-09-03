@@ -28,6 +28,7 @@ export compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_
 export compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
 export compute_matrix_of_UMIs_per_gene_per_block!
 export compute_vector_of_block_closest_by_pertinent_markers_per_cell!
+export compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!
 export compute_vector_of_n_cells_per_block!
 export compute_vector_of_n_environment_cells_per_block!
 export compute_vector_of_n_environment_metacells_per_block!
@@ -106,6 +107,7 @@ import Metacells.Contracts.vector_of_is_excluded_per_gene
 import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_is_marker_per_gene
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
+import Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_block
 import Metacells.Contracts.vector_of_n_cells_per_metacell
@@ -2305,6 +2307,99 @@ $(CONTRACT2)
         metacells_qualifier = "punctuated",
     )
 
+    return nothing
+end
+
+"""
+    compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!(;
+        other_daf::DafWriter,
+        base_daf::DafReader,
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set
+[`vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block`](@ref) by reducing
+[`matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref) to one
+number per base block.
+
+The genes averaged over are the environment markers of the base block which are not lateral and whose correlation is
+not zero. A zero is what a gene which took no part in the correlation is left at, and the environment markers are a
+subset of the markers the correlation was computed for, so this is the mean over the genes the base block's environment
+is told apart by. A base block with no such gene is `NaN`.
+
+# Other
+
+$(CONTRACT1)
+
+# Base
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(
+    name = "other_daf",
+    axes = [gene_axis(RequiredInput), base_block_axis(RequiredInput)],
+    data = [
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+            RequiredInput,
+        ),
+        vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block(
+            CreatedOutput,
+        ),
+    ],
+) Contract(
+    name = "base_daf",
+    # The gene masks are read from `base_daf`, as they are for the correlation itself; the other repository's may
+    # differ (e.g. it excludes the held-out cross-validation gene bin) and are not consulted here.
+    axes = [gene_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        vector_of_is_lateral_per_gene(RequiredInput),
+        matrix_of_is_environment_marker_per_gene_per_block(RequiredInput),
+    ],
+) function compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!(;
+    other_daf::DafWriter,
+    base_daf::DafReader,
+    overwrite::Bool = false,
+)::Nothing
+    @assert axis_vector(base_daf, "gene") == axis_vector(other_daf, "gene")
+    @assert axis_vector(base_daf, "block") == axis_vector(other_daf, "base_block")
+
+    n_base_blocks = axis_length(base_daf, "block")
+    n_genes = axis_length(base_daf, "gene")
+
+    is_lateral_per_gene = get_vector(base_daf, "gene", "is_lateral").array
+    is_environment_marker_per_gene_per_base_block = get_matrix(base_daf, "gene", "block", "is_environment_marker").array
+    correlation_per_gene_per_base_block = get_matrix(
+        other_daf,
+        "gene",
+        "base_block",
+        "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
+    ).array
+
+    mean_correlation_per_base_block = fill(Float32(NaN), n_base_blocks)
+    is_relevant_per_gene = BitVector(undef, n_genes)
+    for base_block_index in 1:n_base_blocks
+        @views is_environment_marker_per_gene = is_environment_marker_per_gene_per_base_block[:, base_block_index]
+        @views correlation_per_gene = correlation_per_gene_per_base_block[:, base_block_index]
+        @. is_relevant_per_gene = is_environment_marker_per_gene & !is_lateral_per_gene & (correlation_per_gene != 0)
+        if any(is_relevant_per_gene)
+            mean_correlation_per_base_block[base_block_index] = mean(correlation_per_gene[is_relevant_per_gene])  # NOLINT
+        end
+    end
+
+    set_vector!(
+        other_daf,
+        "base_block",
+        "mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells",
+        mean_correlation_per_base_block;
+        overwrite,
+    )
+
+    valid_mean_per_base_block = filter(!isnan, mean_correlation_per_base_block)
+    mean_correlation_over_base_blocks = isempty(valid_mean_per_base_block) ? NaN : mean(valid_mean_per_base_block)  # NOLINT
+    @debug (
+        "Mean correlation of base neighborhood environment marker genes between base neighborhood cells and their " *
+        "punctuated metacells: $(mean_correlation_over_base_blocks)"
+    ) _group = :mcs_results
     return nothing
 end
 

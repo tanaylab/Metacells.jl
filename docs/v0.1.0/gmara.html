@@ -306,9 +306,15 @@
 </pre>
 <p>Normalize a gene name in some namespace. In most namespaces, this means removing the 
 <code>.[0-9]
-</code> version suffix from the name, and converting the name to upper case. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. The UCSC namespace is an exception in that it is all-lower-case and the 
+</code> version suffix from the name. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. The UCSC namespace is an exception in that the 
 <code>.[0-9]
-</code> suffix seems to be an inherent part of the identifier.
+</code> suffix seems to be an inherent part of the (all-lower-case) identifier.
+</p>
+<p>The case of a name is never changed, as Gmara names are in mixed case, differing between namespaces; for example, 
+<code>SOX4
+</code> for the human gene and 
+<code>Sox4
+</code> for the mouse one.
 </p>
 </div>
 </section>

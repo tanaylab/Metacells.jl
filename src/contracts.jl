@@ -101,6 +101,7 @@ export vector_of_is_ribosomal_per_gene
 export vector_of_is_skeleton_per_gene
 export vector_of_is_transcription_factor_per_gene
 export vector_of_marker_rank_per_gene
+export vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
 export vector_of_mean_euclidean_modules_cells_distance_per_metacell
 export vector_of_metacell_per_cell
 export vector_of_mitochondrial_UMIs_per_cell
@@ -2249,6 +2250,30 @@ function matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_me
         expectation,
         StorageFloat,
         "The correlation between cells and their metacells (minus the correlated cell) of each gene's expression levels in each base block's neighborhood.",
+    )
+end
+
+"""
+    vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The mean of [`matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref)
+over the environment marker genes of each base block which are not lateral and which took part in the correlation. This
+is the single number saying how well the metacells describe the cells in each location of the manifold, so metacells
+scored against the same base repository can be compared to each other. This is `NaN` for a base block with no such gene.
+
+This vector is populated by
+[`compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!`](@ref
+Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!).
+"""
+function vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("base_block", "mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells") => (
+        expectation,
+        StorageFloat,
+        "The mean correlation between cells and their metacells (minus the correlated cell) over the environment marker genes of each base block.",
     )
 end
 

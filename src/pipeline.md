@@ -22,6 +22,12 @@ Metacells.Pipeline.prepare_metacells!
 Metacells.Pipeline.analyze_metacells!
 ```
 
+## Scoring
+
+```@docs
+Metacells.Pipeline.qc_metacells!
+```
+
 ## Index
 
 ```@index

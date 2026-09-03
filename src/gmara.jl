@@ -25,9 +25,11 @@ using TanayLabUtilities
     normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
 
 Normalize a gene name in some namespace. In most namespaces, this means removing the `.[0-9]` version suffix from the
-name, and converting the name to upper case. To lookup a name in a list or a namespace, you need to normalize the query
-gene name accordingly. The UCSC namespace is an exception in that it is all-lower-case and the `.[0-9]` suffix seems to
-be an inherent part of the identifier.
+name. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. The UCSC
+namespace is an exception in that the `.[0-9]` suffix seems to be an inherent part of the (all-lower-case) identifier.
+
+The case of a name is never changed, as Gmara names are in mixed case, differing between namespaces; for example,
+`SOX4` for the human gene and `Sox4` for the mouse one.
 """
 function normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
     if namespace == "UCSC"
@@ -188,15 +190,15 @@ function ensure_is_downloaded(
 
     response_headers = Dict(response.headers)
     cache_data_path = cache_dir * "/" * version * "/" * path * ".gz"
-    # TODO: Seems that LFS files are never served zipped.
-    # Strange, you would think it would be a priotity for them.
+    # The cache holds the data gzipped, so a body the server has already gzipped is written as it came - `decompress =
+    # false` above is what keeps it that way - and any other body is compressed on the way in.
     if get(response_headers, "Content-Encoding", nothing) == "gzip"
-        open(cache_data_path, "w") do file  # UNTESTED
-            return write(file, response.body)  # UNTESTED
+        open(cache_data_path, "w") do file
+            return write(file, response.body)
         end
     else
-        GZip.open(cache_data_path, "w") do file
-            return write(file, response.body)
+        GZip.open(cache_data_path, "w") do file  # UNTESTED
+            return write(file, response.body)  # UNTESTED
         end
     end
 
@@ -215,8 +217,9 @@ function ensure_is_downloaded(
 end
 
 function github_url(path::AbstractString; version::AbstractString = "main")::AbstractString
-    # PRE-LFS: return "https://raw.githubusercontent.com/tanaylab/Gmara/$(version)/$(path)"
-    return "https://media.githubusercontent.com/media/tanaylab/Gmara/$(version)/$(path)"
+    # If Gmara switches back to using LFS, this may need to change to:
+    # `https://media.githubusercontent.com/media/tanaylab/Gmara/$(version)/$(path)`
+    return "https://raw.githubusercontent.com/tanaylab/Gmara/$(version)/$(path)"
 end
 
 function write_set_to_file(

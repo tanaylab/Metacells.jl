@@ -3126,6 +3126,142 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!(;
+    other_daf::DafWriter,
+    base_daf::DafReader,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block">
+<code>vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
+</code>
+</a> by reducing 
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
+</code>
+</a> to one number per base block.
+</p>
+<p>The genes averaged over are the environment markers of the base block which are not lateral and whose correlation is not zero. A zero is what a gene which took no part in the correlation is left at, and the environment markers are a subset of the markers the correlation was computed for, so this is the mean over the genes the base block&#39;s environment is told apart by. A base block with no such gene is 
+<code>NaN
+</code>.
+</p>
+<p>
+<strong>Other
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>base_block
+</strong> (required): A copy of the base 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (required): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>base
+<em>block @ mean
+</em>correlation
+<em>between
+</em>base
+<em>neighborhood
+</em>cells
+<em>and
+</em>punctuated_metacells
+</strong>::Union{Float32, Float64} (created): The mean correlation between cells and their metacells (minus the correlated cell) over the environment marker genes of each base block.
+</p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, block @ is
+<em>environment
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s environment.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!">
 <a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!
@@ -4064,6 +4200,12 @@
 <li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_block_closest_by_pertinent_markers_per_cell!">
 <code>Metacells.AnalyzeBlocks.compute_vector_of_block_closest_by_pertinent_markers_per_cell!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!">
+<code>Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!
 </code>
 </a>
 </li>

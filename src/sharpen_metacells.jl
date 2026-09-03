@@ -37,7 +37,7 @@ import Metacells.Contracts.gene_axis
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
 import Metacells.Contracts.matrix_of_is_found_per_module_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
-import Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
+import Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
 import Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_module_per_gene_per_block
 import Metacells.Contracts.matrix_of_n_cells_per_prev_block_per_block
@@ -55,6 +55,7 @@ import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_global_flow_order_per_type
 import Metacells.Contracts.vector_of_is_base_outlier_per_cell
 import Metacells.Contracts.vector_of_is_excluded_per_cell
+import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_block
@@ -256,8 +257,13 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     center in the same module z-score space K-means clustered them in. A block's last cluster is never dissolved, so
     every clustered cell always ends up in some cluster. We increase the number of target metacells for every input
     metacell whose maximal `cells_dispersion` is above `max_cells_dispersion_in_metacell`. This still leaves us with
-    multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation
-    with most-correlated marker genes in the (previous round's) neighborhoods. To stabilize the choice as sharpening
+    multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation,
+    across the pertinent (non-lateral) marker genes of each (previous round's) neighborhood, between each cell's log
+    gene fraction and the punctuated (leave-one-out) log fraction of the same gene in the metacell we are considering
+    placing the cell in. This is the measure reported by
+    [`matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block`](@ref
+    Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block),
+    evaluated against the previous round's neighborhoods. To stabilize the choice as sharpening
     proceeds, a candidate whose number of clusters differs from the expected number must improve this prediction by an
     extra `cooldown_margin` for each cluster of difference. The `sharpening_round` is 1-based: the first sharpening
     round (`sharpening_round == 1`) applies no cooldown (the plain correlation tie-break), and for each later round the
@@ -327,7 +333,8 @@ $(CONTRACT2)
         vector_of_n_neighborhood_cells_per_block(RequiredInput),
         vector_of_total_neighborhood_UMIs_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
-        matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(RequiredInput),
+        vector_of_is_lateral_per_gene(RequiredInput),
+        matrix_of_is_neighborhood_marker_per_gene_per_block(RequiredInput),
         matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
         matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
     ],
@@ -565,32 +572,24 @@ $(CONTRACT2)
     # The tie-break evaluates against the previous round (base_daf), so its blocks are the base blocks.
     base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
     is_in_base_neighborhood_per_other_base_block_per_base_block = is_in_neighborhood_per_other_block_per_base_block
-    most_correlated_gene_in_base_neighborhood_per_gene_per_base_block =
-        get_matrix(base_daf, "gene", "block", "most_correlated_gene_in_neighborhood").array
-    gene_name_to_index = axis_dict(base_daf, "gene")
+    is_lateral_per_gene = get_vector(base_daf, "gene", "is_lateral").array
+    is_neighborhood_marker_per_gene_per_base_block =
+        get_matrix(base_daf, "gene", "block", "is_neighborhood_marker").array
     n_base_blocks = n_blocks
 
-    # Per base block, the (gene, friend) correlation series as raw (global) gene indices - parallel vectors. The friend
-    # is the gene's most-correlated-in-base-neighborhood partner; every gene with such a partner contributes a series.
-    # Consumed by `build_grouped_for_base_block` (for reading `UMIs_per_cell_per_gene` columns) and by
-    # `precompute_walkable_indirection` (to build each walkable block's friend-gene subspace).
-    correlated_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
-    friend_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
+    # Per base block, the genes whose correlation series the tie-break evaluates, as raw (global) gene indices: the
+    # pertinent (non-lateral) markers of the base block's neighborhood. This is the gene set
+    # `compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!` averages
+    # over, so the tie-break optimizes the measure the analysis reports. Consumed by `build_grouped_for_base_block`
+    # (for reading `UMIs_per_cell_per_gene` columns) and by `precompute_walkable_indirection` (to build each walkable
+    # block's gene subspace).
+    pertinent_neighborhood_marker_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
+    is_pertinent_neighborhood_marker_per_gene = BitVector(undef, n_genes)
     for base_block_index in 1:n_base_blocks
-        @views most_correlated_gene_in_base_neighborhood_per_gene =
-            most_correlated_gene_in_base_neighborhood_per_gene_per_base_block[:, base_block_index]
-        correlated_gene_indices = Int[]
-        friend_gene_indices = Int[]
-        for gene_index in 1:n_genes
-            name = most_correlated_gene_in_base_neighborhood_per_gene[gene_index]
-            if !isempty(name)
-                friend_gene_index = gene_name_to_index[name]
-                push!(correlated_gene_indices, gene_index)
-                push!(friend_gene_indices, friend_gene_index)
-            end
-        end
-        correlated_gene_indices_per_base_block[base_block_index] = correlated_gene_indices
-        friend_gene_indices_per_base_block[base_block_index] = friend_gene_indices
+        @views is_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene_per_base_block[:, base_block_index]
+        @. is_pertinent_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene & !is_lateral_per_gene
+        pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index] =
+            findall(is_pertinent_neighborhood_marker_per_gene)
     end
 
     local_clusters_per_block = compute_local_clusters(;
@@ -616,8 +615,7 @@ $(CONTRACT2)
         std_fraction_regularization_per_block,
         base_block_index_per_cell,
         is_in_base_neighborhood_per_other_base_block_per_base_block,
-        correlated_gene_indices_per_base_block,
-        friend_gene_indices_per_base_block,
+        pertinent_neighborhood_marker_gene_indices_per_base_block,
         gene_fraction_regularization,
         max_n_kmeans_clusters,
         kmeans_sizes_max_buffers_per_thread,
@@ -999,8 +997,7 @@ function compute_local_clusters(;
     std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
     base_block_index_per_cell::AbstractVector{<:Integer},
     is_in_base_neighborhood_per_other_base_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
-    correlated_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
-    friend_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
+    pertinent_neighborhood_marker_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
     gene_fraction_regularization::AbstractFloat,
     max_n_kmeans_clusters::Integer,
     kmeans_sizes_max_buffers_per_thread::AbstractVector{<:KmeansSizesBuffers},
@@ -1190,7 +1187,7 @@ function compute_local_clusters(;
         block_cell_indices_per_block,
         base_block_index_per_cell,
         is_in_base_neighborhood_per_other_base_block_per_base_block,
-        friend_gene_indices_per_base_block,
+        pertinent_neighborhood_marker_gene_indices_per_base_block,
         n_base_blocks,
         n_genes,
     )
@@ -1342,8 +1339,7 @@ function compute_local_clusters(;
             UMIs_per_gene_per_baseline_metacell,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            correlated_gene_indices = correlated_gene_indices_per_base_block[base_block_index],
-            friend_gene_indices = friend_gene_indices_per_base_block[base_block_index],
+            pertinent_neighborhood_marker_gene_indices = pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index],
             gene_fraction_regularization,
         )
         grouped_per_base_block[base_block_index] = grouped
@@ -2090,10 +2086,11 @@ end
 
 # Build one base block's baseline `GroupedSeriesCorrelations{Float32}`. Each group corresponds to one block whose
 # cells contribute to the base block's neighborhood; the points within a group are the contributing cells laid out
-# contiguously, preserving the per-block cell order. Per (point, base-block series) we store the cell's
-# `log2(correlated_UMIs / total_UMIs + reg)` as the fixed side and the punctuated baseline-metacell
-# `log2((baseline_metacell_friend_UMIs - cell_friend_UMIs) / (baseline_metacell_total - cell_total) + reg)` as the
-# variable side - with the mask `is_active_per_point` set false (and the variable value zeroed) when the cell's
+# contiguously, preserving the per-block cell order. Per (point, base-block series) - one series per pertinent
+# neighborhood marker gene - we store the cell's `log2(marker_UMIs / total_UMIs + reg)` as the fixed side and the
+# punctuated baseline-metacell `log2((baseline_metacell_marker_UMIs - cell_marker_UMIs) / (baseline_metacell_total -
+# cell_total) + reg)` of the same gene as the variable side - with the mask `is_active_per_point` set false (and the
+# variable value zeroed) when the cell's
 # baseline metacell is missing or the punctuation denominator is non-positive. `baseline_metacell_index_per_cell` and
 # the per-baseline-metacell aggregates (`total_UMIs_per_baseline_metacell`,
 # `UMIs_per_gene_per_baseline_metacell`) encode "Phase 1's choice of K per block" - the baseline candidate's cluster
@@ -2111,12 +2108,10 @@ function build_grouped_for_base_block(;
     UMIs_per_gene_per_baseline_metacell::AbstractMatrix{<:Integer},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
-    correlated_gene_indices::AbstractVector{<:Integer},
-    friend_gene_indices::AbstractVector{<:Integer},
+    pertinent_neighborhood_marker_gene_indices::AbstractVector{<:Integer},
     gene_fraction_regularization::AbstractFloat,
 )::Tuple{GroupedSeriesCorrelations{Float32}, Vector{Int}}
-    n_series = length(correlated_gene_indices)
-    @assert length(friend_gene_indices) == n_series
+    n_series = length(pertinent_neighborhood_marker_gene_indices)
 
     # Count how many cells each block contributes to this base block's neighborhood.
     n_points_per_block = zeros(Int, n_blocks)
@@ -2178,21 +2173,18 @@ function build_grouped_for_base_block(;
         is_active_per_point[point_index] = is_active
 
         for series_index in 1:n_series
-            correlated_gene_index = correlated_gene_indices[series_index]
-            friend_gene_index = friend_gene_indices[series_index]
-
-            cell_correlated_UMIs = Int(UMIs_per_cell_per_gene[cell_index, correlated_gene_index])
+            marker_gene_index = pertinent_neighborhood_marker_gene_indices[series_index]
+            cell_marker_UMIs = Int(UMIs_per_cell_per_gene[cell_index, marker_gene_index])
             fixed_per_point_per_series[point_index, series_index] =
-                log2(Float32(cell_correlated_UMIs) / Float32(cell_total) + regularization)
+                log2(Float32(cell_marker_UMIs) / Float32(cell_total) + regularization)
 
             if is_active
-                baseline_metacell_friend_UMIs =
-                    Int(UMIs_per_gene_per_baseline_metacell[baseline_metacell_index, friend_gene_index])
-                cell_friend_UMIs = Int(UMIs_per_cell_per_gene[cell_index, friend_gene_index])
-                punctuated_friend = baseline_metacell_friend_UMIs - cell_friend_UMIs
+                baseline_metacell_marker_UMIs =
+                    Int(UMIs_per_gene_per_baseline_metacell[baseline_metacell_index, marker_gene_index])
+                punctuated_marker = baseline_metacell_marker_UMIs - cell_marker_UMIs
                 punctuated_total = baseline_metacell_total - cell_total
                 variable_per_point_per_series[point_index, series_index] =
-                    log2(Float32(punctuated_friend) / Float32(punctuated_total) + regularization)
+                    log2(Float32(punctuated_marker) / Float32(punctuated_total) + regularization)
             else
                 variable_per_point_per_series[point_index, series_index] = 0.0f0
             end
@@ -2300,7 +2292,7 @@ end
 #   * `gene_index_per_friend_per_walkable_block[walkable_position]`: the block's friend-gene subspace (global gene index per
 #     column).
 #   * `friend_position_per_series_per_base_block_per_walkable_block[walkable_position][base_block_index]`: per (block, base block), the
-#     block's friend column for each of the base block's correlated-friend series.
+#     block's friend column for each of the base block's series genes.
 #   * `block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position][base_block_index]`: per (block, base block), the block's
 #     `block_cell_position`s of the cells in the base block's neighborhood, in the block's canonical block-cell order.
 #     Row indirection for the indirect-gather query.
@@ -2309,7 +2301,7 @@ function precompute_walkable_indirection(
     block_cell_indices_per_block::AbstractVector{<:AbstractVector{<:Integer}},
     base_block_index_per_cell::AbstractVector{<:Integer},
     is_in_base_neighborhood_per_other_base_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
-    friend_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
+    pertinent_neighborhood_marker_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
     n_base_blocks::Integer,
     n_genes::Integer,
 )::Tuple{Vector{Vector{Int}}, Vector{Vector{Int}}, Vector{Dict{Int, Vector{Int}}}, Vector{Dict{Int, Vector{Int}}}}
@@ -2362,12 +2354,12 @@ function precompute_walkable_indirection(
         affected_base_block_indices = findall(is_affected_base_block)
         affected_base_block_indices_per_walkable_block[walkable_position] = affected_base_block_indices
 
-        # Friend-gene subspace for this walkable block: union of friend genes across its affected base blocks.
+        # Gene subspace for this walkable block: union of the series genes across its affected base blocks.
         is_friend_gene_for_walkable_block = is_friend_gene_for_walkable_block_per_thread[threadid()]
         friend_position_per_gene = friend_position_per_gene_per_thread[threadid()]
         fill!(is_friend_gene_for_walkable_block, false)
         for base_block_index in affected_base_block_indices
-            for friend_gene_index in friend_gene_indices_per_base_block[base_block_index]
+            for friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index]
                 is_friend_gene_for_walkable_block[friend_gene_index] = true
             end
         end
@@ -2386,7 +2378,7 @@ function precompute_walkable_indirection(
         for base_block_index in affected_base_block_indices
             friend_position_per_series_per_base_block[base_block_index] = [
                 friend_position_per_gene[friend_gene_index] for
-                friend_gene_index in friend_gene_indices_per_base_block[base_block_index]
+                friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index]
             ]
             @views is_in_base_neighborhood_for_base_block =
                 is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]

@@ -257,7 +257,11 @@
 <code>cells_dispersion
 </code> is above 
 <code>max_cells_dispersion_in_metacell
-</code>. This still leaves us with multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation with most-correlated marker genes in the (previous round&#39;s) neighborhoods. To stabilize the choice as sharpening proceeds, a candidate whose number of clusters differs from the expected number must improve this prediction by an extra 
+</code>. This still leaves us with multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation, across the pertinent (non-lateral) marker genes of each (previous round&#39;s) neighborhood, between each cell&#39;s log gene fraction and the punctuated (leave-one-out) log fraction of the same gene in the metacell we are considering placing the cell in. This is the measure reported by 
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block">
+<code>matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
+</code>
+</a>, evaluated against the previous round&#39;s neighborhoods. To stabilize the choice as sharpening proceeds, a candidate whose number of clusters differs from the expected number must improve this prediction by an extra 
 <code>cooldown_margin
 </code> for each cluster of difference. The 
 <code>sharpening_round
@@ -455,6 +459,10 @@
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
 </p>
 <p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -481,12 +489,10 @@
 </strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
 </p>
 <p>
-<strong>gene, block @ most
-<em>correlated
-</em>gene
-<em>in
-</em>neighborhood
-</strong>::AbstractString (required): The most correlated neighborhood marker gene of each neighborhood marker gene per block.
+<strong>gene, block @ is
+<em>neighborhood
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
 </p>
 <p>
 <strong>block, module @ mean

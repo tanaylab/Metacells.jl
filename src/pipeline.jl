@@ -12,6 +12,7 @@ module Pipeline
 export analyze_metacells!
 export import_base_metacells!
 export prepare_metacells!
+export qc_metacells!
 
 using DataAxesFormats
 using Random
@@ -30,11 +31,13 @@ using ..ProjectCells
 import Random.default_rng
 
 # Needed because of JET:
+import Metacells.Contracts.base_block_axis
 import Metacells.Contracts.block_axis
 import Metacells.Contracts.cell_axis
 import Metacells.Contracts.gene_axis
 import Metacells.Contracts.matrix_of_cells_dispersion_per_metacell_per_module
 import Metacells.Contracts.matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
+import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
 import Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block
@@ -50,8 +53,6 @@ import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_m
 import Metacells.Contracts.matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_module_per_gene_per_block
 import Metacells.Contracts.matrix_of_module_status_per_gene_per_block
-import Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
-import Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.matrix_of_n_genes_per_module_per_block
 import Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_block
@@ -87,6 +88,7 @@ import Metacells.Contracts.vector_of_is_regulator_per_gene
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
 import Metacells.Contracts.vector_of_marker_rank_per_gene
 import Metacells.Contracts.vector_of_is_base_outlier_per_cell
+import Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_metacell
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
@@ -210,8 +212,6 @@ $(CONTRACT)
         vector_of_n_neighborhood_cells_per_block(CreatedOutput),
         vector_of_total_neighborhood_UMIs_per_block(CreatedOutput),
         matrix_of_is_neighborhood_marker_per_gene_per_block(CreatedOutput),
-        matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
-        matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
 
         # The environment of each block, which the gene modules are estimated over.
         matrix_of_is_in_environment_per_metacell_per_block(CreatedOutput),
@@ -284,10 +284,6 @@ $(CONTRACT)
     compute_matrix_of_is_environment_distinct_per_gene_per_block!(daf; overwrite)
     compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!(daf; overwrite)
 
-    # Always recomputed rather than inherited: this describes the metacells of this round, and a repository chained onto
-    # an earlier one would otherwise keep that round's answer.
-    compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!(daf; overwrite = true)
-
     # The gene modules of each block - the local programs the sharpening clusters cells by.
     compute_blocks_modules!(daf; module_status, rng, overwrite)
     compute_vector_of_n_modules_per_block!(daf; overwrite)
@@ -339,6 +335,86 @@ $(CONTRACT2)
         unify_empty_vector_values!(metacells_daf; axis = "cell", property = "metacell", empty_values = empty_metacells)
     end
     compute_vector_of_is_base_outlier_per_cell!(; cells_daf, metacells_daf, overwrite)
+    return nothing
+end
+
+"""
+    function qc_metacells!(;
+        daf::DafWriter,
+        base_daf::DafReader,
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Say how well the metacells describe the cells they were aggregated from, judged in the locations of the manifold a base
+repository laid out.
+
+Each cell is correlated against its own metacell minus itself, over the cells of each base block's neighborhood, and
+the result is averaged over the environment marker genes of that base block. A higher number means the metacells of
+that location are a better account of the cells there. Only metacells scored against the same `base_daf` can be
+compared to each other, since it is the `base_daf` which decides both the locations and the genes each of them is read
+by. A repository is free to be its own base, which is how the metacells the sharpening started from are scored.
+
+# Daf
+
+$(CONTRACT1)
+
+# Base
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "daf",
+    axes = [
+        gene_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        base_block_axis(GuaranteedOutput),
+    ],
+    data = [
+        # The gene masks are read from `base_daf`; this repository's may differ and are not consulted.
+        vector_of_is_excluded_per_gene(OptionalInput),
+        vector_of_is_lateral_per_gene(OptionalInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        vector_of_metacell_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+            CreatedOutput,
+        ),
+        vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block(
+            CreatedOutput,
+        ),
+    ],
+) Contract(;
+    name = "base_daf",
+    axes = [
+        gene_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        block_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_is_marker_per_gene(RequiredInput),
+        vector_of_is_lateral_per_gene(RequiredInput),
+        matrix_of_is_neighborhood_marker_per_gene_per_block(RequiredInput),
+        matrix_of_is_environment_marker_per_gene_per_block(RequiredInput),
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        vector_of_n_neighborhood_cells_per_block(RequiredInput),
+        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
+    ],
+) function qc_metacells!(; daf::DafWriter, base_daf::DafReader, overwrite::Bool = false)::Nothing
+    compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;
+        other_daf = daf,
+        base_daf,
+        overwrite,
+    )
+    compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!(;
+        other_daf = daf,
+        base_daf,
+        overwrite,
+    )
     return nothing
 end
 

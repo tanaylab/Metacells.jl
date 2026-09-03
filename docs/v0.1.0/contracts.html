@@ -3868,6 +3868,42 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block">
+<code>Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The mean of 
+<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
+<code>matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
+</code>
+</a> over the environment marker genes of each base block which are not lateral and which took part in the correlation. This is the single number saying how well the metacells describe the cells in each location of the manifold, so metacells scored against the same base repository can be compared to each other. This is 
+<code>NaN
+</code> for a base block with no such gene.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!">
+<code>compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block">
 <a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block">
 <code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block
@@ -4610,6 +4646,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_marker_rank_per_gene">
 <code>Metacells.Contracts.vector_of_marker_rank_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block">
+<code>Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
 </code>
 </a>
 </li>
