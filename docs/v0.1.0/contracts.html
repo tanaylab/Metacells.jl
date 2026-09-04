@@ -1696,9 +1696,9 @@
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.vector_of_base_block_per_metacell">
-<a class="docstring-binding" href="#Metacells.Contracts.vector_of_base_block_per_metacell">
-<code>Metacells.Contracts.vector_of_base_block_per_metacell
+<summary id="Metacells.Contracts.vector_of_prev_block_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_prev_block_per_metacell">
+<code>Metacells.Contracts.vector_of_prev_block_per_metacell
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1707,12 +1707,12 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">vector_of_base_block_per_metacell(
+<code class="language-julia hljs">vector_of_prev_block_per_metacell(
     expectation::ContractExpectation
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The unique base block each sharpened metacell belongs to. This refers to the blocks of the base metacells, not to the new blocks computed for the sharpened metacells (if any).
+<p>The unique previous round&#39;s block each sharpened metacell belongs to. This refers to the blocks of the metacells the sharpening started from, not to the new blocks computed for the sharpened metacells (if any). The sharpening assigns each cell to one such block and then clusters each block&#39;s cells on their own, so a sharpened metacell never straddles two of them.
 </p>
 <p>This vector is populated by 
 <a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
@@ -4518,12 +4518,6 @@
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.vector_of_base_block_per_metacell">
-<code>Metacells.Contracts.vector_of_base_block_per_metacell
-</code>
-</a>
-</li>
-<li>
 <a href="contracts.html#Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell">
 <code>Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 </code>
@@ -4760,6 +4754,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell">
 <code>Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_prev_block_per_metacell">
+<code>Metacells.Contracts.vector_of_prev_block_per_metacell
 </code>
 </a>
 </li>

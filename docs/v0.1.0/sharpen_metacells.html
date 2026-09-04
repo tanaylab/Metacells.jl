@@ -199,7 +199,7 @@
 <pre>
 <code class="language-julia hljs">function sharpen_metacells!(;
     sharp_daf::DafWriter,
-    base_daf::DafReader,
+    prev_daf::DafReader,
     prefix::AbstractString = ```&quot;M&quot;```,
     min_cells_in_metacell::Integer = ```12```,
     max_cells_in_metacell::Integer = ```800```,
@@ -222,8 +222,8 @@
 )::Nothing
 </code>
 </pre>
-<p>Given an 
-<code>base_daf
+<p>Given a 
+<code>prev_daf
 </code> metacells repository with a blocks structure and local gene modules that describe the cell state manifold, compute a 
 <code>sharp_daf
 </code> metacells repository, which hopefully more faithfully captures this manifold.
@@ -233,13 +233,13 @@
 <code>std_fraction_regularization
 </code>, and increase the standard deviation by it - so that modules with a tiny standard deviation will not turn single-UMI noise into a large z-score. This regularization is specified in UMIs (
 <code>std_UMIs_regularization
-</code>) and is converted to a linear fraction by dividing it by the mean total UMIs of a cell in the block&#39;s neighborhood. The number of clusters is the number of base metacells in that neighborhood.
+</code>) and is converted to a linear fraction by dividing it by the mean total UMIs of a cell in the block&#39;s neighborhood. The number of clusters is the number of previous round&#39;s metacells in that neighborhood.
 </li>
-<li>We assign to each cluster the base block which is most frequent in the cluster cells. Cells of the base base block of the neighborhood, which belong to a cluster that is assigned to a different block, and which also belong to a cluster of that block in the neighborhood of that block, are migrated to that block, but only if the enrichment of the cells of that block in the cluster is at least 
+<li>We assign to each cluster the previous round&#39;s block which is most frequent in the cluster cells. Cells of the block whose neighborhood this is, which belong to a cluster that is assigned to a different block, and which also belong to a cluster of that block in the neighborhood of that block, are migrated to that block, but only if the enrichment of the cells of that block in the cluster is at least 
 <code>min_migration_likelihood
-</code> times what would be expected assuming random clustering based on the relative sizes of the base and other blocks.
+</code> times what would be expected assuming random clustering based on the relative sizes of the two blocks.
 </li>
-<li>Having finalized the block to which each cell belongs to, we cluster all the cells in each block using K-means using the modules of the neighborhood of that block. We start with the expected number of metacells in that block (based on the mean number of cells per metacell in the base block) and adjust the number of clusters to try and enforce the sizes of the clusters - not more than twice that mean, no more than 
+<li>Having finalized the block to which each cell belongs to, we cluster all the cells in each block using K-means using the modules of the neighborhood of that block. We start with the expected number of metacells in that block (based on the mean number of cells per metacell in the previous round&#39;s block) and adjust the number of clusters to try and enforce the sizes of the clusters - not more than twice that mean, no more than 
 <code>max_cells_in_metacell
 </code>, and no less than 
 <code>min_cells_in_metacell
@@ -333,8 +333,8 @@
 </strong>::AbstractString (created): The unique metacell each cell belongs to.
 </p>
 <p>
-<strong>metacell @ base_block
-</strong>::AbstractString (created): The unique base block each sharpened metacell belongs to.
+<strong>metacell @ prev_block
+</strong>::AbstractString (created): The unique previous round&#39;s block each sharpened metacell belongs to.
 </p>
 <p>
 <strong>cell @ prev
@@ -529,7 +529,7 @@
 <pre>
 <code class="language-julia hljs">compute_matrix_of_n_cells_per_prev_block_per_block!(;
     other_daf::DafWriter,
-    base_daf::DafReader,
+    prev_daf::DafReader,
     overwrite::Bool = false,
 )::Nothing
 </code>
@@ -925,7 +925,7 @@
 <pre>
 <code class="language-julia hljs">compute_vector_of_global_flow_order_per_type!(
     final_daf::DafReader,
-    base_daf_per_round::AbstractVector{&lt;:DafReader};
+    daf_per_round::AbstractVector{&lt;:DafReader};
     output_daf::DafWriter,
     restarts::Integer = 20,
     rng::AbstractRNG = default_rng(),
@@ -940,7 +940,7 @@
 </a>, a global order of the types minimizing the total weighted crossings of the type flow across the sharpening rounds.
 </p>
 <p>The 
-<code>base_daf_per_round
+<code>daf_per_round
 </code> are the repositories of the earlier rounds (rounds 0 to N-1) and 
 <code>final_daf
 </code> is the last round (round N); together they form the full sequence of rounds 0 to N, which must all share the same 
@@ -957,7 +957,7 @@
 <code>restarts
 </code> restarts, since the problem is NP-hard) and write the resulting order into 
 <code>output_daf
-</code>, which is typically the base repository shared by all the rounds, so that they all see the same order.
+</code>, which is typically the prev repository shared by all the rounds, so that they all see the same order.
 </p>
 <p>
 <strong>Rounds

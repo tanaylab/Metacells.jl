@@ -79,7 +79,7 @@ export projected_block_axis
 export tensor_of_linear_fraction_per_block_per_module_per_metacell
 export type_axis
 export vector_of_anchor_per_module
-export vector_of_base_block_per_metacell
+export vector_of_prev_block_per_metacell
 export vector_of_block_closest_by_pertinent_markers_per_cell
 export vector_of_block_per_metacell
 export vector_of_color_per_type
@@ -975,18 +975,20 @@ function vector_of_block_per_metacell(expectation::ContractExpectation)::Pair{Ve
 end
 
 """
-    vector_of_base_block_per_metacell(
+    vector_of_prev_block_per_metacell(
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
-The unique base block each sharpened metacell belongs to. This refers to the blocks of the base metacells,
-not to the new blocks computed for the sharpened metacells (if any).
+The unique previous round's block each sharpened metacell belongs to. This refers to the blocks of the metacells the
+sharpening started from, not to the new blocks computed for the sharpened metacells (if any). The sharpening assigns
+each cell to one such block and then clusters each block's cells on their own, so a sharpened metacell never straddles
+two of them.
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
-function vector_of_base_block_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
-    return ("metacell", "base_block") =>
-        (expectation, AbstractString, "The unique base block each sharpened metacell belongs to.")
+function vector_of_prev_block_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "prev_block") =>
+        (expectation, AbstractString, "The unique previous round's block each sharpened metacell belongs to.")
 end
 
 """

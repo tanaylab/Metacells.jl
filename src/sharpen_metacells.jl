@@ -48,7 +48,7 @@ import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.module_axis
 import Metacells.Contracts.prev_block_axis
 import Metacells.Contracts.type_axis
-import Metacells.Contracts.vector_of_base_block_per_metacell
+import Metacells.Contracts.vector_of_prev_block_per_metacell
 import Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_block_per_metacell
@@ -172,19 +172,19 @@ end
 
 @kwdef mutable struct DeltaCorrelationContext
     # Global baseline (shared across walkable blocks).
-    grouped_per_base_block::AbstractVector{GroupedSeriesCorrelations{Float32}}
-    baseline_mean_correlation_per_base_block::AbstractVector{Float32}
-    group_index_per_block_per_base_block::AbstractMatrix{<:Integer}
+    grouped_per_prev_block::AbstractVector{GroupedSeriesCorrelations{Float32}}
+    baseline_mean_correlation_per_prev_block::AbstractVector{Float32}
+    group_index_per_block_per_prev_block::AbstractMatrix{<:Integer}
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer}
     total_UMIs_per_cell::AbstractVector{<:Integer}
     gene_fraction_regularization::Float32
     # Per-walkable-block (assigned per work item before the `compute_delta_correlation` call).
     walkable_block_index::Int
     block_cell_indices::AbstractVector{<:Integer}
-    affected_base_block_indices::AbstractVector{<:Integer}
+    affected_prev_block_indices::AbstractVector{<:Integer}
     gene_index_per_friend::AbstractVector{<:Integer}
-    friend_position_per_series_per_base_block::Dict{Int, Vector{Int}}
-    block_cell_position_per_point_per_base_block::Dict{Int, Vector{Int}}
+    friend_position_per_series_per_prev_block::Dict{Int, Vector{Int}}
+    block_cell_position_per_point_per_prev_block::Dict{Int, Vector{Int}}
     # Per-thread scratch (sized to the walkable blocks' maxima).
     total_UMIs_per_max_cluster::Vector{Float64}
     UMIs_per_friend_per_max_cluster::Matrix{Float64}
@@ -208,7 +208,7 @@ end
 """
     function sharpen_metacells!(;
         sharp_daf::DafWriter,
-        base_daf::DafReader,
+        prev_daf::DafReader,
         prefix::AbstractString = $(DEFAULT.prefix),
         min_cells_in_metacell::Integer = $(DEFAULT.min_cells_in_metacell),
         max_cells_in_metacell::Integer = $(DEFAULT.max_cells_in_metacell),
@@ -230,7 +230,7 @@ end
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Given an `base_daf` metacells repository with a blocks structure and local gene modules that describe the cell state
+Given a `prev_daf` metacells repository with a blocks structure and local gene modules that describe the cell state
 manifold, compute a `sharp_daf` metacells repository, which hopefully more faithfully captures this manifold.
 
  1. We cluster using K-means all the cells in each neighborhood using the z-score of the expression of the modules of
@@ -239,16 +239,16 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     difference from the mean away from zero by `std_fraction_regularization`, and increase the standard deviation by
     it - so that modules with a tiny standard deviation will not turn single-UMI noise into a large z-score. This
     regularization is specified in UMIs (`std_UMIs_regularization`) and is converted to a linear fraction by dividing
-    it by the mean total UMIs of a cell in the block's neighborhood. The number of clusters is the number of base
-    metacells in that neighborhood.
- 2. We assign to each cluster the base block which is most frequent in the cluster cells.
-    Cells of the base base block of the neighborhood, which belong to a cluster that is assigned to a different
+    it by the mean total UMIs of a cell in the block's neighborhood. The number of clusters is the number of previous
+    round's metacells in that neighborhood.
+ 2. We assign to each cluster the previous round's block which is most frequent in the cluster cells.
+    Cells of the block whose neighborhood this is, which belong to a cluster that is assigned to a different
     block, and which also belong to a cluster of that block in the neighborhood of that block, are migrated to that
     block, but only if the enrichment of the cells of that block in the cluster is at least `min_migration_likelihood`
-    times what would be expected assuming random clustering based on the relative sizes of the base and other blocks.
+    times what would be expected assuming random clustering based on the relative sizes of the two blocks.
  3. Having finalized the block to which each cell belongs to, we cluster all the cells in each block using K-means
     using the modules of the neighborhood of that block. We start with the expected number of metacells in that block
-    (based on the mean number of cells per metacell in the base block) and adjust the number of clusters to try and
+    (based on the mean number of cells per metacell in the previous round's block) and adjust the number of clusters to try and
     enforce the sizes of the clusters - not more than twice that mean, no more than `max_cells_in_metacell`, and no less
     than `min_cells_in_metacell`. A cluster is also considered too-large if it is larger than `max_cells_in_metacell`,
     if its maximal `cells_dispersion` (across the block's modules) is above `max_cells_dispersion_in_metacell`, and
@@ -299,7 +299,7 @@ $(CONTRACT2)
     axes = [cell_axis(RequiredInput), metacell_axis(CreatedOutput)],
     data = [
         vector_of_metacell_per_cell(CreatedOutput),
-        vector_of_base_block_per_metacell(CreatedOutput),
+        vector_of_prev_block_per_metacell(CreatedOutput),
         vector_of_outlier_in_prev_block_per_cell(CreatedOutput),
         vector_of_outlier_in_metacell_per_cell(CreatedOutput),
         vector_of_outlier_by_prev_block_per_cell(CreatedOutput),
@@ -308,7 +308,7 @@ $(CONTRACT2)
         vector_of_outlier_actual_UMIs_per_cell(CreatedOutput),
     ],
 ) Contract(;
-    name = "base_daf",
+    name = "prev_daf",
     axes = [
         cell_axis(RequiredInput),
         metacell_axis(RequiredInput),
@@ -340,7 +340,7 @@ $(CONTRACT2)
     ],
 ) function sharpen_metacells!(;
     sharp_daf::DafWriter,
-    base_daf::DafReader,
+    prev_daf::DafReader,
     prefix::AbstractString = "M",
     min_cells_in_metacell::Integer = 12,
     max_cells_in_metacell::Integer = 800,
@@ -382,39 +382,39 @@ $(CONTRACT2)
     @assert min_outlier_fold > 0
     @assert outlier_UMIs_regularization > 0
 
-    n_cells = axis_length(base_daf, "cell")
-    n_blocks = axis_length(base_daf, "block")
-    n_base_metacells = axis_length(base_daf, "metacell")
-    name_per_block = axis_vector(base_daf, "block")
+    n_cells = axis_length(prev_daf, "cell")
+    n_blocks = axis_length(prev_daf, "block")
+    n_prev_metacells = axis_length(prev_daf, "metacell")
+    name_per_block = axis_vector(prev_daf, "block")
 
-    UMIs_per_cell_per_gene = get_matrix(base_daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = mutable_array(densify(get_vector(base_daf, "cell", "total_UMIs").array))
+    UMIs_per_cell_per_gene = get_matrix(prev_daf, "cell", "gene", "UMIs").array
+    total_UMIs_per_cell = mutable_array(densify(get_vector(prev_daf, "cell", "total_UMIs").array))
 
     mean_linear_fraction_in_environment_cells_per_module_per_block =
-        get_matrix(base_daf, "module", "block", "mean_linear_fraction_in_environment_cells").array
+        get_matrix(prev_daf, "module", "block", "mean_linear_fraction_in_environment_cells").array
     std_linear_fraction_in_environment_cells_per_module_per_block =
-        get_matrix(base_daf, "module", "block", "std_linear_fraction_in_environment_cells").array
+        get_matrix(prev_daf, "module", "block", "std_linear_fraction_in_environment_cells").array
 
     # The z-score regularization is specified in UMIs; convert it to a linear fraction using the mean total UMIs of a
     # cell in each block's neighborhood.
     mean_total_UMIs_in_neighborhood_cells_per_block =
-        get_vector(base_daf, "block", "total_neighborhood_UMIs").array ./
-        get_vector(base_daf, "block", "n_neighborhood_cells").array
+        get_vector(prev_daf, "block", "total_neighborhood_UMIs").array ./
+        get_vector(prev_daf, "block", "n_neighborhood_cells").array
     std_fraction_regularization_per_block =
         Float32.(std_UMIs_regularization ./ mean_total_UMIs_in_neighborhood_cells_per_block)
 
-    is_in_neighborhood_per_other_block_per_base_block =
-        get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
-    is_found_per_module_per_block = get_matrix(base_daf, "module", "block", "is_found").array
-    module_index_per_gene_per_block = base_daf["@ gene @ block :: module ?? 0 : index"].array
+    is_in_neighborhood_per_other_block_per_prev_block =
+        get_matrix(prev_daf, "block", "block", "is_in_neighborhood").array
+    is_found_per_module_per_block = get_matrix(prev_daf, "module", "block", "is_found").array
+    module_index_per_gene_per_block = prev_daf["@ gene @ block :: module ?? 0 : index"].array
 
-    block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
-    is_base_outlier_per_cell = get_vector(base_daf, "cell", "is_base_outlier").array
-    is_excluded_per_cell = get_vector(base_daf, "cell", "is_excluded").array
-    closest_block_index_per_cell = base_daf["@ cell : block.closest_by_pertinent_markers : index"].array
+    block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
+    is_base_outlier_per_cell = get_vector(prev_daf, "cell", "is_base_outlier").array
+    is_excluded_per_cell = get_vector(prev_daf, "cell", "is_excluded").array
+    closest_block_index_per_cell = prev_daf["@ cell : block.closest_by_pertinent_markers : index"].array
     # Base outliers and excluded cells are never clustered. Every other cell gets a block: grouped cells use their
     # metacell's block; round outliers (lost their metacell in a previous sharpening round) use the closest block by
-    # pertinent markers as a synthetic base.
+    # pertinent markers as a synthetic previous block.
     block_index_per_cell = ifelse.(
         is_base_outlier_per_cell .| is_excluded_per_cell,
         zero(eltype(block_index_per_cell)),
@@ -443,14 +443,14 @@ $(CONTRACT2)
         return nothing
     end
 
-    n_metacells_per_block = get_vector(base_daf, "block", "n_metacells").array
-    block_index_per_metacell = base_daf["@ metacell : block : index"].array
-    max_cells_dispersion_per_metacell = base_daf["@ module @ metacell :: cells_dispersion >- Max"].array
-    @assert_vector(max_cells_dispersion_per_metacell, n_base_metacells)
+    n_metacells_per_block = get_vector(prev_daf, "block", "n_metacells").array
+    block_index_per_metacell = prev_daf["@ metacell : block : index"].array
+    max_cells_dispersion_per_metacell = prev_daf["@ module @ metacell :: cells_dispersion >- Max"].array
+    @assert_vector(max_cells_dispersion_per_metacell, n_prev_metacells)
 
     n_target_metacells_per_block = copy_array(n_metacells_per_block)
     n_added_metacells = 0
-    for metacell_index in 1:n_base_metacells
+    for metacell_index in 1:n_prev_metacells
         if max_cells_dispersion_per_metacell[metacell_index] > max_cells_dispersion_in_metacell
             block_index = block_index_per_metacell[metacell_index]
             if (n_target_metacells_per_block[block_index] + 1) * target_min_cells_per_block[block_index] * 2 <
@@ -460,17 +460,17 @@ $(CONTRACT2)
             end
         end
     end
-    @debug "Adding metacells: $(n_added_metacells) to base: $(n_base_metacells) due to cells dispersion" _group =
+    @debug "Adding metacells: $(n_added_metacells) to prev: $(n_prev_metacells) due to cells dispersion" _group =
         :mcs_results
 
     mean_metacell_cells_per_block = n_cells_per_block ./ max.(n_target_metacells_per_block, 1)
 
-    n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
+    n_modules_per_block = get_vector(prev_daf, "block", "n_modules").array
     max_n_block_modules = maximum(n_modules_per_block)
     n_neighborhood_cells_per_block = [
         sum(
             (block_index_per_cell .> 0) .& getindex.(
-                Ref(is_in_neighborhood_per_other_block_per_base_block[:, block_index]),
+                Ref(is_in_neighborhood_per_other_block_per_prev_block[:, block_index]),
                 max.(block_index_per_cell, 1),
             ),
         ) for block_index in 1:n_blocks
@@ -507,7 +507,7 @@ $(CONTRACT2)
     end
 
     preferred_block_index_per_cell_per_block = compute_preferred_block_index_per_cell_per_block(;
-        base_daf,
+        prev_daf,
         kmeans_rounds,
         name_per_block,
         n_cells_per_block,
@@ -516,7 +516,7 @@ $(CONTRACT2)
         UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         mean_metacell_cells_per_block,
-        is_in_neighborhood_per_other_block_per_base_block,
+        is_in_neighborhood_per_other_block_per_prev_block,
         is_found_per_module_per_block,
         module_index_per_gene_per_block,
         mean_linear_fraction_in_environment_cells_per_module_per_block,
@@ -569,31 +569,31 @@ $(CONTRACT2)
         ) for _ in 1:maxthreadid()
     ]
 
-    # The tie-break evaluates against the previous round (base_daf), so its blocks are the base blocks.
-    base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
-    is_in_base_neighborhood_per_other_base_block_per_base_block = is_in_neighborhood_per_other_block_per_base_block
-    is_lateral_per_gene = get_vector(base_daf, "gene", "is_lateral").array
-    is_neighborhood_marker_per_gene_per_base_block =
-        get_matrix(base_daf, "gene", "block", "is_neighborhood_marker").array
-    n_base_blocks = n_blocks
+    # The tie-break evaluates against the previous round (prev_daf), so its blocks are the prev blocks.
+    prev_block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
+    is_in_prev_neighborhood_per_other_prev_block_per_prev_block = is_in_neighborhood_per_other_block_per_prev_block
+    is_lateral_per_gene = get_vector(prev_daf, "gene", "is_lateral").array
+    is_neighborhood_marker_per_gene_per_prev_block =
+        get_matrix(prev_daf, "gene", "block", "is_neighborhood_marker").array
+    n_prev_blocks = n_blocks
 
-    # Per base block, the genes whose correlation series the tie-break evaluates, as raw (global) gene indices: the
-    # pertinent (non-lateral) markers of the base block's neighborhood. This is the gene set
+    # Per prev block, the genes whose correlation series the tie-break evaluates, as raw (global) gene indices: the
+    # pertinent (non-lateral) markers of the prev block's neighborhood. This is the gene set
     # `compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!` averages
-    # over, so the tie-break optimizes the measure the analysis reports. Consumed by `build_grouped_for_base_block`
+    # over, so the tie-break optimizes the measure the analysis reports. Consumed by `build_grouped_for_prev_block`
     # (for reading `UMIs_per_cell_per_gene` columns) and by `precompute_walkable_indirection` (to build each walkable
     # block's gene subspace).
-    pertinent_neighborhood_marker_gene_indices_per_base_block = Vector{Vector{Int}}(undef, n_base_blocks)
+    pertinent_neighborhood_marker_gene_indices_per_prev_block = Vector{Vector{Int}}(undef, n_prev_blocks)
     is_pertinent_neighborhood_marker_per_gene = BitVector(undef, n_genes)
-    for base_block_index in 1:n_base_blocks
-        @views is_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene_per_base_block[:, base_block_index]
+    for prev_block_index in 1:n_prev_blocks
+        @views is_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene_per_prev_block[:, prev_block_index]
         @. is_pertinent_neighborhood_marker_per_gene = is_neighborhood_marker_per_gene & !is_lateral_per_gene
-        pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index] =
+        pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index] =
             findall(is_pertinent_neighborhood_marker_per_gene)
     end
 
     local_clusters_per_block = compute_local_clusters(;
-        base_daf,
+        prev_daf,
         UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         min_cells_in_metacell,
@@ -613,9 +613,9 @@ $(CONTRACT2)
         mean_linear_fraction_in_environment_cells_per_module_per_block,
         std_linear_fraction_in_environment_cells_per_module_per_block,
         std_fraction_regularization_per_block,
-        base_block_index_per_cell,
-        is_in_base_neighborhood_per_other_base_block_per_base_block,
-        pertinent_neighborhood_marker_gene_indices_per_base_block,
+        prev_block_index_per_cell,
+        is_in_prev_neighborhood_per_other_prev_block_per_prev_block,
+        pertinent_neighborhood_marker_gene_indices_per_prev_block,
         gene_fraction_regularization,
         max_n_kmeans_clusters,
         kmeans_sizes_max_buffers_per_thread,
@@ -624,7 +624,7 @@ $(CONTRACT2)
     )
 
     cells_of_sharp_metacells, block_index_per_sharp_metacell =
-        combine_local_clusters(; local_clusters_per_block, n_base_metacells)
+        combine_local_clusters(; local_clusters_per_block, n_prev_metacells)
 
     outlier_certificates = eject_outliers!(;
         cells_of_sharp_metacells,
@@ -641,14 +641,14 @@ $(CONTRACT2)
         UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         name_per_block,
-        name_per_module = axis_vector(base_daf, "module"),
+        name_per_module = axis_vector(prev_daf, "module"),
         n_cells,
         n_genes,
-        n_modules = axis_length(base_daf, "module"),
+        n_modules = axis_length(prev_daf, "module"),
         n_blocks,
     )
 
-    name_per_sharp_metacell = group_names(axis_vector(base_daf, "cell"), cells_of_sharp_metacells; prefix)  # NOJET
+    name_per_sharp_metacell = group_names(axis_vector(prev_daf, "cell"), cells_of_sharp_metacells; prefix)  # NOJET
     sharp_metacell_name_per_cell = fill("", n_cells)
     for (sharp_metacell_name, cells_of_sharp_metacell) in zip(name_per_sharp_metacell, cells_of_sharp_metacells)
         sharp_metacell_name_per_cell[cells_of_sharp_metacell] .= sharp_metacell_name
@@ -669,7 +669,7 @@ $(CONTRACT2)
 
     add_axis!(sharp_daf, "metacell", name_per_sharp_metacell; overwrite)
     set_vector!(sharp_daf, "cell", "metacell", sharp_metacell_name_per_cell; overwrite)
-    set_vector!(sharp_daf, "metacell", "base_block", name_per_block[block_index_per_sharp_metacell]; overwrite)
+    set_vector!(sharp_daf, "metacell", "prev_block", name_per_block[block_index_per_sharp_metacell]; overwrite)
     set_vector!(sharp_daf, "cell", "prev_block.outlier_in", outlier_in_block_name_per_cell; overwrite)
     set_vector!(sharp_daf, "cell", "metacell.outlier_in", outlier_in_metacell_name_per_cell; overwrite)
     set_vector!(sharp_daf, "cell", "prev_block.outlier_by", outlier_certificates.by_prev_block_name_per_cell; overwrite)
@@ -687,7 +687,7 @@ $(CONTRACT2)
 end
 
 function compute_preferred_block_index_per_cell_per_block(;
-    base_daf::DafReader,
+    prev_daf::DafReader,
     kmeans_rounds::Integer,
     name_per_block::AbstractVector{<:AbstractString},
     n_cells_per_block::AbstractVector{<:Integer},
@@ -696,7 +696,7 @@ function compute_preferred_block_index_per_cell_per_block(;
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     mean_metacell_cells_per_block::AbstractVector{<:AbstractFloat},
-    is_in_neighborhood_per_other_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    is_in_neighborhood_per_other_block_per_prev_block::Union{AbstractMatrix{Bool}, BitMatrix},
     min_migration_likelihood::AbstractFloat,
     is_found_per_module_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
@@ -708,9 +708,9 @@ function compute_preferred_block_index_per_cell_per_block(;
 )::Vector{Maybe{SparseVector{<:Integer}}}
     n_cells = length(block_index_per_cell)
     n_blocks = length(name_per_block)
-    n_modules = axis_length(base_daf, "module")
+    n_modules = axis_length(prev_daf, "module")
 
-    n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
+    n_modules_per_block = get_vector(prev_daf, "block", "n_modules").array
     max_n_block_modules = maximum(n_modules_per_block)
 
     max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
@@ -754,7 +754,7 @@ function compute_preferred_block_index_per_cell_per_block(;
             desc = "preferred_block_index_per_cell_per_block",
         ),
     ) do block_index, rng
-        @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_base_block[:, block_index]
+        @views is_in_neighborhood_per_other_block = is_in_neighborhood_per_other_block_per_prev_block[:, block_index]
         is_in_neighborhood_per_cell = is_in_neighborhood_per_cell_per_thread[threadid()]
         is_in_neighborhood_per_cell .=
             (block_index_per_cell .> 0) .&
@@ -924,14 +924,14 @@ function compute_preferred_block_index_of_cells(;
         progress = DebugProgress(n_cells; group = :mcs_loops, desc = "preferred_block_index_of_cells"),
         progress_chunk = 100,
     ) do cell_index
-        base_block_index_of_cell = block_index_per_cell[cell_index]
-        if base_block_index_of_cell == 0
+        prev_block_index_of_cell = block_index_per_cell[cell_index]
+        if prev_block_index_of_cell == 0
             return nothing
         end
 
-        preferred_block_index_per_block = preferred_block_index_per_cell_per_block[base_block_index_of_cell]
+        preferred_block_index_per_block = preferred_block_index_per_cell_per_block[prev_block_index_of_cell]
         if preferred_block_index_per_block === nothing
-            new_block_index_per_cell[cell_index] = base_block_index_of_cell
+            new_block_index_per_cell[cell_index] = prev_block_index_of_cell
             atomic_add!(n_stationary, 1)
             return nothing
         end
@@ -945,17 +945,17 @@ function compute_preferred_block_index_of_cells(;
         end
 
         if preferred_block_index_per_other_block === nothing
-            new_block_index_per_cell[cell_index] = base_block_index_of_cell
+            new_block_index_per_cell[cell_index] = prev_block_index_of_cell
             atomic_add!(n_stationary, 1)
             return nothing
         end
 
         back_preferred_block_index_of_cell = preferred_block_index_per_other_block[cell_index]
-        if preferred_block_index_of_cell == base_block_index_of_cell
-            new_block_index_per_cell[cell_index] = base_block_index_of_cell
+        if preferred_block_index_of_cell == prev_block_index_of_cell
+            new_block_index_per_cell[cell_index] = prev_block_index_of_cell
             atomic_add!(n_stationary, 1)
         elseif back_preferred_block_index_of_cell != preferred_block_index_of_cell
-            new_block_index_per_cell[cell_index] = base_block_index_of_cell
+            new_block_index_per_cell[cell_index] = prev_block_index_of_cell
             atomic_add!(n_restless, 1)
         else
             new_block_index_per_cell[cell_index] = preferred_block_index_of_cell
@@ -975,7 +975,7 @@ function compute_preferred_block_index_of_cells(;
 end
 
 function compute_local_clusters(;
-    base_daf::DafReader,
+    prev_daf::DafReader,
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     min_cells_in_metacell::Integer,
@@ -995,9 +995,9 @@ function compute_local_clusters(;
     mean_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     std_linear_fraction_in_environment_cells_per_module_per_block::Maybe{AbstractMatrix{<:AbstractFloat}},
     std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
-    base_block_index_per_cell::AbstractVector{<:Integer},
-    is_in_base_neighborhood_per_other_base_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
-    pertinent_neighborhood_marker_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
+    prev_block_index_per_cell::AbstractVector{<:Integer},
+    is_in_prev_neighborhood_per_other_prev_block_per_prev_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    pertinent_neighborhood_marker_gene_indices_per_prev_block::AbstractVector{<:AbstractVector{<:Integer}},
     gene_fraction_regularization::AbstractFloat,
     max_n_kmeans_clusters::Integer,
     kmeans_sizes_max_buffers_per_thread::AbstractVector{<:KmeansSizesBuffers},
@@ -1006,9 +1006,9 @@ function compute_local_clusters(;
 )::AbstractVector{Maybe{LocalClusters}}
     n_cells = length(total_UMIs_per_cell)
     n_blocks = size(is_found_per_module_per_block, 2)
-    n_modules = axis_length(base_daf, "module")
+    n_modules = axis_length(prev_daf, "module")
     n_genes = size(module_index_per_gene_per_block, 1)
-    n_base_blocks = size(is_in_base_neighborhood_per_other_base_block_per_base_block, 1)
+    n_prev_blocks = size(is_in_prev_neighborhood_per_other_prev_block_per_prev_block, 1)
 
     local_clusters_per_block = Vector{Maybe{LocalClusters}}(undef, n_blocks)
     local_clusters_per_block .= nothing
@@ -1019,7 +1019,7 @@ function compute_local_clusters(;
     n_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
     max_n_block_cells = maximum(n_cells_per_block)
 
-    n_modules_per_block = get_vector(base_daf, "block", "n_modules").array
+    n_modules_per_block = get_vector(prev_daf, "block", "n_modules").array
     max_n_block_modules = maximum(n_modules_per_block)
 
     is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:maxthreadid()]
@@ -1142,27 +1142,27 @@ function compute_local_clusters(;
     end
 
     # `block_cell_indices_per_block` is constant across optimization passes (block membership is fixed by Phase 1;
-    # only cluster assignments within a block change). Same for `n_points_per_base_block` (depends only on
-    # `base_block_index_per_cell` and the neighborhood matrix).
+    # only cluster assignments within a block change). Same for `n_points_per_prev_block` (depends only on
+    # `prev_block_index_per_cell` and the neighborhood matrix).
     block_cell_indices_per_block = [
         local_clusters === nothing ? Int[] : Vector{Int}(local_clusters.block_cell_indices) for
         local_clusters in local_clusters_per_block
     ]
 
-    n_cells_per_cell_base_block = zeros(Int, n_base_blocks)
+    n_cells_per_cell_prev_block = zeros(Int, n_prev_blocks)
     for cell_index in 1:n_cells
-        base_block_of_cell = base_block_index_per_cell[cell_index]
-        if base_block_of_cell > 0
-            n_cells_per_cell_base_block[base_block_of_cell] += 1
+        prev_block_of_cell = prev_block_index_per_cell[cell_index]
+        if prev_block_of_cell > 0
+            n_cells_per_cell_prev_block[prev_block_of_cell] += 1
         end
     end
-    n_points_per_base_block =
-        vec(is_in_base_neighborhood_per_other_base_block_per_base_block' * n_cells_per_cell_base_block)
+    n_points_per_prev_block =
+        vec(is_in_prev_neighborhood_per_other_prev_block_per_prev_block' * n_cells_per_cell_prev_block)
 
-    # Pre-allocate the grouped-correlations outputs; each pass overwrites them via `build_grouped_for_base_block`.
-    grouped_per_base_block = Vector{GroupedSeriesCorrelations{Float32}}(undef, n_base_blocks)
-    baseline_mean_correlation_per_base_block = Vector{Float32}(undef, n_base_blocks)
-    group_index_per_block_per_base_block = zeros(Int, n_blocks, n_base_blocks)
+    # Pre-allocate the grouped-correlations outputs; each pass overwrites them via `build_grouped_for_prev_block`.
+    grouped_per_prev_block = Vector{GroupedSeriesCorrelations{Float32}}(undef, n_prev_blocks)
+    baseline_mean_correlation_per_prev_block = Vector{Float32}(undef, n_prev_blocks)
+    group_index_per_block_per_prev_block = zeros(Int, n_blocks, n_prev_blocks)
 
     # ===== Walkable blocks: those whose Phase 1 produced more than one candidate K =====
     walkable_block_indices = Int[]
@@ -1178,17 +1178,17 @@ function compute_local_clusters(;
     end
 
     (
-        affected_base_block_indices_per_walkable_block,
+        affected_prev_block_indices_per_walkable_block,
         gene_index_per_friend_per_walkable_block,
-        friend_position_per_series_per_base_block_per_walkable_block,
-        block_cell_position_per_point_per_base_block_per_walkable_block,
+        friend_position_per_series_per_prev_block_per_walkable_block,
+        block_cell_position_per_point_per_prev_block_per_walkable_block,
     ) = precompute_walkable_indirection(
         walkable_block_indices,
         block_cell_indices_per_block,
-        base_block_index_per_cell,
-        is_in_base_neighborhood_per_other_base_block_per_base_block,
-        pertinent_neighborhood_marker_gene_indices_per_base_block,
-        n_base_blocks,
+        prev_block_index_per_cell,
+        is_in_prev_neighborhood_per_other_prev_block_per_prev_block,
+        pertinent_neighborhood_marker_gene_indices_per_prev_block,
+        n_prev_blocks,
         n_genes,
     )
 
@@ -1224,19 +1224,19 @@ function compute_local_clusters(;
 
     delta_context_per_thread = [
         DeltaCorrelationContext(;
-            grouped_per_base_block,
-            baseline_mean_correlation_per_base_block,
-            group_index_per_block_per_base_block,
+            grouped_per_prev_block,
+            baseline_mean_correlation_per_prev_block,
+            group_index_per_block_per_prev_block,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             gene_fraction_regularization = Float32(gene_fraction_regularization),
             # Per-walkable-block fields - re-assigned per work item.
             walkable_block_index = 0,
             block_cell_indices = Int[],
-            affected_base_block_indices = Int[],
+            affected_prev_block_indices = Int[],
             gene_index_per_friend = Int[],
-            friend_position_per_series_per_base_block = Dict{Int, Vector{Int}}(),
-            block_cell_position_per_point_per_base_block = Dict{Int, Vector{Int}}(),
+            friend_position_per_series_per_prev_block = Dict{Int, Vector{Int}}(),
+            block_cell_position_per_point_per_prev_block = Dict{Int, Vector{Int}}(),
             # Per-thread scratch.
             total_UMIs_per_max_cluster = Vector{Float64}(undef, max_n_kmeans_clusters),
             UMIs_per_friend_per_max_cluster = Matrix{Float64}(undef, max_n_friends, max_n_kmeans_clusters),
@@ -1254,8 +1254,8 @@ function compute_local_clusters(;
 
     # Per-walkable-block scratches sized to that walkable block's own dimensions. Pass A (parallel argmax) populates
     # the variable + is_active scratches for every changed walkable block; Pass B (parallel `replace_group!`) reads them
-    # per (changed_walkable, affected base block) without re-populating - the two-pass split eliminates the populate
-    # redundancy that a parallel-by-base-block commit would otherwise pay. The `UMI_per_friend_per_block_cell`
+    # per (changed_walkable, affected prev block) without re-populating - the two-pass split eliminates the populate
+    # redundancy that a parallel-by-prev-block commit would otherwise pay. The `UMI_per_friend_per_block_cell`
     # cache (filled once below) lets every populate call read this walkable block's UMIs straight from a sequential
     # Float32 column instead of indexing the global `UMIs_per_cell_per_gene` matrix on every (cell, friend gene).
     variable_per_block_cell_per_friend_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
@@ -1304,11 +1304,11 @@ function compute_local_clusters(;
         return nothing
     end
 
-    # Per-base-block locks serialize `replace_group!` updates to each base block's grouped correlations during the
+    # Per-prev-block locks serialize `replace_group!` updates to each prev block's grouped correlations during the
     # commit phase. Allocated once and reused across all optimization passes.
-    lock_per_base_block = [SpinLock() for _ in 1:n_base_blocks]
+    lock_per_prev_block = [SpinLock() for _ in 1:n_prev_blocks]
 
-    # One-time setup: build the per-base-block grouped correlations from the Phase-1 `local_clusters_per_block`. All
+    # One-time setup: build the per-prev-block grouped correlations from the Phase-1 `local_clusters_per_block`. All
     # later updates happen in place via the optimization loop's `replace_group!`.
     (total_UMIs_per_baseline_metacell, UMIs_per_gene_per_baseline_metacell, baseline_metacell_index_per_cell, _) =
         compute_baseline_metacell_aggregates(
@@ -1320,35 +1320,35 @@ function compute_local_clusters(;
         )
 
     parallel_loop_wo_rng(
-        1:n_base_blocks;
-        weights = n_points_per_base_block,
+        1:n_prev_blocks;
+        weights = n_points_per_prev_block,
         name = "compute_local_clusters.build_grouped",
-        progress = DebugProgress(sum(n_points_per_base_block); group = :mcs_loops, desc = "build_grouped"),
-    ) do base_block_index
-        @views is_in_base_neighborhood_for_base_block =
-            is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]
-        (grouped, group_index_per_block) = build_grouped_for_base_block(;
+        progress = DebugProgress(sum(n_points_per_prev_block); group = :mcs_loops, desc = "build_grouped"),
+    ) do prev_block_index
+        @views is_in_prev_neighborhood_for_prev_block =
+            is_in_prev_neighborhood_per_other_prev_block_per_prev_block[:, prev_block_index]
+        (grouped, group_index_per_block) = build_grouped_for_prev_block(;
             n_blocks,
             n_cells,
-            base_block_index_per_cell,
+            prev_block_index_per_cell,
             block_index_per_cell,
             block_cell_indices_per_block,
-            is_in_base_neighborhood_for_base_block,
+            is_in_prev_neighborhood_for_prev_block,
             baseline_metacell_index_per_cell,
             total_UMIs_per_baseline_metacell,
             UMIs_per_gene_per_baseline_metacell,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            pertinent_neighborhood_marker_gene_indices = pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index],
+            pertinent_neighborhood_marker_gene_indices = pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index],
             gene_fraction_regularization,
         )
-        grouped_per_base_block[base_block_index] = grouped
-        @views group_index_per_block_per_base_block[:, base_block_index] .= group_index_per_block
-        baseline_mean_correlation_per_base_block[base_block_index] = Float32(mean_correlation(grouped))
+        grouped_per_prev_block[prev_block_index] = grouped
+        @views group_index_per_block_per_prev_block[:, prev_block_index] .= group_index_per_block
+        baseline_mean_correlation_per_prev_block[prev_block_index] = Float32(mean_correlation(grouped))
         return nothing
     end
 
-    baseline_correlation = mean(baseline_mean_correlation_per_base_block)  # NOLINT
+    baseline_correlation = mean(baseline_mean_correlation_per_prev_block)  # NOLINT
     @debug "Baseline mean correlation: $(baseline_correlation)" _group = :mcs_results
 
     epsilon = 1e-6
@@ -1386,13 +1386,13 @@ function compute_local_clusters(;
                 delta_context = delta_context_per_thread[threadid()]
                 delta_context.walkable_block_index = block_index
                 delta_context.block_cell_indices = block_cell_indices_per_block[block_index]
-                delta_context.affected_base_block_indices =
-                    affected_base_block_indices_per_walkable_block[walkable_position]
+                delta_context.affected_prev_block_indices =
+                    affected_prev_block_indices_per_walkable_block[walkable_position]
                 delta_context.gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
-                delta_context.friend_position_per_series_per_base_block =
-                    friend_position_per_series_per_base_block_per_walkable_block[walkable_position]
-                delta_context.block_cell_position_per_point_per_base_block =
-                    block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position]
+                delta_context.friend_position_per_series_per_prev_block =
+                    friend_position_per_series_per_prev_block_per_walkable_block[walkable_position]
+                delta_context.block_cell_position_per_point_per_prev_block =
+                    block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position]
                 delta_per_work_item[work_index] = compute_delta_correlation(
                     candidate,
                     solution_candidates.n_points,
@@ -1448,13 +1448,13 @@ function compute_local_clusters(;
             delta_context = delta_context_per_thread[threadid()]
             delta_context.walkable_block_index = block_index
             delta_context.block_cell_indices = block_cell_indices_per_block[block_index]
-            delta_context.affected_base_block_indices =
-                affected_base_block_indices_per_walkable_block[walkable_position]
+            delta_context.affected_prev_block_indices =
+                affected_prev_block_indices_per_walkable_block[walkable_position]
             delta_context.gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
-            delta_context.friend_position_per_series_per_base_block =
-                friend_position_per_series_per_base_block_per_walkable_block[walkable_position]
-            delta_context.block_cell_position_per_point_per_base_block =
-                block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position]
+            delta_context.friend_position_per_series_per_prev_block =
+                friend_position_per_series_per_prev_block_per_walkable_block[walkable_position]
+            delta_context.block_cell_position_per_point_per_prev_block =
+                block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position]
             populate_candidate_scratches!(
                 chosen,
                 solution_candidates.n_points,
@@ -1464,33 +1464,33 @@ function compute_local_clusters(;
                 is_active_per_block_cell_per_walkable_block[walkable_position],
             )
 
-            # Apply the change directly to each affected base block's grouped correlations under its lock.
-            for base_block_index in affected_base_block_indices_per_walkable_block[walkable_position]
-                group_index_in_base_block = group_index_per_block_per_base_block[block_index, base_block_index]
-                @assert group_index_in_base_block > 0
-                grouped_for_base_block = grouped_per_base_block[base_block_index]
+            # Apply the change directly to each affected prev block's grouped correlations under its lock.
+            for prev_block_index in affected_prev_block_indices_per_walkable_block[walkable_position]
+                group_index_in_prev_block = group_index_per_block_per_prev_block[block_index, prev_block_index]
+                @assert group_index_in_prev_block > 0
+                grouped_for_prev_block = grouped_per_prev_block[prev_block_index]
                 block_cell_position_per_point =
-                    block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position][base_block_index]
+                    block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position][prev_block_index]
                 friend_position_per_series =
-                    friend_position_per_series_per_base_block_per_walkable_block[walkable_position][base_block_index]
-                lock(lock_per_base_block[base_block_index]) do
+                    friend_position_per_series_per_prev_block_per_walkable_block[walkable_position][prev_block_index]
+                lock(lock_per_prev_block[prev_block_index]) do
                     replace_group!(
-                        grouped_for_base_block,
-                        group_index_in_base_block,
+                        grouped_for_prev_block,
+                        group_index_in_prev_block,
                         variable_per_block_cell_per_friend_per_walkable_block[walkable_position],
                         is_active_per_block_cell_per_walkable_block[walkable_position],
                         block_cell_position_per_point,
                         friend_position_per_series,
                     )
-                    baseline_mean_correlation_per_base_block[base_block_index] =
-                        Float32(mean_correlation(grouped_for_base_block))
+                    baseline_mean_correlation_per_prev_block[prev_block_index] =
+                        Float32(mean_correlation(grouped_for_prev_block))
                     return nothing
                 end
             end
             return nothing
         end
 
-        pass_correlation = mean(baseline_mean_correlation_per_base_block)  # NOLINT
+        pass_correlation = mean(baseline_mean_correlation_per_prev_block)  # NOLINT
         delta_correlation = pass_correlation - baseline_correlation
         baseline_correlation = pass_correlation
 
@@ -1510,7 +1510,7 @@ end
 # is in exactly one of them), and the block each was clustered in.
 function combine_local_clusters(;
     local_clusters_per_block::AbstractVector{Maybe{LocalClusters}},
-    n_base_metacells::Integer,
+    n_prev_metacells::Integer,
 )::Tuple{Vector{Vector{Int}}, Vector{Int}}
     cells_of_new_metacells = Vector{Vector{Int}}()
     block_index_per_new_metacell = Vector{Int}()
@@ -1526,7 +1526,7 @@ function combine_local_clusters(;
         end
     end
 
-    @debug ("Metacells Original: $(n_base_metacells) Sharpened: $(length(block_index_per_new_metacell))") _group =
+    @debug ("Metacells Original: $(n_prev_metacells) Sharpened: $(length(block_index_per_new_metacell))") _group =
         :mcs_results
 
     return (cells_of_new_metacells, block_index_per_new_metacell)
@@ -1603,7 +1603,7 @@ struct OutlierCandidate
     actual_UMIs::Float32
 end
 
-# Detect the outlier cells: cells whose expression of some base found module wildly exceeds what their metacell
+# Detect the outlier cells: cells whose expression of some prev found module wildly exceeds what their metacell
 # predicts. For every found module instance in the previous round's repository (across all blocks, not just the modules of a cell's
 # own region), and for each grouped cell that expresses the module, compare the cell's actual UMIs of the module's genes
 # to the expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's metacell excluding the
@@ -1660,18 +1660,18 @@ function compute_outlier_certificates(;
         end
     end
 
-    base_total_modules = collect_total_found_modules(;
+    prev_total_modules = collect_total_found_modules(;
         is_found_per_module_per_block,
         module_index_per_gene_per_block,
         name_per_block,
         name_per_module,
     )
-    n_total_found_modules = length(base_total_modules.gene_indices_per_total_found_module)
+    n_total_found_modules = length(prev_total_modules.gene_indices_per_total_found_module)
 
     # Weight each instance by the total nonzeros of its module's gene columns, so the heaviest instances are dispatched
     # first for load balance.
     weight_per_total_found_module = [
-        sum(gene_index -> length(nzrange(sparse_UMIs_per_cell_per_gene, gene_index)), gene_indices_in_module; init = 0) for gene_indices_in_module in base_total_modules.gene_indices_per_total_found_module
+        sum(gene_index -> length(nzrange(sparse_UMIs_per_cell_per_gene, gene_index)), gene_indices_in_module; init = 0) for gene_indices_in_module in prev_total_modules.gene_indices_per_total_found_module
     ]
 
     row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
@@ -1699,7 +1699,7 @@ function compute_outlier_certificates(;
         touched_metacells = touched_metacells_per_thread[threadid()]
         candidates = candidates_per_thread[threadid()]
 
-        gene_indices_in_module = base_total_modules.gene_indices_per_total_found_module[total_found_module_index]
+        gene_indices_in_module = prev_total_modules.gene_indices_per_total_found_module[total_found_module_index]
 
         # Gather the module's UMIs into `actual_per_cell` for every grouped cell that expresses it, walking only the
         # nonzeros of the module's gene columns and recording each cell once in `touched_cells`.
@@ -1779,9 +1779,9 @@ function compute_outlier_certificates(;
                 is_outlier_per_cell[cell_index] = true
                 in_metacell_index_per_cell[cell_index] = metacell_index_per_cell[cell_index]
                 by_prev_block_name_per_cell[cell_index] =
-                    base_total_modules.block_name_per_total_found_module[candidate.total_found_module_index]
+                    prev_total_modules.block_name_per_total_found_module[candidate.total_found_module_index]
                 by_prev_module_name_per_cell[cell_index] =
-                    base_total_modules.module_name_per_total_found_module[candidate.total_found_module_index]
+                    prev_total_modules.module_name_per_total_found_module[candidate.total_found_module_index]
                 expected_UMIs_per_cell[cell_index] = candidate.expected_UMIs
                 actual_UMIs_per_cell[cell_index] = candidate.actual_UMIs
             end
@@ -2084,9 +2084,9 @@ function relocate_dissolved_metacell_cells!(;
     return nothing
 end
 
-# Build one base block's baseline `GroupedSeriesCorrelations{Float32}`. Each group corresponds to one block whose
-# cells contribute to the base block's neighborhood; the points within a group are the contributing cells laid out
-# contiguously, preserving the per-block cell order. Per (point, base-block series) - one series per pertinent
+# Build one prev block's baseline `GroupedSeriesCorrelations{Float32}`. Each group corresponds to one block whose
+# cells contribute to the prev block's neighborhood; the points within a group are the contributing cells laid out
+# contiguously, preserving the per-block cell order. Per (point, prev-block series) - one series per pertinent
 # neighborhood marker gene - we store the cell's `log2(marker_UMIs / total_UMIs + reg)` as the fixed side and the
 # punctuated baseline-metacell `log2((baseline_metacell_marker_UMIs - cell_marker_UMIs) / (baseline_metacell_total -
 # cell_total) + reg)` of the same gene as the variable side - with the mask `is_active_per_point` set false (and the
@@ -2094,15 +2094,15 @@ end
 # baseline metacell is missing or the punctuation denominator is non-positive. `baseline_metacell_index_per_cell` and
 # the per-baseline-metacell aggregates (`total_UMIs_per_baseline_metacell`,
 # `UMIs_per_gene_per_baseline_metacell`) encode "Phase 1's choice of K per block" - the baseline candidate's cluster
-# assignments. The returned `group_index_per_block` tells the indirect-gather scoring API which group inside this base
+# assignments. The returned `group_index_per_block` tells the indirect-gather scoring API which group inside this prev
 # block corresponds to each contributing block.
-function build_grouped_for_base_block(;
+function build_grouped_for_prev_block(;
     n_blocks::Integer,
     n_cells::Integer,
-    base_block_index_per_cell::AbstractVector{<:Integer},
+    prev_block_index_per_cell::AbstractVector{<:Integer},
     block_index_per_cell::AbstractVector{<:Integer},
     block_cell_indices_per_block::AbstractVector,
-    is_in_base_neighborhood_for_base_block::AbstractVector{Bool},
+    is_in_prev_neighborhood_for_prev_block::AbstractVector{Bool},
     baseline_metacell_index_per_cell::AbstractVector{<:Integer},
     total_UMIs_per_baseline_metacell::AbstractVector{<:Integer},
     UMIs_per_gene_per_baseline_metacell::AbstractMatrix{<:Integer},
@@ -2113,12 +2113,12 @@ function build_grouped_for_base_block(;
 )::Tuple{GroupedSeriesCorrelations{Float32}, Vector{Int}}
     n_series = length(pertinent_neighborhood_marker_gene_indices)
 
-    # Count how many cells each block contributes to this base block's neighborhood.
+    # Count how many cells each block contributes to this prev block's neighborhood.
     n_points_per_block = zeros(Int, n_blocks)
     for cell_index in 1:n_cells
-        base_block_of_cell = base_block_index_per_cell[cell_index]
+        prev_block_of_cell = prev_block_index_per_cell[cell_index]
         block_of_cell = block_index_per_cell[cell_index]
-        if base_block_of_cell > 0 && block_of_cell > 0 && is_in_base_neighborhood_for_base_block[base_block_of_cell]
+        if prev_block_of_cell > 0 && block_of_cell > 0 && is_in_prev_neighborhood_for_prev_block[prev_block_of_cell]
             n_points_per_block[block_of_cell] += 1
         end
     end
@@ -2150,8 +2150,8 @@ function build_grouped_for_base_block(;
             continue
         end
         for cell_index in block_cell_indices_per_block[block_index]
-            base_block_of_cell = base_block_index_per_cell[cell_index]
-            if base_block_of_cell > 0 && is_in_base_neighborhood_for_base_block[base_block_of_cell]
+            prev_block_of_cell = prev_block_index_per_cell[cell_index]
+            if prev_block_of_cell > 0 && is_in_prev_neighborhood_for_prev_block[prev_block_of_cell]
                 cell_indices_in_order[write_position] = cell_index
                 write_position += 1
             end
@@ -2283,39 +2283,39 @@ function compute_baseline_metacell_aggregates(
     )
 end
 
-# Per walkable block, precompute the indirection vectors the delta-correlation scoring will need: which base blocks'
+# Per walkable block, precompute the indirection vectors the delta-correlation scoring will need: which prev blocks'
 # correlations the block can affect, the block's friend-gene subspace (column axis for the per-(block, K-candidate)
-# log-fill cache), and per (block, affected base block) the (column position in the block's friend subspace, the
+# log-fill cache), and per (block, affected prev block) the (column position in the block's friend subspace, the
 # block's `block_cell_position` per point) maps.
-#   * `affected_base_block_indices_per_walkable_block[walkable_position]`: list of base blocks whose neighborhoods overlap any of the
+#   * `affected_prev_block_indices_per_walkable_block[walkable_position]`: list of prev blocks whose neighborhoods overlap any of the
 #     block's cells.
 #   * `gene_index_per_friend_per_walkable_block[walkable_position]`: the block's friend-gene subspace (global gene index per
 #     column).
-#   * `friend_position_per_series_per_base_block_per_walkable_block[walkable_position][base_block_index]`: per (block, base block), the
-#     block's friend column for each of the base block's series genes.
-#   * `block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position][base_block_index]`: per (block, base block), the block's
-#     `block_cell_position`s of the cells in the base block's neighborhood, in the block's canonical block-cell order.
+#   * `friend_position_per_series_per_prev_block_per_walkable_block[walkable_position][prev_block_index]`: per (block, prev block), the
+#     block's friend column for each of the prev block's series genes.
+#   * `block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position][prev_block_index]`: per (block, prev block), the block's
+#     `block_cell_position`s of the cells in the prev block's neighborhood, in the block's canonical block-cell order.
 #     Row indirection for the indirect-gather query.
 function precompute_walkable_indirection(
     walkable_block_indices::AbstractVector{<:Integer},
     block_cell_indices_per_block::AbstractVector{<:AbstractVector{<:Integer}},
-    base_block_index_per_cell::AbstractVector{<:Integer},
-    is_in_base_neighborhood_per_other_base_block_per_base_block::Union{AbstractMatrix{Bool}, BitMatrix},
-    pertinent_neighborhood_marker_gene_indices_per_base_block::AbstractVector{<:AbstractVector{<:Integer}},
-    n_base_blocks::Integer,
+    prev_block_index_per_cell::AbstractVector{<:Integer},
+    is_in_prev_neighborhood_per_other_prev_block_per_prev_block::Union{AbstractMatrix{Bool}, BitMatrix},
+    pertinent_neighborhood_marker_gene_indices_per_prev_block::AbstractVector{<:AbstractVector{<:Integer}},
+    n_prev_blocks::Integer,
     n_genes::Integer,
 )::Tuple{Vector{Vector{Int}}, Vector{Vector{Int}}, Vector{Dict{Int, Vector{Int}}}, Vector{Dict{Int, Vector{Int}}}}
     n_walkable_blocks = length(walkable_block_indices)
 
-    affected_base_block_indices_per_walkable_block = Vector{Vector{Int}}(undef, n_walkable_blocks)
+    affected_prev_block_indices_per_walkable_block = Vector{Vector{Int}}(undef, n_walkable_blocks)
     gene_index_per_friend_per_walkable_block = Vector{Vector{Int}}(undef, n_walkable_blocks)
-    friend_position_per_series_per_base_block_per_walkable_block =
+    friend_position_per_series_per_prev_block_per_walkable_block =
         Vector{Dict{Int, Vector{Int}}}(undef, n_walkable_blocks)
-    block_cell_position_per_point_per_base_block_per_walkable_block =
+    block_cell_position_per_point_per_prev_block_per_walkable_block =
         Vector{Dict{Int, Vector{Int}}}(undef, n_walkable_blocks)
 
-    is_base_block_of_block_per_thread = [BitVector(undef, n_base_blocks) for _ in 1:maxthreadid()]
-    is_affected_base_block_per_thread = [BitVector(undef, n_base_blocks) for _ in 1:maxthreadid()]
+    is_prev_block_of_block_per_thread = [BitVector(undef, n_prev_blocks) for _ in 1:maxthreadid()]
+    is_affected_prev_block_per_thread = [BitVector(undef, n_prev_blocks) for _ in 1:maxthreadid()]
     is_friend_gene_for_walkable_block_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
     friend_position_per_gene_per_thread = [zeros(Int, n_genes) for _ in 1:maxthreadid()]
 
@@ -2336,30 +2336,30 @@ function precompute_walkable_indirection(
         block_cell_indices_of_walkable_block = block_cell_indices_per_block[block_index]
         n_block_cells = length(block_cell_indices_of_walkable_block)
 
-        # Affected base blocks for this walkable block.
-        is_base_block_of_block = is_base_block_of_block_per_thread[threadid()]
-        is_affected_base_block = is_affected_base_block_per_thread[threadid()]
-        fill!(is_base_block_of_block, false)
+        # Affected prev blocks for this walkable block.
+        is_prev_block_of_block = is_prev_block_of_block_per_thread[threadid()]
+        is_affected_prev_block = is_affected_prev_block_per_thread[threadid()]
+        fill!(is_prev_block_of_block, false)
         for cell_index in block_cell_indices_of_walkable_block
-            base_block_index = base_block_index_per_cell[cell_index]
-            if base_block_index > 0
-                is_base_block_of_block[base_block_index] = true
+            prev_block_index = prev_block_index_per_cell[cell_index]
+            if prev_block_index > 0
+                is_prev_block_of_block[prev_block_index] = true
             end
         end
-        fill!(is_affected_base_block, false)
-        @foreach_true_index is_base_block_of_block base_block_index begin  # NOLINT
-            @views is_affected_base_block .|=
-                is_in_base_neighborhood_per_other_base_block_per_base_block[base_block_index, :]  # NOLINT
+        fill!(is_affected_prev_block, false)
+        @foreach_true_index is_prev_block_of_block prev_block_index begin  # NOLINT
+            @views is_affected_prev_block .|=
+                is_in_prev_neighborhood_per_other_prev_block_per_prev_block[prev_block_index, :]  # NOLINT
         end
-        affected_base_block_indices = findall(is_affected_base_block)
-        affected_base_block_indices_per_walkable_block[walkable_position] = affected_base_block_indices
+        affected_prev_block_indices = findall(is_affected_prev_block)
+        affected_prev_block_indices_per_walkable_block[walkable_position] = affected_prev_block_indices
 
-        # Gene subspace for this walkable block: union of the series genes across its affected base blocks.
+        # Gene subspace for this walkable block: union of the series genes across its affected prev blocks.
         is_friend_gene_for_walkable_block = is_friend_gene_for_walkable_block_per_thread[threadid()]
         friend_position_per_gene = friend_position_per_gene_per_thread[threadid()]
         fill!(is_friend_gene_for_walkable_block, false)
-        for base_block_index in affected_base_block_indices
-            for friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index]
+        for prev_block_index in affected_prev_block_indices
+            for friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index]
                 is_friend_gene_for_walkable_block[friend_gene_index] = true
             end
         end
@@ -2373,37 +2373,37 @@ function precompute_walkable_indirection(
         end
         gene_index_per_friend_per_walkable_block[walkable_position] = gene_index_per_friend
 
-        friend_position_per_series_per_base_block = Dict{Int, Vector{Int}}()
-        block_cell_position_per_point_per_base_block = Dict{Int, Vector{Int}}()
-        for base_block_index in affected_base_block_indices
-            friend_position_per_series_per_base_block[base_block_index] = [
+        friend_position_per_series_per_prev_block = Dict{Int, Vector{Int}}()
+        block_cell_position_per_point_per_prev_block = Dict{Int, Vector{Int}}()
+        for prev_block_index in affected_prev_block_indices
+            friend_position_per_series_per_prev_block[prev_block_index] = [
                 friend_position_per_gene[friend_gene_index] for
-                friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_base_block[base_block_index]
+                friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index]
             ]
-            @views is_in_base_neighborhood_for_base_block =
-                is_in_base_neighborhood_per_other_base_block_per_base_block[:, base_block_index]
+            @views is_in_prev_neighborhood_for_prev_block =
+                is_in_prev_neighborhood_per_other_prev_block_per_prev_block[:, prev_block_index]
             block_cell_position_per_point = Int[]
             for block_cell_position in 1:n_block_cells
                 cell_index = block_cell_indices_of_walkable_block[block_cell_position]
-                base_block_of_cell = base_block_index_per_cell[cell_index]
-                if base_block_of_cell > 0 && is_in_base_neighborhood_for_base_block[base_block_of_cell]
+                prev_block_of_cell = prev_block_index_per_cell[cell_index]
+                if prev_block_of_cell > 0 && is_in_prev_neighborhood_for_prev_block[prev_block_of_cell]
                     push!(block_cell_position_per_point, block_cell_position)
                 end
             end
-            block_cell_position_per_point_per_base_block[base_block_index] = block_cell_position_per_point
+            block_cell_position_per_point_per_prev_block[prev_block_index] = block_cell_position_per_point
         end
-        friend_position_per_series_per_base_block_per_walkable_block[walkable_position] =
-            friend_position_per_series_per_base_block
-        block_cell_position_per_point_per_base_block_per_walkable_block[walkable_position] =
-            block_cell_position_per_point_per_base_block
+        friend_position_per_series_per_prev_block_per_walkable_block[walkable_position] =
+            friend_position_per_series_per_prev_block
+        block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position] =
+            block_cell_position_per_point_per_prev_block
         return nothing
     end
 
     return (
-        affected_base_block_indices_per_walkable_block,
+        affected_prev_block_indices_per_walkable_block,
         gene_index_per_friend_per_walkable_block,
-        friend_position_per_series_per_base_block_per_walkable_block,
-        block_cell_position_per_point_per_base_block_per_walkable_block,
+        friend_position_per_series_per_prev_block_per_walkable_block,
+        block_cell_position_per_point_per_prev_block_per_walkable_block,
     )
 end
 
@@ -2766,9 +2766,9 @@ function populate_candidate_scratches!(
 end
 
 # Score one candidate K-solution for a walkable block: returns the delta of grouped mean correlation against the
-# current baseline, summed across the block's `affected_base_block_indices`. Per affected base block, the mean
+# current baseline, summed across the block's `affected_prev_block_indices`. Per affected prev block, the mean
 # correlation of the grouped correlations when the block's group is replaced (under `candidate`'s assignments) minus
-# the cached baseline mean correlation for that base block. Uses `delta_context`'s per-thread variable + mask scratches
+# the cached baseline mean correlation for that prev block. Uses `delta_context`'s per-thread variable + mask scratches
 # for the gather, sized to the walkable blocks' global maxima.
 function compute_delta_correlation(
     candidate::SolutionCandidate,
@@ -2791,28 +2791,28 @@ end
 
 # Query half of `compute_delta_correlation`: reads `delta_context`'s per-thread variable + mask scratches (assumed
 # already populated for some candidate via `populate_candidate_scratches!`) plus the per-walkable indirections, sums
-# the per-affected-base-block delta against the cached baseline mean correlations. Allocation-free.
+# the per-affected-prev-block delta against the cached baseline mean correlations. Allocation-free.
 function query_delta_correlation_from_scratches(delta_context::DeltaCorrelationContext)::Float64
     variable_per_block_cell_per_friend = delta_context.variable_per_block_cell_per_friend
     is_active_per_block_cell = delta_context.is_active_per_block_cell
 
-    # Sum per-base-block delta: query each affected base block's grouped correlations with the block's candidate
+    # Sum per-prev-block delta: query each affected prev block's grouped correlations with the block's candidate
     # values via the 6-arg indirect-gather form, subtract the cached baseline mean.
     delta = 0.0
     walkable_block_index = delta_context.walkable_block_index
-    for base_block_index in delta_context.affected_base_block_indices
-        group_index_in_base_block =
-            delta_context.group_index_per_block_per_base_block[walkable_block_index, base_block_index]
-        if group_index_in_base_block == 0
+    for prev_block_index in delta_context.affected_prev_block_indices
+        group_index_in_prev_block =
+            delta_context.group_index_per_block_per_prev_block[walkable_block_index, prev_block_index]
+        if group_index_in_prev_block == 0
             continue
         end
-        grouped_for_base_block = delta_context.grouped_per_base_block[base_block_index]
-        block_cell_position_per_point = delta_context.block_cell_position_per_point_per_base_block[base_block_index]
-        friend_position_per_series = delta_context.friend_position_per_series_per_base_block[base_block_index]
+        grouped_for_prev_block = delta_context.grouped_per_prev_block[prev_block_index]
+        block_cell_position_per_point = delta_context.block_cell_position_per_point_per_prev_block[prev_block_index]
+        friend_position_per_series = delta_context.friend_position_per_series_per_prev_block[prev_block_index]
 
         new_mean_correlation = mean_correlation_if_group_replaced(
-            grouped_for_base_block,
-            group_index_in_base_block,
+            grouped_for_prev_block,
+            group_index_in_prev_block,
             variable_per_block_cell_per_friend,
             is_active_per_block_cell,
             block_cell_position_per_point,
@@ -2820,7 +2820,7 @@ function query_delta_correlation_from_scratches(delta_context::DeltaCorrelationC
         )
         delta +=
             Float64(new_mean_correlation) -
-            Float64(delta_context.baseline_mean_correlation_per_base_block[base_block_index])
+            Float64(delta_context.baseline_mean_correlation_per_prev_block[prev_block_index])
     end
 
     return delta
@@ -3578,7 +3578,7 @@ end
 """
     compute_matrix_of_n_cells_per_prev_block_per_block!(;
         other_daf::DafWriter,
-        base_daf::DafReader,
+        prev_daf::DafReader,
         overwrite::Bool = false,
     )::Nothing
 
@@ -3787,28 +3787,28 @@ $(CONTRACT2)
 end
 
 # The total weighted crossings of the type flow for a given order, summed over all the consecutive-round transitions.
-# Each transition is a list of edges; an edge connects a base type (in the left column) to a type (in the right column)
-# and weighs the number of cells with that base type and type. Two edges cross when their endpoints are in the opposite
+# Each transition is a list of edges; an edge connects a prev type (in the left column) to a type (in the right column)
+# and weighs the number of cells with that prev type and type. Two edges cross when their endpoints are in the opposite
 # order in the two columns, and such a crossing weighs the product of the two edges' cell counts. Both columns of every
 # transition use the same order, given by `position_per_type`.
 function total_type_flow_crossings(
     position_per_type::AbstractVector{<:Integer},
-    base_type_per_edge_per_transition::AbstractVector{Vector{Int}},
+    prev_type_per_edge_per_transition::AbstractVector{Vector{Int}},
     type_per_edge_per_transition::AbstractVector{Vector{Int}},
     n_cells_per_edge_per_transition::AbstractVector{Vector{Float64}},
 )::Float64
     total_crossings = 0.0
-    @inbounds for transition_index in eachindex(base_type_per_edge_per_transition)
-        base_type_per_edge = base_type_per_edge_per_transition[transition_index]
+    @inbounds for transition_index in eachindex(prev_type_per_edge_per_transition)
+        prev_type_per_edge = prev_type_per_edge_per_transition[transition_index]
         type_per_edge = type_per_edge_per_transition[transition_index]
         n_cells_per_edge = n_cells_per_edge_per_transition[transition_index]
-        n_edges = length(base_type_per_edge)
+        n_edges = length(prev_type_per_edge)
         for first_edge_index in 1:(n_edges - 1)
-            first_left_position = position_per_type[base_type_per_edge[first_edge_index]]
+            first_left_position = position_per_type[prev_type_per_edge[first_edge_index]]
             first_right_position = position_per_type[type_per_edge[first_edge_index]]
             first_n_cells = n_cells_per_edge[first_edge_index]
             for second_edge_index in (first_edge_index + 1):n_edges
-                second_left_position = position_per_type[base_type_per_edge[second_edge_index]]
+                second_left_position = position_per_type[prev_type_per_edge[second_edge_index]]
                 second_right_position = position_per_type[type_per_edge[second_edge_index]]
                 if (first_left_position - second_left_position) * (first_right_position - second_right_position) < 0
                     total_crossings += first_n_cells * n_cells_per_edge[second_edge_index]
@@ -3862,7 +3862,7 @@ MOVES_PROGRESS_CHUNK = 100
 function hill_climb_type_flow_order!(
     type_per_position::AbstractVector{Int},
     position_per_type::AbstractVector{Int},
-    base_type_per_edge_per_transition::AbstractVector{Vector{Int}},
+    prev_type_per_edge_per_transition::AbstractVector{Vector{Int}},
     type_per_edge_per_transition::AbstractVector{Vector{Int}},
     n_cells_per_edge_per_transition::AbstractVector{Vector{Float64}},
     progress::Maybe{ProgressUnknown},
@@ -3871,7 +3871,7 @@ function hill_climb_type_flow_order!(
     fill_position_per_type!(position_per_type, type_per_position)
     current_crossings = total_type_flow_crossings(
         position_per_type,
-        base_type_per_edge_per_transition,
+        prev_type_per_edge_per_transition,
         type_per_edge_per_transition,
         n_cells_per_edge_per_transition,
     )
@@ -3929,7 +3929,7 @@ function hill_climb_type_flow_order!(
             fill_position_per_type!(position_per_type_of_move, candidate_per_position_of_move)
             crossings_per_move[move_index] = total_type_flow_crossings(
                 position_per_type_of_move,
-                base_type_per_edge_per_transition,
+                prev_type_per_edge_per_transition,
                 type_per_edge_per_transition,
                 n_cells_per_edge_per_transition,
             )
@@ -3961,7 +3961,7 @@ end
 
 # Compute a global order of the types (the 1-based position of each type) that minimizes the total weighted crossings of
 # the type flow across all the consecutive-round transitions. Each transition is described by an `n_cells` matrix whose
-# `[base_type, type]` entry counts the cells of that base type (left column) and type (right column). Since minimizing
+# `[prev_type, type]` entry counts the cells of that prev type (left column) and type (right column). Since minimizing
 # crossings is NP-hard, we use random-restart hill climbing using the exact crossing count, seeding one restart with the
 # types ordered by their total number of cells.
 function compute_global_flow_order_per_type(
@@ -3974,29 +3974,29 @@ function compute_global_flow_order_per_type(
     n_types = size(n_cells_per_prev_type_per_type_per_transition[1], 1)
     n_transitions = length(n_cells_per_prev_type_per_type_per_transition)
 
-    base_type_per_edge_per_transition = Vector{Vector{Int}}(undef, n_transitions)
+    prev_type_per_edge_per_transition = Vector{Vector{Int}}(undef, n_transitions)
     type_per_edge_per_transition = Vector{Vector{Int}}(undef, n_transitions)
     n_cells_per_edge_per_transition = Vector{Vector{Float64}}(undef, n_transitions)
     total_cells_per_type = zeros(Float64, n_types)
     for transition_index in 1:n_transitions
         n_cells_per_prev_block_type_per_block_type = n_cells_per_prev_type_per_type_per_transition[transition_index]
         @assert size(n_cells_per_prev_block_type_per_block_type) == (n_types, n_types)
-        base_type_per_edge = Int[]
+        prev_type_per_edge = Int[]
         type_per_edge = Int[]
         n_cells_per_edge = Float64[]
         for type in 1:n_types
-            for base_type in 1:n_types
-                n_cells = Float64(n_cells_per_prev_block_type_per_block_type[base_type, type])
+            for prev_type in 1:n_types
+                n_cells = Float64(n_cells_per_prev_block_type_per_block_type[prev_type, type])
                 if n_cells != 0
-                    push!(base_type_per_edge, base_type)
+                    push!(prev_type_per_edge, prev_type)
                     push!(type_per_edge, type)
                     push!(n_cells_per_edge, n_cells)
-                    total_cells_per_type[base_type] += n_cells
+                    total_cells_per_type[prev_type] += n_cells
                     total_cells_per_type[type] += n_cells
                 end
             end
         end
-        base_type_per_edge_per_transition[transition_index] = base_type_per_edge
+        prev_type_per_edge_per_transition[transition_index] = prev_type_per_edge
         type_per_edge_per_transition[transition_index] = type_per_edge
         n_cells_per_edge_per_transition[transition_index] = n_cells_per_edge
     end
@@ -4021,7 +4021,7 @@ function compute_global_flow_order_per_type(
         crossings_per_restart[restart_index] = hill_climb_type_flow_order!(
             type_per_position,
             position_per_type_per_restart[restart_index],
-            base_type_per_edge_per_transition,
+            prev_type_per_edge_per_transition,
             type_per_edge_per_transition,
             n_cells_per_edge_per_transition,
             progress,
@@ -4036,7 +4036,7 @@ end
 """
     compute_vector_of_global_flow_order_per_type!(
         final_daf::DafReader,
-        base_daf_per_round::AbstractVector{<:DafReader};
+        daf_per_round::AbstractVector{<:DafReader};
         output_daf::DafWriter,
         restarts::Integer = 20,
         rng::AbstractRNG = default_rng(),
@@ -4046,7 +4046,7 @@ end
 Compute and set [`vector_of_global_flow_order_per_type`](@ref), a global order of the types minimizing the total weighted
 crossings of the type flow across the sharpening rounds.
 
-The `base_daf_per_round` are the repositories of the earlier rounds (rounds 0 to N-1) and `final_daf` is the last round
+The `daf_per_round` are the repositories of the earlier rounds (rounds 0 to N-1) and `final_daf` is the last round
 (round N); together they form the full sequence of rounds 0 to N, which must all share the same `type` axis. For each
 consecutive pair of rounds we read both the [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) and the
 [`matrix_of_n_cells_per_prev_metacell_type_per_metacell_type`](@ref) (the type flow from the previous round, by block type
@@ -4054,7 +4054,7 @@ and by metacell type) from the later round's repository, that is, from every rep
 previous round). Each matrix is normalized by its total number of cells, so that the finer by-metacell flow, which has
 many more edges, does not dominate the by-block flow. We minimize the combined (averaged) crossings of both using
 random-restart hill climbing (`restarts` restarts, since the problem is NP-hard) and write the resulting order into
-`output_daf`, which is typically the base repository shared by all the rounds, so that they all see the same order.
+`output_daf`, which is typically the prev repository shared by all the rounds, so that they all see the same order.
 
 # Rounds
 
@@ -4079,19 +4079,19 @@ $(CONTRACT2)
     data = [vector_of_global_flow_order_per_type(CreatedOutput)],
 ) function compute_vector_of_global_flow_order_per_type!(
     final_daf::DafReader,
-    base_daf_per_round::AbstractVector{<:DafReader};
+    daf_per_round::AbstractVector{<:DafReader};
     output_daf::DafWriter,
     restarts::Integer = 20,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
     @assert restarts >= 1
-    n_rounds = length(base_daf_per_round)
+    n_rounds = length(daf_per_round)
     @assert n_rounds > 0
 
     type_names = axis_vector(final_daf, "type")
-    for base_daf in base_daf_per_round
-        @assert axis_vector(base_daf, "type") == type_names "the types differ between the round repositories"
+    for round_daf in daf_per_round
+        @assert axis_vector(round_daf, "type") == type_names "the types differ between the round repositories"
     end
     @assert axis_vector(output_daf, "type") == type_names "the types differ between the rounds and the output"
 
@@ -4109,8 +4109,8 @@ $(CONTRACT2)
     end
 
     for round_index in 2:n_rounds
-        push_type_flow!(base_daf_per_round[round_index], "n_cells_by_block")
-        push_type_flow!(base_daf_per_round[round_index], "n_cells_by_metacell")
+        push_type_flow!(daf_per_round[round_index], "n_cells_by_block")
+        push_type_flow!(daf_per_round[round_index], "n_cells_by_metacell")
     end
     push_type_flow!(final_daf, "n_cells_by_block")
     push_type_flow!(final_daf, "n_cells_by_metacell")

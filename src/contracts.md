@@ -101,7 +101,7 @@ Metacells.Contracts.vector_of_umap_w_per_metacell
 ```@docs
 Metacells.Contracts.block_axis
 Metacells.Contracts.vector_of_block_per_metacell
-Metacells.Contracts.vector_of_base_block_per_metacell
+Metacells.Contracts.vector_of_prev_block_per_metacell
 Metacells.Contracts.vector_of_n_metacells_per_block
 Metacells.Contracts.vector_of_n_cells_per_block
 ```
