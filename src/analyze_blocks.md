@@ -83,6 +83,12 @@ Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 ```
 
+## Modules
+
+```@docs
+Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!
+```
+
 ## UMAP
 
 ```@docs

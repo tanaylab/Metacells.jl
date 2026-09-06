@@ -674,6 +674,7 @@
 <code class="language-julia hljs">compute_gene_report(;
     daf::DafReader,
     base_daf::Maybe{DafReader} = nothing,
+    regulators_count::Integer = ```5```,
 )::DataFrame
 </code>
 </pre>
@@ -737,7 +738,7 @@
 </ul>
 <p>When 
 <code>base_daf
-</code> (the round-0 model) is given, three more columns compare each gene&#39;s projected-punctuated base-neighborhood correlation in 
+</code> (the round-0 model) is given, three more columns compare each gene&#39;s punctuated base-neighborhood correlation in 
 <code>daf
 </code> against 
 <code>base_daf
@@ -770,6 +771,44 @@
 </code> (that is, when 
 <code>daf
 </code> is itself the round-0 model).
+</p>
+<p>When the repository also holds the module sharing (see 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<code>compute_module_sharing_at_changed_base_blocks!
+</code>
+</a>), 
+<code>2 + 2 * 2 * regulators_count
+</code> more columns say what the gene moved 
+<em>with
+</em>, where 
+<code>imp_f
+</code> and 
+<code>deg_f
+</code> say only how often it moved:
+</p>
+<ul>
+<li>
+<code>imp_no_mod_f
+</code> - the mean fraction of the cells in which the gene is in no module at all, over the base blocks where it improved.
+</li>
+<li>
+<code>imp_reg1
+</code> ... and 
+<code>imp_reg1_f
+</code> ... - the 
+<code>regulators_count
+</code> regulators it most often shares a module with there, most often first, and those fractions. A gene sharing a module with fewer regulators than that is padded with an empty name and a zero fraction.
+</li>
+<li>
+<code>deg_no_mod_f
+</code>, 
+<code>deg_reg1
+</code> ... and 
+<code>deg_reg1_f
+</code> ... - the same, over the base blocks where it degraded.
+</li>
+</ul>
+<p>These columns are omitted when the repository does not hold the module sharing.
 </p>
 <p>
 <strong>Inputs
@@ -822,6 +861,34 @@
 </strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
 </p>
 <p>
+<strong>gene @ mean
+<em>no
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>improved
+</em>base_blocks
+</strong>::Union{Float32, Float64} (optional): How often each gene is in no module at all, where the metacells improved it.
+</p>
+<p>
+<strong>gene @ mean
+<em>no
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>degraded
+</em>base_blocks
+</strong>::Union{Float32, Float64} (optional): How often each gene is in no module at all, where the metacells degraded it.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -839,9 +906,37 @@
 </em>neighborhood
 <em>cells
 </em>and
-<em>projected
-</em>punctuated_metacells
-</strong>::Union{Float32, Float64} (optional): The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood, punctuated where the cell is a member of its projected metacell.
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (optional): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>gene, gene @ mean
+<em>shared
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>improved
+</em>base_blocks
+</strong>::Union{Float32, Float64} (optional): Which regulators each gene shares a module with, where the metacells improved it.
+</p>
+<p>
+<strong>gene, gene @ mean
+<em>shared
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>degraded
+</em>base_blocks
+</strong>::Union{Float32, Float64} (optional): Which regulators each gene shares a module with, where the metacells degraded it.
 </p>
 </div>
 </section>
@@ -898,7 +993,7 @@
 <a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_gene_report">
 <code>compute_gene_report
 </code>
-</a> projected-punctuated values of those markers - where each marker&#39;s 
+</a> punctuated values of those markers - where each marker&#39;s 
 <code>delta
 </code> correlation is the mean over its base blocks (with a non-zero round-0 correlation) of 
 <code>round_N - round_0
@@ -984,9 +1079,9 @@
 </em>neighborhood
 <em>cells
 </em>and
-<em>projected
-</em>punctuated_metacells
-</strong>::Union{Float32, Float64} (optional): The correlation between cells and their projected metacells of each gene&#39;s expression levels in each base block&#39;s neighborhood, punctuated where the cell is a member of its projected metacell.
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (optional): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
 </p>
 </div>
 </section>

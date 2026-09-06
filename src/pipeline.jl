@@ -73,6 +73,7 @@ import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_type_per_block
+import Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
@@ -124,6 +125,7 @@ $(CONTRACT)
         matrix_of_log_linear_fraction_per_gene_per_metacell(CreatedOutput),
         vector_of_is_marker_per_gene(CreatedOutput),
         vector_of_marker_rank_per_gene(CreatedOutput),
+        matrix_of_correlation_between_markers_per_gene_per_gene(CreatedOutput),
     ],
 ) function prepare_metacells!(daf::DafWriter; overwrite::Bool = false)::Nothing
     # The types of the metacells come from the types of their cells, so without the one there is not the other.
@@ -137,6 +139,7 @@ $(CONTRACT)
     compute_matrix_of_log_linear_fraction_per_gene_per_metacell!(daf; overwrite)
     compute_vector_of_is_marker_per_gene!(daf; overwrite)
     compute_vector_of_marker_rank_per_gene!(daf; overwrite)
+    compute_matrix_of_correlation_between_markers_per_gene_per_gene!(daf; overwrite)
     return nothing
 end
 

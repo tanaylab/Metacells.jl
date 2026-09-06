@@ -31,10 +31,12 @@ import Random.default_rng
 # Needed because of JET:
 import Metacells.Contracts.base_block_axis
 import Metacells.Contracts.gene_axis
-import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block
+import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
+import Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene
+import Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene
 import Metacells.Contracts.vector_of_is_excluded_per_gene
@@ -45,6 +47,8 @@ import Metacells.Contracts.vector_of_is_regulator_per_gene
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
 import Metacells.Contracts.vector_of_is_transcription_factor_per_gene
 import Metacells.Contracts.vector_of_marker_rank_per_gene
+import Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene
+import Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
 
 """
     function compute_vector_of_is_marker_per_gene!(
@@ -573,6 +577,7 @@ end
     compute_gene_report(;
         daf::DafReader,
         base_daf::Maybe{DafReader} = nothing,
+        regulators_count::Integer = $(DEFAULT.regulators_count),
     )::DataFrame
 
 Return a per-marker-gene report as a `DataFrame`, one row per marker gene, sorted by `rank`. Its columns are:
@@ -586,7 +591,7 @@ Return a per-marker-gene report as a `DataFrame`, one row per marker gene, sorte
     [`matrix_of_correlation_between_markers_per_gene_per_gene`](@ref). Since only markers are correlated, e.g. `lat` is
     the most correlated lateral *marker*. An empty set (e.g. no regulators) yields an empty name and a zero correlation.
 
-When `base_daf` (the round-0 model) is given, three more columns compare each gene's projected-punctuated
+When `base_daf` (the round-0 model) is given, three more columns compare each gene's punctuated
 base-neighborhood correlation in `daf` against `base_daf`, over the base blocks where the gene is scored (has a non-zero
 correlation) at round 0:
 
@@ -597,6 +602,19 @@ correlation) at round 0:
     `0.05`).
 
 These three columns are omitted when `base_daf` is `nothing` (that is, when `daf` is itself the round-0 model).
+
+When the repository also holds the module sharing (see
+[`compute_module_sharing_at_changed_base_blocks!`](@ref Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!)), `2 + 2 * 2 * regulators_count` more columns say what the
+gene moved *with*, where `imp_f` and `deg_f` say only how often it moved:
+
+  - `imp_no_mod_f` - the mean fraction of the cells in which the gene is in no module at all, over the base blocks
+    where it improved.
+  - `imp_reg1` ... and `imp_reg1_f` ... - the `regulators_count` regulators it most often shares a module with there,
+    most often first, and those fractions. A gene sharing a module with fewer regulators than that is padded with an
+    empty name and a zero fraction.
+  - `deg_no_mod_f`, `deg_reg1` ... and `deg_reg1_f` ... - the same, over the base blocks where it degraded.
+
+These columns are omitted when the repository does not hold the module sharing.
 
 $(CONTRACT)
 """
@@ -611,11 +629,23 @@ $(CONTRACT)
         vector_of_is_regulator_per_gene(RequiredInput),
         vector_of_is_skeleton_per_gene(RequiredInput),
         matrix_of_correlation_between_markers_per_gene_per_gene(RequiredInput),
-        matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block(
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+            OptionalInput,
+        ),
+        vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene(OptionalInput),
+        vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene(OptionalInput),
+        matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene(
+            OptionalInput,
+        ),
+        matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(
             OptionalInput,
         ),
     ],
-) function compute_gene_report(; daf::DafReader, base_daf::Maybe{DafReader} = nothing)::DataFrame
+) function compute_gene_report(;
+    daf::DafReader,
+    base_daf::Maybe{DafReader} = nothing,
+    regulators_count::Integer = 5,
+)::DataFrame
     is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
     indices_of_markers = findall(is_marker_per_gene)
 
@@ -676,7 +706,7 @@ $(CONTRACT)
         delta_per_marker, improved_per_marker, degraded_per_marker = correlation_change_per_marker(
             daf,
             base_daf,
-            "correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells",
+            "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
             indices_of_markers,
         )
         data_frame[!, "delta"] = delta_per_marker
@@ -684,8 +714,98 @@ $(CONTRACT)
         data_frame[!, "deg_f"] = degraded_per_marker
     end
 
+    for (prefix, side) in (("imp", "improved"), ("deg", "degraded"))
+        collect_module_sharing_columns!(
+            data_frame,
+            daf,
+            gene_name_per_gene,
+            indices_of_markers,
+            regulators_count,
+            prefix,
+            side,
+        )
+    end
+
     sort!(data_frame, "rank")
     return data_frame
+end
+
+# Add to the report, for one of the two sides, how often each marker gene is in no module there and which regulators it
+# most often shares one with. A repository which was never asked for the module sharing has no such columns.
+function collect_module_sharing_columns!(
+    data_frame::DataFrame,
+    daf::DafReader,
+    gene_name_per_gene::AbstractVector{<:AbstractString},
+    indices_of_markers::AbstractVector{<:Integer},
+    regulators_count::Integer,
+    prefix::AbstractString,
+    side::AbstractString,
+)::Nothing
+    no_module_fraction_per_gene = get_vector(
+        daf,
+        "gene",
+        "mean_no_module_fraction_in_base_neighborhood_cells_at_$(side)_base_blocks";
+        default = nothing,
+    )
+    shared_fraction_per_regulator_per_gene = get_matrix(
+        daf,
+        "gene",
+        "gene",
+        "mean_shared_module_fraction_in_base_neighborhood_cells_at_$(side)_base_blocks";
+        default = nothing,
+    )
+    if no_module_fraction_per_gene === nothing || shared_fraction_per_regulator_per_gene === nothing
+        return nothing
+    end
+
+    data_frame[!, "$(prefix)_no_mod_f"] = no_module_fraction_per_gene.array[indices_of_markers]
+
+    name_per_marker_per_rank, fraction_per_marker_per_rank = top_shared_regulators_per_marker(
+        shared_fraction_per_regulator_per_gene.array,
+        gene_name_per_gene,
+        indices_of_markers,
+        regulators_count,
+    )
+    for rank in 1:regulators_count
+        data_frame[!, "$(prefix)_reg$(rank)"] = name_per_marker_per_rank[rank]
+        data_frame[!, "$(prefix)_reg$(rank)_f"] = fraction_per_marker_per_rank[rank]
+    end
+
+    return nothing
+end
+
+# For each marker gene, the `regulators_count` regulators it most often shares a module with and those fractions, most
+# often first, returned per rank rather than per marker so each is a report column. The matrix holds the regulators in
+# its rows and the genes in its columns. A gene sharing a module with fewer regulators than that is padded with an empty
+# name and a zero fraction, as an empty set of correlations is.
+function top_shared_regulators_per_marker(
+    shared_fraction_per_regulator_per_gene::AbstractMatrix{<:Real},
+    gene_name_per_gene::AbstractVector{<:AbstractString},
+    indices_of_markers::AbstractVector{<:Integer},
+    regulators_count::Integer,
+)::Tuple{Vector{Vector{AbstractString}}, Vector{Vector{Float64}}}
+    n_markers = length(indices_of_markers)
+    name_per_marker_per_rank = [Vector{AbstractString}(undef, n_markers) for _ in 1:regulators_count]
+    fraction_per_marker_per_rank = [zeros(Float64, n_markers) for _ in 1:regulators_count]
+
+    parallel_loop_wo_rng(1:n_markers; name = "top_shared_regulators_per_marker") do marker_position
+        gene_index = indices_of_markers[marker_position]
+        @views shared_fraction_per_regulator = shared_fraction_per_regulator_per_gene[:, gene_index]
+        regulator_indices = findall(!iszero, shared_fraction_per_regulator)
+        order = sortperm(shared_fraction_per_regulator[regulator_indices]; rev = true)
+        for rank in 1:regulators_count
+            if rank <= length(order)
+                regulator_index = regulator_indices[order[rank]]
+                name_per_marker_per_rank[rank][marker_position] = gene_name_per_gene[regulator_index]
+                fraction_per_marker_per_rank[rank][marker_position] = shared_fraction_per_regulator[regulator_index]
+            else
+                name_per_marker_per_rank[rank][marker_position] = ""
+            end
+        end
+        return nothing
+    end
+
+    return (name_per_marker_per_rank, fraction_per_marker_per_rank)
 end
 
 # For each marker gene, the gene in the set (restricted to markers, since only markers are correlated) most correlated
@@ -741,15 +861,15 @@ function correlation_change_per_marker(
 
     n_markers = length(indices_of_markers)
     delta_per_marker = zeros(Float64, n_markers)
-    better_per_marker = zeros(Float64, n_markers)
-    worse_per_marker = zeros(Float64, n_markers)
+    improved_per_marker = zeros(Float64, n_markers)
+    degraded_per_marker = zeros(Float64, n_markers)
     for (marker_position, gene_index) in enumerate(indices_of_markers)
         @views correlation_per_base_block = correlation_per_gene_per_base_block[gene_index, :]
         @views base_correlation_per_base_block = base_correlation_per_gene_per_base_block[gene_index, :]
         n_relevant = 0
         sum_delta = 0.0
-        n_better = 0
-        n_worse = 0
+        n_improved = 0
+        n_degraded = 0
         for base_block in 1:n_base_blocks
             base_correlation = base_correlation_per_base_block[base_block]
             if base_correlation != 0
@@ -757,19 +877,19 @@ function correlation_change_per_marker(
                 delta = correlation_per_base_block[base_block] - base_correlation
                 sum_delta += delta
                 if delta >= 0.05
-                    n_better += 1
+                    n_improved += 1
                 elseif delta <= -0.05
-                    n_worse += 1
+                    n_degraded += 1
                 end
             end
         end
         if n_relevant > 0
             delta_per_marker[marker_position] = sum_delta / n_relevant
-            better_per_marker[marker_position] = n_better / n_relevant
-            worse_per_marker[marker_position] = n_worse / n_relevant
+            improved_per_marker[marker_position] = n_improved / n_relevant
+            degraded_per_marker[marker_position] = n_degraded / n_relevant
         end
     end
-    return (delta_per_marker, better_per_marker, worse_per_marker)
+    return (delta_per_marker, improved_per_marker, degraded_per_marker)
 end
 
 """
@@ -788,7 +908,7 @@ lateral-plus-pertinent total, and the pertinent value. The statistics are:
   - `#` - the number of markers most correlated with this skeleton.
 
 When `base_daf` (the round-0 model) is given, three more statistics aggregate the [`compute_gene_report`](@ref)
-projected-punctuated values of those markers - where each marker's `delta` correlation is the mean over its base blocks
+punctuated values of those markers - where each marker's `delta` correlation is the mean over its base blocks
 (with a non-zero round-0 correlation) of `round_N - round_0`, and `imp_f` / `deg_f` are the fractions of its base blocks
 that significantly improved / degraded (by at least `0.05`):
 
@@ -808,7 +928,7 @@ $(CONTRACT)
         vector_of_is_skeleton_per_gene(RequiredInput),
         vector_of_is_lateral_per_gene(RequiredInput),
         matrix_of_correlation_between_markers_per_gene_per_gene(RequiredInput),
-        matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block(
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
             OptionalInput,
         ),
     ],
@@ -855,7 +975,7 @@ $(CONTRACT)
         change_per_marker = correlation_change_per_marker(
             daf,
             base_daf,
-            "correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells",
+            "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
             indices_of_markers,
         )
     end

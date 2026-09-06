@@ -129,6 +129,12 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="#Modules">
+<span>Modules
+</span>
+</a>
+</li>
+<li>
 <a class="tocitem" href="#UMAP">
 <span>UMAP
 </span>
@@ -3154,9 +3160,7 @@
 </code>
 </a> to one number per base block.
 </p>
-<p>The genes averaged over are the environment markers of the base block which are not lateral and whose correlation is not zero. A zero is what a gene which took no part in the correlation is left at, and the environment markers are a subset of the markers the correlation was computed for, so this is the mean over the genes the base block&#39;s environment is told apart by. A base block with no such gene is 
-<code>NaN
-</code>.
+<p>The genes averaged over are the environment markers of the base block which are not lateral and whose correlation is not zero. A zero is what a gene which took no part in the correlation is left at, and the environment markers are a subset of the markers the correlation was computed for, so this is the mean over the genes the base block&#39;s environment is told apart by. A base block with no such gene is zero, the way a correlation says it measured nothing.
 </p>
 <p>
 <strong>Other
@@ -3850,6 +3854,259 @@
 </section>
 </details>
 </article>
+<h2 id="Modules">
+<a class="docs-heading-anchor" href="#Modules">Modules
+</a>
+<a id="Modules-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Modules" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<code>Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_module_sharing_at_changed_base_blocks!(;
+    other_daf::DafWriter,
+    base_daf::DafReader,
+    min_changed_correlation::AbstractFloat = ```0.05```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set, for each gene, how often it is in no module and which regulators it shares one with, separately where these metacells improved its correlation with the cells and where they degraded it - that is, 
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene">
+<code>vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
+</code>
+</a>, 
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene">
+<code>matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
+</code>
+</a> and their degraded counterparts. Where the correlations say which genes the sharpening moved, these say what it moved them with.
+</p>
+<p>A gene improved in a base block when its correlation there is at least 
+<code>min_changed_correlation
+</code> above what it is in the 
+<code>base_daf
+</code>, and degraded when it is at least that far below; a base block whose base correlation is zero says nothing about the gene and counts for neither. The cells of a base block are those of its neighborhood which have a metacell here - the cells the correlation itself was measured over - and each is in one block of this repository, whose modules say which module that block gives each gene.
+</p>
+<p>The no-module fraction is out of all of a base block&#39;s cells, and the regulator fractions are out of only those whose block does give the gene a module. Both are averaged over the base blocks of the side in question. A gene with no such base block, or which is in no module in any of their cells, is left with a no-module fraction of one and a column of zeros; read a column only where the no-module fraction is below one.
+</p>
+<p>
+<strong>Other
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>base_block
+</strong> (required): A copy of the base 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (required): The module each gene belongs to in each block.
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (required): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ mean
+<em>no
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>improved
+</em>base_blocks
+</strong>::Union{Float32, Float64} (created): How often each gene is in no module at all, where the metacells improved it.
+</p>
+<p>
+<strong>gene @ mean
+<em>no
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>degraded
+</em>base_blocks
+</strong>::Union{Float32, Float64} (created): How often each gene is in no module at all, where the metacells degraded it.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, gene @ mean
+<em>shared
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>improved
+</em>base_blocks
+</strong>::Union{Float32, Float64} (created): Which regulators each gene shares a module with, where the metacells improved it.
+</p>
+<p>
+<strong>gene, gene @ mean
+<em>shared
+</em>module
+<em>fraction
+</em>in
+<em>base
+</em>neighborhood
+<em>cells
+</em>at
+<em>degraded
+</em>base_blocks
+</strong>::Union{Float32, Float64} (created): Which regulators each gene shares a module with, where the metacells degraded it.
+</p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_regulator
+</strong>::Bool (required): A mask of genes that regulate the expression level of other genes.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (required): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="UMAP">
 <a class="docs-heading-anchor" href="#UMAP">UMAP
 </a>
@@ -4194,6 +4451,12 @@
 <li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<code>Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!
 </code>
 </a>
 </li>

@@ -3888,13 +3888,149 @@
 <a href="contracts.html#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
 <code>matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 </code>
-</a> over the environment marker genes of each base block which are not lateral and which took part in the correlation. This is the single number saying how well the metacells describe the cells in each location of the manifold, so metacells scored against the same base repository can be compared to each other. This is 
-<code>NaN
-</code> for a base block with no such gene.
+</a> over the environment marker genes of each base block which are not lateral and which took part in the correlation. This is the single number saying how well the metacells describe the cells in each location of the manifold, so metacells scored against the same base repository can be compared to each other. This is zero for a base block with no such gene, the way a correlation says it measured nothing.
 </p>
 <p>This vector is populated by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!">
 <code>compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene">
+<code>Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>How often each gene is in no module at all, where the metacells improved it. In each base block the gene improved in, this is the fraction of the block&#39;s neighborhood cells whose metacell&#39;s block gives the gene no module; the stored value is the mean of that over those base blocks.
+</p>
+<p>A gene at one has no module anywhere it improved - or improved nowhere at all - so its row of 
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene">
+<code>matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
+</code>
+</a> is zeros for want of anything to measure rather than for want of company. Read that row only where this is below one.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<code>compute_module_sharing_at_changed_base_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene">
+<code>Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>How often each gene is in no module at all, where the metacells degraded it. This is 
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene">
+<code>vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
+</code>
+</a> taken over the base blocks the gene degraded in instead.
+</p>
+<p>This vector is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<code>compute_module_sharing_at_changed_base_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene">
+<code>Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>For each (column) gene, how often each (row) regulator is in the same module, where the metacells improved the gene. This is 
+<strong>not
+</strong> a symmetric matrix, and only the rows of the regulator genes are non-zero. In each base block the gene improved in, and out of that block&#39;s neighborhood cells whose metacell&#39;s block does give the gene a module, this is the fraction which put the regulator in that same module; the stored value is the mean of that over those base blocks.
+</p>
+<p>The denominator is the cells where the gene is in a module rather than all of them, so this says who the gene sits with given that it sits with anything. It is therefore bounded by one, not by one minus the no-module fraction, and the regulators do not partition anything, one module holding several of them.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<code>compute_module_sharing_at_changed_base_blocks!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene">
+<code>Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(
+    expectation::ContractExpectation
+)::Pair{MatrixKey, DataSpecification}
+</code>
+</pre>
+<p>For each (column) gene, how often each (row) regulator is in the same module, where the metacells degraded the gene. This is 
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene">
+<code>matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
+</code>
+</a> taken over the base blocks the gene degraded in instead.
+</p>
+<p>This matrix is populated by 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!">
+<code>compute_module_sharing_at_changed_base_blocks!
 </code>
 </a>.
 </p>
@@ -4416,6 +4552,18 @@
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene">
+<code>Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene">
+<code>Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_module_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_module_per_gene_per_block
 </code>
@@ -4652,6 +4800,18 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
 <code>Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene">
+<code>Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene">
+<code>Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
 </code>
 </a>
 </li>

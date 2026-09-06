@@ -4,6 +4,7 @@ Do simple blocks analysis.
 module AnalyzeBlocks
 
 export compute_correlation_with_most_for_base_block!
+export compute_module_sharing_at_changed_base_blocks!
 export compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!
 export compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!
 export compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!
@@ -91,6 +92,9 @@ import Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block
 import Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
 import Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
+import Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene
+import Metacells.Contracts.matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
+import Metacells.Contracts.matrix_of_module_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_strong_per_gene_per_block
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
@@ -107,7 +111,10 @@ import Metacells.Contracts.vector_of_is_excluded_per_gene
 import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_is_marker_per_gene
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
+import Metacells.Contracts.vector_of_is_regulator_per_gene
 import Metacells.Contracts.vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
+import Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene
+import Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_block
 import Metacells.Contracts.vector_of_n_cells_per_metacell
@@ -2325,7 +2332,7 @@ number per base block.
 The genes averaged over are the environment markers of the base block which are not lateral and whose correlation is
 not zero. A zero is what a gene which took no part in the correlation is left at, and the environment markers are a
 subset of the markers the correlation was computed for, so this is the mean over the genes the base block's environment
-is told apart by. A base block with no such gene is `NaN`.
+is told apart by. A base block with no such gene is zero, the way a correlation says it measured nothing.
 
 # Other
 
@@ -2375,7 +2382,9 @@ $(CONTRACT2)
         "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
     ).array
 
-    mean_correlation_per_base_block = fill(Float32(NaN), n_base_blocks)
+    # A base block with no gene to average over is left at zero, which is how a correlation says it measured nothing
+    # here - the same way this vector's own matrix marks a gene which says nothing about a block.
+    mean_correlation_per_base_block = zeros(Float32, n_base_blocks)
     is_relevant_per_gene = BitVector(undef, n_genes)
     for base_block_index in 1:n_base_blocks
         @views is_environment_marker_per_gene = is_environment_marker_per_gene_per_base_block[:, base_block_index]
@@ -2394,13 +2403,358 @@ $(CONTRACT2)
         overwrite,
     )
 
-    valid_mean_per_base_block = filter(!isnan, mean_correlation_per_base_block)
-    mean_correlation_over_base_blocks = isempty(valid_mean_per_base_block) ? NaN : mean(valid_mean_per_base_block)  # NOLINT
+    valid_mean_per_base_block = filter(!=(0), mean_correlation_per_base_block)
+    mean_correlation_over_base_blocks = isempty(valid_mean_per_base_block) ? 0 : mean(valid_mean_per_base_block)  # NOLINT
     @debug (
         "Mean correlation of base neighborhood environment marker genes between base neighborhood cells and their " *
         "punctuated metacells: $(mean_correlation_over_base_blocks)"
     ) _group = :mcs_results
     return nothing
+end
+
+# Which of this repository's blocks hold each base block's neighborhood cells, and how many of them each holds. Held as
+# a list per base block rather than as a matrix, since a base block's neighborhood reaches only a few of them.
+struct BaseNeighborhoodCells
+    block_indices_per_base_block::Vector{Vector{Int32}}
+    n_cells_per_block_position_per_base_block::Vector{Vector{Int32}}
+end
+
+"""
+    compute_module_sharing_at_changed_base_blocks!(;
+        other_daf::DafWriter,
+        base_daf::DafReader,
+        min_changed_correlation::AbstractFloat = $(DEFAULT.min_changed_correlation),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set, for each gene, how often it is in no module and which regulators it shares one with, separately where
+these metacells improved its correlation with the cells and where they degraded it - that is,
+[`vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene`](@ref),
+[`matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene`](@ref)
+and their degraded counterparts. Where the correlations say which genes the sharpening moved, these say what it moved
+them with.
+
+A gene improved in a base block when its correlation there is at least `min_changed_correlation` above what it is in
+the `base_daf`, and degraded when it is at least that far below; a base block whose base correlation is zero says
+nothing about the gene and counts for neither. The cells of a base block are those of its neighborhood which have a
+metacell here - the cells the correlation itself was measured over - and each is in one block of this repository, whose
+modules say which module that block gives each gene.
+
+The no-module fraction is out of all of a base block's cells, and the regulator fractions are out of only those whose
+block does give the gene a module. Both are averaged over the base blocks of the side in question. A gene with no such
+base block, or which is in no module in any of their cells, is left with a no-module fraction of one and a column of
+zeros; read a column only where the no-module fraction is below one.
+
+# Other
+
+$(CONTRACT1)
+
+# Base
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(
+    name = "other_daf",
+    axes = [
+        gene_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        block_axis(RequiredInput),
+        base_block_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        matrix_of_module_per_gene_per_block(RequiredInput),
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+            RequiredInput,
+        ),
+        vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene(CreatedOutput),
+        vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene(CreatedOutput),
+        matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene(
+            CreatedOutput,
+        ),
+        matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(
+            CreatedOutput,
+        ),
+    ],
+) Contract(
+    name = "base_daf",
+    # The gene masks and the neighborhoods are the base repository's, as they are for the correlation this reads.
+    axes = [
+        gene_axis(RequiredInput),
+        cell_axis(RequiredInput),
+        metacell_axis(RequiredInput),
+        block_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_is_regulator_per_gene(RequiredInput),
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_block_per_metacell(RequiredInput),
+        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+            RequiredInput,
+        ),
+    ],
+) function compute_module_sharing_at_changed_base_blocks!(;  # UNTESTED
+    other_daf::DafWriter,
+    base_daf::DafReader,
+    min_changed_correlation::AbstractFloat = 0.05,
+    overwrite::Bool = false,
+)::Nothing
+    @assert min_changed_correlation > 0
+    @assert axis_vector(base_daf, "gene") == axis_vector(other_daf, "gene")
+    @assert axis_vector(base_daf, "block") == axis_vector(other_daf, "base_block")
+
+    n_genes = axis_length(base_daf, "gene")
+    indices_of_regulator_genes = get_query(base_daf, "@ gene [ is_regulator ] : index").array
+    n_regulators = length(indices_of_regulator_genes)
+    regulator_position_per_gene = zeros(Int32, n_genes)
+    regulator_position_per_gene[indices_of_regulator_genes] = 1:n_regulators
+
+    module_index_per_block_per_gene, regulator_positions_per_module_per_block =
+        block_module_members(other_daf, regulator_position_per_gene)
+    cells_of_base_blocks = base_neighborhood_cells_of_base_blocks(base_daf, other_daf)
+
+    # Everything here holds the genes in its columns, since the loop below walks the base blocks, the blocks and the
+    # regulators of one gene at a time, and a column of them is contiguous where a row of them is a stride apart.
+    base_correlation_per_base_block_per_gene = get_matrix(
+        base_daf,
+        "base_block",
+        "gene",
+        "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
+    ).array
+    correlation_per_base_block_per_gene = get_matrix(
+        other_daf,
+        "base_block",
+        "gene",
+        "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
+    ).array
+
+    # A gene is written only by the loop iteration which owns it, so the results are shared between the threads rather
+    # than accumulated per thread and merged - which at this many threads would cost gigabytes of buffers.
+    mean_no_module_fraction_per_side_per_gene = ones(Float32, 2, n_genes)
+    mean_shared_fraction_per_regulator_per_gene_per_side =
+        [zeros(Float32, n_regulators, n_genes), zeros(Float32, n_regulators, n_genes)]
+
+    parallel_loop_wo_rng(
+        1:n_genes;
+        progress = DebugProgress(n_genes; group = :mcs_loops, desc = "module_sharing_at_changed_base_blocks"),
+    ) do gene_index
+        collect_gene_module_sharing!(;
+            gene_index,
+            mean_no_module_fraction_per_side_per_gene,
+            mean_shared_fraction_per_regulator_per_gene_per_side,
+            base_correlation_per_base_block_per_gene,
+            correlation_per_base_block_per_gene,
+            min_changed_correlation,
+            cells_of_base_blocks,
+            module_index_per_block_per_gene,
+            regulator_positions_per_module_per_block,
+        )
+        return nothing
+    end
+
+    for (side_index, side) in enumerate(("improved", "degraded"))
+        @views mean_no_module_fraction_per_gene = mean_no_module_fraction_per_side_per_gene[side_index, :]
+        set_vector!(
+            other_daf,
+            "gene",
+            "mean_no_module_fraction_in_base_neighborhood_cells_at_$(side)_base_blocks",
+            Vector(mean_no_module_fraction_per_gene);
+            overwrite,
+        )
+        set_matrix!(
+            other_daf,
+            "gene",
+            "gene",
+            "mean_shared_module_fraction_in_base_neighborhood_cells_at_$(side)_base_blocks",
+            sparse_shared_fractions(
+                mean_shared_fraction_per_regulator_per_gene_per_side[side_index],
+                indices_of_regulator_genes,
+            );
+            overwrite,
+        )
+        @debug "Genes in a module where $(side): $(sum(mean_no_module_fraction_per_gene .< 1))" _group = :mcs_results
+    end
+
+    return nothing
+end
+
+# Everything one gene takes from the base blocks it changed in. Each iteration writes only this gene's column of each
+# result, so the loop over the genes is the one which parallelizes.
+function collect_gene_module_sharing!(;
+    gene_index::Integer,
+    mean_no_module_fraction_per_side_per_gene::Matrix{Float32},
+    mean_shared_fraction_per_regulator_per_gene_per_side::Vector{Matrix{Float32}},
+    base_correlation_per_base_block_per_gene::AbstractMatrix{<:AbstractFloat},
+    correlation_per_base_block_per_gene::AbstractMatrix{<:AbstractFloat},
+    min_changed_correlation::AbstractFloat,
+    cells_of_base_blocks::BaseNeighborhoodCells,
+    module_index_per_block_per_gene::Matrix{Int32},
+    regulator_positions_per_module_per_block::Vector{Vector{Vector{Int32}}},
+)::Nothing
+    n_base_blocks = size(base_correlation_per_base_block_per_gene, 1)
+    n_base_blocks_per_side = zeros(Int, 2)
+    n_modular_base_blocks_per_side = zeros(Int, 2)
+    no_module_fraction_sum_per_side = zeros(Float32, 2)
+
+    @views module_index_per_block = module_index_per_block_per_gene[:, gene_index]
+    @views base_correlation_per_base_block = base_correlation_per_base_block_per_gene[:, gene_index]
+    @views correlation_per_base_block = correlation_per_base_block_per_gene[:, gene_index]
+
+    for base_block_index in 1:n_base_blocks
+        base_correlation = base_correlation_per_base_block[base_block_index]
+        if base_correlation == 0
+            continue
+        end
+
+        change = correlation_per_base_block[base_block_index] - base_correlation
+        if change >= min_changed_correlation
+            side_index = 1
+        elseif change <= -min_changed_correlation
+            side_index = 2
+        else
+            continue
+        end
+
+        block_indices = cells_of_base_blocks.block_indices_per_base_block[base_block_index]
+        n_cells_per_block_position = cells_of_base_blocks.n_cells_per_block_position_per_base_block[base_block_index]
+        n_base_block_cells = sum(n_cells_per_block_position)
+        if n_base_block_cells == 0
+            continue  # UNTESTED
+        end
+
+        modular_cells = 0
+        for (block_index, n_cells) in zip(block_indices, n_cells_per_block_position)
+            if module_index_per_block[block_index] > 0
+                modular_cells += n_cells
+            end
+        end
+
+        n_base_blocks_per_side[side_index] += 1
+        no_module_fraction_sum_per_side[side_index] += (n_base_block_cells - modular_cells) / n_base_block_cells
+        if modular_cells == 0
+            continue
+        end
+        n_modular_base_blocks_per_side[side_index] += 1
+
+        @views mean_shared_fraction_per_regulator =
+            mean_shared_fraction_per_regulator_per_gene_per_side[side_index][:, gene_index]
+        for (block_index, n_cells) in zip(block_indices, n_cells_per_block_position)
+            module_index = module_index_per_block[block_index]
+            if module_index > 0
+                regulator_positions = regulator_positions_per_module_per_block[block_index][module_index]
+                mean_shared_fraction_per_regulator[regulator_positions] .+= Float32(n_cells / modular_cells)
+            end
+        end
+    end
+
+    for side_index in 1:2
+        if n_base_blocks_per_side[side_index] > 0
+            mean_no_module_fraction_per_side_per_gene[side_index, gene_index] =
+                no_module_fraction_sum_per_side[side_index] / n_base_blocks_per_side[side_index]
+        end
+        if n_modular_base_blocks_per_side[side_index] > 0
+            @views mean_shared_fraction_per_regulator_per_gene_per_side[side_index][:, gene_index] ./=  # NOJET
+                n_modular_base_blocks_per_side[side_index]
+        end
+    end
+
+    return nothing
+end
+
+# A cell counts when it has a metacell in both repositories, and it counts for every base block whose neighborhood
+# holds the base block the cell is in - so the neighborhoods overlapping means a cell counts for several of them, as it
+# does for the correlation these numbers accompany.
+function base_neighborhood_cells_of_base_blocks(base_daf::DafReader, other_daf::DafReader)::BaseNeighborhoodCells
+    n_blocks = axis_length(other_daf, "block")
+    n_base_blocks = axis_length(base_daf, "block")
+
+    base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
+    block_index_per_cell = other_daf["@ cell : metacell ?? 0 : block : index"].array
+
+    n_cells_per_block_per_own_base_block = zeros(Int32, n_blocks, n_base_blocks)
+    for (base_block_index, block_index) in zip(base_block_index_per_cell, block_index_per_cell)
+        if base_block_index > 0 && block_index > 0
+            n_cells_per_block_per_own_base_block[block_index, base_block_index] += 1
+        end
+    end
+
+    is_in_neighborhood_per_own_base_block_per_base_block =
+        get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
+    n_cells_per_block_per_base_block =
+        n_cells_per_block_per_own_base_block * is_in_neighborhood_per_own_base_block_per_base_block
+
+    block_indices_per_base_block = Vector{Vector{Int32}}(undef, n_base_blocks)
+    n_cells_per_block_position_per_base_block = Vector{Vector{Int32}}(undef, n_base_blocks)
+    for base_block_index in 1:n_base_blocks
+        @views n_cells_per_block = n_cells_per_block_per_base_block[:, base_block_index]
+        block_indices = Int32.(findall(n_cells_per_block .> 0))
+        block_indices_per_base_block[base_block_index] = block_indices
+        n_cells_per_block_position_per_base_block[base_block_index] = Int32.(n_cells_per_block[block_indices])
+    end
+
+    return BaseNeighborhoodCells(block_indices_per_base_block, n_cells_per_block_position_per_base_block)
+end
+
+# The module each gene is in in each block, as an index into that block's modules (zero for a gene in no module), and
+# the regulators of each of those modules, by their position among the regulator genes.
+function block_module_members(
+    other_daf::DafReader,
+    regulator_position_per_gene::AbstractVector{<:Integer},
+)::Tuple{Matrix{Int32}, Vector{Vector{Vector{Int32}}}}
+    module_per_block_per_gene = get_matrix(other_daf, "block", "gene", "module").array
+    n_blocks, n_genes = size(module_per_block_per_gene)
+
+    module_index_per_block_per_gene = zeros(Int32, n_blocks, n_genes)
+    module_index_per_module_name_per_block = [Dict{AbstractString, Int32}() for _ in 1:n_blocks]
+    regulator_positions_per_module_per_block = [Vector{Vector{Int32}}() for _ in 1:n_blocks]
+
+    for gene_index in 1:n_genes
+        regulator_position = regulator_position_per_gene[gene_index]
+        for block_index in 1:n_blocks
+            module_name = module_per_block_per_gene[block_index, gene_index]
+            if module_name != ""
+                regulator_positions_per_module = regulator_positions_per_module_per_block[block_index]
+                module_index = get!(module_index_per_module_name_per_block[block_index], module_name) do
+                    push!(regulator_positions_per_module, Int32[])
+                    return Int32(length(regulator_positions_per_module))
+                end
+                module_index_per_block_per_gene[block_index, gene_index] = module_index
+                if regulator_position > 0
+                    push!(regulator_positions_per_module[module_index], regulator_position)
+                end
+            end
+        end
+    end
+
+    return (module_index_per_block_per_gene, regulator_positions_per_module_per_block)
+end
+
+# The gene by gene matrix of the mean shared fractions. Only the regulator rows are ever filled, and only for the genes
+# which changed somewhere, so it is stored sparse.
+function sparse_shared_fractions(
+    mean_shared_fraction_per_regulator_per_gene::Matrix{Float32},
+    indices_of_regulator_genes::AbstractVector{<:Integer},
+)::SparseMatrixCSC{Float32, Int32}
+    n_genes = size(mean_shared_fraction_per_regulator_per_gene, 2)
+    regulator_gene_indices = Int32[]
+    gene_indices = Int32[]
+    mean_shared_fractions = Float32[]
+
+    for gene_index in 1:n_genes
+        for (regulator_position, regulator_gene_index) in enumerate(indices_of_regulator_genes)
+            mean_shared_fraction = mean_shared_fraction_per_regulator_per_gene[regulator_position, gene_index]
+            if mean_shared_fraction > 0
+                push!(regulator_gene_indices, Int32(regulator_gene_index))
+                push!(gene_indices, Int32(gene_index))
+                push!(mean_shared_fractions, mean_shared_fraction)
+            end
+        end
+    end
+
+    return sparse(regulator_gene_indices, gene_indices, mean_shared_fractions, n_genes, n_genes)
 end
 
 """

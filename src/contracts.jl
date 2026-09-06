@@ -32,6 +32,8 @@ export matrix_of_cells_dispersion_per_metacell_per_module
 export matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block
 export matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block
 export matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block
+export matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene
+export matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene
 export matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block
 export matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 export matrix_of_correlation_between_markers_per_gene_per_gene
@@ -102,6 +104,8 @@ export vector_of_is_skeleton_per_gene
 export vector_of_is_transcription_factor_per_gene
 export vector_of_marker_rank_per_gene
 export vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block
+export vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene
+export vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
 export vector_of_mean_euclidean_modules_cells_distance_per_metacell
 export vector_of_metacell_per_cell
 export vector_of_mitochondrial_UMIs_per_cell
@@ -2263,7 +2267,7 @@ end
 The mean of [`matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref)
 over the environment marker genes of each base block which are not lateral and which took part in the correlation. This
 is the single number saying how well the metacells describe the cells in each location of the manifold, so metacells
-scored against the same base repository can be compared to each other. This is `NaN` for a base block with no such gene.
+scored against the same base repository can be compared to each other. This is zero for a base block with no such gene, the way a correlation says it measured nothing.
 
 This vector is populated by
 [`compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!`](@ref
@@ -2277,6 +2281,92 @@ function vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuat
         StorageFloat,
         "The mean correlation between cells and their metacells (minus the correlated cell) over the environment marker genes of each base block.",
     )
+end
+
+"""
+    vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+How often each gene is in no module at all, where the metacells improved it. In each base block the gene improved in,
+this is the fraction of the block's neighborhood cells whose metacell's block gives the gene no module; the stored
+value is the mean of that over those base blocks.
+
+A gene at one has no module anywhere it improved - or improved nowhere at all - so its row of
+[`matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene`](@ref)
+is zeros for want of anything to measure rather than for want of company. Read that row only where this is below one.
+
+This vector is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
+Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
+"""
+function vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("gene", "mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks") =>
+        (expectation, StorageFloat, "How often each gene is in no module at all, where the metacells improved it.")
+end
+
+"""
+    vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+How often each gene is in no module at all, where the metacells degraded it. This is
+[`vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene`](@ref) taken over the
+base blocks the gene degraded in instead.
+
+This vector is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
+Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
+"""
+function vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene(
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("gene", "mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks") =>
+        (expectation, StorageFloat, "How often each gene is in no module at all, where the metacells degraded it.")
+end
+
+"""
+    matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+For each (column) gene, how often each (row) regulator is in the same module, where the metacells improved the gene.
+This is **not** a symmetric matrix, and only the rows of the regulator genes are non-zero. In each base block the gene
+improved in, and out of that block's neighborhood cells whose metacell's block does give the gene a module, this is the
+fraction which put the regulator in that same module; the stored value is the mean of that over those base blocks.
+
+The denominator is the cells where the gene is in a module rather than all of them, so this says who the gene sits with
+given that it sits with anything. It is therefore bounded by one, not by one minus the no-module fraction, and the
+regulators do not partition anything, one module holding several of them.
+
+This matrix is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
+Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
+"""
+function matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "gene", "mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks") =>
+        (expectation, StorageFloat, "Which regulators each gene shares a module with, where the metacells improved it.")
+end
+
+"""
+    matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(
+        expectation::ContractExpectation
+    )::Pair{MatrixKey, DataSpecification}
+
+For each (column) gene, how often each (row) regulator is in the same module, where the metacells degraded the gene.
+This is
+[`matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene`](@ref)
+taken over the base blocks the gene degraded in instead.
+
+This matrix is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
+Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
+"""
+function matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(
+    expectation::ContractExpectation,
+)::Pair{MatrixKey, DataSpecification}
+    return ("gene", "gene", "mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks") =>
+        (expectation, StorageFloat, "Which regulators each gene shares a module with, where the metacells degraded it.")
 end
 
 """
