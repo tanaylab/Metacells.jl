@@ -1000,6 +1000,23 @@ struct PriorInitialization <: UMAP.AbstractInitialization
     position_per_point::AbstractVector{<:AbstractVector{<:AbstractFloat}}
 end
 
+# Run something which draws from the global random number generator, using the given one instead. `UMAP` initializes
+# and negatively samples with bare `rand`, so this is the only way to make its layout reproducible. The global
+# generator is put back as it was, so that giving a computation its own generator does not change what anything else
+# draws afterwards; without a generator of our own there is nothing to isolate, and the global one is left alone.
+function with_global_rng(action::Function, rng::AbstractRNG)
+    if rng === default_rng()
+        return action()
+    end
+    global_rng_state = copy(default_rng())
+    try
+        Random.seed!(rand(rng, UInt64))
+        return action()
+    finally
+        copy!(default_rng(), global_rng_state)
+    end
+end
+
 # `UMAP.optimize_embedding!` mutates the embedding in place, so hand it a copy of the prior positions.
 function UMAP.initialize_embedding(
     ::AbstractMatrix{T},
@@ -1100,19 +1117,21 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     distances_between_metacells = daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"].array
-    if prev_daf === nothing
-        result = UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
-    else
-        init = PriorInitialization(compute_prior_position_per_metacell(; daf, prev_daf, rng))
-        result = UMAP.fit(  # NOJET
-            distances_between_metacells,
-            2;
-            metric = :precomputed,
-            min_dist,
-            n_neighbors,
-            init,
-            n_epochs = 150,
-        )
+    result = with_global_rng(rng) do
+        if prev_daf === nothing
+            return UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
+        else
+            init = PriorInitialization(compute_prior_position_per_metacell(; daf, prev_daf, rng))
+            return UMAP.fit(  # NOJET
+                distances_between_metacells,
+                2;
+                metric = :precomputed,
+                min_dist,
+                n_neighbors,
+                init,
+                n_epochs = 200,
+            )
+        end
     end
     set_vector!(daf, "metacell", "umap_x", Float32[point[1] for point in result.embedding]; overwrite)
     set_vector!(daf, "metacell", "umap_y", Float32[point[2] for point in result.embedding]; overwrite)
@@ -1124,6 +1143,7 @@ end
         daf::DafWriter;
         min_dist::AbstractFloat = $(DEFAULT.min_dist),
         n_neighbors::Integer = $(DEFAULT.n_neighbors),
+        rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
@@ -1145,10 +1165,13 @@ $(CONTRACT)
     daf::DafWriter;
     min_dist::AbstractFloat = 0.5,
     n_neighbors::Integer = 15,
+    rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
     distances_between_metacells = daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"].array
-    result = UMAP.fit(distances_between_metacells, 3; metric = :precomputed, min_dist, n_neighbors)
+    result = with_global_rng(rng) do
+        return UMAP.fit(distances_between_metacells, 3; metric = :precomputed, min_dist, n_neighbors)
+    end
     set_vector!(daf, "metacell", "umap_u", Float32[point[1] for point in result.embedding]; overwrite)
     set_vector!(daf, "metacell", "umap_v", Float32[point[2] for point in result.embedding]; overwrite)
     set_vector!(daf, "metacell", "umap_w", Float32[point[3] for point in result.embedding]; overwrite)
