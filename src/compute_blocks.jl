@@ -85,7 +85,7 @@ $(CONTRACT)
     n_blocks = length(metacell_indices_per_block)
     name_per_block = group_names(axis_vector(daf, "metacell"), metacell_indices_per_block; prefix)
 
-    add_axis!(daf, "block", name_per_block)
+    add_axis!(daf, "block", name_per_block; overwrite)
     set_vector!(daf, "metacell", "block", name_per_block[block_index_per_metacell]; overwrite)
 
     @debug "Blocks: $(n_blocks)" _group = :mcs_results

@@ -811,6 +811,10 @@
 <p>These columns are omitted when the repository does not hold the module sharing.
 </p>
 <p>
+<strong>Daf
+</strong>
+</p>
+<p>
 <strong>Inputs
 </strong>
 </p>
@@ -938,6 +942,50 @@
 </em>base_blocks
 </strong>::Union{Float32, Float64} (optional): Which regulators each gene shares a module with, where the metacells degraded it.
 </p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>Only if 
+<code>base_daf
+</code> is given.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>base_block
+</strong> (required): A copy of the base 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (required): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
 </div>
 </section>
 </details>
@@ -1026,6 +1074,10 @@
 </code>.
 </p>
 <p>
+<strong>Daf
+</strong>
+</p>
+<p>
 <strong>Inputs
 </strong>
 </p>
@@ -1082,6 +1134,50 @@
 <em>punctuated
 </em>metacells
 </strong>::Union{Float32, Float64} (optional): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>Base
+</strong>
+</p>
+<p>Only if 
+<code>base_daf
+</code> is given.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>base_block
+</strong> (required): A copy of the base 
+<a href="contracts.html#Metacells.Contracts.block_axis">
+<code>block_axis
+</code>
+</a>, copied into the alternative.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (required): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
 </p>
 </div>
 </section>

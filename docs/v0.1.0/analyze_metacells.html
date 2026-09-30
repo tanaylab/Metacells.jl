@@ -1342,6 +1342,10 @@
 </code>.
 </p>
 <p>
+<strong>Metacells
+</strong>
+</p>
+<p>
 <strong>Inputs
 </strong>
 </p>
@@ -1390,6 +1394,46 @@
 <p>
 <strong>metacell @ umap_y
 </strong>::Union{Float32, Float64} (created): The Y coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>Previous Metacells
+</strong>
+</p>
+<p>Only if 
+<code>prev_daf
+</code> is given.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ umap_x
+</strong>::Union{Float32, Float64} (required): The X coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_y
+</strong>::Union{Float32, Float64} (required): The Y coordinate of each metacell in a 2D UMAP projection.
 </p>
 </div>
 </section>

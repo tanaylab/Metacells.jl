@@ -1098,7 +1098,15 @@ many epochs, since the seed already places the metacells. This requires [`vector
 and [`vector_of_metacell_per_cell`](@ref), [`vector_of_umap_x_per_metacell`](@ref) and
 [`vector_of_umap_y_per_metacell`](@ref) in `prev_daf`.
 
-$(CONTRACT)
+# Metacells
+
+$(CONTRACT1)
+
+# Previous Metacells
+
+Only if `prev_daf` is given.
+
+$(CONTRACT2)
 """
 @logged :mcs_ops @computation Contract(;
     axes = [metacell_axis(RequiredInput), cell_axis(OptionalInput)],
@@ -1107,6 +1115,14 @@ $(CONTRACT)
         vector_of_metacell_per_cell(OptionalInput),
         vector_of_umap_x_per_metacell(CreatedOutput),
         vector_of_umap_y_per_metacell(CreatedOutput),
+    ],
+) Contract(;
+    name = "prev_daf",
+    axes = [metacell_axis(RequiredInput), cell_axis(RequiredInput)],
+    data = [
+        vector_of_metacell_per_cell(RequiredInput),
+        vector_of_umap_x_per_metacell(RequiredInput),
+        vector_of_umap_y_per_metacell(RequiredInput),
     ],
 ) function compute_metacells_2d_umap!(  # UNTESTED
     daf::DafWriter;

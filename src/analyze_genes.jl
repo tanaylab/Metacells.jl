@@ -616,7 +616,15 @@ gene moved *with*, where `imp_f` and `deg_f` say only how often it moved:
 
 These columns are omitted when the repository does not hold the module sharing.
 
-$(CONTRACT)
+# Daf
+
+$(CONTRACT1)
+
+# Base
+
+Only if `base_daf` is given.
+
+$(CONTRACT2)
 """
 @logged :mcs_ops @computation Contract(;
     name = "daf",
@@ -639,6 +647,14 @@ $(CONTRACT)
         ),
         matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(
             OptionalInput,
+        ),
+    ],
+) Contract(;
+    name = "base_daf",
+    axes = [gene_axis(RequiredInput), base_block_axis(RequiredInput)],
+    data = [
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+            RequiredInput,
         ),
     ],
 ) function compute_gene_report(;
@@ -918,7 +934,15 @@ that significantly improved / degraded (by at least `0.05`):
 
 These comparison statistics are omitted when `base_daf` is `nothing`.
 
-$(CONTRACT)
+# Daf
+
+$(CONTRACT1)
+
+# Base
+
+Only if `base_daf` is given.
+
+$(CONTRACT2)
 """
 @logged :mcs_ops @computation Contract(;
     name = "daf",
@@ -930,6 +954,14 @@ $(CONTRACT)
         matrix_of_correlation_between_markers_per_gene_per_gene(RequiredInput),
         matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
             OptionalInput,
+        ),
+    ],
+) Contract(;
+    name = "base_daf",
+    axes = [gene_axis(RequiredInput), base_block_axis(RequiredInput)],
+    data = [
+        matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+            RequiredInput,
         ),
     ],
 ) function compute_skeleton_report(; daf::DafReader, base_daf::Maybe{DafReader} = nothing)::DataFrame

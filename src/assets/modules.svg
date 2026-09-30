@@ -19,9 +19,9 @@
 </g>
 </g>
 <!-- ComputeBlocks -->
-<g id="node11" class="node">
+<g id="node9" class="node">
 <title>ComputeBlocks</title>
-<g id="a_node11"><a xlink:href="../compute_blocks.html" xlink:title="ComputeBlocks" target="_top">
+<g id="a_node9"><a xlink:href="../compute_blocks.html" xlink:title="ComputeBlocks" target="_top">
 <polygon fill="none" stroke="#ffffff" points="268,-74 168,-74 168,-55 268,-55 268,-74"/>
 <text text-anchor="middle" x="218" y="-60.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">ComputeBlocks</text>
 </a>
@@ -48,40 +48,25 @@
 <path fill="none" stroke="#000000" d="M284.1028,-109.9197C292.4004,-102.0514 304.3537,-90.7164 314.2431,-81.3385"/>
 <polygon fill="#000000" stroke="#000000" points="316.7745,-83.7615 321.6224,-74.3408 311.9578,-78.6821 316.7745,-83.7615"/>
 </g>
-<!-- Gmara -->
-<g id="node2" class="node">
-<title>Gmara</title>
-<g id="a_node2"><a xlink:href="../gmara.html" xlink:title="Gmara" target="_top">
-<polygon fill="none" stroke="#ffffff" points="243.5,-184 196.5,-184 196.5,-165 243.5,-165 243.5,-184"/>
-<text text-anchor="middle" x="220" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Gmara</text>
-</a>
-</g>
-</g>
-<!-- Gmara&#45;&gt;AnalyzeGenes -->
-<g id="edge1" class="edge">
-<title>Gmara&#45;&gt;AnalyzeGenes</title>
-<path fill="none" stroke="#000000" d="M229.4061,-164.9197C237.0549,-157.1293 248.0403,-145.9405 257.1936,-136.6176"/>
-<polygon fill="#000000" stroke="#000000" points="259.8296,-138.9286 264.3381,-129.3408 254.8347,-134.0244 259.8296,-138.9286"/>
-</g>
 <!-- AnalyzeMetacells -->
-<g id="node3" class="node">
+<g id="node2" class="node">
 <title>AnalyzeMetacells</title>
-<g id="a_node3"><a xlink:href="../analyze_metacells.html" xlink:title="AnalyzeMetacells" target="_top">
+<g id="a_node2"><a xlink:href="../analyze_metacells.html" xlink:title="AnalyzeMetacells" target="_top">
 <polygon fill="none" stroke="#ffffff" points="372,-184 262,-184 262,-165 372,-165 372,-184"/>
 <text text-anchor="middle" x="317" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeMetacells</text>
 </a>
 </g>
 </g>
 <!-- AnalyzeMetacells&#45;&gt;AnalyzeGenes -->
-<g id="edge2" class="edge">
+<g id="edge1" class="edge">
 <title>AnalyzeMetacells&#45;&gt;AnalyzeGenes</title>
 <path fill="none" stroke="#000000" d="M309.51,-164.9197C303.602,-157.363 295.1941,-146.6087 288.0427,-137.4616"/>
 <polygon fill="#000000" stroke="#000000" points="290.6103,-135.0632 281.6937,-129.3408 285.0957,-139.3747 290.6103,-135.0632"/>
 </g>
 <!-- AnalyzeModules -->
-<g id="node9" class="node">
+<g id="node10" class="node">
 <title>AnalyzeModules</title>
-<g id="a_node9"><a xlink:href="../analyze_modules.html" xlink:title="AnalyzeModules" target="_top">
+<g id="a_node10"><a xlink:href="../analyze_modules.html" xlink:title="AnalyzeModules" target="_top">
 <polygon fill="none" stroke="#ffffff" points="500,-74 396,-74 396,-55 500,-55 500,-74"/>
 <text text-anchor="middle" x="448" y="-60.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeModules</text>
 </a>
@@ -92,6 +77,21 @@
 <title>AnalyzeMetacells&#45;&gt;AnalyzeModules</title>
 <path fill="none" stroke="#000000" d="M328.6254,-164.7382C351.211,-145.7732 401.2176,-103.7829 428.8021,-80.6204"/>
 <polygon fill="#000000" stroke="#000000" points="431.1802,-83.1938 436.5877,-74.0828 426.6788,-77.833 431.1802,-83.1938"/>
+</g>
+<!-- Gmara -->
+<g id="node3" class="node">
+<title>Gmara</title>
+<g id="a_node3"><a xlink:href="../gmara.html" xlink:title="Gmara" target="_top">
+<polygon fill="none" stroke="#ffffff" points="243.5,-184 196.5,-184 196.5,-165 243.5,-165 243.5,-184"/>
+<text text-anchor="middle" x="220" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Gmara</text>
+</a>
+</g>
+</g>
+<!-- Gmara&#45;&gt;AnalyzeGenes -->
+<g id="edge2" class="edge">
+<title>Gmara&#45;&gt;AnalyzeGenes</title>
+<path fill="none" stroke="#000000" d="M229.4061,-164.9197C237.0549,-157.1293 248.0403,-145.9405 257.1936,-136.6176"/>
+<polygon fill="#000000" stroke="#000000" points="259.8296,-138.9286 264.3381,-129.3408 254.8347,-134.0244 259.8296,-138.9286"/>
 </g>
 <!-- AnalyzeCells -->
 <g id="node4" class="node">
@@ -124,9 +124,9 @@
 <polygon fill="#000000" stroke="#000000" points="143.5001,-194.3408 140,-184.3408 136.5001,-194.3409 143.5001,-194.3408"/>
 </g>
 <!-- ComputeModules -->
-<g id="node10" class="node">
+<g id="node11" class="node">
 <title>ComputeModules</title>
-<g id="a_node10"><a xlink:href="../compute_modules.html" xlink:title="ComputeModules" target="_top">
+<g id="a_node11"><a xlink:href="../compute_modules.html" xlink:title="ComputeModules" target="_top">
 <polygon fill="none" stroke="#ffffff" points="112,-129 0,-129 0,-110 112,-110 112,-129"/>
 <text text-anchor="middle" x="56" y="-115.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">ComputeModules</text>
 </a>
@@ -184,13 +184,19 @@
 </g>
 </g>
 <!-- ProjectCells&#45;&gt;Pipeline -->
-<g id="edge12" class="edge">
+<g id="edge8" class="edge">
 <title>ProjectCells&#45;&gt;Pipeline</title>
 <path fill="none" stroke="#000000" d="M139.2323,-164.7114C138.0154,-143.2168 137.6587,-90.9463 159,-55 166.4723,-42.4141 178.8662,-32.0648 190.3709,-24.4339"/>
 <polygon fill="#000000" stroke="#000000" points="192.2513,-27.3862 198.899,-19.1364 188.5576,-21.44 192.2513,-27.3862"/>
 </g>
+<!-- ComputeBlocks&#45;&gt;Pipeline -->
+<g id="edge9" class="edge">
+<title>ComputeBlocks&#45;&gt;Pipeline</title>
+<path fill="none" stroke="#000000" d="M218,-54.9197C218,-47.9083 218,-38.1442 218,-29.4652"/>
+<polygon fill="#000000" stroke="#000000" points="221.5001,-29.3408 218,-19.3408 214.5001,-29.3409 221.5001,-29.3408"/>
+</g>
 <!-- AnalyzeModules&#45;&gt;Pipeline -->
-<g id="edge8" class="edge">
+<g id="edge10" class="edge">
 <title>AnalyzeModules&#45;&gt;Pipeline</title>
 <path fill="none" stroke="#000000" d="M408.1996,-54.9825C364.9642,-44.6436 296.4759,-28.266 254.5564,-18.2418"/>
 <polygon fill="#000000" stroke="#000000" points="255.2981,-14.8205 244.7582,-15.8987 253.67,-21.6285 255.2981,-14.8205"/>
@@ -211,19 +217,13 @@
 <polygon fill="#000000" stroke="#000000" points="410.0422,-23.6821 400.3776,-19.3408 405.2255,-28.7615 410.0422,-23.6821"/>
 </g>
 <!-- ComputeModules&#45;&gt;Pipeline -->
-<g id="edge9" class="edge">
+<g id="edge11" class="edge">
 <title>ComputeModules&#45;&gt;Pipeline</title>
 <path fill="none" stroke="#000000" d="M64.7828,-109.8239C77.3833,-96.3324 101.7546,-71.6552 126,-55 144.2168,-42.4861 166.3775,-31.4175 184.3843,-23.3313"/>
 <polygon fill="#000000" stroke="#000000" points="186.156,-26.3762 193.9093,-19.1555 183.3454,-19.9652 186.156,-26.3762"/>
 </g>
-<!-- ComputeBlocks&#45;&gt;Pipeline -->
-<g id="edge10" class="edge">
-<title>ComputeBlocks&#45;&gt;Pipeline</title>
-<path fill="none" stroke="#000000" d="M218,-54.9197C218,-47.9083 218,-38.1442 218,-29.4652"/>
-<polygon fill="#000000" stroke="#000000" points="221.5001,-29.3408 218,-19.3408 214.5001,-29.3409 221.5001,-29.3408"/>
-</g>
 <!-- AnalyzeBlocks&#45;&gt;Pipeline -->
-<g id="edge11" class="edge">
+<g id="edge12" class="edge">
 <title>AnalyzeBlocks&#45;&gt;Pipeline</title>
 <path fill="none" stroke="#000000" d="M312.1427,-54.9197C294.1896,-46.2581 267.5292,-33.3957 247.1581,-23.5675"/>
 <polygon fill="#000000" stroke="#000000" points="248.5397,-20.3481 238.0122,-19.155 245.498,-26.6527 248.5397,-20.3481"/>

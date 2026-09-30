@@ -288,16 +288,16 @@
 </strong>
 </p>
 <p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
 <strong>cell
 </strong> (required): Sequenced single cells.
 </p>
 <p>
 <strong>gene
 </strong> (required): Sequenced genes.
-</p>
-<p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
 </p>
 <p>
 <strong>Vectors
@@ -413,6 +413,10 @@
 <p>Compute more advanced properties based on the metacells, taking into account gene masks. Specifically this depends on the lateral and regulator gene masks, and the forbidden gene masks. These are used to determine the set of skeleton genes which are then used to drive the rest of the analysis, starting with grouping metacells into blocks and ending with local gene modules.
 </p>
 <p>
+<strong>Metacells
+</strong>
+</p>
+<p>
 <strong>Inputs
 </strong>
 </p>
@@ -425,32 +429,20 @@
 </strong> (required): Sequenced genes.
 </p>
 <p>
-<strong>cell
-</strong> (required): Sequenced single cells.
-</p>
-<p>
 <strong>metacell
 </strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
 </p>
 <p>
 <strong>Vectors
 </strong>
 </p>
 <p>
-<strong>cell @ total_UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
-</p>
-<p>
-<strong>cell @ metacell
-</strong>::AbstractString (required): The unique metacell each cell belongs to.
-</p>
-<p>
-<strong>metacell @ total_UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
-</p>
-<p>
-<strong>metacell @ n_cells
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
+<strong>gene @ is_regulator
+</strong>::Bool (required): A mask of genes that regulate the expression level of other genes.
 </p>
 <p>
 <strong>gene @ is_excluded
@@ -465,32 +457,44 @@
 </strong>::Bool (required): A mask of genes that are forbidden from being used as skeleton genes.
 </p>
 <p>
-<strong>gene @ is_regulator
-</strong>::Bool (required): A mask of genes that regulate the expression level of other genes.
-</p>
-<p>
 <strong>gene @ is_marker
 </strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
 </p>
 <p>
 <strong>metacell @ type
 </strong>::AbstractString (optional): The type each metacell belongs to.
 </p>
 <p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
 <p>
-<strong>gene, cell @ UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
 </p>
 <p>
 <strong>gene, metacell @ UMIs
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
 </p>
 <p>
-<strong>gene, metacell @ linear_fraction
-</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
 </p>
 <p>
 <strong>gene, metacell @ log
@@ -503,12 +507,20 @@
 </strong>
 </p>
 <p>
-<strong>Vectors
+<strong>Axes
 </strong>
 </p>
 <p>
-<strong>block @ type
-</strong>::AbstractString (optional): The type each block belongs to.
+<strong>block
+</strong> (created): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>module
+</strong> (created): Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold.
+</p>
+<p>
+<strong>Vectors
+</strong>
 </p>
 <p>
 <strong>gene @ is_skeleton
@@ -527,12 +539,6 @@
 </strong>::AbstractString (created): The unique block each metacell belongs to.
 </p>
 <p>
-<strong>cell @ block.closest
-<em>by
-</em>pertinent_markers
-</strong>::AbstractString (created): The block each cell is closest to considering only the non-lateral marker genes.
-</p>
-<p>
 <strong>block @ n_metacells
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of metacells in each block.
 </p>
@@ -543,6 +549,16 @@
 <p>
 <strong>block @ total_UMIs
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of all the non-excluded genes in each block.
+</p>
+<p>
+<strong>block @ type
+</strong>::AbstractString (optional): The type each block belongs to.
+</p>
+<p>
+<strong>cell @ block.closest
+<em>by
+</em>pertinent_markers
+</strong>::AbstractString (created): The block each cell is closest to considering only the non-lateral marker genes.
 </p>
 <p>
 <strong>block @ n
@@ -611,20 +627,6 @@
 </strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
 </p>
 <p>
-<strong>gene, block @ UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of each gene in each block.
-</p>
-<p>
-<strong>gene, block @ linear_fraction
-</strong>::Union{Float32, Float64} (created): The linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.
-</p>
-<p>
-<strong>gene, block @ log
-<em>linear
-</em>fraction
-</strong>::Union{Float32, Float64} (created): The log base 2 of the linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.
-</p>
-<p>
 <strong>metacell, block @ mean
 <em>euclidean
 </em>skeleton
@@ -639,6 +641,20 @@
 <em>fold
 </em>distance
 </strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.
+</p>
+<p>
+<strong>gene, block @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of each gene in each block.
+</p>
+<p>
+<strong>gene, block @ linear_fraction
+</strong>::Union{Float32, Float64} (created): The linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.
+</p>
+<p>
+<strong>gene, block @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (created): The log base 2 of the linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.
 </p>
 <p>
 <strong>block, block @ confusion
@@ -687,12 +703,12 @@
 </strong>::Bool (created): Whether each gene has strong correlation with the skeleton genes in each block&#39;s environment.
 </p>
 <p>
-<strong>block, gene @ module
-</strong>::AbstractString (created): The module each gene belongs to in each block.
-</p>
-<p>
 <strong>block, module @ is_found
 </strong>::Bool (created): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (created): The module each gene belongs to in each block.
 </p>
 <p>
 <strong>block, gene @ module_status
@@ -721,6 +737,46 @@
 <p>
 <strong>module, metacell @ cells_dispersion
 </strong>::Union{Float32, Float64} (created): The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.
+</p>
+<p>
+<strong>Previous Metacells
+</strong>
+</p>
+<p>Only if 
+<code>prev_daf
+</code> is given.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ umap_x
+</strong>::Union{Float32, Float64} (required): The X coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_y
+</strong>::Union{Float32, Float64} (required): The Y coordinate of each metacell in a 2D UMAP projection.
 </p>
 </div>
 </section>
@@ -923,16 +979,16 @@
 </strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
 </p>
 <p>
-<strong>gene, block @ is
-<em>environment
-</em>marker
-</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s environment.
-</p>
-<p>
 <strong>block, block @ is
 <em>in
 </em>neighborhood
 </strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, block @ is
+<em>environment
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s environment.
 </p>
 </div>
 </section>
