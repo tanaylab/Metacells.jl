@@ -805,18 +805,24 @@
 <pre>
 <code class="language-julia hljs">function qc_metacells!(;
     daf::DafWriter,
-    base_daf::DafReader,
+    score_daf::DafReader,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
-<p>Say how well the metacells describe the cells they were aggregated from, judged in the locations of the manifold a base repository laid out.
+<p>Say how well the metacells describe the cells they were aggregated from, judged in the locations of the manifold the 
+<code>score_daf
+</code> repository laid out.
 </p>
-<p>Each cell is correlated against its own metacell minus itself, over the cells of each base block&#39;s neighborhood, and the result is averaged over the environment marker genes of that base block. A higher number means the metacells of that location are a better account of the cells there. Only metacells scored against the same 
-<code>base_daf
+<p>Each cell is correlated against its own metacell minus itself, over the cells of each base block&#39;s neighborhood, and the result is averaged over the environment marker genes of that base block. The base blocks are the blocks of the 
+<code>score_daf
+</code>. A higher number means the metacells of that location are a better account of the cells there. Only metacells scored against the same 
+<code>score_daf
 </code> can be compared to each other, since it is the 
-<code>base_daf
-</code> which decides both the locations and the genes each of them is read by. A repository is free to be its own base, which is how the metacells the sharpening started from are scored.
+<code>score_daf
+</code> which decides both the locations and the genes each of them is read by. A repository is free to be its own 
+<code>score_daf
+</code>, which is how the metacells the sharpening started from are scored.
 </p>
 <p>
 <strong>Daf
@@ -915,7 +921,7 @@
 </strong>::Union{Float32, Float64} (created): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
 </p>
 <p>
-<strong>Base
+<strong>Score
 </strong>
 </p>
 <p>
@@ -994,6 +1000,922 @@
 </section>
 </details>
 </article>
+<h2 id="Sharpening">
+<a class="docs-heading-anchor" href="#Sharpening">Sharpening
+</a>
+<a id="Sharpening-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Sharpening" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.sharpen_round!">
+<a class="docstring-binding" href="#Metacells.Pipeline.sharpen_round!">
+<code>Metacells.Pipeline.sharpen_round!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function sharpen_round!(;
+    sharp_daf::DafWriter,
+    prev_daf::DafReader,
+    score_daf::DafReader,
+    sharpening_round::Integer,
+    metacells_prefix::AbstractString = ```&quot;M&quot;```,
+    blocks_prefix::AbstractString = ```&quot;B&quot;```,
+    module_status::Bool = ```false```,
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Run one round of sharpening. This regroups the cells into new metacells in 
+<code>sharp_daf
+</code>, using what 
+<code>prev_daf
+</code> says about the manifold (
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>). It then aggregates the new metacells (
+<a href="pipeline.html#Metacells.Pipeline.prepare_metacells!">
+<code>prepare_metacells!
+</code>
+</a>) and analyzes them (
+<a href="pipeline.html#Metacells.Pipeline.analyze_metacells!">
+<code>analyze_metacells!
+</code>
+</a>). Finally, it scores them against 
+<code>score_daf
+</code> (
+<a href="pipeline.html#Metacells.Pipeline.qc_metacells!">
+<code>qc_metacells!
+</code>
+</a>).
+</p>
+<p>The new metacells are named using the 
+<code>metacells_prefix
+</code>, and their blocks using the 
+<code>blocks_prefix
+</code>. The prefixes 
+<a href="pipeline.html#Metacells.Pipeline.sharpening_rounds">
+<code>sharpening_rounds
+</code>
+</a> gives each round are one way to choose them.
+</p>
+<p>
+<strong>Sharpened Metacells
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ type
+</strong>::AbstractString (optional): The type each cell belongs to.
+</p>
+<p>
+<strong>gene @ is_excluded
+</strong>::Bool (required): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>gene @ is_regulator
+</strong>::Bool (required): A mask of genes that regulate the expression level of other genes.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>gene @ is_forbidden
+</strong>::Bool (required): A mask of genes that are forbidden from being used as skeleton genes.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (created): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (created): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>module
+</strong> (created): Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (created): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ prev_block
+</strong>::AbstractString (created): The unique previous round&#39;s block each sharpened metacell belongs to.
+</p>
+<p>
+<strong>cell @ prev
+<em>block.outlier
+</em>in
+</strong>::AbstractString (created): The previous round&#39;s block each outlier cell was clustered in.
+</p>
+<p>
+<strong>cell @ metacell.outlier_in
+</strong>::AbstractString (created): The metacell each outlier cell was ejected from.
+</p>
+<p>
+<strong>cell @ prev
+<em>block.outlier
+</em>by
+</strong>::AbstractString (created): The previous round&#39;s block whose found module most strongly deviates in each outlier cell.
+</p>
+<p>
+<strong>cell @ prev
+<em>module.outlier
+</em>by
+</strong>::AbstractString (created): The found module that most strongly deviates in each outlier cell.
+</p>
+<p>
+<strong>cell @ outlier
+<em>expected
+</em>UMIs
+</strong>::Union{Float32, Float64} (created): The expected UMIs of the outlier module&#39;s genes in each outlier cell.
+</p>
+<p>
+<strong>cell @ outlier
+<em>actual
+</em>UMIs
+</strong>::Union{Float32, Float64} (created): The actual UMIs of the outlier module&#39;s genes in each outlier cell.
+</p>
+<p>
+<strong>metacell @ type
+</strong>::AbstractString (optional): The type each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of cells in each metacell.
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (created): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ marker_rank
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The relative ranks of the marker genes.
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (created): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
+<strong>metacell @ umap_x
+</strong>::Union{Float32, Float64} (created): The X coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_y
+</strong>::Union{Float32, Float64} (created): The Y coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (created): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n_metacells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of metacells in each block.
+</p>
+<p>
+<strong>block @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of cells in each block.
+</p>
+<p>
+<strong>block @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of all the non-excluded genes in each block.
+</p>
+<p>
+<strong>block @ type
+</strong>::AbstractString (optional): The type each block belongs to.
+</p>
+<p>
+<strong>cell @ block.closest
+<em>by
+</em>pertinent_markers
+</strong>::AbstractString (created): The block each cell is closest to considering only the non-lateral marker genes.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>blocks
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of (rows) blocks in each (column) block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>metacells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of metacells in the blocks in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ total
+<em>neighborhood
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ n
+<em>environment
+</em>metacells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of metacells in each block&#39;s environment.
+</p>
+<p>
+<strong>block @ n
+<em>environment
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of cells in the metacells in each block&#39;s environment.
+</p>
+<p>
+<strong>block @ total
+<em>environment
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s environment.
+</p>
+<p>
+<strong>module @ gene.anchor
+</strong>::AbstractString (created): The anchor gene each module is based on.
+</p>
+<p>
+<strong>block @ n_modules
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of found modules in each block.
+</p>
+<p>
+<strong>base
+<em>block @ mean
+</em>correlation
+<em>between
+</em>base
+<em>neighborhood
+</em>cells
+<em>and
+</em>punctuated_metacells
+</strong>::Union{Float32, Float64} (created): The mean correlation between cells and their metacells (minus the correlated cell) over the environment marker genes of each base block.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (created): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>gene, metacell @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (created): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>gene, gene @ correlation
+<em>between
+</em>markers
+</strong>::Union{Float32, Float64} (created): The correlation between the log expression of pairs of marker genes across the metacells.
+</p>
+<p>
+<strong>metacell, metacell @ max
+<em>skeleton
+</em>fold_distance
+</strong>::Union{Float32, Float64} (created): The maximal significant fold factor between the fraction of skeleton genes between the metacells.
+</p>
+<p>
+<strong>metacell, metacell @ euclidean
+<em>skeleton
+</em>fold_distance
+</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+</p>
+<p>
+<strong>metacell, block @ mean
+<em>euclidean
+</em>skeleton
+<em>fold
+</em>distance
+</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</p>
+<p>
+<strong>block, block @ mean
+<em>euclidean
+</em>skeleton
+<em>fold
+</em>distance
+</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.
+</p>
+<p>
+<strong>gene, block @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The total number of UMIs of each gene in each block.
+</p>
+<p>
+<strong>gene, block @ linear_fraction
+</strong>::Union{Float32, Float64} (created): The linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.
+</p>
+<p>
+<strong>gene, block @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (created): The log base 2 of the linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.
+</p>
+<p>
+<strong>block, block @ confusion
+<em>by
+</em>closest
+<em>by
+</em>pertinent_markers
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of cells which are included in each column (block) and are closest to each (row) block.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (created): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, block @ is
+<em>neighborhood
+</em>marker
+</strong>::Bool (created): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>metacell, block @ is
+<em>in
+</em>environment
+</strong>::Bool (created): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>gene, block @ is
+<em>environment
+</em>marker
+</strong>::Bool (created): A mask of genes that distinguish between cell states in each block&#39;s environment.
+</p>
+<p>
+<strong>block, gene @ is
+<em>environment
+</em>distinct
+</strong>::Bool (created): A mask of genes that distinguish between cell states of each block&#39;s environment and the rest of the manifold.
+</p>
+<p>
+<strong>gene, block @ is
+<em>correlated
+</em>with
+<em>skeleton
+</em>in_environment
+</strong>::Bool (created): Whether each gene has strong correlation with the skeleton genes in each block&#39;s environment.
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (created): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (created): The module each gene belongs to in each block.
+</p>
+<p>
+<strong>block, gene @ module_status
+</strong>::AbstractString (optional): What happened to each gene when computing modules in each block.
+</p>
+<p>
+<strong>block, module @ n_genes
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of genes in each module in each block.
+</p>
+<p>
+<strong>block, module @ mean
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (created): The mean of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>block, module @ std
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (created): The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>module, metacell @ cells_dispersion
+</strong>::Union{Float32, Float64} (created): The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.
+</p>
+<p>
+<strong>gene, base
+<em>block @ correlation
+</em>between
+<em>base
+</em>neighborhood
+<em>cells
+</em>and
+<em>punctuated
+</em>metacells
+</strong>::Union{Float32, Float64} (created): The correlation between cells and their metacells (minus the correlated cell) of each gene&#39;s expression levels in each base block&#39;s neighborhood.
+</p>
+<p>
+<strong>Previous Metacells
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>module
+</strong> (required): Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>cell @ is
+<em>base
+</em>outlier
+</strong>::Bool (required): A mask of cells that were outliers at the original input.
+</p>
+<p>
+<strong>cell @ is_excluded
+</strong>::Bool (required): A mask of cells that are totally excluded from the analysis.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>cell @ block.closest
+<em>by
+</em>pertinent_markers
+</strong>::AbstractString (required): The block each cell is closest to considering only the non-lateral marker genes.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each block.
+</p>
+<p>
+<strong>block @ n_metacells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of metacells in each block.
+</p>
+<p>
+<strong>block @ n_modules
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of found modules in each block.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ total
+<em>neighborhood
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>metacell @ umap_x
+</strong>::Union{Float32, Float64} (required): The X coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>metacell @ umap_y
+</strong>::Union{Float32, Float64} (required): The Y coordinate of each metacell in a 2D UMAP projection.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>module, metacell @ cells_dispersion
+</strong>::Union{Float32, Float64} (required): The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (required): The module each gene belongs to in each block.
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (required): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, block @ is
+<em>neighborhood
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block, module @ mean
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The mean of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>block, module @ std
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>Score
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, block @ is
+<em>neighborhood
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, block @ is
+<em>environment
+</em>marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states in each block&#39;s environment.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.sharpening_rounds">
+<a class="docstring-binding" href="#Metacells.Pipeline.sharpening_rounds">
+<code>Metacells.Pipeline.sharpening_rounds
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">sharpening_rounds(;
+    initial_daf::DafReader,
+    base_daf::DafReader,
+    score_daf::DafReader,
+    directory::AbstractString,
+    metacells_prefix::AbstractString = ```&quot;M&quot;```,
+    blocks_prefix::AbstractString = ```&quot;B&quot;```,
+    module_status::Bool = ```false```,
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = ```false```,
+)::SharpeningRounds
+</code>
+</pre>
+<p>Iterate on rounds of sharpening, starting from the 
+<code>initial_daf
+</code> metacells. Each round is a 
+<a href="pipeline.html#Metacells.Pipeline.SharpeningRound">
+<code>SharpeningRound
+</code>
+</a>. Running it using 
+<a href="pipeline.html#Metacells.Pipeline.run!">
+<code>run!
+</code>
+</a> creates a new repository in the 
+<code>directory
+</code>, chained on the 
+<code>base_daf
+</code>. It then fills it using 
+<a href="pipeline.html#Metacells.Pipeline.sharpen_round!">
+<code>sharpen_round!
+</code>
+</a>, which scores it against the 
+<code>score_daf
+</code>. The iteration never ends by itself. The caller decides when to stop:
+</p>
+<pre>
+<code class="language-julia hljs">for sharpening_round in sharpening_rounds(; initial_daf, base_daf, score_daf, directory = &quot;dafs&quot;)
+    sharpening_round.index &gt; 2 &amp;&amp; break
+    metacells_daf = run!(sharpening_round, &quot;metacells.R$(sharpening_round.index)&quot;)
+end
+</code>
+</pre>
+<p>The 
+<code>metacells_prefix
+</code> and the 
+<code>blocks_prefix
+</code> are the base letters of the prefixes of each round. The 
+<code>initial_daf
+</code> metacells are round 0, and are expected to be named using the base letters. Each round&#39;s prefix is the next string, in shortlex order, over the 11 letters starting at the base letter. That is, for 
+<code>B
+</code>, the rounds are 
+<code>C
+</code>, 
+<code>D
+</code>, ... 
+<code>L
+</code>, then 
+<code>BB
+</code>, 
+<code>BC
+</code>, ... 
+<code>LL
+</code>, then 
+<code>BBB
+</code>, and so on. The letters of the two base prefixes must not overlap, so a block prefix can never be mistaken for a metacells prefix.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.SharpeningRounds">
+<a class="docstring-binding" href="#Metacells.Pipeline.SharpeningRounds">
+<code>Metacells.Pipeline.SharpeningRounds
+</code>
+</a> — 
+<span class="docstring-category">Type
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">mutable struct SharpeningRounds ... end
+</code>
+</pre>
+<p>The sharpening rounds, as returned by 
+<a href="pipeline.html#Metacells.Pipeline.sharpening_rounds">
+<code>sharpening_rounds
+</code>
+</a>. Iterating on it gives a 
+<a href="pipeline.html#Metacells.Pipeline.SharpeningRound">
+<code>SharpeningRound
+</code>
+</a> for each round in turn. Each must be 
+<a href="pipeline.html#Metacells.Pipeline.run!">
+<code>run!
+</code>
+</a> before the next one is taken.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.SharpeningRound">
+<a class="docstring-binding" href="#Metacells.Pipeline.SharpeningRound">
+<code>Metacells.Pipeline.SharpeningRound
+</code>
+</a> — 
+<span class="docstring-category">Type
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">struct SharpeningRound
+    index::Int
+    previous_daf::DafReader
+    base_daf::DafReader
+    score_daf::DafReader
+    directory::AbstractString
+    metacells_prefix::AbstractString
+    blocks_prefix::AbstractString
+    module_status::Bool
+    rng::AbstractRNG
+    overwrite::Bool
+end
+</code>
+</pre>
+<p>One round of the 
+<a href="pipeline.html#Metacells.Pipeline.sharpening_rounds">
+<code>sharpening_rounds
+</code>
+</a>. The 
+<code>index
+</code> is the number of the round, starting at 1. The 
+<code>previous_daf
+</code> is the metacells of the round before this one (for the first round, the 
+<code>initial_daf
+</code> the rounds started from). The 
+<code>metacells_prefix
+</code> and the 
+<code>blocks_prefix
+</code> are this round&#39;s prefixes. The rest are as given to 
+<a href="pipeline.html#Metacells.Pipeline.sharpening_rounds">
+<code>sharpening_rounds
+</code>
+</a>.
+</p>
+<p>Running the round using 
+<a href="pipeline.html#Metacells.Pipeline.run!">
+<code>run!
+</code>
+</a> uses all of these. Any of the parameters can be overridden when calling it.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.run!">
+<a class="docstring-binding" href="#Metacells.Pipeline.run!">
+<code>Metacells.Pipeline.run!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">run!(
+    sharpening_round::SharpeningRound,
+    name::AbstractString;
+    metacells_prefix::AbstractString = sharpening_round.metacells_prefix,
+    blocks_prefix::AbstractString = sharpening_round.blocks_prefix,
+    module_status::Bool = sharpening_round.module_status,
+    rng::AbstractRNG = sharpening_round.rng,
+    overwrite::Bool = sharpening_round.overwrite,
+)::DafWriter
+</code>
+</pre>
+<p>Run one of the 
+<a href="pipeline.html#Metacells.Pipeline.sharpening_rounds">
+<code>sharpening_rounds
+</code>
+</a>. This creates a repository with the 
+<code>name
+</code> in the round&#39;s 
+<code>directory
+</code>, chained on the round&#39;s 
+<code>base_daf
+</code>. It fills it using 
+<a href="pipeline.html#Metacells.Pipeline.sharpen_round!">
+<code>sharpen_round!
+</code>
+</a>, and returns it. The next round starts from it. Any of the round&#39;s parameters can be overridden for this round only.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -1006,6 +1928,18 @@
 <li>
 <a href="pipeline.html#Metacells.Pipeline">
 <code>Metacells.Pipeline
+</code>
+</a>
+</li>
+<li>
+<a href="pipeline.html#Metacells.Pipeline.SharpeningRound">
+<code>Metacells.Pipeline.SharpeningRound
+</code>
+</a>
+</li>
+<li>
+<a href="pipeline.html#Metacells.Pipeline.SharpeningRounds">
+<code>Metacells.Pipeline.SharpeningRounds
 </code>
 </a>
 </li>
@@ -1030,6 +1964,24 @@
 <li>
 <a href="pipeline.html#Metacells.Pipeline.qc_metacells!">
 <code>Metacells.Pipeline.qc_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="pipeline.html#Metacells.Pipeline.run!">
+<code>Metacells.Pipeline.run!
+</code>
+</a>
+</li>
+<li>
+<a href="pipeline.html#Metacells.Pipeline.sharpen_round!">
+<code>Metacells.Pipeline.sharpen_round!
+</code>
+</a>
+</li>
+<li>
+<a href="pipeline.html#Metacells.Pipeline.sharpening_rounds">
+<code>Metacells.Pipeline.sharpening_rounds
 </code>
 </a>
 </li>

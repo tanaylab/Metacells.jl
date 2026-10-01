@@ -52,7 +52,8 @@ maximal skeleton fold distance between the metacells in each cluster of `max_blo
 `:complete` linkage using the [`matrix_of_max_skeleton_fold_distance_between_metacells`](@ref).
 
 The actual blocks are computed using hierarchical clustering with `:ward` linkage based on the euclidean skeleton
-distance between the metacells (that is, using the [`matrix_of_euclidean_skeleton_fold_distance_between_metacells`](@ref)).
+distance between the metacells (that is, using the
+[`matrix_of_euclidean_skeleton_fold_distance_between_metacells`](@ref)).
 
 $(CONTRACT)
 """
@@ -63,7 +64,7 @@ $(CONTRACT)
         matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
         vector_of_block_per_metacell(CreatedOutput),
     ],
-) function compute_metacells_blocks!(
+) function compute_metacells_blocks!(  # UNTESTED
     daf::DafWriter;
     n_blocks::Maybe{Integer} = nothing,
     max_block_span::Real = function_default(compute_vector_of_is_marker_per_gene!, :min_marker_gene_range_fold),

@@ -267,7 +267,7 @@ $(CONTRACT)
         matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_euclidean_skeleton_fold_distance_between_metacells(CreatedOutput),
     ],
-) function compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(
+) function compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
@@ -319,7 +319,7 @@ $(CONTRACT)
         vector_of_total_UMIs_per_metacell(RequiredInput),
         matrix_of_max_skeleton_fold_distance_between_metacells(CreatedOutput),
     ],
-) function compute_matrix_of_max_skeleton_fold_distance_between_metacells!(
+) function compute_matrix_of_max_skeleton_fold_distance_between_metacells!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     min_significant_gene_UMIs::Integer = 40,
@@ -913,7 +913,7 @@ in a per-gene-per-gene `matrix_name`.
         vector_of_is_marker_per_gene(RequiredInput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
     ],
-) function compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!(
+) function compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!(  # UNTESTED
     daf::DafWriter;
     metacells_subset::Maybe{Union{QueryString, BitVector, AbstractVector{Bool}}} = nothing,
     matrix_name::AbstractString,
@@ -983,7 +983,7 @@ $(CONTRACT)
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_correlation_between_markers_per_gene_per_gene(CreatedOutput),
     ],
-) function compute_matrix_of_correlation_between_markers_per_gene_per_gene!(
+) function compute_matrix_of_correlation_between_markers_per_gene_per_gene!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -1004,7 +1004,7 @@ end
 # and negatively samples with bare `rand`, so this is the only way to make its layout reproducible. The global
 # generator is put back as it was, so that giving a computation its own generator does not change what anything else
 # draws afterwards; without a generator of our own there is nothing to isolate, and the global one is left alone.
-function with_global_rng(action::Function, rng::AbstractRNG)
+function with_global_rng(action::Function, rng::AbstractRNG)  # UNTESTED
     if rng === default_rng()
         return action()
     end
@@ -1018,7 +1018,7 @@ function with_global_rng(action::Function, rng::AbstractRNG)
 end
 
 # `UMAP.optimize_embedding!` mutates the embedding in place, so hand it a copy of the prior positions.
-function UMAP.initialize_embedding(
+function UMAP.initialize_embedding(  # UNTESTED
     ::AbstractMatrix{T},
     ::UMAP._EuclideanManifold{N},
     initialization::PriorInitialization,
@@ -1030,7 +1030,7 @@ end
 # The initial 2D position of each metacell of `daf` - the mean position of the `prev_daf` metacells of its cells. A
 # metacell all of whose cells were outliers in `prev_daf` has no position to inherit, and is placed at the origin with a
 # slight random offset (as `UMAP` itself does) so such metacells do not coincide.
-function compute_prior_position_per_metacell(;
+function compute_prior_position_per_metacell(;  # UNTESTED
     daf::DafReader,
     prev_daf::DafReader,
     rng::AbstractRNG,

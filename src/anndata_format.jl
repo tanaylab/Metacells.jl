@@ -194,7 +194,7 @@ Per-cell:
     It is common to manually call `reconstruct_axis!` on the result to create additional axes (e.g., if the cells were
     collected from a set of batches and some properties are actually per-batch).
 """
-@logged :mcs_ops @documented function import_cells_h5ad!(
+@logged :mcs_ops @documented function import_cells_h5ad!(  # UNTESTED
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = nothing,
@@ -279,14 +279,16 @@ the per-cell repository, which you'd keep read-only to allow sharing it when you
 metacells for it.
 
 This behaves similarly to [`import_cells_h5ad!`](@ref), specifically the generic rules (except that we copy per-metacell
-properties and not per-cell properties so the rules are adjusted accordingly), and we make the following special exceptions:
+properties and not per-cell properties so the rules are adjusted accordingly), and we make the following special
+exceptions:
 
 Per-metacell-per-gene:
 
   - The `X` matrix is renamed to `fraction` and always stored as `Float32`.
   - The `corrected_fraction` matrix is always stored as `Float32`.
   - The `essential` matrix is renamed to `is_essential`.
-  - The `essential`, `fitted`, and `misfit` matrices are renamed to `is_essential`, `is_fitted` and `is_misfit`, respectively.
+  - The `essential`, `fitted`, and `misfit` matrices are renamed to `is_essential`, `is_fitted` and `is_misfit`,
+    respectively.
   - The `inner_fold`, `inner_stdev_log` (renamed to `inner_std_log`), `projected_fold`, `projected_fraction` matrices
     are always stored as `Float32`.
   - The `total_umis` matrix is renamed to `UMIs` and always stored as `UInt32`.
@@ -321,7 +323,7 @@ Per-metacell-per-metacell:
 
     It is common to manually call `reconstruct_type!` on the result to create a type axis.
 """
-@logged :mcs_ops @documented function import_metacells_h5ad!(
+@logged :mcs_ops @documented function import_metacells_h5ad!(  # UNTESTED
     daf::DafWriter;
     cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,
@@ -418,7 +420,7 @@ default of `false`), which is what it was all along.
 The `type_axis` must exist, since it says which types there are; a type with no mask property simply has no genes in
 it. In practice these masks come in a metacells `h5ad` rather than a cells one.
 """
-@logged :mcs_ops @documented function import_gene_masks_per_type!(
+@logged :mcs_ops @documented function import_gene_masks_per_type!(  # UNTESTED
     daf::DafWriter;
     type_axis::AbstractString = "type",
 )::Nothing
@@ -439,7 +441,7 @@ it. In practice these masks come in a metacells `h5ad` rather than a cells one.
     return nothing
 end
 
-function import_mask_matrix(
+function import_mask_matrix(  # UNTESTED
     daf::DafWriter,
     type_axis::AbstractString,
     type_names::AbstractVector{<:AbstractString},
@@ -487,7 +489,7 @@ Data spelling that some other way - `Outliers`, `Doublet`, and the like - should
 
 Nothing is written until all of the above has been verified, so a rejected file leaves the data as it was.
 """
-@logged :mcs_ops @documented function import_type_colors_csv!(
+@logged :mcs_ops @documented function import_type_colors_csv!(  # UNTESTED
     daf::DafWriter;
     type_colors_csv::AbstractString,
     axis::AbstractString = "cell",
@@ -540,7 +542,7 @@ Nothing is written until all of the above has been verified, so a rejected file 
     return nothing
 end
 
-function import_scalars_data(
+function import_scalars_data(  # UNTESTED
     daf::DafWriter,
     source::DafReader;
     copy_data::Maybe{CopyAnnData},
@@ -573,7 +575,7 @@ function import_scalars_data(
     return nothing
 end
 
-function import_vectors_data(
+function import_vectors_data(  # UNTESTED
     daf::DafWriter,
     source::DafReader,
     axis::AbstractString,
@@ -668,7 +670,7 @@ function import_vectors_data(
     return nothing
 end
 
-function import_matrices_data(
+function import_matrices_data(  # UNTESTED
     daf::DafWriter,
     source::DafReader,
     rows_axis::AbstractString,
@@ -711,8 +713,9 @@ function import_matrices_data(
         relayout = !has_matrix(source, columns_axis, rows_axis, matrix_name; relayout = false)
 
         if !overwrite && !insist && has_matrix(daf, rows_axis, columns_axis, rename; relayout)
-            @debug "skip existing $(rows_axis)-$(columns_axis) matrix: $(matrix_name) ($(relayout ? "" : "!")relayout)" _group =
-                :mcs_details
+            @debug (
+                "skip existing $(rows_axis)-$(columns_axis) matrix: $(matrix_name) ($(relayout ? "" : "!")relayout)"
+            ) _group = :mcs_details
             continue
         end
 
@@ -726,8 +729,10 @@ function import_matrices_data(
             @debug "copy $(rows_axis)-$(columns_axis) matrix: $(matrix_name) ($(relayout ? "" : "!")relayout)" _group =
                 :mcs_details
         else
-            @debug "copy $(rows_axis)-$(columns_axis) matrix: $(matrix_name) to: $(rename) ($(relayout ? "" : "!")relayout)" _group =
-                :mcs_details
+            @debug (
+                "copy $(rows_axis)-$(columns_axis) matrix: $(matrix_name) to: $(rename)" *
+                " ($(relayout ? "" : "!")relayout)"
+            ) _group = :mcs_details
         end
 
         copy_matrix!(;  # NOJET
@@ -750,7 +755,7 @@ function import_matrices_data(
     return nothing
 end
 
-function copy_metacells_of_cells(
+function copy_metacells_of_cells(  # UNTESTED
     daf::DafWriter,
     cells_h5ad::AbstractString;
     bestify::Bool,

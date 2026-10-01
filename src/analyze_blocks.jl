@@ -356,7 +356,7 @@ $(CONTRACT)
         vector_of_block_per_metacell(RequiredInput),
         matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(
+) function compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -393,7 +393,7 @@ $(CONTRACT)
         vector_of_block_per_metacell(RequiredInput),
         matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(CreatedOutput),
     ],
-) function compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(
+) function compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -429,7 +429,7 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
         vector_of_is_marker_per_gene(RequiredInput),
         vector_of_block_closest_by_pertinent_markers_per_cell(CreatedOutput),
     ],
-) function compute_vector_of_block_closest_by_pertinent_markers_per_cell!(
+) function compute_vector_of_block_closest_by_pertinent_markers_per_cell!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
@@ -522,7 +522,7 @@ $(CONTRACT)
         vector_of_block_closest_by_pertinent_markers_per_cell(RequiredInput),
         matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!(
+) function compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -568,7 +568,7 @@ $(CONTRACT)
         vector_of_block_closest_by_pertinent_markers_per_cell(RequiredInput),
         matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!(
+) function compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -636,7 +636,7 @@ $(CONTRACT)
         matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_in_neighborhood_per_block_per_block!(
+) function compute_matrix_of_is_in_neighborhood_per_block_per_block!(  # UNTESTED
     daf::DafWriter;
     min_neighbour_confusion_fractions::AbstractFloat = 0.01,
     min_blocks_in_neighborhood::Integer = 5,
@@ -855,7 +855,7 @@ $(CONTRACT)
     return nothing
 end
 
-function compute_vector_of_neighborhood_something_per_block(
+function compute_vector_of_neighborhood_something_per_block(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
     vector_property::AbstractString,
@@ -970,7 +970,7 @@ $(CONTRACT)
     return nothing
 end
 
-function compute_vector_of_environment_something_per_block(
+function compute_vector_of_environment_something_per_block(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
     vector_property::AbstractString,
@@ -1021,7 +1021,7 @@ We only consider genes which are markers in the overall population. We then call
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_neighborhood_marker_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_neighborhood_marker_per_gene_per_block!(
+) function compute_matrix_of_is_neighborhood_marker_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
     min_marker_gene_range_fold::Real = 1.0,
@@ -1119,7 +1119,7 @@ We only consider genes which are markers in the overall population. We then call
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_environment_marker_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_environment_marker_per_gene_per_block!(
+) function compute_matrix_of_is_environment_marker_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
     min_marker_gene_range_fold::Real = 1.0,
@@ -1213,7 +1213,7 @@ $(CONTRACT)
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_neighborhood_distinct_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!(
+) function compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
     min_distinct_gene_mean_fold::Real = 2,
@@ -1315,7 +1315,7 @@ $(CONTRACT)
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_environment_distinct_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_environment_distinct_per_gene_per_block!(
+) function compute_matrix_of_is_environment_distinct_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
     min_distinct_gene_mean_fold::Real = 2,
@@ -1416,7 +1416,7 @@ $(CONTRACT)
         matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(RequiredInput),
         matrix_of_is_environment_specific_per_gene_per_metacell(CreatedOutput),
     ],
-) function compute_matrix_of_is_environment_specific_per_gene_per_metacell!(
+) function compute_matrix_of_is_environment_specific_per_gene_per_metacell!(  # UNTESTED
     daf::DafWriter;
     min_rare_gene_fold_factor::AbstractFloat = 2.0,
     min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
@@ -1463,8 +1463,8 @@ $(CONTRACT)
         @views is_environment_marker_per_gene = is_environment_marker_per_gene_per_block[:, block_index]
         @views is_correlated_with_skeleton_in_environment_per_gene =
             is_correlated_with_skeleton_in_environment_per_gene_per_block[:, block_index]
-        is_candidate_per_gene =
-            is_environment_marker_per_gene .& .!is_correlated_with_skeleton_in_environment_per_gene .& .!is_lateral_per_gene
+        is_candidate_per_gene = is_environment_marker_per_gene .& .!is_lateral_per_gene
+        is_candidate_per_gene .&= .!is_correlated_with_skeleton_in_environment_per_gene
         indices_of_candidate_genes = findall(is_candidate_per_gene)
 
         linear_fraction_per_candidate_gene_per_environment_metacell =
@@ -1499,8 +1499,9 @@ $(CONTRACT)
         bestify(is_environment_specific_per_gene_per_metacell);
         overwrite,
     )
-    @debug "Mean specific genes per metacell: $(sum(is_environment_specific_per_gene_per_metacell) / n_metacells)" _group =
-        :mcs_results
+    @debug (
+        "Mean specific genes per metacell: " * "$(sum(is_environment_specific_per_gene_per_metacell) / n_metacells)"
+    ) _group = :mcs_results
     return nothing
 end
 
@@ -1536,7 +1537,7 @@ Compute and set [`matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!(
+) function compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     min_gene_correlation::AbstractFloat = function_default(
         compute_vector_of_is_correlated_with_skeleton_per_gene!,
@@ -1720,7 +1721,7 @@ Compute and set [`matrix_of_is_correlated_with_skeleton_in_environment_per_gene_
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!(
+) function compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     min_gene_correlation::AbstractFloat = function_default(
         compute_vector_of_is_correlated_with_skeleton_per_gene!,
@@ -1903,7 +1904,7 @@ $(CONTRACT)
         vector_of_is_lateral_per_gene(RequiredInput),
         matrix_of_is_neighborhood_marker_per_gene_per_block(RequiredInput),
     ],
-) function compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!(
+) function compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
@@ -1936,7 +1937,8 @@ $(CONTRACT)
 
     # Punctuated: leave-one-out makes each cell's metacell log fraction vary per cell. Each cell's `x`, `y` are
     # per-(cell, gene) and each block's neighborhood is a union of whole blocks, so accumulate the Pearson sufficient
-    # statistics per block once and combine each target's neighborhood blocks (exact, far cheaper than the dense gather).
+    # statistics per block once and combine each target's neighborhood blocks (exact, far cheaper than the dense
+    # gather).
     own_block_index_per_cell =
         [metacell_index_per_cell[cell] > 0 ? block_index_per_cell[cell] : 0 for cell in 1:n_cells]
     own_block_punctuated_correlation_per_gene_per_block!(
@@ -1973,7 +1975,8 @@ $(CONTRACT)
     )
 
     @debug (
-        "Mean correlation of neighborhood pertinent marker genes between neighborhood cells and their punctuated metacells: " *
+        "Mean correlation of neighborhood pertinent marker genes between neighborhood cells and their punctuated" *
+        " metacells: " *
         "$(mean(mean_correlation_per_block))"  # NOLINT
     ) _group = :mcs_results
     return nothing
@@ -1981,9 +1984,10 @@ end
 
 # The base block of each of the other repository's cells, for
 # `correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block`. Returns `nothing` when the two
-# repositories share the cell axis (the kernel then reads the base blocks positionally, which is cheaper); otherwise maps
-# each of the other repository's cells to its base block by name (the other cells being a subset of the base cells).
-function base_block_index_per_other_cell(base_daf::DafReader, other_daf::DafReader)::Maybe{Vector{<:Integer}}
+# repositories share the cell axis (the kernel then reads the base blocks positionally, which is cheaper); otherwise
+# maps each of the other repository's cells to its base block by name (the other cells being a subset of the base
+# cells).
+function base_block_index_per_other_cell(base_daf::DafReader, other_daf::DafReader)::Maybe{Vector{<:Integer}}  # UNTESTED
     if axis_vector(base_daf, "cell") == axis_vector(other_daf, "cell")
         return nothing
     end
@@ -1994,7 +1998,7 @@ end
 # Each base cell's metacell index in `other_daf` (0 when the cell is not in `other_daf`), for when `other_daf` holds a
 # subset of the base cells (e.g. cross-validation on held-out cells). All of `other_daf`'s cells must exist in
 # `base_daf` (`axis_indices` without `allow_missing` asserts this); base cells absent from `other_daf` keep metacell 0.
-function other_metacell_index_per_base_cell(base_daf::DafReader, other_daf::DafReader)::Vector{Int32}
+function other_metacell_index_per_base_cell(base_daf::DafReader, other_daf::DafReader)::Vector{Int32}  # UNTESTED
     other_metacell_index_per_other_cell = other_daf["@ cell : metacell ?? 0 : index"].array
     base_cell_index_per_other_cell = axis_indices(base_daf, "cell", axis_vector(other_daf, "cell"))
     other_metacell_index_per_base_cell = zeros(Int32, axis_length(base_daf, "cell"))
@@ -2009,12 +2013,12 @@ end
 # linear fraction in the cell against its log linear fraction in the cell's metacell. When `punctuate`, the metacell
 # excludes the correlated cell's own UMIs (used when the cell is a member of the metacell); otherwise the full metacell
 # is used (for held-out cells projected onto a metacell they were never part of). `is_punctuated_per_cell`, when given,
-# selects leave-one-out per cell (members of their projected metacell are punctuated, the rest are not). The cells, their
-# metacells, and the
-# metacell expression are supplied by the caller (they come from different repositories in the two uses); the blocks,
-# neighborhoods and gene axis come from `base_daf`. Returns the per-gene-per-base-block correlation matrix and the number
-# of participating neighborhood cells per base block (for the caller to discard blocks with too few cells to correlate).
-function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(;
+# selects leave-one-out per cell (members of their projected metacell are punctuated, the rest are not). The cells,
+# their metacells, and the metacell expression are supplied by the caller (they come from different repositories in the
+# two uses); the blocks, neighborhoods and gene axis come from `base_daf`. Returns the per-gene-per-base-block
+# correlation matrix and the number of participating neighborhood cells per base block (for the caller to discard blocks
+# with too few cells to correlate).
+function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(;  # UNTESTED
     base_daf::DafReader,
     metacell_index_per_cell::AbstractVector{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -2038,8 +2042,8 @@ function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_
         get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
 
     # Without an explicit mapping, the cells share the base repository's cell axis and each cell's base block is read
-    # positionally. Otherwise the caller supplies each cell's base block (via a name join, when the cells are a subset of
-    # the base repository - cross validation on held-out cells).
+    # positionally. Otherwise the caller supplies each cell's base block (via a name join, when the cells are a subset
+    # of the base repository - cross validation on held-out cells).
     if base_block_index_per_cell === nothing
         base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
     end
@@ -2084,10 +2088,10 @@ function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_
 
     # Punctuated: leave-one-out makes each cell's metacell log fraction vary per cell, so the constant-per-metacell
     # background collapse above does not apply. Each cell's `x`, `y` are per-(cell, gene) and each base block's
-    # neighborhood is a union of whole base blocks, so `own_block_punctuated_correlation_per_gene_per_block!` accumulates
-    # the Pearson sufficient statistics per base block once and combines each target's neighborhood base blocks - exact,
-    # and far cheaper than the dense per-block gather. With `is_punctuated_per_cell`, leave-one-out is applied only to the
-    # flagged cells (members of their projected metacell); the rest use the full metacell.
+    # neighborhood is a union of whole base blocks, so `own_block_punctuated_correlation_per_gene_per_block!`
+    # accumulates the Pearson sufficient statistics per base block once and combines each target's neighborhood base
+    # blocks - exact, and far cheaper than the dense per-block gather. With `is_punctuated_per_cell`, leave-one-out is
+    # applied only to the flagged cells (members of their projected metacell); the rest use the full metacell.
     own_block_index_per_cell =
         [metacell_index_per_cell[cell] > 0 ? base_block_index_per_cell[cell] : 0 for cell in 1:n_cells]
     correlation_per_gene_per_base_block = zeros(Float32, n_genes, n_base_blocks)
@@ -2130,7 +2134,7 @@ end
 # logs a single mean; otherwise it logs the in-bin and out-of-bin means separately (the cross-validation split). The
 # `metacells_qualifier` ("punctuated" or "projected") distinguishes the two correlation kinds in the log text, which the
 # summary scripts grep.
-function log_base_neighborhood_correlation_means(;
+function log_base_neighborhood_correlation_means(;  # UNTESTED
     base_daf::DafReader,
     correlation_per_gene_per_base_block::AbstractMatrix{<:AbstractFloat},
     n_participating_cells_per_base_block::AbstractVector{<:Integer},
@@ -2143,7 +2147,7 @@ function log_base_neighborhood_correlation_means(;
     is_base_neighborhood_marker_per_gene_per_base_block =
         get_matrix(base_daf, "gene", "block", "is_neighborhood_marker").array
 
-    function mean_over_relevant(mask_per_gene::Union{AbstractVector{Bool}, BitVector})::Vector{Float64}
+    function mean_over_relevant(mask_per_gene::Union{AbstractVector{Bool}, BitVector})::Vector{Float64}  # UNTESTED
         mean_per_base_block = fill(NaN, n_base_blocks)
         is_relevant_per_gene = BitVector(undef, n_genes)
         for base_block_index in 1:n_base_blocks
@@ -2161,7 +2165,7 @@ function log_base_neighborhood_correlation_means(;
         return mean_per_base_block
     end
 
-    function log_mean(mean_per_base_block::AbstractVector{<:AbstractFloat})::Float64
+    function log_mean(mean_per_base_block::AbstractVector{<:AbstractFloat})::Float64  # UNTESTED
         valid_mean_per_base_block = filter(!isnan, mean_per_base_block)
         return isempty(valid_mean_per_base_block) ? NaN : mean(valid_mean_per_base_block)  # NOLINT
     end
@@ -2246,7 +2250,7 @@ $(CONTRACT2)
         vector_of_n_neighborhood_cells_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
     ],
-) function compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;
+) function compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;  # UNTESTED
     other_daf::DafWriter,
     base_daf::DafReader,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
@@ -2362,7 +2366,7 @@ $(CONTRACT2)
         vector_of_is_lateral_per_gene(RequiredInput),
         matrix_of_is_environment_marker_per_gene_per_block(RequiredInput),
     ],
-) function compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!(;
+) function compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!(;  # UNTESTED
     other_daf::DafWriter,
     base_daf::DafReader,
     overwrite::Bool = false,
@@ -2667,7 +2671,7 @@ end
 # A cell counts when it has a metacell in both repositories, and it counts for every base block whose neighborhood
 # holds the base block the cell is in - so the neighborhoods overlapping means a cell counts for several of them, as it
 # does for the correlation these numbers accompany.
-function base_neighborhood_cells_of_base_blocks(base_daf::DafReader, other_daf::DafReader)::BaseNeighborhoodCells
+function base_neighborhood_cells_of_base_blocks(base_daf::DafReader, other_daf::DafReader)::BaseNeighborhoodCells  # UNTESTED
     n_blocks = axis_length(other_daf, "block")
     n_base_blocks = axis_length(base_daf, "block")
 
@@ -2700,7 +2704,7 @@ end
 
 # The module each gene is in in each block, as an index into that block's modules (zero for a gene in no module), and
 # the regulators of each of those modules, by their position among the regulator genes.
-function block_module_members(
+function block_module_members(  # UNTESTED
     other_daf::DafReader,
     regulator_position_per_gene::AbstractVector{<:Integer},
 )::Tuple{Matrix{Int32}, Vector{Vector{Vector{Int32}}}}
@@ -2734,7 +2738,7 @@ end
 
 # The gene by gene matrix of the mean shared fractions. Only the regulator rows are ever filled, and only for the genes
 # which changed somewhere, so it is stored sparse.
-function sparse_shared_fractions(
+function sparse_shared_fractions(  # UNTESTED
     mean_shared_fraction_per_regulator_per_gene::Matrix{Float32},
     indices_of_regulator_genes::AbstractVector{<:Integer},
 )::SparseMatrixCSC{Float32, Int32}
@@ -2819,7 +2823,7 @@ $(CONTRACT2)
         vector_of_n_neighborhood_cells_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
     ],
-) function compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!(;
+) function compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!(;  # UNTESTED
     other_daf::DafWriter,
     base_daf::DafReader,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
@@ -2958,7 +2962,7 @@ $(CONTRACT2)
         vector_of_n_neighborhood_cells_per_block(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
     ],
-) function compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!(;
+) function compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!(;  # UNTESTED
     other_daf::DafWriter,
     base_daf::DafReader,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
@@ -2989,8 +2993,9 @@ $(CONTRACT2)
     is_punctuated_per_cell =
         (own_metacell_index_per_cell .> 0) .& (own_metacell_index_per_cell .== metacell_index_per_cell)
 
-    # A cell participates in the correlation if it was projected onto a metacell (and, when the cells are a subset of the
-    # base repository, lies in a base block; `base_block_index_per_cell === nothing` means they share the base axis).
+    # A cell participates in the correlation if it was projected onto a metacell (and, when the cells are a subset of
+    # the base repository, lies in a base block; `base_block_index_per_cell === nothing` means they share the base
+    # axis).
     is_participating_per_cell = metacell_index_per_cell .> 0
     if base_block_index_per_cell !== nothing
         is_participating_per_cell = is_participating_per_cell .& (base_block_index_per_cell .> 0)
@@ -3058,9 +3063,9 @@ end
 # since the cells were never members of the metacells, the metacell expression is not punctuated. Unlike that
 # computation this only logs the means and writes no matrix. The `base_daf` provides the blocks, neighborhoods and
 # marker genes; the `query_daf` the cells and their projected metacell; the `atlas_daf` the metacell expression. All
-# three share the gene axis; the `query_daf` cells may be a subset of the `base_daf` cells (mapped to their base block by
-# name), and cells with no projected metacell do not participate.
-function log_projected_base_neighborhood_correlation_means(;
+# three share the gene axis; the `query_daf` cells may be a subset of the `base_daf` cells (mapped to their base block
+# by name), and cells with no projected metacell do not participate.
+function log_projected_base_neighborhood_correlation_means(;  # UNTESTED
     base_daf::DafReader,
     query_daf::DafReader,
     atlas_daf::DafReader,
@@ -3147,7 +3152,7 @@ $(CONTRACT)
         matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
         matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!(
+) function compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
@@ -3350,7 +3355,7 @@ end
 # Compute the correlation-with-most between base neighborhood cells and their punctuated metacells for a single
 # `base_block_index`. Writes per-gene values into `correlation_with_most_per_gene` (the caller's output column for this
 # base block) and returns the mean over the correlated genes. All scratch buffers must be preallocated by the caller.
-function compute_correlation_with_most_for_base_block!(;
+function compute_correlation_with_most_for_base_block!(;  # UNTESTED
     base_block_index::Integer,
     most_correlated_gene_in_base_neighborhood_per_gene_per_base_block::AbstractMatrix{<:AbstractString},
     gene_name_to_index::AbstractDict{<:AbstractString, <:Integer},
@@ -3459,7 +3464,8 @@ function compute_correlation_with_most_for_base_block!(;
             continue
         end
 
-        # Gather the friend gene's cell UMIs into the metacell buffer (reused in place below for its punctuated fraction).
+        # Gather the friend gene's cell UMIs into the metacell buffer (reused in place below for its punctuated
+        # fraction).
         gather_gene_UMIs_per_region_cell!(
             punctuated_metacell_log_fraction_per_base_neighborhood_cell,
             n_base_neighborhood_cells,
@@ -3590,7 +3596,7 @@ $(CONTRACT2)
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(RequiredInput),
     ],
-) function compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;
+) function compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;  # UNTESTED
     other_daf::DafWriter,
     base_daf::DafReader,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
@@ -3606,8 +3612,8 @@ $(CONTRACT2)
 
     # All per-cell data (UMIs, base blocks, neighborhoods) comes from `base_daf`; from `other_daf` only each base cell's
     # metacell index is needed. When the cell axes are identical (the common case) read it directly; otherwise
-    # `other_daf` must hold a subset of the base cells (cross-validation on held-out cells), so map each base cell to its
-    # `other_daf` metacell by name - cells absent from `other_daf` get metacell 0 and drop out of the neighborhoods.
+    # `other_daf` must hold a subset of the base cells (cross-validation on held-out cells), so map each base cell to
+    # its `other_daf` metacell by name - cells absent from `other_daf` get metacell 0 and drop out of the neighborhoods.
     if axis_vector(base_daf, "cell") == axis_vector(other_daf, "cell")
         other_metacell_index_per_cell = other_daf["@ cell : metacell ?? 0 : index"].array
     else
@@ -3721,7 +3727,8 @@ $(CONTRACT2)
     # held-out cells give degenerate per-block means, so the overall mean is an uninformative NaN.
     if is_relevant_gene_per_base_block === nothing
         @debug (
-            "Mean correlation of base neighborhood pertinent marker genes with friends between base neighborhood cells and their punctuated metacells:" *
+            "Mean correlation of base neighborhood pertinent marker genes with friends between base neighborhood" *
+            " cells and their punctuated metacells:" *
             " $(mean(mean_correlation_with_most_per_base_block))"  # NOLINT
         ) _group = :mcs_results
     end
@@ -3750,7 +3757,7 @@ $(CONTRACT)
         ),
         matrix_of_is_strong_per_gene_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_strong_per_gene_per_block!(
+) function compute_matrix_of_is_strong_per_gene_per_block!(  # UNTESTED
     daf::DafWriter;
     min_strong_linear_fraction::AbstractFloat = 1e-4,
     overwrite::Bool = false,
@@ -3955,7 +3962,8 @@ end
 """
     compute_matrix_of_is_in_environment_per_metacell_per_block!(
         daf::DafWriter;
-        max_environment_metacell_relative_distance::AbstractFloat = $(DEFAULT.max_environment_metacell_relative_distance),
+        max_environment_metacell_relative_distance::AbstractFloat =
+            $(DEFAULT.max_environment_metacell_relative_distance),
         environment_distance_base_quantile::AbstractFloat = $(DEFAULT.environment_distance_base_quantile),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
@@ -3977,7 +3985,7 @@ $(CONTRACT)
         vector_of_block_per_metacell(RequiredInput),
         matrix_of_is_in_environment_per_metacell_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_is_in_environment_per_metacell_per_block!(
+) function compute_matrix_of_is_in_environment_per_metacell_per_block!(  # UNTESTED
     daf::DafWriter;
     max_environment_metacell_relative_distance::AbstractFloat = 0.5,
     environment_distance_base_quantile::AbstractFloat = 0.95,

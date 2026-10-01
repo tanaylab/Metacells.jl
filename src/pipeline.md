@@ -28,6 +28,16 @@ Metacells.Pipeline.analyze_metacells!
 Metacells.Pipeline.qc_metacells!
 ```
 
+## Sharpening
+
+```@docs
+Metacells.Pipeline.sharpen_round!
+Metacells.Pipeline.sharpening_rounds
+Metacells.Pipeline.SharpeningRounds
+Metacells.Pipeline.SharpeningRound
+Metacells.Pipeline.run!
+```
+
 ## Index
 
 ```@index

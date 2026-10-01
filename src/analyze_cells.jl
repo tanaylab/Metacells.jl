@@ -106,7 +106,7 @@ end
 # genes); walking the gene's column once replaces per-cell random `UMIs_per_cell_per_gene[cell_index, gene_index]`
 # access, each of which is a binary search into the sparse column. Returns whether any region cell has nonzero UMIs of
 # the gene (the all-zero early-exit check the callers need).
-function gather_gene_UMIs_per_region_cell!(
+function gather_gene_UMIs_per_region_cell!(  # UNTESTED
     UMIs_per_region_cell::AbstractVector{<:Real},
     n_region_cells::Integer,
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC,
@@ -133,7 +133,7 @@ end
 # for cells with `is_participating_per_cell`. Columns are cells, so a cell's groups are a single CSC column walk in
 # `sparse_cell_reference_correlation_per_gene_per_group!`. Non-participating cells (no metacell / outside all
 # neighborhoods) are members of no group.
-function cell_group_membership_from_block_neighborhoods(
+function cell_group_membership_from_block_neighborhoods(  # UNTESTED
     block_index_per_cell::AbstractVector{<:Integer},
     is_in_neighborhood_per_block_per_group::AbstractMatrix{Bool},
     is_participating_per_cell::Union{AbstractVector{Bool}, BitVector},
@@ -180,7 +180,7 @@ end
 # background (every such cell has log fraction `log2(regularization)`) into the Pearson sufficient statistics in closed
 # form, using each group's cell count and its reference distribution. The result matches the dense correlation up to
 # floating point (the sums are reassociated). Groups with fewer than `min_group_cells` cells are left as zero.
-function sparse_cell_reference_correlation_per_gene_per_group!(
+function sparse_cell_reference_correlation_per_gene_per_group!(  # UNTESTED
     correlation_per_gene_per_group::AbstractMatrix{Float32},
     is_member_per_group_per_cell::SparseMatrixCSC{Bool},
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC,
@@ -342,15 +342,15 @@ end
 # `sparse_cell_reference_correlation_per_gene_per_group!` does not apply. Instead this exploits that each cell's `x` and
 # `y` are per-(cell, gene) - independent of the target block - and each target block's neighborhood is a union of whole
 # own blocks (a cell is in block `b`'s neighborhood iff its own block is in `b`'s neighborhood). So it computes each
-# participating cell's `(x, y)` once per gene, accumulates the Pearson sufficient statistics per own block, then combines
-# each target block's neighborhood own blocks - exact, and far cheaper than gathering each block's dense vectors. A cell
-# participates iff `own_block_index_per_cell[cell] > 0`. Two numeric guards keep the one-pass sufficient statistics
-# stable: the log fractions are shifted by `log2(regularization)` (so zero-UMI background cells contribute exactly 0),
-# and a relative-variance guard rejects the floating point residual of constant data (matching a two-pass zero
-# correlation). Target blocks with fewer than `min_block_cells` neighborhood cells are left as zero. When
+# participating cell's `(x, y)` once per gene, accumulates the Pearson sufficient statistics per own block, then
+# combines each target block's neighborhood own blocks - exact, and far cheaper than gathering each block's dense
+# vectors. A cell participates iff `own_block_index_per_cell[cell] > 0`. Two numeric guards keep the one-pass sufficient
+# statistics stable: the log fractions are shifted by `log2(regularization)` (so zero-UMI background cells contribute
+# exactly 0), and a relative-variance guard rejects the floating point residual of constant data (matching a two-pass
+# zero correlation). Target blocks with fewer than `min_block_cells` neighborhood cells are left as zero. When
 # `is_punctuated_per_cell` is given, a cell's metacell fraction is punctuated only where its flag is set (elsewhere it
 # uses the plain `metacell_UMIs / metacell_total`), so `metacell_index_per_cell` need not be the cell's own metacell.
-function own_block_punctuated_correlation_per_gene_per_block!(
+function own_block_punctuated_correlation_per_gene_per_block!(  # UNTESTED
     correlation_per_gene_per_block::AbstractMatrix{Float32},
     own_block_index_per_cell::AbstractVector{<:Integer},
     is_in_neighborhood_per_own_block_per_target_block::Union{AbstractMatrix{Bool}, BitMatrix},
@@ -480,9 +480,9 @@ end
 # `sparse_UMIs_per_cell_per_gene` is a `SparseMatrixCSC` whose columns are the genes; each group's gene columns are
 # walked once - touching only stored non-zeros - and scattered into their cells, rather than gathering a dense per-group
 # submatrix. The target cell of output column `position` is `cell_index_per_position[position]`; a gene contributes to a
-# column only for cells in this set. `cell_position_per_cell` is caller-provided scratch of length `size(sparse, 1)`, all
-# zero on entry and left all zero on exit, so it can be a reused per-thread buffer.
-function sum_sparse_UMIs_per_gene_group_per_cell!(
+# column only for cells in this set. `cell_position_per_cell` is caller-provided scratch of length `size(sparse, 1)`,
+# all zero on entry and left all zero on exit, so it can be a reused per-thread buffer.
+function sum_sparse_UMIs_per_gene_group_per_cell!(  # UNTESTED
     summed_UMIs_per_group_per_cell::AbstractMatrix{<:AbstractFloat},
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC,
     cell_index_per_position::AbstractVector{<:Integer},

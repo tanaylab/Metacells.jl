@@ -119,8 +119,9 @@ $(CONTRACT)
     end
 
     set_matrix!(daf, "module", "block", "n_genes", bestify(n_genes_per_module_per_block); overwrite)  # NOJET
-    @debug "Mean genes per found module: $(mean(n_genes_per_module_per_block[n_genes_per_module_per_block .!= 0]))" _group =  # NOLINT
-        :mcs_results
+    @debug (
+        "Mean genes per found module: $(mean(n_genes_per_module_per_block[n_genes_per_module_per_block .!= 0]))"  # NOLINT
+    ) _group = :mcs_results
 
     return nothing
 end
@@ -150,7 +151,7 @@ $(CONTRACT)
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         tensor_of_linear_fraction_per_block_per_module_per_metacell(CreatedOutput),
     ],
-) function compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!(
+) function compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -255,7 +256,7 @@ $(CONTRACT)
         matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(CreatedOutput),
         matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(CreatedOutput),
     ],
-) function compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!(
+) function compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -429,7 +430,7 @@ $(CONTRACT)
         matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(CreatedOutput),
         matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(CreatedOutput),
     ],
-) function compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!(
+) function compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -606,7 +607,7 @@ $(CONTRACT)
         vector_of_mean_euclidean_modules_cells_distance_per_metacell(CreatedOutput),
         vector_of_std_euclidean_modules_cells_distance_per_metacell(CreatedOutput),
     ],
-) function compute_stats_of_euclidean_modules_cells_distance_per_metacell!(
+) function compute_stats_of_euclidean_modules_cells_distance_per_metacell!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
@@ -715,7 +716,7 @@ end
 # threshold). If no found module's mean reaches `min_module_UMIs`, the threshold is auto-reduced by integer steps until
 # at least one module qualifies (concretely: `effective_threshold = min(min_module_UMIs, floor(max_mean))`). Returns 0
 # when there are fewer than two cells, no found modules, or every found module has mean = 0.
-function maximal_cells_dispersion_of_modules!(;
+function maximal_cells_dispersion_of_modules!(;  # UNTESTED
     cells_dispersion_per_module::AbstractVector{<:AbstractFloat},
     mean_normalized_per_module::AbstractVector{<:AbstractFloat},
     indices_of_cells::AbstractVector{<:Integer},
@@ -844,7 +845,7 @@ $(CONTRACT)
         vector_of_total_UMIs_per_cell(RequiredInput),
         matrix_of_cells_dispersion_per_metacell_per_module(CreatedOutput),
     ],
-) function compute_matrix_of_cells_dispersion_per_metacell_per_module!(
+) function compute_matrix_of_cells_dispersion_per_metacell_per_module!(  # UNTESTED
     daf::DafWriter;
     normalized_UMIs_quantile::AbstractFloat = 0.25,
     min_module_UMIs::Integer = 9,

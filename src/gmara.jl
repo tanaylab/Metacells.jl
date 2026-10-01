@@ -282,7 +282,7 @@ function lock_file(path::AbstractString; timeout::Real)::Base.Filesystem.File
     end
 end
 
-function unlock_file(file::Base.Filesystem.File, path::AbstractString)::Nothing
+function unlock_file(file::Base.Filesystem.File, path::AbstractString)::Nothing  # UNTESTED
     close(file)
     return rm(path * ".lock")
 end

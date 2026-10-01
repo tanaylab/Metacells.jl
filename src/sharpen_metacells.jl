@@ -102,7 +102,7 @@ struct DispersionScratches
     normalized_factor_per_cluster_cell::Vector{Float32}
 end
 
-function DispersionScratches(; n_points::Integer, n_modules::Integer)
+function DispersionScratches(; n_points::Integer, n_modules::Integer)  # UNTESTED
     return DispersionScratches(
         Vector{Int}(undef, n_points),
         Vector{Float32}(undef, n_modules),
@@ -112,7 +112,7 @@ function DispersionScratches(; n_points::Integer, n_modules::Integer)
     )
 end
 
-function KmeansSizesBuffers{T}(; n_dims::Integer, max_k::Integer, n_points::Integer) where {T <: AbstractFloat}
+function KmeansSizesBuffers{T}(; n_dims::Integer, max_k::Integer, n_points::Integer) where {T <: AbstractFloat}  # UNTESTED
     return KmeansSizesBuffers{T}(
         Vector{Int}(undef, n_points),         # max_best_assignments
         Vector{Int}(undef, max_k),            # max_best_counts
@@ -246,43 +246,44 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     block, and which also belong to a cluster of that block in the neighborhood of that block, are migrated to that
     block, but only if the enrichment of the cells of that block in the cluster is at least `min_migration_likelihood`
     times what would be expected assuming random clustering based on the relative sizes of the two blocks.
- 3. Having finalized the block to which each cell belongs to, we cluster all the cells in each block using K-means
-    using the modules of the neighborhood of that block. We start with the expected number of metacells in that block
-    (based on the mean number of cells per metacell in the previous round's block) and adjust the number of clusters to try and
+ 3. Having finalized the block to which each cell belongs to, we cluster all the cells in each block using K-means using
+    the modules of the neighborhood of that block. We start with the expected number of metacells in that block (based
+    on the mean number of cells per metacell in the previous round's block) and adjust the number of clusters to try and
     enforce the sizes of the clusters - not more than twice that mean, no more than `max_cells_in_metacell`, and no less
     than `min_cells_in_metacell`. A cluster is also considered too-large if it is larger than `max_cells_in_metacell`,
     if its maximal `cells_dispersion` (across the block's modules) is above `max_cells_dispersion_in_metacell`, and
     too-small if its maximal `cells_dispersion` is below `min_cells_dispersion_in_metacell`. In edge cases we dissolve
-    too-small clusters, relocating each of their cells to the nearest surviving cluster, by the distance to the cluster's
-    center in the same module z-score space K-means clustered them in. A block's last cluster is never dissolved, so
-    every clustered cell always ends up in some cluster. We increase the number of target metacells for every input
-    metacell whose maximal `cells_dispersion` is above `max_cells_dispersion_in_metacell`. This still leaves us with
-    multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean correlation,
-    across the pertinent (non-lateral) marker genes of each (previous round's) neighborhood, between each cell's log
-    gene fraction and the punctuated (leave-one-out) log fraction of the same gene in the metacell we are considering
-    placing the cell in. This is the measure reported by
-    [`matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block`](@ref
-    Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block),
-    evaluated against the previous round's neighborhoods. To stabilize the choice as sharpening
-    proceeds, a candidate whose number of clusters differs from the expected number must improve this prediction by an
-    extra `cooldown_margin` for each cluster of difference. The `sharpening_round` is 1-based: the first sharpening
-    round (`sharpening_round == 1`) applies no cooldown (the plain correlation tie-break), and for each later round the
+    too-small clusters, relocating each of their cells to the nearest surviving cluster, by the distance to the
+    cluster's center in the same module z-score space K-means clustered them in. A block's last cluster is never
+    dissolved, so every clustered cell always ends up in some cluster. We increase the number of target metacells for
+    every input metacell whose maximal `cells_dispersion` is above `max_cells_dispersion_in_metacell`. This still leaves
+    us with multiple possible numbers of clusters for the block; we break the tie using a prediction of the mean
+    correlation, across the pertinent (non-lateral) marker genes of each (previous round's) neighborhood, between each
+    cell's log gene fraction and the punctuated (leave-one-out) log fraction of the same gene in the metacell we are
+    considering placing the cell in. This is the measure reported by
+    [`matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block`](@ref Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block),
+    evaluated against the previous round's neighborhoods. To stabilize the choice as sharpening proceeds, a candidate
+    whose number of clusters differs from the expected number must improve this prediction by an extra `cooldown_margin`
+    for each cluster of difference. The `sharpening_round` is 1-based: the first sharpening round
+    (`sharpening_round == 1`) applies no cooldown (the plain correlation tie-break), and for each later round the
     margin's distance from its maximum halves every `improvement_half_life` rounds. Passing
     `improvement_half_life == nothing` disables the cooldown entirely.
- 4. We detect the outlier cells and eject them from their metacell. For each cell in each metacell, and for every
-    found module instance in the previous round's repository (across all blocks, not just the modules of the cell's own region), we
-    compare the actual UMIs of the module's genes in the cell to the expected UMIs. The expectation is punctuated - the
-    module's linear fraction in the cell's metacell excluding the cell itself, times the cell's total UMIs - so a strong
-    outlier cannot inflate its own baseline. The comparison is a fold factor `log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization))`, using a strong UMIs regularization so low-count modules do not trigger.
-    A cell whose maximal fold (across all module instances) exceeds `min_outlier_fold` is an outlier: it loses its
-    metacell, and we record the certificate (the metacell it was ejected from, the previous round's block and module that
-    flagged it, and the expected and actual UMIs) of the module instance that most deviates. Ejecting the outliers can
-    drop a metacell below `min_cells_in_metacell`; we dissolve such a metacell, relocate all its cells to the nearest
-    surviving metacell of its block (by the same module z-score distance used above), and detect the outliers again - so
-    a cell forced into a metacell it does not fit is caught. This repeats until no metacell is dissolved. A block's last
-    metacell is never dissolved, so every outlier's certificate names a metacell that survives.
- 5. The final clusters are the sharp metacells. We name them using the `prefix`, the convention is to advance the letter
-    for each sharpening round (`M` to `N` to `O` to ...).
+ 4. We detect the outlier cells and eject them from their metacell. For each cell in each metacell, and for every found
+    module instance in the previous round's repository (across all blocks, not just the modules of the cell's own
+    region), we compare the actual UMIs of the module's genes in the cell to the expected UMIs. The expectation is
+    punctuated - the module's linear fraction in the cell's metacell excluding the cell itself, times the cell's total
+    UMIs - so a strong outlier cannot inflate its own baseline. The comparison is a fold factor
+    `log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization))`, using a strong UMIs
+    regularization so low-count modules do not trigger. A cell whose maximal fold (across all module instances) exceeds
+    `min_outlier_fold` is an outlier: it loses its metacell, and we record the certificate (the metacell it was ejected
+    from, the previous round's block and module that flagged it, and the expected and actual UMIs) of the module
+    instance that most deviates. Ejecting the outliers can drop a metacell below `min_cells_in_metacell`; we dissolve
+    such a metacell, relocate all its cells to the nearest surviving metacell of its block (by the same module z-score
+    distance used above), and detect the outliers again - so a cell forced into a metacell it does not fit is caught.
+    This repeats until no metacell is dissolved. A block's last metacell is never dissolved, so every outlier's
+    certificate names a metacell that survives.
+ 5. The final clusters are the sharp metacells. We name them using the `prefix`. The prefixes
+    [`sharpening_rounds`](@ref Metacells.Pipeline.sharpening_rounds) gives each round are one way to choose it.
 
 Whenever we call K-means we repeat the call `kmeans_rounds` times and pick the best result.
 
@@ -338,7 +339,7 @@ $(CONTRACT2)
         matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
         matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
     ],
-) function sharpen_metacells!(;
+) function sharpen_metacells!(;  # UNTESTED
     sharp_daf::DafWriter,
     prev_daf::DafReader,
     prefix::AbstractString = "M",
@@ -686,7 +687,7 @@ $(CONTRACT2)
     return nothing
 end
 
-function compute_preferred_block_index_per_cell_per_block(;
+function compute_preferred_block_index_per_cell_per_block(;  # UNTESTED
     prev_daf::DafReader,
     kmeans_rounds::Integer,
     name_per_block::AbstractVector{<:AbstractString},
@@ -725,18 +726,21 @@ function compute_preferred_block_index_per_cell_per_block(;
     is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
     is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:maxthreadid()]
 
-    # Channel pool of per-neighborhood-cell Float32 accumulators for `compute_z_score_per_found_module_per_region_cell!`'s
-    # nested parallel-over-found-modules loop. Each inner task takes one for the duration of its module's gene-outer
-    # fill, then puts it back. Sized to `nthreads()` because each take/put is a single non-yielding scope.
+    # Channel pool of per-neighborhood-cell Float32 accumulators for
+    # `compute_z_score_per_found_module_per_region_cell!`'s nested parallel-over-found-modules loop. Each inner task
+    # takes one for the duration of its module's gene-outer fill, then puts it back. Sized to `nthreads()` because each
+    # take/put is a single non-yielding scope.
     z_score_accumulator_pool = Channel{Vector{Float32}}(nthreads())
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_neighborhood_cells))
     end
     region_position_per_cell_per_thread = [zeros(Int, n_cells) for _ in 1:maxthreadid()]
 
-    max_n_neighborhood_clusters = maximum(
-        max(Int(round(n_neighborhood_cells_per_block[block_index] / mean_metacell_cells_per_block[block_index])), 1) for block_index in 1:n_blocks
-    )
+    max_n_neighborhood_clusters = maximum(1:n_blocks) do block_index
+        n_clusters =
+            Int(round(n_neighborhood_cells_per_block[block_index] / mean_metacell_cells_per_block[block_index]))
+        return max(n_clusters, 1)
+    end
     preferred_block_index_per_cluster_per_thread =
         [Vector{Int}(undef, max_n_neighborhood_clusters) for _ in 1:maxthreadid()]
     n_cluster_cells_per_block_scratch_per_thread = [zeros(Int, n_blocks) for _ in 1:maxthreadid()]
@@ -831,7 +835,7 @@ function compute_preferred_block_index_per_cell_per_block(;
     return preferred_block_index_per_cell_per_block
 end
 
-function pick_preferred_block_index_per_neighborhood_cell(;
+function pick_preferred_block_index_per_neighborhood_cell(;  # UNTESTED
     block_index::Integer,
     min_migration_likelihood::AbstractFloat,
     n_cells_per_block::AbstractVector{<:Integer},
@@ -907,7 +911,7 @@ function pick_preferred_block_index_per_neighborhood_cell(;
     return preferred_block_index_per_neighborhood_cell
 end
 
-function compute_preferred_block_index_of_cells(;
+function compute_preferred_block_index_of_cells(;  # UNTESTED
     block_index_per_cell::AbstractVector{<:Integer},
     preferred_block_index_per_cell_per_block::Vector{Maybe{SparseVector{<:Integer}}},
 )::Vector{<:Integer}
@@ -974,7 +978,7 @@ function compute_preferred_block_index_of_cells(;
     return new_block_index_per_cell
 end
 
-function compute_local_clusters(;
+function compute_local_clusters(;  # UNTESTED
     prev_daf::DafReader,
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -1327,6 +1331,8 @@ function compute_local_clusters(;
     ) do prev_block_index
         @views is_in_prev_neighborhood_for_prev_block =
             is_in_prev_neighborhood_per_other_prev_block_per_prev_block[:, prev_block_index]
+        pertinent_neighborhood_marker_gene_indices =
+            pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index]
         (grouped, group_index_per_block) = build_grouped_for_prev_block(;
             n_blocks,
             n_cells,
@@ -1339,7 +1345,7 @@ function compute_local_clusters(;
             UMIs_per_gene_per_baseline_metacell,
             UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
-            pertinent_neighborhood_marker_gene_indices = pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index],
+            pertinent_neighborhood_marker_gene_indices,
             gene_fraction_regularization,
         )
         grouped_per_prev_block[prev_block_index] = grouped
@@ -1421,7 +1427,8 @@ function compute_local_clusters(;
             expected_n_clusters = expected_n_clusters_per_block[block_index]
             current_distance_from_expected = abs(candidates[previous_candidate_index].k - expected_n_clusters)
             best_candidate_index = previous_candidate_index
-            # Seed with the current candidate's penalized score: its delta is 0, but it still owes its K-distance penalty.
+            # Seed with the current candidate's penalized score: its delta is 0, but it still owes its K-distance
+            # penalty.
             best_score = -cooldown_margin_per_k_distance * current_distance_from_expected
             slice_start = work_item_start_per_walkable_block[walkable_position]
             slice_end = work_item_start_per_walkable_block[walkable_position + 1] - 1
@@ -1508,7 +1515,7 @@ end
 
 # Collect the clusters of all the blocks into a single flat list of the candidate sharp metacells (every clustered cell
 # is in exactly one of them), and the block each was clustered in.
-function combine_local_clusters(;
+function combine_local_clusters(;  # UNTESTED
     local_clusters_per_block::AbstractVector{Maybe{LocalClusters}},
     n_prev_metacells::Integer,
 )::Tuple{Vector{Vector{Int}}, Vector{Int}}
@@ -1542,7 +1549,7 @@ struct TotalFoundModules
 end
 
 # Collect every found module instance across all blocks into a single flat enumeration.
-function collect_total_found_modules(;
+function collect_total_found_modules(;  # UNTESTED
     is_found_per_module_per_block::AbstractMatrix{Bool},
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
     name_per_block::AbstractVector{<:AbstractString},
@@ -1581,9 +1588,10 @@ function collect_total_found_modules(;
     )
 end
 
-# The per-cell certificates of the outlier detection. For each outlier cell, the metacell it was ejected from, the name of
-# the most-deviant previous round's block and module that flagged it, and the expected and actual UMIs of that module's
-# genes in the cell. All entries are the "not an outlier" defaults (zero / empty string) for cells that are not outliers.
+# The per-cell certificates of the outlier detection. For each outlier cell, the metacell it was ejected from, the name
+# of the most-deviant previous round's block and module that flagged it, and the expected and actual UMIs of that
+# module's genes in the cell. All entries are the "not an outlier" defaults (zero / empty string) for cells that are not
+# outliers.
 struct OutlierCertificates
     is_outlier_per_cell::BitVector
     in_metacell_index_per_cell::Vector{Int}
@@ -1604,13 +1612,13 @@ struct OutlierCandidate
 end
 
 # Detect the outlier cells: cells whose expression of some prev found module wildly exceeds what their metacell
-# predicts. For every found module instance in the previous round's repository (across all blocks, not just the modules of a cell's
-# own region), and for each grouped cell that expresses the module, compare the cell's actual UMIs of the module's genes
-# to the expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's metacell excluding the
-# cell itself, times the cell's total UMIs - so a strong outlier cannot inflate its own baseline. A cell whose maximal
-# fold (across all module instances) exceeds `min_outlier_fold` is an outlier, with the certificate of the most-deviant
-# module instance. A metacell is never emptied - every outlier names the metacell it was ejected from, so if all the
-# cells of a metacell are outliers, none of them is.
+# predicts. For every found module instance in the previous round's repository (across all blocks, not just the modules
+# of a cell's own region), and for each grouped cell that expresses the module, compare the cell's actual UMIs of the
+# module's genes to the expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's
+# metacell excluding the cell itself, times the cell's total UMIs - so a strong outlier cannot inflate its own baseline.
+# A cell whose maximal fold (across all module instances) exceeds `min_outlier_fold` is an outlier, with the certificate
+# of the most-deviant module instance. A metacell is never emptied - every outlier names the metacell it was ejected
+# from, so if all the cells of a metacell are outliers, none of them is.
 #
 # The loop is parallel over module instances. `UMIs_per_cell_per_gene` is a CSC sparse matrix whose columns are genes,
 # so each instance walks only the nonzeros of its module's gene columns (the cells that actually express it); cells with
@@ -1619,7 +1627,7 @@ end
 # metacells) in preallocated index vectors so both the per-instance reduction and the reset are O(touched), not
 # O(n_cells). Each instance emits only its fold-exceeding candidates (rare) to a per-thread buffer, reduced serially to
 # the per-cell maximum at the end.
-function compute_outlier_certificates(;
+function compute_outlier_certificates(;  # UNTESTED
     cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -1670,9 +1678,9 @@ function compute_outlier_certificates(;
 
     # Weight each instance by the total nonzeros of its module's gene columns, so the heaviest instances are dispatched
     # first for load balance.
-    weight_per_total_found_module = [
-        sum(gene_index -> length(nzrange(sparse_UMIs_per_cell_per_gene, gene_index)), gene_indices_in_module; init = 0) for gene_indices_in_module in prev_total_modules.gene_indices_per_total_found_module
-    ]
+    weight_per_total_found_module = map(prev_total_modules.gene_indices_per_total_found_module) do gene_indices
+        return sum(gene_index -> length(nzrange(sparse_UMIs_per_cell_per_gene, gene_index)), gene_indices; init = 0)
+    end
 
     row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
     UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
@@ -1788,8 +1796,8 @@ function compute_outlier_certificates(;
         end
     end
 
-    # Every outlier names the metacell it was ejected from, so a metacell must keep at least one cell. If all the cells of
-    # a metacell are outliers, none of them is.
+    # Every outlier names the metacell it was ejected from, so a metacell must keep at least one cell. If all the cells
+    # of a metacell are outliers, none of them is.
     for cell_indices in cells_of_sharp_metacells
         if all(cell_index -> is_outlier_per_cell[cell_index], cell_indices)
             for cell_index in cell_indices
@@ -1826,7 +1834,7 @@ end
 # does not fit is caught. This repeats until no metacell is dissolved. Mutates `cells_of_sharp_metacells` (and the
 # parallel `block_index_per_sharp_metacell`) into the final metacells, and returns the certificates of the cells ejected
 # from them.
-function eject_outliers!(;
+function eject_outliers!(;  # UNTESTED
     cells_of_sharp_metacells::Vector{Vector{Int}},
     block_index_per_sharp_metacell::Vector{Int},
     min_cells_in_metacell::Integer,
@@ -1906,9 +1914,9 @@ function eject_outliers!(;
 end
 
 # The metacells to dissolve: those left with fewer than `min_cells_in_metacell` cells once their outliers are ejected. A
-# block's last metacell is never dissolved - there would be nowhere to relocate its cells to - so if all the metacells of
-# a block would be dissolved, the one that keeps the most cells survives to absorb the rest.
-function pick_dissolved_metacells(;
+# block's last metacell is never dissolved - there would be nowhere to relocate its cells to - so if all the metacells
+# of a block would be dissolved, the one that keeps the most cells survives to absorb the rest.
+function pick_dissolved_metacells(;  # UNTESTED
     cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
     block_index_per_sharp_metacell::AbstractVector{<:Integer},
     is_outlier_per_cell::Union{AbstractVector{Bool}, BitVector},
@@ -1940,10 +1948,10 @@ end
 # Relocate all the cells of each dissolved metacell to the nearest surviving metacell of its block, in the
 # environment-normalized module z-score space K-means clustered the block's cells in (recomputed here via the shared
 # `setup_z_score_per_found_module_per_region_cell!`). A surviving metacell's center is the mean z-score of the cells it
-# keeps (its outliers are exactly the cells that do not belong in it, so they do not contribute), and it is updated as it
-# absorbs cells. Compacts `cells_of_sharp_metacells` and the parallel `block_index_per_sharp_metacell` to the surviving
-# metacells.
-function relocate_dissolved_metacell_cells!(;
+# keeps (its outliers are exactly the cells that do not belong in it, so they do not contribute), and it is updated as
+# it absorbs cells. Compacts `cells_of_sharp_metacells` and the parallel `block_index_per_sharp_metacell` to the
+# surviving metacells.
+function relocate_dissolved_metacell_cells!(;  # UNTESTED
     cells_of_sharp_metacells::Vector{Vector{Int}},
     block_index_per_sharp_metacell::Vector{Int},
     is_dissolved_per_sharp_metacell::BitVector,
@@ -2096,7 +2104,7 @@ end
 # `UMIs_per_gene_per_baseline_metacell`) encode "Phase 1's choice of K per block" - the baseline candidate's cluster
 # assignments. The returned `group_index_per_block` tells the indirect-gather scoring API which group inside this prev
 # block corresponds to each contributing block.
-function build_grouped_for_prev_block(;
+function build_grouped_for_prev_block(;  # UNTESTED
     n_blocks::Integer,
     n_cells::Integer,
     prev_block_index_per_cell::AbstractVector{<:Integer},
@@ -2208,7 +2216,7 @@ end
 # metacells begin in the global array. For a cell in some block whose Phase 1 cluster is `cluster_index`, the
 # baseline metacell index is `first_baseline_metacell_per_block[block_index] + cluster_index - 1`. Blocks with
 # `local_clusters === nothing` contribute no baseline metacells.
-function compute_baseline_metacell_aggregates(
+function compute_baseline_metacell_aggregates(  # UNTESTED
     local_clusters_per_block::AbstractVector{Maybe{LocalClusters}},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -2287,16 +2295,16 @@ end
 # correlations the block can affect, the block's friend-gene subspace (column axis for the per-(block, K-candidate)
 # log-fill cache), and per (block, affected prev block) the (column position in the block's friend subspace, the
 # block's `block_cell_position` per point) maps.
-#   * `affected_prev_block_indices_per_walkable_block[walkable_position]`: list of prev blocks whose neighborhoods overlap any of the
-#     block's cells.
-#   * `gene_index_per_friend_per_walkable_block[walkable_position]`: the block's friend-gene subspace (global gene index per
-#     column).
+#   * `affected_prev_block_indices_per_walkable_block[walkable_position]`: list of prev blocks whose neighborhoods
+#     overlap any of the block's cells.
+#   * `gene_index_per_friend_per_walkable_block[walkable_position]`: the block's friend-gene subspace (global gene index
+#     per column).
 #   * `friend_position_per_series_per_prev_block_per_walkable_block[walkable_position][prev_block_index]`: per (block, prev block), the
 #     block's friend column for each of the prev block's series genes.
 #   * `block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position][prev_block_index]`: per (block, prev block), the block's
 #     `block_cell_position`s of the cells in the prev block's neighborhood, in the block's canonical block-cell order.
 #     Row indirection for the indirect-gather query.
-function precompute_walkable_indirection(
+function precompute_walkable_indirection(  # UNTESTED
     walkable_block_indices::AbstractVector{<:Integer},
     block_cell_indices_per_block::AbstractVector{<:AbstractVector{<:Integer}},
     prev_block_index_per_cell::AbstractVector{<:Integer},
@@ -2413,7 +2421,7 @@ end
 # returns the per-module gene index lists (the inverted `module_index_per_gene`, reused by callers). This is the shared
 # setup around [`compute_z_score_per_found_module_per_region_cell!`](@ref); the caller owns (and sizes) the reused
 # buffers.
-function setup_z_score_per_found_module_per_region_cell!(;
+function setup_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
     is_found_per_module::BitVector,
     block_index::Integer,
@@ -2465,7 +2473,7 @@ function setup_z_score_per_found_module_per_region_cell!(;
     return gene_indices_per_module
 end
 
-function compute_z_score_per_found_module_per_region_cell!(;
+function compute_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
     UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -2551,7 +2559,7 @@ function compute_z_score_per_found_module_per_region_cell!(;
 end
 
 # Copy all fields and the active-range data from source to target.
-function copy_solution!(target::KmeansSolution{T}, source::KmeansSolution{T})::Nothing where {T <: AbstractFloat}
+function copy_solution!(target::KmeansSolution{T}, source::KmeansSolution{T})::Nothing where {T <: AbstractFloat}  # UNTESTED
     @assert source.is_filled
     target.is_filled = true
     target.n_dims = source.n_dims
@@ -2570,7 +2578,7 @@ function copy_solution!(target::KmeansSolution{T}, source::KmeansSolution{T})::N
 end
 
 # Recompute weight_per_cluster from the active assignments.
-function compute_weight_per_cluster!(solution::KmeansSolution, weight_per_point::AbstractVector{<:Real})::Nothing
+function compute_weight_per_cluster!(solution::KmeansSolution, weight_per_point::AbstractVector{<:Real})::Nothing  # UNTESTED
     @views fill!(solution.weight_per_cluster[1:solution.k], 0.0)
     @inbounds for point_index in eachindex(weight_per_point)
         cluster_index = solution.assignments[point_index]
@@ -2582,7 +2590,7 @@ end
 # Recompute the maximal cells_dispersion (across the dispersion context's found modules) for a single cluster and store
 # it in solution.cells_dispersion_per_cluster. `dispersion_scratches` is the per-call scratch the caller obtained from
 # the `Channel{DispersionScratches}` pool (held for the duration of this call and released by the caller).
-function compute_cluster_dispersion!(
+function compute_cluster_dispersion!(  # UNTESTED
     solution::KmeansSolution,
     cluster_index::Integer,
     dispersion_scratches::DispersionScratches,
@@ -2625,7 +2633,7 @@ end
 # `:greedy` nested loop (the caller - Phase 1 - is itself running under the top-level `parallel_loop_with_rng`); each
 # inner task `take!`s a `DispersionScratches` from the pool, runs the per-cluster compute (no yield), and `put!`s it
 # back. The pool size of `nthreads()` is sufficient because every running task holds at most one scratch.
-function compute_all_dispersions!(
+function compute_all_dispersions!(  # UNTESTED
     solution::KmeansSolution,
     dispersion_scratches_pool::Channel{DispersionScratches},
     dispersion_context::DispersionContext,
@@ -2654,7 +2662,7 @@ end
 # from the `DispersionScratches` pool); unchanged clusters copy their dispersion from the reference. The
 # change-detection sweep is serial and writes to a locally-allocated `is_changed_per_cluster` (small `BitVector`); the
 # `BitVector` is read-only inside the parallel inner tasks.
-function compute_changed_dispersions!(
+function compute_changed_dispersions!(  # UNTESTED
     solution::KmeansSolution,
     reference_assignments::AbstractVector{<:Integer},
     reference_cells_dispersion_per_cluster::AbstractVector{<:AbstractFloat},
@@ -2698,7 +2706,7 @@ end
 # `UMI_per_friend_per_block_cell` cache (Float32, friend-position-major) - no scattered indexing into the
 # global UMI matrix on each call. Allocation-free; the supplied output buffers may be per-thread (for Phase 2
 # evaluation, overwritten per work item) or per-walkable-block (for Pass A, kept alive into Pass B).
-function populate_candidate_scratches!(
+function populate_candidate_scratches!(  # UNTESTED
     candidate::SolutionCandidate,
     n_block_cells::Integer,
     delta_context::DeltaCorrelationContext,
@@ -2770,7 +2778,7 @@ end
 # correlation of the grouped correlations when the block's group is replaced (under `candidate`'s assignments) minus
 # the cached baseline mean correlation for that prev block. Uses `delta_context`'s per-thread variable + mask scratches
 # for the gather, sized to the walkable blocks' global maxima.
-function compute_delta_correlation(
+function compute_delta_correlation(  # UNTESTED
     candidate::SolutionCandidate,
     n_block_cells::Integer,
     delta_context::DeltaCorrelationContext,
@@ -2792,7 +2800,7 @@ end
 # Query half of `compute_delta_correlation`: reads `delta_context`'s per-thread variable + mask scratches (assumed
 # already populated for some candidate via `populate_candidate_scratches!`) plus the per-walkable indirections, sums
 # the per-affected-prev-block delta against the cached baseline mean correlations. Allocation-free.
-function query_delta_correlation_from_scratches(delta_context::DeltaCorrelationContext)::Float64
+function query_delta_correlation_from_scratches(delta_context::DeltaCorrelationContext)::Float64  # UNTESTED
     variable_per_block_cell_per_friend = delta_context.variable_per_block_cell_per_friend
     is_active_per_block_cell = delta_context.is_active_per_block_cell
 
@@ -2826,7 +2834,7 @@ function query_delta_correlation_from_scratches(delta_context::DeltaCorrelationC
     return delta
 end
 
-function update_size_statistics!(
+function update_size_statistics!(  # UNTESTED
     solution::KmeansSolution,
     min_cluster_size::Real,
     max_cluster_size::Real,
@@ -2861,7 +2869,7 @@ function update_size_statistics!(
     return nothing
 end
 
-function penalty(solution::KmeansSolution)::Tuple{Int, Int, Int}
+function penalty(solution::KmeansSolution)::Tuple{Int, Int, Int}  # UNTESTED
     n_too_tight_or_small = solution.n_too_tight + solution.n_too_small
     n_too_wide_or_large = solution.n_too_wide + solution.n_too_large
     # Third slot is `K` for both perfect and imperfect: smaller K wins on the tiebreaker. Perfect candidates are
@@ -2872,7 +2880,7 @@ end
 # Split a single cluster into two using a 2-cluster kmeans on its points. Replaces the split cluster's center with one
 # sub-center, appends the other at a fresh last position (incrementing `candidate_solution.k`), reassigns the points,
 # and updates the counts of both sub-clusters.
-function split_one_cluster!(
+function split_one_cluster!(  # UNTESTED
     candidate_solution::KmeansSolution{T},
     old_cluster_index::Integer,
     values_of_points::AbstractMatrix{<:AbstractFloat},
@@ -2939,7 +2947,7 @@ end
 # only when its count and weight are at least twice the respective minimums (so that each half can plausibly clear
 # them), and only when its bit in `is_rejected_for_split_per_cluster` is false. Returns the chosen cluster index in
 # `current_solution`, or 0 if no eligible cluster remains.
-function split_largest_cluster!(
+function split_largest_cluster!(  # UNTESTED
     candidate_solution::KmeansSolution{T},
     current_solution::KmeansSolution{T},
     is_rejected_for_split_per_cluster::AbstractVector{Bool},
@@ -3025,7 +3033,7 @@ end
 # Run kmeans (in rounds), overwrite `rerun_solution` with the result, and if the new solution is perfect push a copy
 # into `perfect_candidates`. Every K-means run by the Phase 1 walk flows through here, so this is the single point
 # that collects perfect candidates for the block's `SolutionCandidates`.
-function rerun_kmeans!(
+function rerun_kmeans!(  # UNTESTED
     rerun_solution::KmeansSolution{T},
     perfect_candidates::Vector{SolutionCandidate},
     values_of_points::AbstractMatrix{<:AbstractFloat},
@@ -3097,7 +3105,7 @@ function rerun_kmeans!(
     return nothing
 end
 
-@inline function is_perfect(solution::KmeansSolution)::Bool
+@inline function is_perfect(solution::KmeansSolution)::Bool  # UNTESTED
     return solution.n_too_tight + solution.n_too_small + solution.n_too_wide + solution.n_too_large == 0
 end
 
@@ -3105,7 +3113,7 @@ end
 # while the latest `current_solution` stays "pure" in the same direction (no opposite-direction size issues), updating
 # `best_solution` whenever a current solution improves on `penalty`. Pushes a fresh `SolutionCandidate` to
 # `perfect_candidates` for every perfect `current_solution` encountered.
-function walk_directions!(
+function walk_directions!(  # UNTESTED
     best_solution::KmeansSolution{T},
     current_solution::KmeansSolution{T},
     perfect_candidates::Vector{SolutionCandidate},
@@ -3167,7 +3175,7 @@ end
 # the per-thread max-k buffers), so that the candidate survives subsequent `rerun_kmeans!` overwrites of the working
 # buffers. The solution's too-small clusters are dissolved into the surviving ones, so a candidate never contains a
 # too-small cluster. A perfect solution has none to dissolve; only the imperfect compromise solution does.
-function build_candidate_from_solution(
+function build_candidate_from_solution(  # UNTESTED
     solution::KmeansSolution,
     values_of_points::AbstractMatrix{<:AbstractFloat},
     weight_per_point::AbstractVector{<:Real},
@@ -3225,7 +3233,7 @@ end
 # The clusters to dissolve: the too-small ones, with fewer than `min_cluster_size` points or less than
 # `min_cluster_weight` weight. The last cluster is never dissolved - there would be nowhere to relocate its points to -
 # so if all the clusters are too small, the largest one survives to absorb the rest.
-function pick_dissolved_clusters(
+function pick_dissolved_clusters(  # UNTESTED
     counts::AbstractVector{<:Integer},
     weight_per_cluster::AbstractVector{<:Real},
     min_cluster_size::Real,
@@ -3239,11 +3247,11 @@ function pick_dissolved_clusters(
 end
 
 # Relocate every point of the dissolved clusters into the nearest surviving cluster, in the space
-# `value_per_dim_per_point` (the same space K-means clustered the points in). A cluster's center is the mean value of its
-# center points, kept as a Float64 sum and a count, so absorbing a point immediately updates the center the next point is
-# compared against. The points are visited in order, so the result does not depend on the number of threads. Updates
-# `cluster_index_per_point` in place; the caller recomputes whatever per-cluster aggregates it needs.
-function relocate_dissolved_points!(;
+# `value_per_dim_per_point` (the same space K-means clustered the points in). A cluster's center is the mean value of
+# its center points, kept as a Float64 sum and a count, so absorbing a point immediately updates the center the next
+# point is compared against. The points are visited in order, so the result does not depend on the number of threads.
+# Updates `cluster_index_per_point` in place; the caller recomputes whatever per-cluster aggregates it needs.
+function relocate_dissolved_points!(;  # UNTESTED
     cluster_index_per_point::AbstractVector{<:Integer},
     value_per_dim_per_point::AbstractMatrix{<:AbstractFloat},
     is_dissolved_per_cluster::Union{AbstractVector{Bool}, BitVector},
@@ -3301,7 +3309,7 @@ end
 # it improves further). Terminates naturally once `best_solution` becomes perfect (the next call to
 # `split_largest_cluster!` returns 0 because no cluster is too-large or too-wide) or all candidate clusters have been
 # rejected.
-function walk_split!(
+function walk_split!(  # UNTESTED
     best_solution::KmeansSolution{T},
     current_solution::KmeansSolution{T},
     candidate_solution::KmeansSolution{T},
@@ -3398,7 +3406,7 @@ function walk_split!(
     return nothing
 end
 
-function kmeans_with_sizes_candidates(
+function kmeans_with_sizes_candidates(  # UNTESTED
     values_of_points::AbstractMatrix{T},
     weight_per_point::AbstractVector{<:Real},
     initial_k::Integer;
@@ -3564,7 +3572,7 @@ end
 
 # Build a `LocalClusters` from a `SolutionCandidate`. `block_cell_indices` is shared (not copied); the assignment vector
 # is owned by the returned `LocalClusters`.
-function build_local_clusters_from_candidate(
+function build_local_clusters_from_candidate(  # UNTESTED
     candidate::SolutionCandidate,
     block_cell_indices::AbstractVector{<:Integer},
 )::LocalClusters
@@ -3611,12 +3619,14 @@ $(CONTRACT2)
     name = "prev_daf",
     axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [vector_of_metacell_per_cell(RequiredInput), vector_of_block_per_metacell(RequiredInput)],
-) function compute_matrix_of_n_cells_per_prev_block_per_block!(;
+) function compute_matrix_of_n_cells_per_prev_block_per_block!(;  # UNTESTED
     other_daf::DafWriter,
     prev_daf::DafReader,
     overwrite::Bool = false,
 )::Nothing
-    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") "the cells differ between `other_daf` and `prev_daf`"
+    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") (
+        "the cells differ between `other_daf` and `prev_daf`"
+    )
 
     if has_axis(other_daf, "prev_block")
         @assert axis_vector(other_daf, "prev_block") == axis_vector(prev_daf, "block")
@@ -3650,8 +3660,8 @@ end
     )::Nothing
 
 Compute and set [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref). This counts, for each pair of a
-previous-round block type and an `other_daf` block type, the cells that are of both. The block type of a cell is the type
-of the block of the metacell of the cell, so it reflects this repository's blocks rather than any per-cell type
+previous-round block type and an `other_daf` block type, the cells that are of both. The block type of a cell is the
+type of the block of the metacell of the cell, so it reflects this repository's blocks rather than any per-cell type
 annotation. The (shared) [`type_axis`](@ref) must be identical between the `prev_daf` and the `other_daf`.
 
 # Other
@@ -3689,13 +3699,17 @@ $(CONTRACT2)
         vector_of_block_per_metacell(RequiredInput),
         vector_of_type_per_block(RequiredInput),
     ],
-) function compute_matrix_of_n_cells_per_prev_block_type_per_block_type!(;
+) function compute_matrix_of_n_cells_per_prev_block_type_per_block_type!(;  # UNTESTED
     other_daf::DafWriter,
     prev_daf::DafReader,
     overwrite::Bool = false,
 )::Nothing
-    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") "the cells differ between `other_daf` and `prev_daf`"
-    @assert axis_vector(other_daf, "type") == axis_vector(prev_daf, "type") "the types differ between `other_daf` and `prev_daf`"
+    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") (
+        "the cells differ between `other_daf` and `prev_daf`"
+    )
+    @assert axis_vector(other_daf, "type") == axis_vector(prev_daf, "type") (
+        "the types differ between `other_daf` and `prev_daf`"
+    )
 
     n_types = axis_length(other_daf, "type")
 
@@ -3729,9 +3743,9 @@ end
     )::Nothing
 
 Compute and set [`matrix_of_n_cells_per_prev_metacell_type_per_metacell_type`](@ref). This counts, for each pair of a
-previous-round metacell type and an `other_daf` metacell type, the cells that are of both. The metacell type of a cell is
-the type of the metacell of the cell. The (shared) [`type_axis`](@ref) must be identical between the `prev_daf` and the
-`other_daf`.
+previous-round metacell type and an `other_daf` metacell type, the cells that are of both. The metacell type of a cell
+is the type of the metacell of the cell. The (shared) [`type_axis`](@ref) must be identical between the `prev_daf` and
+the `other_daf`.
 
 # Other
 
@@ -3753,13 +3767,17 @@ $(CONTRACT2)
     name = "prev_daf",
     axes = [cell_axis(RequiredInput), metacell_axis(RequiredInput), type_axis(RequiredInput)],
     data = [vector_of_metacell_per_cell(RequiredInput), vector_of_type_per_metacell(RequiredInput)],
-) function compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!(;
+) function compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!(;  # UNTESTED
     other_daf::DafWriter,
     prev_daf::DafReader,
     overwrite::Bool = false,
 )::Nothing
-    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") "the cells differ between `other_daf` and `prev_daf`"
-    @assert axis_vector(other_daf, "type") == axis_vector(prev_daf, "type") "the types differ between `other_daf` and `prev_daf`"
+    @assert axis_vector(other_daf, "cell") == axis_vector(prev_daf, "cell") (
+        "the cells differ between `other_daf` and `prev_daf`"
+    )
+    @assert axis_vector(other_daf, "type") == axis_vector(prev_daf, "type") (
+        "the types differ between `other_daf` and `prev_daf`"
+    )
 
     n_types = axis_length(other_daf, "type")
 
@@ -3791,7 +3809,7 @@ end
 # and weighs the number of cells with that prev type and type. Two edges cross when their endpoints are in the opposite
 # order in the two columns, and such a crossing weighs the product of the two edges' cell counts. Both columns of every
 # transition use the same order, given by `position_per_type`.
-function total_type_flow_crossings(
+function total_type_flow_crossings(  # UNTESTED
     position_per_type::AbstractVector{<:Integer},
     prev_type_per_edge_per_transition::AbstractVector{Vector{Int}},
     type_per_edge_per_transition::AbstractVector{Vector{Int}},
@@ -3820,7 +3838,7 @@ function total_type_flow_crossings(
 end
 
 # Fill `position_per_type` with the inverse of the `type_per_position` order (the position holding each type).
-function fill_position_per_type!(
+function fill_position_per_type!(  # UNTESTED
     position_per_type::AbstractVector{<:Integer},
     type_per_position::AbstractVector{<:Integer},
 )::Nothing
@@ -3832,7 +3850,7 @@ end
 
 # Fill `target_per_position` with the order obtained from `source_per_position` by moving the type at `from_position` to
 # `to_position`, shifting the types in between by one place.
-function fill_type_flow_insertion!(
+function fill_type_flow_insertion!(  # UNTESTED
     target_per_position::AbstractVector{<:Integer},
     source_per_position::AbstractVector{<:Integer},
     from_position::Integer,
@@ -3859,7 +3877,7 @@ MOVES_PROGRESS_CHUNK = 100
 # Improve the `type_per_position` order in place by repeatedly applying the best crossing-reducing move (exchanging the
 # types at two positions, or moving one type to another position), until reaching a local optimum. Returns the local
 # optimum's total weighted crossings. The other vectors are reused scratch buffers.
-function hill_climb_type_flow_order!(
+function hill_climb_type_flow_order!(  # UNTESTED
     type_per_position::AbstractVector{Int},
     position_per_type::AbstractVector{Int},
     prev_type_per_edge_per_transition::AbstractVector{Vector{Int}},
@@ -3964,7 +3982,7 @@ end
 # `[prev_type, type]` entry counts the cells of that prev type (left column) and type (right column). Since minimizing
 # crossings is NP-hard, we use random-restart hill climbing using the exact crossing count, seeding one restart with the
 # types ordered by their total number of cells.
-function compute_global_flow_order_per_type(
+function compute_global_flow_order_per_type(  # UNTESTED
     n_cells_per_prev_type_per_type_per_transition::AbstractVector{<:AbstractMatrix{<:Real}};
     restarts::Integer,
     rng::AbstractRNG,
@@ -4043,18 +4061,18 @@ end
         overwrite::Bool = false,
     )::Nothing
 
-Compute and set [`vector_of_global_flow_order_per_type`](@ref), a global order of the types minimizing the total weighted
-crossings of the type flow across the sharpening rounds.
+Compute and set [`vector_of_global_flow_order_per_type`](@ref), a global order of the types minimizing the total
+weighted crossings of the type flow across the sharpening rounds.
 
 The `daf_per_round` are the repositories of the earlier rounds (rounds 0 to N-1) and `final_daf` is the last round
 (round N); together they form the full sequence of rounds 0 to N, which must all share the same `type` axis. For each
 consecutive pair of rounds we read both the [`matrix_of_n_cells_per_prev_block_type_per_block_type`](@ref) and the
-[`matrix_of_n_cells_per_prev_metacell_type_per_metacell_type`](@ref) (the type flow from the previous round, by block type
-and by metacell type) from the later round's repository, that is, from every repository except the first (round 0 has no
-previous round). Each matrix is normalized by its total number of cells, so that the finer by-metacell flow, which has
-many more edges, does not dominate the by-block flow. We minimize the combined (averaged) crossings of both using
-random-restart hill climbing (`restarts` restarts, since the problem is NP-hard) and write the resulting order into
-`output_daf`, which is typically the prev repository shared by all the rounds, so that they all see the same order.
+[`matrix_of_n_cells_per_prev_metacell_type_per_metacell_type`](@ref) (the type flow from the previous round, by block
+type and by metacell type) from the later round's repository, that is, from every repository except the first (round 0
+has no previous round). Each matrix is normalized by its total number of cells, so that the finer by-metacell flow,
+which has many more edges, does not dominate the by-block flow. We minimize the combined (averaged) crossings of both
+using random-restart hill climbing (`restarts` restarts, since the problem is NP-hard) and write the resulting order
+into `output_daf`, which is typically the prev repository shared by all the rounds, so that they all see the same order.
 
 # Rounds
 
@@ -4077,7 +4095,7 @@ $(CONTRACT2)
     name = "output_daf",
     axes = [type_axis(RequiredInput)],
     data = [vector_of_global_flow_order_per_type(CreatedOutput)],
-) function compute_vector_of_global_flow_order_per_type!(
+) function compute_vector_of_global_flow_order_per_type!(  # UNTESTED
     final_daf::DafReader,
     daf_per_round::AbstractVector{<:DafReader};
     output_daf::DafWriter,
@@ -4102,7 +4120,7 @@ $(CONTRACT2)
     # neither needs to be weighted against the other.
     n_cells_per_prev_type_per_type_per_transition = AbstractMatrix{<:Real}[]
 
-    function push_type_flow!(daf::DafReader, name::AbstractString)::Nothing
+    function push_type_flow!(daf::DafReader, name::AbstractString)::Nothing  # UNTESTED
         @assert has_matrix(daf, "type", "type", name) "missing the $(name) matrix"
         push!(n_cells_per_prev_type_per_type_per_transition, get_matrix(daf, "type", "type", name).array)
         return nothing

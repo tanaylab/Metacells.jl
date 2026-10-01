@@ -53,7 +53,7 @@ struct ClusterMasks
     is_uncorrelated_pertinent_in_cluster_per_local_gene::Vector{Bool}
 end
 
-function ClusterMasks(; n_genes::Integer)
+function ClusterMasks(; n_genes::Integer)  # UNTESTED
     return ClusterMasks(
         Vector{Bool}(undef, n_genes),
         Vector{Bool}(undef, n_genes),
@@ -118,7 +118,7 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         matrix_of_module_per_gene_per_block(CreatedOutput),
         matrix_of_module_status_per_gene_per_block(OptionalOutput),
     ],
-) function compute_blocks_modules!(
+) function compute_blocks_modules!(  # UNTESTED
     daf::DafWriter;
     max_clusters::Integer = 24,
     min_member_correlation::AbstractFloat = 0.5,
@@ -219,6 +219,8 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
         else
             @views module_status_per_gene = module_status_per_gene_per_block[:, block_index]
         end
+        z_score_per_max_environment_metacell_per_max_gene =
+            z_score_per_max_environment_metacell_per_max_gene_per_thread[threadid()]
         genes_indices_of_anchor_index_per_block[block_index] = compute_block_modules!(;
             block_index,
             name_per_gene,
@@ -235,7 +237,7 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
             is_in_environment_per_cell = is_in_environment_per_cell_per_thread[threadid()],
             is_selected_per_gene = is_selected_per_gene_per_thread[threadid()],
             lateral_cluster_per_gene = lateral_cluster_per_gene_per_thread[threadid()],
-            z_score_per_max_environment_metacell_per_max_gene = z_score_per_max_environment_metacell_per_max_gene_per_thread[threadid()],
+            z_score_per_max_environment_metacell_per_max_gene,
             rng,
             module_status_per_gene,
             sparse_UMIs_per_cell_per_gene,
@@ -277,8 +279,10 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
                 module_name = name_per_module[module_index]
                 module_per_gene_per_block[genes_indices_of_anchor, block_index] .= module_name
                 is_found_per_module_per_block[module_index, block_index] = true
-                @debug "Block: $(block_name) anchor: $(name_per_gene[anchor_index]) genes: [ $(join(sort(name_per_gene[genes_indices_of_anchor]), ", ")) ]" _group =
-                    :mcs_details
+                @debug (
+                    "Block: $(block_name) anchor: $(name_per_gene[anchor_index]) genes: [" *
+                    " $(join(sort(name_per_gene[genes_indices_of_anchor]), ", ")) ]"
+                ) _group = :mcs_details
             end
         end
         @assert any(@view is_found_per_module_per_block[:, block_index])
@@ -293,7 +297,7 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
     return nothing
 end
 
-function compute_block_modules!(;
+function compute_block_modules!(;  # UNTESTED
     block_index::Integer,
     name_per_gene::AbstractVector{<:AbstractString},
     name_per_block::AbstractVector{<:AbstractString},
@@ -649,7 +653,9 @@ function compute_block_modules!(;
                     if correlation >= min_orphan_correlation
                         cluster_index_per_local_gene[local_gene_index] = cluster_index
                         if module_status_per_gene !== nothing
-                            module_status_per_gene[indices_of_local_genes[local_gene_index]] *= ",joined($(name_per_gene[indices_of_local_genes[anchor_local_position]]))"
+                            joined_gene_index = indices_of_local_genes[local_gene_index]
+                            anchor_gene_index = indices_of_local_genes[anchor_local_position]
+                            module_status_per_gene[joined_gene_index] *= ",joined($(name_per_gene[anchor_gene_index]))"
                         end
                     end
                 end

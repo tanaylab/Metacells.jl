@@ -179,7 +179,7 @@ $(CONTRACT)
     return nothing
 end
 
-function fill_vector_of_is_correlated_with_skeleton_per_gene!(;  # NOJET
+function fill_vector_of_is_correlated_with_skeleton_per_gene!(;  # NOJET # UNTESTED
     min_gene_correlation::AbstractFloat,
     min_gene_correlation_quantile::AbstractFloat,
     genes_correlation_window::Integer,
@@ -222,7 +222,7 @@ end
 # high enough maximal skeleton correlation, either absolutely (`min_gene_correlation`) or relative to the
 # `min_gene_correlation_quantile` of a rolling window of `genes_correlation_window` markers with a similar maximal
 # skeleton correlation.
-function mark_is_correlated_with_skeleton_per_gene!(;  # NOJET
+function mark_is_correlated_with_skeleton_per_gene!(;  # NOJET # UNTESTED
     min_gene_correlation::AbstractFloat,
     min_gene_correlation_quantile::AbstractFloat,
     genes_correlation_window::Integer,
@@ -261,7 +261,7 @@ function mark_is_correlated_with_skeleton_per_gene!(;  # NOJET
 end
 
 # TODO: Move to `TanayLabUtilities`?
-function non_allocating_quantile(;
+function non_allocating_quantile(;  # UNTESTED
     data::AbstractVector{T},
     scratch::AbstractVector{T},
     quantile_fraction::AbstractFloat,
@@ -289,7 +289,7 @@ function non_allocating_quantile(;
 end
 
 # TODO: Move to `TanayLabUtilities`?
-function rolling_quantile!(;
+function rolling_quantile!(;  # UNTESTED
     results::AbstractVector{T},
     data::AbstractVector{T},
     scratch::AbstractVector{T},
@@ -407,8 +407,8 @@ Given some `score_per_variable_per_observation` matrix, return a vector of the r
 "most significant" variables are first.
 
  1. Rank the variables for each observation (1 having the highest score).
- 2. For each variable, give it a priority which is a tuple of (1) the minimal rank it has in all observations (2) the maximal
-    score it has in observations where it has that rank (negated).
+ 2. For each variable, give it a priority which is a tuple of (1) the minimal rank it has in all observations (2) the
+    maximal score it has in observations where it has that rank (negated).
  3. Sort the variables according to this priority.
 
 This heuristic is useful for focusing on the "most significant" variables in a data set. It is used by
@@ -416,7 +416,7 @@ This heuristic is useful for focusing on the "most significant" variables in a d
 
 # TODO: Move to `TanayLabUtilities`?
 """
-function rank_variables(score_per_variable_per_observation::AbstractMatrix{<:AbstractFloat})::AbstractVector{<:Integer}
+function rank_variables(score_per_variable_per_observation::AbstractMatrix{<:AbstractFloat})::AbstractVector{<:Integer}  # UNTESTED
     @assert_matrix(score_per_variable_per_observation, Columns)
     n_variables, n_observations = size(score_per_variable_per_observation)
 
@@ -473,7 +473,7 @@ $(CONTRACT)
 @logged :mcs_ops @computation Contract(
     axes = [gene_axis(RequiredInput)],
     data = [vector_of_is_transcription_factor_per_gene(CreatedOutput)],
-) function fetch_gmara_vector_of_is_transcription_factor_per_gene!(
+) function fetch_gmara_vector_of_is_transcription_factor_per_gene!(  # UNTESTED
     daf::DafWriter;
     species::AbstractString,
     namespace::AbstractString = "GeneSymbol",
@@ -514,7 +514,7 @@ $(CONTRACT)
 @logged :mcs_ops @computation Contract(
     axes = [gene_axis(RequiredInput)],
     data = [vector_of_is_regulator_per_gene(CreatedOutput)],
-) function fetch_gmara_vector_of_is_regulator_per_gene!(
+) function fetch_gmara_vector_of_is_regulator_per_gene!(  # UNTESTED
     daf::DafWriter;
     species::AbstractString,
     namespace::AbstractString = "GeneSymbol",
@@ -560,14 +560,15 @@ $(CONTRACT)
     is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
     is_forbidden_per_gene = get_vector(daf, "gene", "is_forbidden").array
 
-    is_skeleton_per_gene =
-        is_regulator_per_gene .& .!is_excluded_per_gene .& .!is_lateral_per_gene .& .!is_forbidden_per_gene .& is_marker_per_gene
+    is_skeleton_per_gene = is_regulator_per_gene .& is_marker_per_gene
+    is_skeleton_per_gene .&= .!is_excluded_per_gene .& .!is_lateral_per_gene .& .!is_forbidden_per_gene
 
     set_vector!(daf, "gene", "is_skeleton", is_skeleton_per_gene; overwrite)
 
     name_per_gene = axis_vector(daf, "gene")
-    @debug "Skeletons: $(length(is_skeleton_per_gene)) [ $(join(sort(name_per_gene[is_skeleton_per_gene]), ", ")) ]" _group =
-        :mcs_results
+    @debug (
+        "Skeletons: $(length(is_skeleton_per_gene))" * " [ $(join(sort(name_per_gene[is_skeleton_per_gene]), ", ")) ]"
+    ) _group = :mcs_results
 
     @assert any(is_skeleton_per_gene)
     return nothing
@@ -585,7 +586,8 @@ Return a per-marker-gene report as a `DataFrame`, one row per marker gene, sorte
   - `gene` - the gene name.
   - `rank` - the gene's rank as a marker (`1` being the most significant; see
     [`vector_of_marker_rank_per_gene`](@ref)).
-  - `lat?`, `tf?`, `reg?`, `skl?` - whether the gene is lateral, a transcription factor, a regulator, or a skeleton gene.
+  - `lat?`, `tf?`, `reg?`, `skl?` - whether the gene is lateral, a transcription factor, a regulator, or a skeleton
+    gene.
   - `mrk` and `mrk_c`, `lat` and `lat_c`, `reg` and `reg_c`, `skl` and `skl_c` - the most correlated marker / lateral /
     regulator / skeleton gene (other than the gene itself) and that correlation, from
     [`matrix_of_correlation_between_markers_per_gene_per_gene`](@ref). Since only markers are correlated, e.g. `lat` is
@@ -604,8 +606,9 @@ correlation) at round 0:
 These three columns are omitted when `base_daf` is `nothing` (that is, when `daf` is itself the round-0 model).
 
 When the repository also holds the module sharing (see
-[`compute_module_sharing_at_changed_base_blocks!`](@ref Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!)), `2 + 2 * 2 * regulators_count` more columns say what the
-gene moved *with*, where `imp_f` and `deg_f` say only how often it moved:
+[`Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!`](@ref)),
+`2 + 2 * 2 * regulators_count` more columns say what the gene moved *with*, where `imp_f` and `deg_f` say only how often
+it moved:
 
   - `imp_no_mod_f` - the mean fraction of the cells in which the gene is in no module at all, over the base blocks
     where it improved.
@@ -657,7 +660,7 @@ $(CONTRACT2)
             RequiredInput,
         ),
     ],
-) function compute_gene_report(;
+) function compute_gene_report(;  # UNTESTED
     daf::DafReader,
     base_daf::Maybe{DafReader} = nothing,
     regulators_count::Integer = 5,
@@ -748,7 +751,7 @@ end
 
 # Add to the report, for one of the two sides, how often each marker gene is in no module there and which regulators it
 # most often shares one with. A repository which was never asked for the module sharing has no such columns.
-function collect_module_sharing_columns!(
+function collect_module_sharing_columns!(  # UNTESTED
     data_frame::DataFrame,
     daf::DafReader,
     gene_name_per_gene::AbstractVector{<:AbstractString},
@@ -794,7 +797,7 @@ end
 # often first, returned per rank rather than per marker so each is a report column. The matrix holds the regulators in
 # its rows and the genes in its columns. A gene sharing a module with fewer regulators than that is padded with an empty
 # name and a zero fraction, as an empty set of correlations is.
-function top_shared_regulators_per_marker(
+function top_shared_regulators_per_marker(  # UNTESTED
     shared_fraction_per_regulator_per_gene::AbstractMatrix{<:Real},
     gene_name_per_gene::AbstractVector{<:AbstractString},
     indices_of_markers::AbstractVector{<:Integer},
@@ -826,7 +829,7 @@ end
 
 # For each marker gene, the gene in the set (restricted to markers, since only markers are correlated) most correlated
 # with it and that correlation, excluding the gene itself. An empty set yields an empty name and a zero correlation.
-function most_correlated_gene_in_set_per_marker(
+function most_correlated_gene_in_set_per_marker(  # UNTESTED
     correlation_per_marker_per_marker::AbstractMatrix{<:Real},
     gene_name_per_marker::AbstractVector{<:AbstractString},
     indices_of_markers::AbstractVector{<:Integer},
@@ -862,9 +865,9 @@ function most_correlated_gene_in_set_per_marker(
 end
 
 # For a base-neighborhood correlation matrix (gene X base_block), the per-marker mean change from the round-0 `base_daf`
-# and the fraction of the base blocks in which the gene significantly improved (by at least `0.05`) or degraded, over the
-# base blocks where the gene is scored (has a non-zero correlation) at round 0.
-function correlation_change_per_marker(
+# and the fraction of the base blocks in which the gene significantly improved (by at least `0.05`) or degraded, over
+# the base blocks where the gene is scored (has a non-zero correlation) at round 0.
+function correlation_change_per_marker(  # UNTESTED
     daf::DafReader,
     base_daf::DafReader,
     property_name::AbstractString,
@@ -914,9 +917,9 @@ end
         base_daf::Maybe{DafReader} = nothing,
     )::DataFrame
 
-Return a per-skeleton-gene report as a `DataFrame`, one row per skeleton gene, sorted by the total number of markers most
-correlated with it (descending). Each marker gene is assigned to the single skeleton gene it is most correlated with
-(from [`matrix_of_correlation_between_markers_per_gene_per_gene`](@ref), excluding itself), and split into lateral
+Return a per-skeleton-gene report as a `DataFrame`, one row per skeleton gene, sorted by the total number of markers
+most correlated with it (descending). Each marker gene is assigned to the single skeleton gene it is most correlated
+with (from [`matrix_of_correlation_between_markers_per_gene_per_gene`](@ref), excluding itself), and split into lateral
 (`lat`) markers and pertinent (`pert`, non-lateral) markers. Apart from the `gene` (skeleton name) column, every
 statistic is emitted as a `lat_<name>`, `lat_<name>_r`, `pert_<name>` trio - the lateral value, its ratio out of the
 lateral-plus-pertinent total, and the pertinent value. The statistics are:
@@ -964,7 +967,7 @@ $(CONTRACT2)
             RequiredInput,
         ),
     ],
-) function compute_skeleton_report(; daf::DafReader, base_daf::Maybe{DafReader} = nothing)::DataFrame
+) function compute_skeleton_report(; daf::DafReader, base_daf::Maybe{DafReader} = nothing)::DataFrame  # UNTESTED
     is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
     indices_of_markers = findall(is_marker_per_gene)
     n_markers = length(indices_of_markers)
@@ -1051,7 +1054,7 @@ $(CONTRACT2)
 end
 
 # The per-skeleton sum of a per-marker value over the markers of a category (grouped by their most-correlated skeleton).
-function sum_per_skeleton(
+function sum_per_skeleton(  # UNTESTED
     top_skeleton_per_marker::AbstractVector{<:Integer},
     is_in_category_per_marker::AbstractVector{Bool},
     value_per_marker::AbstractVector{<:Real},
@@ -1068,7 +1071,7 @@ function sum_per_skeleton(
 end
 
 # The mean per skeleton (the sum divided by the count, or zero where the count is zero).
-function mean_per_skeleton(
+function mean_per_skeleton(  # UNTESTED
     sum_per_skeleton::AbstractVector{<:Real},
     count_per_skeleton::AbstractVector{<:Integer},
 )::Vector{Float64}
@@ -1081,7 +1084,7 @@ end
 
 # Add a `lat_<name>`, `lat_<name>_r` (the lateral value's ratio out of the lateral-plus-pertinent total), `pert_<name>`
 # trio of columns to the report.
-function add_skeleton_trio!(
+function add_skeleton_trio!(  # UNTESTED
     data_frame::DataFrame,
     name::AbstractString,
     lateral_per_skeleton::AbstractVector{<:Real},

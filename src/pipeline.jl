@@ -13,6 +13,11 @@ export analyze_metacells!
 export import_base_metacells!
 export prepare_metacells!
 export qc_metacells!
+export run!
+export sharpen_round!
+export SharpeningRound
+export SharpeningRounds
+export sharpening_rounds
 
 using DataAxesFormats
 using Random
@@ -27,6 +32,7 @@ using ..ComputeBlocks
 using ..ComputeModules
 using ..Contracts
 using ..ProjectCells
+using ..SharpenMetacells
 
 import Random.default_rng
 
@@ -56,7 +62,7 @@ $(CONTRACT)
     function_contract(compute_vector_of_is_marker_per_gene!) |>
     function_contract(compute_vector_of_marker_rank_per_gene!) |>
     function_contract(compute_matrix_of_correlation_between_markers_per_gene_per_gene!)
-) function prepare_metacells!(daf::DafWriter; overwrite::Bool = false)::Nothing
+) function prepare_metacells!(daf::DafWriter; overwrite::Bool = false)::Nothing  # UNTESTED
     # The types of the metacells come from the types of their cells, so without the one there is not the other.
     if has_vector(daf, "cell", "type")
         compute_vector_of_type_per_metacell_by_cells!(daf; overwrite)
@@ -132,7 +138,7 @@ $(CONTRACT2)
     function_contract(compute_matrix_of_n_genes_per_module_per_block!) |>
     function_contract(compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!) |>
     function_contract(compute_matrix_of_cells_dispersion_per_metacell_per_module!)
-) function_contract(compute_metacells_2d_umap!, 2) function analyze_metacells!(
+) function_contract(compute_metacells_2d_umap!, 2) function analyze_metacells!(  # UNTESTED
     daf::DafWriter;
     prefix::AbstractString = "B",
     prev_daf::Maybe{DafReader} = nothing,
@@ -240,24 +246,25 @@ end
 """
     function qc_metacells!(;
         daf::DafWriter,
-        base_daf::DafReader,
+        score_daf::DafReader,
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Say how well the metacells describe the cells they were aggregated from, judged in the locations of the manifold a base
-repository laid out.
+Say how well the metacells describe the cells they were aggregated from, judged in the locations of the manifold the
+`score_daf` repository laid out.
 
 Each cell is correlated against its own metacell minus itself, over the cells of each base block's neighborhood, and
-the result is averaged over the environment marker genes of that base block. A higher number means the metacells of
-that location are a better account of the cells there. Only metacells scored against the same `base_daf` can be
-compared to each other, since it is the `base_daf` which decides both the locations and the genes each of them is read
-by. A repository is free to be its own base, which is how the metacells the sharpening started from are scored.
+the result is averaged over the environment marker genes of that base block. The base blocks are the blocks of the
+`score_daf`. A higher number means the metacells of that location are a better account of the cells there. Only
+metacells scored against the same `score_daf` can be compared to each other, since it is the `score_daf` which decides
+both the locations and the genes each of them is read by. A repository is free to be its own `score_daf`, which is how
+the metacells the sharpening started from are scored.
 
 # Daf
 
 $(CONTRACT1)
 
-# Base
+# Score
 
 $(CONTRACT2)
 """
@@ -278,19 +285,297 @@ $(CONTRACT2)
         compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!,
         2,
     ),
-    "base_daf",
-) function qc_metacells!(; daf::DafWriter, base_daf::DafReader, overwrite::Bool = false)::Nothing
+    "score_daf",
+) function qc_metacells!(; daf::DafWriter, score_daf::DafReader, overwrite::Bool = false)::Nothing  # UNTESTED
     compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!(;
         other_daf = daf,
-        base_daf,
+        base_daf = score_daf,
         overwrite,
     )
     compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!(;
         other_daf = daf,
-        base_daf,
+        base_daf = score_daf,
         overwrite,
     )
     return nothing
+end
+
+SHARPEN_ROUND_PREV_CONTRACT =
+    renamed_contract(function_contract(sharpen_metacells!, 2) |> function_contract(analyze_metacells!, 2), "prev_daf")
+
+"""
+    function sharpen_round!(;
+        sharp_daf::DafWriter,
+        prev_daf::DafReader,
+        score_daf::DafReader,
+        sharpening_round::Integer,
+        metacells_prefix::AbstractString = $(DEFAULT.metacells_prefix),
+        blocks_prefix::AbstractString = $(DEFAULT.blocks_prefix),
+        module_status::Bool = $(DEFAULT.module_status),
+        rng::AbstractRNG = default_rng(),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Run one round of sharpening. This regroups the cells into new metacells in `sharp_daf`, using what `prev_daf` says about
+the manifold ([`sharpen_metacells!`](@ref)). It then aggregates the new metacells ([`prepare_metacells!`](@ref)) and
+analyzes them ([`analyze_metacells!`](@ref)). Finally, it scores them against `score_daf` ([`qc_metacells!`](@ref)).
+
+The new metacells are named using the `metacells_prefix`, and their blocks using the `blocks_prefix`. The prefixes
+[`sharpening_rounds`](@ref) gives each round are one way to choose them.
+
+# Sharpened Metacells
+
+$(CONTRACT1)
+
+# Previous Metacells
+
+$(CONTRACT2)
+
+# Score
+
+$(CONTRACT3)
+"""
+@logged :mcs_ops @computation renamed_contract(
+    function_contract(sharpen_metacells!, 1) |>
+    function_contract(prepare_metacells!) |>
+    function_contract(analyze_metacells!, 1) |>
+    function_contract(qc_metacells!, 1),
+    "sharp_daf",
+) SHARPEN_ROUND_PREV_CONTRACT function_contract(qc_metacells!, 2) function sharpen_round!(;  # UNTESTED
+    sharp_daf::DafWriter,
+    prev_daf::DafReader,
+    score_daf::DafReader,
+    sharpening_round::Integer,
+    metacells_prefix::AbstractString = "M",
+    blocks_prefix::AbstractString = "B",
+    module_status::Bool = false,
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = false,
+)::Nothing
+    sharpen_metacells!(; sharp_daf, prev_daf, prefix = metacells_prefix, sharpening_round, rng, overwrite)
+    prepare_metacells!(sharp_daf; overwrite)
+    analyze_metacells!(sharp_daf; prefix = blocks_prefix, prev_daf, module_status, rng, overwrite)
+    qc_metacells!(; daf = sharp_daf, score_daf, overwrite)
+    return nothing
+end
+
+# The number of letters a round prefix is spelled with, starting at its base letter. Eleven letters give rounds 0 to 10
+# a single letter each, and keep the letters of the metacells base `M` apart from those of the blocks base `B`.
+const PREFIX_LETTERS = 11
+
+# The letter a base prefix is. It must leave room for all the `PREFIX_LETTERS` letters before `Z`.
+function base_prefix_letter(base_prefix::AbstractString)::Char
+    @assert length(base_prefix) == 1 "the base prefix: $(base_prefix) is not a single letter"
+    base_letter = base_prefix[1]
+    @assert 'A' <= base_letter && base_letter + (PREFIX_LETTERS - 1) <= 'Z' "invalid base prefix: $(base_prefix)"
+    return base_letter
+end
+
+# The prefix of the names of a round. This is the `sharpening_round`-th string (counting from 0) in shortlex order over
+# the `PREFIX_LETTERS` letters starting at the base letter. Shortlex order lists the shorter strings first, and
+# alphabetically within the same length. Round 0 is the base letter itself, and rounds 1 to 10 are the letters after it.
+function round_prefix(base_prefix::AbstractString, sharpening_round::Integer)::String
+    @assert sharpening_round >= 0
+    base_letter = base_prefix_letter(base_prefix)
+
+    n_letters = 1
+    remaining = sharpening_round
+    while remaining >= PREFIX_LETTERS^n_letters
+        remaining -= PREFIX_LETTERS^n_letters
+        n_letters += 1
+    end
+
+    letters = Vector{Char}(undef, n_letters)
+    for position in n_letters:-1:1
+        letters[position] = base_letter + remaining % PREFIX_LETTERS
+        remaining ÷= PREFIX_LETTERS
+    end
+    return String(letters)
+end
+
+"""
+    mutable struct SharpeningRounds ... end
+
+The sharpening rounds, as returned by [`sharpening_rounds`](@ref). Iterating on it gives a [`SharpeningRound`](@ref)
+for each round in turn. Each must be [`run!`](@ref) before the next one is taken.
+"""
+mutable struct SharpeningRounds
+    base_daf::DafReader
+    score_daf::DafReader
+    directory::AbstractString
+    metacells_prefix::AbstractString
+    blocks_prefix::AbstractString
+    module_status::Bool
+    rng::AbstractRNG
+    overwrite::Bool
+    previous_daf::DafReader
+    n_run_rounds::Int
+end
+
+"""
+    struct SharpeningRound
+        index::Int
+        previous_daf::DafReader
+        base_daf::DafReader
+        score_daf::DafReader
+        directory::AbstractString
+        metacells_prefix::AbstractString
+        blocks_prefix::AbstractString
+        module_status::Bool
+        rng::AbstractRNG
+        overwrite::Bool
+    end
+
+One round of the [`sharpening_rounds`](@ref). The `index` is the number of the round, starting at 1. The
+`previous_daf` is the metacells of the round before this one (for the first round, the `initial_daf` the rounds started
+from). The `metacells_prefix` and the `blocks_prefix` are this round's prefixes. The rest are as given to
+[`sharpening_rounds`](@ref).
+
+Running the round using [`run!`](@ref) uses all of these. Any of the parameters can be overridden when calling it.
+"""
+struct SharpeningRound
+    index::Int
+    previous_daf::DafReader
+    base_daf::DafReader
+    score_daf::DafReader
+    directory::AbstractString
+    metacells_prefix::AbstractString
+    blocks_prefix::AbstractString
+    module_status::Bool
+    rng::AbstractRNG
+    overwrite::Bool
+    rounds::SharpeningRounds
+end
+
+"""
+    sharpening_rounds(;
+        initial_daf::DafReader,
+        base_daf::DafReader,
+        score_daf::DafReader,
+        directory::AbstractString,
+        metacells_prefix::AbstractString = $(DEFAULT.metacells_prefix),
+        blocks_prefix::AbstractString = $(DEFAULT.blocks_prefix),
+        module_status::Bool = $(DEFAULT.module_status),
+        rng::AbstractRNG = default_rng(),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::SharpeningRounds
+
+Iterate on rounds of sharpening, starting from the `initial_daf` metacells. Each round is a [`SharpeningRound`](@ref).
+Running it using [`run!`](@ref) creates a new repository in the `directory`, chained on the `base_daf`. It then fills
+it using [`sharpen_round!`](@ref), which scores it against the `score_daf`. The iteration never ends by itself. The
+caller decides when to stop:
+
+```julia
+for sharpening_round in sharpening_rounds(; initial_daf, base_daf, score_daf, directory = "dafs")
+    sharpening_round.index > 2 && break
+    metacells_daf = run!(sharpening_round, "metacells.R\$(sharpening_round.index)")
+end
+```
+
+The `metacells_prefix` and the `blocks_prefix` are the base letters of the prefixes of each round. The `initial_daf`
+metacells are round 0, and are expected to be named using the base letters. Each round's prefix is the next string, in
+shortlex order, over the 11 letters starting at the base letter. That is, for `B`, the rounds are `C`, `D`, ... `L`,
+then `BB`, `BC`, ... `LL`, then `BBB`, and so on. The letters of the two base prefixes must not overlap, so a block
+prefix can never be mistaken for a metacells prefix.
+"""
+@documented function sharpening_rounds(;
+    initial_daf::DafReader,
+    base_daf::DafReader,
+    score_daf::DafReader,
+    directory::AbstractString,
+    metacells_prefix::AbstractString = "M",
+    blocks_prefix::AbstractString = "B",
+    module_status::Bool = false,
+    rng::AbstractRNG = default_rng(),
+    overwrite::Bool = false,
+)::SharpeningRounds
+    distance = abs(base_prefix_letter(metacells_prefix) - base_prefix_letter(blocks_prefix))
+    @assert distance >= PREFIX_LETTERS (
+        "overlapping metacells prefix: $(metacells_prefix) and blocks prefix: $(blocks_prefix)"
+    )
+    return SharpeningRounds(
+        base_daf,
+        score_daf,
+        directory,
+        metacells_prefix,
+        blocks_prefix,
+        module_status,
+        rng,
+        overwrite,
+        initial_daf,
+        0,
+    )
+end
+
+Base.IteratorSize(::Type{SharpeningRounds}) = Base.IsInfinite()
+
+Base.eltype(::Type{SharpeningRounds}) = SharpeningRound
+
+function Base.iterate(rounds::SharpeningRounds, index::Int = 1)::Tuple{SharpeningRound, Int}
+    @assert rounds.n_run_rounds == index - 1 "the sharpening round: $(index - 1) was not run"
+    sharpening_round = SharpeningRound(
+        index,
+        rounds.previous_daf,
+        rounds.base_daf,
+        rounds.score_daf,
+        rounds.directory,
+        round_prefix(rounds.metacells_prefix, index),
+        round_prefix(rounds.blocks_prefix, index),
+        rounds.module_status,
+        rounds.rng,
+        rounds.overwrite,
+        rounds,
+    )
+    return (sharpening_round, index + 1)
+end
+
+"""
+    run!(
+        sharpening_round::SharpeningRound,
+        name::AbstractString;
+        metacells_prefix::AbstractString = sharpening_round.metacells_prefix,
+        blocks_prefix::AbstractString = sharpening_round.blocks_prefix,
+        module_status::Bool = sharpening_round.module_status,
+        rng::AbstractRNG = sharpening_round.rng,
+        overwrite::Bool = sharpening_round.overwrite,
+    )::DafWriter
+
+Run one of the [`sharpening_rounds`](@ref). This creates a repository with the `name` in the round's `directory`,
+chained on the round's `base_daf`. It fills it using [`sharpen_round!`](@ref), and returns it. The next round starts
+from it. Any of the round's parameters can be overridden for this round only.
+"""
+function run!(  # UNTESTED
+    sharpening_round::SharpeningRound,
+    name::AbstractString;
+    metacells_prefix::AbstractString = sharpening_round.metacells_prefix,
+    blocks_prefix::AbstractString = sharpening_round.blocks_prefix,
+    module_status::Bool = sharpening_round.module_status,
+    rng::AbstractRNG = sharpening_round.rng,
+    overwrite::Bool = sharpening_round.overwrite,
+)::DafWriter
+    rounds = sharpening_round.rounds
+    @assert rounds.n_run_rounds == sharpening_round.index - 1 "the sharpening round: $(sharpening_round.index) was run"
+
+    sharp_daf = complete_chain!(;
+        base_daf = sharpening_round.base_daf,
+        new_daf = FilesDaf(joinpath(sharpening_round.directory, name), "w"; name),
+        name,
+    )
+    sharpen_round!(;
+        sharp_daf,
+        prev_daf = sharpening_round.previous_daf,
+        score_daf = sharpening_round.score_daf,
+        sharpening_round = sharpening_round.index,
+        metacells_prefix,
+        blocks_prefix,
+        module_status,
+        rng,
+        overwrite,
+    )
+
+    rounds.previous_daf = sharp_daf
+    rounds.n_run_rounds = sharpening_round.index
+    return sharp_daf
 end
 
 end  # module

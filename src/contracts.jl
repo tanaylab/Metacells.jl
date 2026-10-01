@@ -18,9 +18,10 @@ in both compared metacells is too low (below 40).
 
 Naming convention is `vector_of_something_per_axis` for vectors (e.g., `vector_of_metacell_per_cell`) and
 `matrix_of_something_per_axis_per_axis` for matrices (e.g., `vector_of_UMIs_per_gene_per_cell`). For square symmetric
-matrices, we use `matrix_of_something_between_axis` (e.g., `matrix_of_euclidean_skeleton_fold_distance_between_metacells`).
-We also allow for `tensor_of_something_per_axis_per_axis_per_axis` - these are simply a set of matrices, one for each
-entry of the first axis, whose names are `entry_something`.
+matrices, we use `matrix_of_something_between_axis` (e.g.,
+`matrix_of_euclidean_skeleton_fold_distance_between_metacells`). We also allow for
+`tensor_of_something_per_axis_per_axis_per_axis` - these are simply a set of matrices, one for each entry of the first
+axis, whose names are `entry_something`.
 """
 module Contracts
 
@@ -160,7 +161,7 @@ depending on the data set.
 
 This axis is typically created when importing data.
 """
-function gene_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+function gene_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "gene" => (expectation, "Sequenced genes.")
 end
 
@@ -175,7 +176,8 @@ A mask of mitochondrial genes. These genes are typically excluded from the analy
 the biological behaviors of interest, and also have such a large and variable expression level that including them would
 skew the denominator when estimating linear gene expression level fractions.
 
-This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in Gmara.
+This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in
+Gmara.
 """
 function vector_of_is_mitochondrial_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_mitochondrial") => (expectation, Bool, "A mask of mitochondrial genes.")
@@ -190,7 +192,8 @@ A mask of ribosomal genes. These genes are typically excluded from the analysis,
 the biological behaviors of interest, they have such a large and variable expression level that including them would
 skew the denominator when estimating linear gene expression level fractions.
 
-This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in Gmara.
+This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in
+Gmara.
 """
 function vector_of_is_ribosomal_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_ribosomal") => (expectation, Bool, "A mask of ribosomal genes.")
@@ -243,7 +246,7 @@ to other considerations (e.g., they may be lateral genes).
 This vector is populated by [`compute_vector_of_is_marker_per_gene!`](@ref
 Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!).
 """
-function vector_of_is_marker_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_is_marker_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_marker") => (expectation, Bool, "A mask of genes that distinguish between cell states.")
 end
 
@@ -259,7 +262,7 @@ maximal the data type allows).
 This vector is populated by [`compute_vector_of_marker_rank_per_gene!`](@ref
 Metacells.AnalyzeGenes.compute_vector_of_marker_rank_per_gene!).
 """
-function vector_of_marker_rank_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_marker_rank_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "marker_rank") => (expectation, StorageUnsigned, "The relative ranks of the marker genes.")
 end
 
@@ -318,7 +321,7 @@ assume that these metacells are "very similar" (will be in the same block), with
 This vector is populated by [`compute_vector_of_is_skeleton_per_gene!`](@ref
 Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!).
 """
-function vector_of_is_skeleton_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_is_skeleton_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_skeleton") =>
         (expectation, Bool, "A mask of genes that are used to predict the values of the rest of the genes.")
 end
@@ -330,9 +333,10 @@ end
 
 A mask of genes that are forbidden from being used as skeleton genes.
 
-This vector is created in a supervised way based on biological and technical considerations. If not set, no gene is forbidden.
+This vector is created in a supervised way based on biological and technical considerations. If not set, no gene is
+forbidden.
 """
-function vector_of_is_forbidden_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_is_forbidden_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_forbidden") =>
         (expectation, Bool, "A mask of genes that are forbidden from being used as skeleton genes.")
 end
@@ -348,7 +352,7 @@ marker genes which do not have such correlation; these are potential candidates 
 This vector is populated by [`compute_vector_of_is_correlated_with_skeleton_per_gene!`](@ref
 Metacells.AnalyzeGenes.compute_vector_of_is_correlated_with_skeleton_per_gene!).
 """
-function vector_of_is_correlated_with_skeleton_per_gene(
+function vector_of_is_correlated_with_skeleton_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("gene", "is_correlated_with_skeleton") => (
@@ -409,7 +413,7 @@ total number of molecules in each cell, this also depends on the unknown and cel
 
 This data is obtained from scRNA-seq experiments.
 """
-function matrix_of_UMIs_per_gene_per_cell(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function matrix_of_UMIs_per_gene_per_cell(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "cell", "UMIs") =>
         (expectation, StorageUnsigned, "The number of UMIs collected for each gene for each cell.")
 end
@@ -423,7 +427,7 @@ The total number of UMIs of all the mitochondrial genes in each cell.
 
 TODO: Implement `compute_vector_of_mitochondrial_UMIs_per_cell` based on `vector_of_is_mitochondrial_per_gene`.
 """
-function vector_of_mitochondrial_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_mitochondrial_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "mitochondrial_UMIs") =>
         (expectation, StorageUnsigned, "The total number of UMIs of all the mitochondrial genes in each cell.")
 end
@@ -437,7 +441,7 @@ The total number of UMIs of all the ribosomal genes in each cell.
 
 TODO: Implement `compute_vector_of_mitochondrial_UMIs_per_cell` based on `vector_of_is_ribosomal_per_gene`.
 """
-function vector_of_ribosomal_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_ribosomal_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "ribosomal_UMIs") =>
         (expectation, StorageUnsigned, "The total number of UMIs of all the ribosomal genes in each cell.")
 end
@@ -451,7 +455,7 @@ The total number of UMIs of all the excluded genes in each cell.
 
 TODO: Implement `compute_vector_of_excluded_UMIs_per_cell` based on `vector_of_is_excluded_per_gene`.
 """
-function vector_of_excluded_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_excluded_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "excluded_UMIs") =>
         (expectation, StorageUnsigned, "The total number of UMIs of all the excluded genes in each cell.")
 end
@@ -466,7 +470,7 @@ The total number of UMIs of all the non-excluded genes in each cell.
 This vector is populated by [`compute_vector_of_total_UMIs_per_cell!`](@ref
 Metacells.AnalyzeCells.compute_vector_of_total_UMIs_per_cell!).
 """
-function vector_of_total_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_total_UMIs_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "total_UMIs") =>
         (expectation, StorageUnsigned, "The total number of UMIs of all the non-excluded genes in each cell.")
 end
@@ -516,8 +520,8 @@ end
 The previous round's block each outlier cell was clustered in - the block of the metacell the cell was ejected from (see
 [`vector_of_outlier_in_metacell_per_cell`](@ref)). A cell is an outlier if, for some found module instance in the
 previous round's repository, its actual UMIs of the module's genes exceed the expected UMIs by a high fold factor - see
-[`vector_of_outlier_by_prev_block_per_cell`](@ref). This is the empty string for any cell that kept its metacell, and for
-base outliers and excluded cells (which never enter the clustering).
+[`vector_of_outlier_by_prev_block_per_cell`](@ref). This is the empty string for any cell that kept its metacell, and
+for base outliers and excluded cells (which never enter the clustering).
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
@@ -548,8 +552,8 @@ end
     )::Pair{VectorKey, DataSpecification}
 
 The previous round's block whose found module most strongly deviates in each outlier cell, in contrast to the
-[`vector_of_outlier_in_prev_block_per_cell`](@ref) which is the block the cell was clustered in. This is the empty string
-for any cell that is not an outlier.
+[`vector_of_outlier_in_prev_block_per_cell`](@ref) which is the block the cell was clustered in. This is the empty
+string for any cell that is not an outlier.
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
@@ -623,7 +627,7 @@ would be discarded as outliers, or not even appear in the data in the first plac
 This axis is typically created when importing data prepared by the Python metacells package, or by
 [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
-function metacell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+function metacell_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "metacell" => (expectation, "Minimal-sized groups of cells for robust point estimates.")
 end
 
@@ -638,7 +642,7 @@ biological state. This is the empty string if the cell does not belong to any me
 This vector can be populated by any metacells-like algorithm (the original R metacells (1) algorithm, the Python
 metacells (2) algorithm, other similar algorithms).
 """
-function vector_of_metacell_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_metacell_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "metacell") => (expectation, AbstractString, "The unique metacell each cell belongs to.")
 end
 
@@ -652,7 +656,7 @@ The number of cells in each metacell.
 This vector is populated by [`compute_vector_of_n_cells_per_metacell!`](@ref
 Metacells.AnalyzeMetacells.compute_vector_of_n_cells_per_metacell!).
 """
-function vector_of_n_cells_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_n_cells_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "n_cells") => (expectation, StorageUnsigned, "The number of cells in each metacell.")
 end
 
@@ -666,7 +670,7 @@ The total number of UMIs of each gene in the cells of each metacell.
 This matrix is populated by [`compute_matrix_of_UMIs_per_gene_per_metacell!`](@ref
 Metacells.AnalyzeMetacells.compute_matrix_of_UMIs_per_gene_per_metacell!).
 """
-function matrix_of_UMIs_per_gene_per_metacell(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function matrix_of_UMIs_per_gene_per_metacell(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "metacell", "UMIs") =>
         (expectation, StorageUnsigned, "The total number of UMIs of each gene in the cells of each metacell.")
 end
@@ -682,7 +686,7 @@ The total number of UMIs of all the non-excluded genes in each metacell. This is
 This vector is populated by [`compute_vector_of_total_UMIs_per_metacell!`](@ref
 Metacells.AnalyzeMetacells.compute_vector_of_total_UMIs_per_metacell!).
 """
-function vector_of_total_UMIs_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_total_UMIs_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "total_UMIs") =>
         (expectation, StorageUnsigned, "The total number of UMIs of all the non-excluded genes in each metacell.")
 end
@@ -701,7 +705,7 @@ levels ("bursty" genes), as these impact the denominator.
 This matrix is populated by [`compute_matrix_of_linear_fraction_per_gene_per_metacell!`](@ref
 Metacells.AnalyzeMetacells.compute_matrix_of_linear_fraction_per_gene_per_metacell!).
 """
-function matrix_of_linear_fraction_per_gene_per_metacell(
+function matrix_of_linear_fraction_per_gene_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "linear_fraction") => (
@@ -724,13 +728,14 @@ measure of difference between gene expression levels.
 This matrix is populated by [`compute_matrix_of_log_linear_fraction_per_gene_per_metacell!`](@ref
 Metacells.AnalyzeMetacells.compute_matrix_of_log_linear_fraction_per_gene_per_metacell!).
 """
-function matrix_of_log_linear_fraction_per_gene_per_metacell(
+function matrix_of_log_linear_fraction_per_gene_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "log_linear_fraction") => (
         expectation,
         StorageFloat,
-        "The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.",
+        "The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the" *
+        " total UMIs.",
     )
 end
 
@@ -747,13 +752,14 @@ environment.
 This matrix is populated by [`compute_matrix_of_is_environment_specific_per_gene_per_metacell!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_specific_per_gene_per_metacell!).
 """
-function matrix_of_is_environment_specific_per_gene_per_metacell(
+function matrix_of_is_environment_specific_per_gene_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "metacell", "is_environment_specific") => (
         expectation,
         Bool,
-        "A mask of non-lateral genes specifically expressed in each metacell relative to the median in its block's environment.",
+        "A mask of non-lateral genes specifically expressed in each metacell relative to the median in its block's" *
+        " environment.",
     )
 end
 
@@ -770,7 +776,7 @@ matrix with zeros in the diagonal.
 This matrix is computed by [`compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!`](@ref
 Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!).
 """
-function matrix_of_euclidean_skeleton_fold_distance_between_metacells(
+function matrix_of_euclidean_skeleton_fold_distance_between_metacells(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("metacell", "metacell", "euclidean_skeleton_fold_distance") => (
@@ -791,7 +797,7 @@ genes. This is a symmetric matrix.
 This matrix is populated by [`compute_matrix_of_correlation_between_markers_per_gene_per_gene!`](@ref
 Metacells.AnalyzeMetacells.compute_matrix_of_correlation_between_markers_per_gene_per_gene!).
 """
-function matrix_of_correlation_between_markers_per_gene_per_gene(
+function matrix_of_correlation_between_markers_per_gene_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "gene", "correlation_between_markers") => (
@@ -813,7 +819,7 @@ zeros in the diagonal.
 This matrix may be populated by [`compute_matrix_of_max_skeleton_fold_distance_between_metacells!`](@ref
 Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!).
 """
-function matrix_of_max_skeleton_fold_distance_between_metacells(
+function matrix_of_max_skeleton_fold_distance_between_metacells(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("metacell", "metacell", "max_skeleton_fold_distance") => (
@@ -837,7 +843,7 @@ relevant genes are properly described by the metacell model.
 This vector may be populated by [`compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!`](@ref
 Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_punctuated_metacells_per_gene!).
 """
-function vector_of_correlation_between_cells_and_punctuated_metacells_per_gene(
+function vector_of_correlation_between_cells_and_punctuated_metacells_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("gene", "correlation_between_cells_and_punctuated_metacells") => (
@@ -864,7 +870,7 @@ This vector may be populated by
 [`compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!`](@ref
 Metacells.AnalyzeMetacells.compute_vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene!).
 """
-function vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene(
+function vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("gene", "correlation_between_cells_and_projected_punctuated_metacells") => (
@@ -886,7 +892,7 @@ The X coordinate of each metacell in a 2D UMAP projection.
 
 This vector is populated by [`compute_metacells_2d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_2d_umap!).
 """
-function vector_of_umap_x_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_x_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "umap_x") =>
         (expectation, StorageFloat, "The X coordinate of each metacell in a 2D UMAP projection.")
 end
@@ -900,7 +906,7 @@ The Y coordinate of each metacell in a 2D UMAP projection.
 
 This vector is populated by [`compute_metacells_2d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_2d_umap!).
 """
-function vector_of_umap_y_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_y_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "umap_y") =>
         (expectation, StorageFloat, "The Y coordinate of each metacell in a 2D UMAP projection.")
 end
@@ -914,7 +920,7 @@ The U coordinate of each metacell in a 3D UMAP projection.
 
 This vector is populated by [`compute_metacells_3d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_3d_umap!).
 """
-function vector_of_umap_u_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_u_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "umap_u") =>
         (expectation, StorageFloat, "The U coordinate of each metacell in a 3D UMAP projection.")
 end
@@ -928,7 +934,7 @@ The V coordinate of each metacell in a 3D UMAP projection.
 
 This vector is populated by [`compute_metacells_3d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_3d_umap!).
 """
-function vector_of_umap_v_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_v_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "umap_v") =>
         (expectation, StorageFloat, "The V coordinate of each metacell in a 3D UMAP projection.")
 end
@@ -942,7 +948,7 @@ The W coordinate of each metacell in a 3D UMAP projection.
 
 This vector is populated by [`compute_metacells_3d_umap!`](@ref Metacells.AnalyzeMetacells.compute_metacells_3d_umap!).
 """
-function vector_of_umap_w_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_w_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "umap_w") =>
         (expectation, StorageFloat, "The W coordinate of each metacell in a 3D UMAP projection.")
 end
@@ -960,7 +966,7 @@ with fewer lower-quality metacells.
 
 This axis is typically created by [`compute_metacells_blocks!`](@ref Metacells.ComputeBlocks.compute_metacells_blocks!).
 """
-function block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+function block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "block" => (expectation, "Distinct groups of metacells with \"very close\" cell state.")
 end
 
@@ -974,7 +980,7 @@ The unique block each metacell belongs to.
 This vector is populated by [`compute_metacells_blocks!`](@ref
 Metacells.ComputeBlocks.compute_metacells_blocks!).
 """
-function vector_of_block_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_block_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "block") => (expectation, AbstractString, "The unique block each metacell belongs to.")
 end
 
@@ -990,7 +996,7 @@ two of them.
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
-function vector_of_prev_block_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_prev_block_per_metacell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("metacell", "prev_block") =>
         (expectation, AbstractString, "The unique previous round's block each sharpened metacell belongs to.")
 end
@@ -1002,9 +1008,10 @@ end
 
 The number of metacells in each block.
 
-This vector is populated by [`compute_vector_of_n_metacells_per_block!`](@ref Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!).
+This vector is populated by
+[`compute_vector_of_n_metacells_per_block!`](@ref Metacells.AnalyzeBlocks.compute_vector_of_n_metacells_per_block!).
 """
-function vector_of_n_metacells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_n_metacells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "n_metacells") => (expectation, StorageUnsigned, "The number of metacells in each block.")
 end
 
@@ -1015,9 +1022,10 @@ end
 
 The number of cells in each block.
 
-This vector is populated by [`compute_vector_of_n_cells_per_block!`](@ref Metacells.AnalyzeBlocks.compute_vector_of_n_cells_per_block!).
+This vector is populated by
+[`compute_vector_of_n_cells_per_block!`](@ref Metacells.AnalyzeBlocks.compute_vector_of_n_cells_per_block!).
 """
-function vector_of_n_cells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_n_cells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "n_cells") => (expectation, StorageUnsigned, "The number of cells in each block.")
 end
 
@@ -1049,7 +1057,7 @@ The total number of UMIs of all the non-excluded genes in each block. This is us
 This vector is populated by [`compute_vector_of_total_UMIs_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_total_UMIs_per_block!).
 """
-function vector_of_total_UMIs_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_total_UMIs_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "total_UMIs") =>
         (expectation, StorageUnsigned, "The total number of UMIs of all the non-excluded genes in each block.")
 end
@@ -1066,7 +1074,7 @@ The linear fraction of the UMIs of each non-excluded gene out of the total UMIs 
 This matrix is populated by [`compute_matrix_of_linear_fraction_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_linear_fraction_per_gene_per_block!).
 """
-function matrix_of_linear_fraction_per_gene_per_block(
+function matrix_of_linear_fraction_per_gene_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "block", "linear_fraction") => (
@@ -1087,13 +1095,14 @@ adds some gene fraction regularization to deal with zero fractions.
 This matrix is populated by [`compute_matrix_of_log_linear_fraction_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_log_linear_fraction_per_gene_per_block!).
 """
-function matrix_of_log_linear_fraction_per_gene_per_block(
+function matrix_of_log_linear_fraction_per_gene_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "block", "log_linear_fraction") => (
         expectation,
         StorageFloat,
-        "The log base 2 of the linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each block.",
+        "The log base 2 of the linear fraction of the UMIs of each non-excluded gene out of the total UMIs in each" *
+        " block.",
     )
 end
 
@@ -1110,7 +1119,7 @@ and the diagonal is the mean distance between the metacells inside each block.
 This matrix may be computed by [`compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!).
 """
-function matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(
+function matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("block", "block", "mean_euclidean_skeleton_fold_distance") => (
@@ -1125,14 +1134,14 @@ end
         expectation::ContractExpectation
     )::Pair{MatrixKey, DataSpecification}
 
-The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. This includes
-the metacells inside the block, so reducing it over each block's metacells gives the
+The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. This
+includes the metacells inside the block, so reducing it over each block's metacells gives the
 [`matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks`](@ref).
 
 This matrix may be computed by [`compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!).
 """
-function matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(
+function matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("metacell", "block", "mean_euclidean_skeleton_fold_distance") => (
@@ -1155,7 +1164,7 @@ in log base 2 of the gene expression level). This adds some gene fraction regula
 This matrix may be computed by [`compute_vector_of_block_closest_by_pertinent_markers_per_cell!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_block_closest_by_pertinent_markers_per_cell!).
 """
-function vector_of_block_closest_by_pertinent_markers_per_cell(
+function vector_of_block_closest_by_pertinent_markers_per_cell(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("cell", "block.closest_by_pertinent_markers") => (
@@ -1175,7 +1184,7 @@ The number of cells which are included in each (column) block and are closest to
 This matrix may be computed by [`compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block!).
 """
-function matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block(
+function matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("block", "block", "confusion_by_closest_by_pertinent_markers") => (
@@ -1195,7 +1204,7 @@ The number of cells which are included in each (row) metacell and are closest to
 This matrix may be computed by [`compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block!).
 """
-function matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block(
+function matrix_of_confusion_by_closest_by_pertinent_markers_per_metacell_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("metacell", "block", "confusion_by_closest_by_pertinent_markers") => (
@@ -1219,7 +1228,7 @@ us to investigate the local gradients of the coarse (block) cell states.
 This matrix is populated by [`compute_matrix_of_is_in_neighborhood_per_block_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_in_neighborhood_per_block_per_block!).
 """
-function matrix_of_is_in_neighborhood_per_block_per_block(
+function matrix_of_is_in_neighborhood_per_block_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("block", "block", "is_in_neighborhood") =>
@@ -1236,7 +1245,7 @@ The total number of (rows) blocks in each (column) block's neighborhood.
 This vector is populated by [`compute_vector_of_n_neighborhood_blocks_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_blocks_per_block!).
 """
-function vector_of_n_neighborhood_blocks_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_n_neighborhood_blocks_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "n_neighborhood_blocks") =>
         (expectation, StorageUnsigned, "The total number of (rows) blocks in each (column) block's neighborhood.")
 end
@@ -1251,7 +1260,7 @@ The total number of metacells in each block's neighborhood.
 This vector is populated by [`compute_vector_of_n_neighborhood_metacells_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_metacells_per_block!).
 """
-function vector_of_n_neighborhood_metacells_per_block(
+function vector_of_n_neighborhood_metacells_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("block", "n_neighborhood_metacells") =>
@@ -1268,7 +1277,7 @@ The total number of cells in the metacells in the each block's neighborhood.
 This vector is populated by [`compute_vector_of_n_neighborhood_cells_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_n_neighborhood_cells_per_block!).
 """
-function vector_of_n_neighborhood_cells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_n_neighborhood_cells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "n_neighborhood_cells") =>
         (expectation, StorageUnsigned, "The total number of cells in the metacells in each block's neighborhood.")
 end
@@ -1283,7 +1292,7 @@ The total number of non-excluded gene UMIs in the cells in the metacells in each
 This vector is populated by [`compute_vector_of_total_neighborhood_UMIs_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_total_neighborhood_UMIs_per_block!).
 """
-function vector_of_total_neighborhood_UMIs_per_block(
+function vector_of_total_neighborhood_UMIs_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("block", "total_neighborhood_UMIs") => (
@@ -1298,8 +1307,9 @@ end
         expectation::ContractExpectation
     )::Pair{MatrixKey, DataSpecification}
 
-A mask of genes that distinguish between cell states in each block's neighborhood. Such genes do not necessarily distinguish the
-neighborhood from the rest of the population - see [`matrix_of_is_neighborhood_distinct_per_gene_per_block`](@ref).
+A mask of genes that distinguish between cell states in each block's neighborhood. Such genes do not necessarily
+distinguish the neighborhood from the rest of the population - see
+[`matrix_of_is_neighborhood_distinct_per_gene_per_block`](@ref).
 
 This matrix is populated by [`compute_matrix_of_is_neighborhood_marker_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_marker_per_gene_per_block!).
@@ -1327,7 +1337,8 @@ function matrix_of_is_neighborhood_distinct_per_gene_per_block(
     return ("block", "gene", "is_neighborhood_distinct") => (
         expectation,
         Bool,
-        "A mask of genes that distinguish between cell states of each block's neighborhood and the rest of the manifold.",
+        "A mask of genes that distinguish between cell states of each block's neighborhood and the rest of the" *
+        " manifold.",
     )
 end
 
@@ -1345,7 +1356,7 @@ be fixed.
 This matrix is populated by [`compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block!).
 """
-function matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block(
+function matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "block", "is_correlated_with_skeleton_in_neighborhood") => (
@@ -1373,7 +1384,8 @@ function matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacel
     return ("gene", "block", "correlation_between_neighborhood_cells_and_punctuated_metacells") => (
         expectation,
         StorageFloat,
-        "The correlation between cells and their metacells (minus the correlated cell) gene expression levels in each block's neighborhood.",
+        "The correlation between cells and their metacells (minus the correlated cell) gene expression levels in each" *
+        " block's neighborhood.",
     )
 end
 
@@ -1392,7 +1404,7 @@ more metacells for estimating local gene programs (modules).
 This matrix is populated by [`compute_matrix_of_is_in_environment_per_metacell_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_in_environment_per_metacell_per_block!).
 """
-function matrix_of_is_in_environment_per_metacell_per_block(
+function matrix_of_is_in_environment_per_metacell_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("metacell", "block", "is_in_environment") =>
@@ -1409,7 +1421,7 @@ The total number of metacells in each block's environment.
 This vector is populated by [`compute_vector_of_n_environment_metacells_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_n_environment_metacells_per_block!).
 """
-function vector_of_n_environment_metacells_per_block(
+function vector_of_n_environment_metacells_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("block", "n_environment_metacells") =>
@@ -1426,7 +1438,7 @@ The total number of cells in the metacells in each block's environment.
 This vector is populated by [`compute_vector_of_n_environment_cells_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_n_environment_cells_per_block!).
 """
-function vector_of_n_environment_cells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_n_environment_cells_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "n_environment_cells") =>
         (expectation, StorageUnsigned, "The total number of cells in the metacells in each block's environment.")
 end
@@ -1441,7 +1453,7 @@ The total number of non-excluded gene UMIs in the cells in the metacells in each
 This vector is populated by [`compute_vector_of_total_environment_UMIs_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_total_environment_UMIs_per_block!).
 """
-function vector_of_total_environment_UMIs_per_block(
+function vector_of_total_environment_UMIs_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("block", "total_environment_UMIs") => (
@@ -1486,7 +1498,8 @@ function matrix_of_is_environment_distinct_per_gene_per_block(
     return ("block", "gene", "is_environment_distinct") => (
         expectation,
         Bool,
-        "A mask of genes that distinguish between cell states of each block's environment and the rest of the manifold.",
+        "A mask of genes that distinguish between cell states of each block's environment and the rest of the" *
+        " manifold.",
     )
 end
 
@@ -1502,7 +1515,7 @@ be fixed.
 This matrix is populated by [`compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block!).
 """
-function matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(
+function matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "block", "is_correlated_with_skeleton_in_environment") => (
@@ -1525,7 +1538,7 @@ the block.
 This vector is populated by [`compute_blocks_2d_umap_by_metacells!`](@ref
 Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!).
 """
-function vector_of_umap_x_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_x_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "umap_x") => (expectation, StorageFloat, "The X coordinate of each block in a 2D UMAP projection.")
 end
 
@@ -1540,7 +1553,7 @@ the block.
 This vector is populated by [`compute_blocks_2d_umap_by_metacells!`](@ref
 Metacells.AnalyzeBlocks.compute_blocks_2d_umap_by_metacells!).
 """
-function vector_of_umap_y_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_y_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "umap_y") => (expectation, StorageFloat, "The Y coordinate of each block in a 2D UMAP projection.")
 end
 
@@ -1555,7 +1568,7 @@ the block.
 This vector is populated by [`compute_blocks_3d_umap_by_metacells!`](@ref
 Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!).
 """
-function vector_of_umap_u_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_u_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "umap_u") => (expectation, StorageFloat, "The U coordinate of each block in a 3D UMAP projection.")
 end
 
@@ -1570,7 +1583,7 @@ the block.
 This vector is populated by [`compute_blocks_3d_umap_by_metacells!`](@ref
 Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!).
 """
-function vector_of_umap_v_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_v_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "umap_v") => (expectation, StorageFloat, "The V coordinate of each block in a 3D UMAP projection.")
 end
 
@@ -1585,7 +1598,7 @@ the block.
 This vector is populated by [`compute_blocks_3d_umap_by_metacells!`](@ref
 Metacells.AnalyzeBlocks.compute_blocks_3d_umap_by_metacells!).
 """
-function vector_of_umap_w_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_umap_w_per_block(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("block", "umap_w") => (expectation, StorageFloat, "The W coordinate of each block in a 3D UMAP projection.")
 end
 
@@ -1640,7 +1653,7 @@ plotted in this order in each pair of consecutive sharpening rounds.
 This vector is populated by [`compute_vector_of_global_flow_order_per_type!`](@ref
 Metacells.SharpenMetacells.compute_vector_of_global_flow_order_per_type!).
 """
-function vector_of_global_flow_order_per_type(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_global_flow_order_per_type(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("type", "global_flow_order") => (
         expectation,
         StorageUnsigned,
@@ -1662,7 +1675,7 @@ Metacells.AnalyzeMetacells.compute_vector_of_type_per_cell_by_metacells!). If th
 level, the per-cell type vector can be populated by [`compute_vector_of_type_per_cell_by_blocks!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_type_per_cell_by_blocks!).
 """
-function vector_of_type_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_type_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "type") => (expectation, AbstractString, "The type each cell belongs to.")
 end
 
@@ -1827,7 +1840,7 @@ sparse representation, it has non-trivial storage overhead. It is needed for pro
 This matrix is populated by [`compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!`](@ref
 Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!).
 """
-function tensor_of_linear_fraction_per_block_per_module_per_metacell(
+function tensor_of_linear_fraction_per_block_per_module_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{TensorKey, DataSpecification}
     return ("block", "module", "metacell", "linear_fraction") => (
@@ -1847,7 +1860,7 @@ The mean of the linear fraction of each module in the cells of the neighborhood 
 This matrix is populated by [`compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!).
 """
-function matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(
+function matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("block", "module", "mean_linear_fraction_in_neighborhood_cells") => (
@@ -1867,7 +1880,7 @@ The standard deviation of the linear fraction of each module in the cells of the
 This matrix is populated by [`compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!).
 """
-function matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(
+function matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("block", "module", "std_linear_fraction_in_neighborhood_cells") => (
@@ -1887,7 +1900,7 @@ The mean of the linear fraction of each module in the cells of the environment o
 This matrix is populated by [`compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!).
 """
-function matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(
+function matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("block", "module", "mean_linear_fraction_in_environment_cells") => (
@@ -1907,7 +1920,7 @@ The standard deviation of the linear fraction of each module in the cells of the
 This matrix is populated by [`compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!).
 """
-function matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(
+function matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("block", "module", "std_linear_fraction_in_environment_cells") => (
@@ -1928,13 +1941,14 @@ modules of the metacell's block's neighborhood.
 This matrix is populated by [`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!).
 """
-function vector_of_mean_euclidean_modules_cells_distance_per_metacell(
+function vector_of_mean_euclidean_modules_cells_distance_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("metacell", "mean_euclidean_modules_cells_distance") => (
         expectation,
         StorageFloat,
-        "In each metacell, the mean of the euclidean distances of between its cells and the metacell's linear fraction of the modules of the metacell's block's neighborhood.",
+        "In each metacell, the mean of the euclidean distances of between its cells and the metacell's linear" *
+        " fraction of the modules of the metacell's block's neighborhood.",
     )
 end
 
@@ -1949,13 +1963,14 @@ fraction of the modules of the metacell's block's neighborhood.
 This matrix is populated by [`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!).
 """
-function vector_of_std_euclidean_modules_cells_distance_per_metacell(
+function vector_of_std_euclidean_modules_cells_distance_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("metacell", "std_euclidean_modules_cells_distance") => (
         expectation,
         StorageFloat,
-        "In each metacell, the standard deviation of the euclidean distances of between its cells and the metacell's linear fraction of the modules of the metacell's block's neighborhood.",
+        "In each metacell, the standard deviation of the euclidean distances of between its cells and the metacell's" *
+        " linear fraction of the modules of the metacell's block's neighborhood.",
     )
 end
 
@@ -1973,13 +1988,15 @@ the module per cell in the metacell is too low to be informative.
 This matrix is populated by [`compute_matrix_of_cells_dispersion_per_metacell_per_module!`](@ref
 Metacells.AnalyzeModules.compute_matrix_of_cells_dispersion_per_metacell_per_module!).
 """
-function matrix_of_cells_dispersion_per_metacell_per_module(
+function matrix_of_cells_dispersion_per_metacell_per_module(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("module", "metacell", "cells_dispersion") => (
         expectation,
         StorageFloat,
-        "The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling noise.",
+        "The ratio between the actual standard deviation of the (normalized) UMIs of each gene module in the cells of" *
+        " each metacell, and the expected standard deviation assuming all the noise is technical multinomial sampling" *
+        " noise.",
     )
 end
 
@@ -1996,7 +2013,7 @@ a "best match" ("least bad match" would be a better term).
 
 This vector is populated by [`compute_cells_projection!`](@ref Metacells.ProjectCells.compute_cells_projection!).
 """
-function vector_of_projected_metacell_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_projected_metacell_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "projected_metacell") =>
         (expectation, AbstractString, "The projected atlas metacell for each cell.")
 end
@@ -2010,7 +2027,7 @@ The atlas block of the projected metacell for each query cell.
 
 This vector is populated by [`compute_cells_projection!`](@ref Metacells.ProjectCells.compute_cells_projection!).
 """
-function vector_of_projected_block_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}
+function vector_of_projected_block_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("cell", "projected_block") =>
         (expectation, AbstractString, "The atlas block of the projected metacell for each query cell.")
 end
@@ -2025,7 +2042,7 @@ likely that the cell is actually a good match for the metacell.
 
 This vector is populated by [`compute_cells_projection!`](@ref Metacells.ProjectCells.compute_cells_projection!).
 """
-function vector_of_projected_modules_z_score_per_cell(
+function vector_of_projected_modules_z_score_per_cell(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("cell", "projected_metacell_modules_z_score") => (
@@ -2041,13 +2058,13 @@ end
     )::Pair{VectorKey, DataSpecification}
 
 The correlation between query cells and their projected atlas metacells of each gene expression levels. This is zero for
-non-marker genes. This reflects the overall quality of the projection of the query cells to the atlas, and verifying that
-all relevant genes are properly described by the atlas metacell model.
+non-marker genes. This reflects the overall quality of the projection of the query cells to the atlas, and verifying
+that all relevant genes are properly described by the atlas metacell model.
 
 This vector may be populated by [`compute_vector_of_correlation_between_cells_and_projected_metacells!`](@ref
 Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!).
 """
-function vector_of_correlation_between_cells_and_projected_metacells_per_gene(
+function vector_of_correlation_between_cells_and_projected_metacells_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("gene", "correlation_between_cells_and_projected_metacells") => (
@@ -2063,8 +2080,8 @@ end
     )::Pair{MatrixKey, DataSpecification}
 
 The correlation between query cells and their projected atlas metacells of each gene's expression levels in each atlas
-block's neighborhood. This is zero for non-marker genes. This reflects the quality of the projection of the query cells to
-the atlas in each region of the manifold.
+block's neighborhood. This is zero for non-marker genes. This reflects the quality of the projection of the query cells
+to the atlas in each region of the manifold.
 
 This matrix is populated by
 [`compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!`](@ref
@@ -2076,7 +2093,8 @@ function matrix_of_correlation_between_neighborhood_cells_and_projected_metacell
     return ("gene", "projected_block", "correlation_between_neighborhood_cells_and_projected_metacells") => (
         expectation,
         StorageFloat,
-        "The correlation between query cells and their projected atlas metacells of each gene's expression levels in each block's neighborhood.",
+        "The correlation between query cells and their projected atlas metacells of each gene's expression levels in" *
+        " each block's neighborhood.",
     )
 end
 
@@ -2090,7 +2108,7 @@ This axis is typically created by
 [`compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!`](@ref
 Metacells.ProjectCells.compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!).
 """
-function projected_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+function projected_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "projected_block" => (expectation, "A copy of the atlas [`block_axis`](@ref), copied into the query.")
 end
 
@@ -2108,7 +2126,7 @@ This is sparse, we actually only compute it for the non-lateral neighborhood mar
 This matrix may be populated by [`compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!).
 """
-function matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(
+function matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "block", "most_correlated_gene_in_neighborhood") => (
@@ -2131,13 +2149,14 @@ zero, are stored as zero, so the matrix is sparse.
 This matrix is populated by [`compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!).
 """
-function matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(
+function matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "block", "most_correlated_quantile_in_neighborhood") => (
         expectation,
         AbstractFloat,
-        "The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood marker gene per block.",
+        "The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base)" *
+        " neighborhood marker gene per block.",
     )
 end
 
@@ -2154,7 +2173,7 @@ or by
 [`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
 """
-function base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+function base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "base_block" => (expectation, "A copy of the base [`block_axis`](@ref), copied into the alternative.")
 end
 
@@ -2167,7 +2186,7 @@ consecutive sharpening rounds (as opposed to the [`base_block_axis`](@ref), whic
 This axis is typically created by [`compute_matrix_of_n_cells_per_prev_block_per_block!`](@ref
 Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_per_block!).
 """
-function prev_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
+function prev_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "prev_block" =>
         (expectation, "A copy of the previous round's [`block_axis`](@ref), copied into the alternative.")
 end
@@ -2190,13 +2209,14 @@ These matrices can be populated by
 [`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
 """
-function matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+function matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "base_block", "correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells") => (
         expectation,
         StorageFloat,
-        "The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their punctuated metacells of each base neighborhood.",
+        "The correlation of each gene with the most correlated other gene between the cells of a base neighborhood" *
+        " and their punctuated metacells of each base neighborhood.",
     )
 end
 
@@ -2213,7 +2233,7 @@ subsequent sharpening rounds.
 This matrix is populated by [`compute_matrix_of_is_strong_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_strong_per_gene_per_block!).
 """
-function matrix_of_is_strong_per_gene_per_block(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}
+function matrix_of_is_strong_per_gene_per_block(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "block", "is_strong") => (
         expectation,
         Bool,
@@ -2229,7 +2249,7 @@ end
 A copy of [`matrix_of_is_strong_per_gene_per_block`](@ref) from the base repository, copied into the alternative. This
 provides access to the round-0 strong-gene mask on the [`base_block_axis`](@ref) of subsequent sharpening rounds.
 """
-function matrix_of_is_strong_per_gene_per_base_block(
+function matrix_of_is_strong_per_gene_per_base_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "base_block", "is_strong") =>
@@ -2249,13 +2269,14 @@ This matrix is populated by
 [`compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
 """
-function matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
+function matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "base_block", "correlation_between_base_neighborhood_cells_and_punctuated_metacells") => (
         expectation,
         StorageFloat,
-        "The correlation between cells and their metacells (minus the correlated cell) of each gene's expression levels in each base block's neighborhood.",
+        "The correlation between cells and their metacells (minus the correlated cell) of each gene's expression" *
+        " levels in each base block's neighborhood.",
     )
 end
 
@@ -2264,22 +2285,25 @@ end
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
-The mean of [`matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref)
-over the environment marker genes of each base block which are not lateral and which took part in the correlation. This
-is the single number saying how well the metacells describe the cells in each location of the manifold, so metacells
-scored against the same base repository can be compared to each other. This is zero for a base block with no such gene, the way a correlation says it measured nothing.
+The mean of
+[`matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block`](@ref) over
+the environment marker genes of each base block which are not lateral and which took part in the correlation. This is
+the single number saying how well the metacells describe the cells in each location of the manifold, so metacells scored
+against the same base repository can be compared to each other. This is zero for a base block with no such gene, the way
+a correlation says it measured nothing.
 
 This vector is populated by
 [`compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!`](@ref
 Metacells.AnalyzeBlocks.compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!).
 """
-function vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block(
+function vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("base_block", "mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells") => (
         expectation,
         StorageFloat,
-        "The mean correlation between cells and their metacells (minus the correlated cell) over the environment marker genes of each base block.",
+        "The mean correlation between cells and their metacells (minus the correlated cell) over the environment" *
+        " marker genes of each base block.",
     )
 end
 
@@ -2299,7 +2323,7 @@ is zeros for want of anything to measure rather than for want of company. Read t
 This vector is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
 Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
 """
-function vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene(
+function vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("gene", "mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks") =>
@@ -2318,7 +2342,7 @@ base blocks the gene degraded in instead.
 This vector is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
 Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
 """
-function vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene(
+function vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{VectorKey, DataSpecification}
     return ("gene", "mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks") =>
@@ -2342,7 +2366,7 @@ regulators do not partition anything, one module holding several of them.
 This matrix is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
 Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
 """
-function matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene(
+function matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_regulator_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "gene", "mean_shared_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks") =>
@@ -2362,7 +2386,7 @@ taken over the base blocks the gene degraded in instead.
 This matrix is populated by [`compute_module_sharing_at_changed_base_blocks!`](@ref
 Metacells.AnalyzeBlocks.compute_module_sharing_at_changed_base_blocks!).
 """
-function matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(
+function matrix_of_mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_regulator_per_gene(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "gene", "mean_shared_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks") =>
@@ -2382,13 +2406,14 @@ This matrix is populated by
 [`compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block!).
 """
-function matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block(
+function matrix_of_correlation_between_base_neighborhood_cells_and_projected_metacells_per_gene_per_base_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "base_block", "correlation_between_base_neighborhood_cells_and_projected_metacells") => (
         expectation,
         StorageFloat,
-        "The correlation between cells and their projected metacells of each gene's expression levels in each base block's neighborhood.",
+        "The correlation between cells and their projected metacells of each gene's expression levels in each base" *
+        " block's neighborhood.",
     )
 end
 
@@ -2405,13 +2430,14 @@ This matrix is populated by
 [`compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block!).
 """
-function matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block(
+function matrix_of_correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells_per_gene_per_base_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("gene", "base_block", "correlation_between_base_neighborhood_cells_and_projected_punctuated_metacells") => (
         expectation,
         StorageFloat,
-        "The correlation between cells and their projected metacells of each gene's expression levels in each base block's neighborhood, punctuated where the cell is a member of its projected metacell.",
+        "The correlation between cells and their projected metacells of each gene's expression levels in each base" *
+        " block's neighborhood, punctuated where the cell is a member of its projected metacell.",
     )
 end
 
@@ -2425,7 +2451,7 @@ The number of cells in each block that existed in each previous-round block.
 This matrix is populated by [`compute_matrix_of_n_cells_per_prev_block_per_block!`](@ref
 Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_per_block!).
 """
-function matrix_of_n_cells_per_prev_block_per_block(
+function matrix_of_n_cells_per_prev_block_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("prev_block", "block", "n_cells") =>
@@ -2445,7 +2471,7 @@ new ones.
 This matrix is populated by [`compute_matrix_of_n_cells_per_prev_block_type_per_block_type!`](@ref
 Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_type_per_block_type!).
 """
-function matrix_of_n_cells_per_prev_block_type_per_block_type(
+function matrix_of_n_cells_per_prev_block_type_per_block_type(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("type", "type", "n_cells_by_block") => (
@@ -2468,13 +2494,14 @@ the new ones.
 This matrix is populated by [`compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!`](@ref
 Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_metacell_type_per_metacell_type!).
 """
-function matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(
+function matrix_of_n_cells_per_prev_metacell_type_per_metacell_type(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
     return ("type", "type", "n_cells_by_metacell") => (
         expectation,
         StorageUnsigned,
-        "The number of cells that were of each metacell type in the previous round and of each metacell type in the new.",
+        "The number of cells that were of each metacell type in the previous round and of each metacell type in the" *
+        " new.",
     )
 end
 

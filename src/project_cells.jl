@@ -67,16 +67,18 @@ import Metacells.Contracts.vector_of_total_UMIs_per_metacell
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set [`vector_of_projected_block_per_cell`] and [`vector_of_projected_modules_z_score_per_cell`](@ref). To pick
-the best metacell in the `atlas_daf` for each cell of the `query_daf`, we:
+Compute and set [`vector_of_projected_block_per_cell`] and [`vector_of_projected_modules_z_score_per_cell`](@ref). To
+pick the best metacell in the `atlas_daf` for each cell of the `query_daf`, we:
 
-  - Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral marker
-    genes.
-  - Then, for each cell, consider the expression level of the found modules of the provisional block's neighborhood. We use
-    this to pick a metacell in the neighborhood which has the closest Euclidean distance.
-  - This metacell might belong to a different block. If so, we repeat the process using that block's neighborhood modules.
+  - Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral
+    marker genes.
+  - Then, for each cell, consider the expression level of the found modules of the provisional block's neighborhood. We
+    use this to pick a metacell in the neighborhood which has the closest Euclidean distance.
+  - This metacell might belong to a different block. If so, we repeat the process using that block's neighborhood
+    modules.
   - If the resulting best match metacell is in the same (new) block, we accept it.
-  - Otherwise, we just look for the closest metacell in the original block (using that block's modules) and settle for that.
+  - Otherwise, we just look for the closest metacell in the original block (using that block's modules) and settle for
+    that.
 
 Distances are computed on the log (base 2) of the gene expression using the `gene_fraction_regularization` to handle
 zero fractions. We also compute the z-score (final distance between the cell and projected metacell, minus the mean
@@ -124,7 +126,7 @@ $(CONTRACT2)
         vector_of_mean_euclidean_modules_cells_distance_per_metacell(RequiredInput),
         vector_of_std_euclidean_modules_cells_distance_per_metacell(RequiredInput),
     ],
-) function compute_cells_projection!(;
+) function compute_cells_projection!(;  # UNTESTED
     query_daf::DafWriter,
     atlas_daf::DafReader,
     gene_fraction_regularization::Real = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
@@ -158,7 +160,7 @@ $(CONTRACT2)
     return nothing
 end
 
-function map_query_atlas_genes(;
+function map_query_atlas_genes(;  # UNTESTED
     query_daf::DafReader,
     atlas_daf::DafReader,
 )::Tuple{AbstractVector{<:Integer}, AbstractVector{<:Integer}}
@@ -178,7 +180,7 @@ function map_query_atlas_genes(;
     return query_gene_index_per_atlas_pertinent_marker, query_gene_index_per_atlas_gene
 end
 
-function compute_provisional_projection_per_query_cell!(;
+function compute_provisional_projection_per_query_cell!(;  # UNTESTED
     query_daf::DafWriter,
     atlas_daf::DafReader,
     gene_fraction_regularization::AbstractFloat,
@@ -339,8 +341,10 @@ function compute_final_projection_per_query_cell(;
         flame_timed(phase_name) do
             indices_of_undetermined_query_cells_per_block = next_indices_of_undetermined_query_cells_per_block
             next_indices_of_undetermined_query_cells_per_block = [Int32[] for _ in 1:n_blocks]
-            @debug "Determined: $(n_determined_query_cells[]) $(percent(n_determined_query_cells[], n_query_cells)) Phase $(phase)..." _group =
-                :mcs_details
+            @debug (
+                "Determined: $(n_determined_query_cells[]) $(percent(n_determined_query_cells[], n_query_cells))" *
+                " Phase $(phase)..."
+            ) _group = :mcs_details
 
             n_undetermined_query_cells_per_block = length.(indices_of_undetermined_query_cells_per_block)
             # TODO: Many memory allocations inside the parallel loop.
@@ -607,8 +611,8 @@ $(CONTRACT2)
     UMIs_per_atlas_metacell_per_gene = get_matrix(atlas_daf, "metacell", "gene", "UMIs").array
     total_UMIs_per_atlas_metacell = get_vector(atlas_daf, "metacell", "total_UMIs").array
 
-    # All included query cells form a single group, each mapped to its projected atlas metacell (cells without one do not
-    # participate); the sparse kernel then correlates each gene over these cells against their projected metacells.
+    # All included query cells form a single group, each mapped to its projected atlas metacell (cells without one do
+    # not participate); the sparse kernel then correlates each gene over these cells against their projected metacells.
     n_query_cells = axis_length(query_daf, "cell")
     is_participating_per_query_cell = falses(n_query_cells)
     is_participating_per_query_cell[indices_of_included_query_cells] .= true
@@ -680,8 +684,9 @@ end
         overwrite::Bool = false,
     )::Nothing
 
-Compute and set [`matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block`](@ref).
-If there are less than `min_neighborhood_query_cells`, we set this to zero. This will create [`projected_block_axis`](@ref)
+Compute and set
+[`matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block`](@ref). If
+there are less than `min_neighborhood_query_cells`, we set this to zero. This will create [`projected_block_axis`](@ref)
 in the `query_daf` if necessary.
 
 # Query
@@ -717,7 +722,7 @@ $(CONTRACT2)
         matrix_of_is_neighborhood_marker_per_gene_per_block(OptionalInput),
         matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
     ],
-) function compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!(;
+) function compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!(;  # UNTESTED
     query_daf::DafWriter,
     atlas_daf::DafReader,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
@@ -887,7 +892,10 @@ $(CONTRACT2)
         n_neighborhood_query_cells = n_neighborhood_query_cells_per_atlas_block[atlas_block_index]
         if n_neighborhood_query_cells < min_neighborhood_query_cells
             if n_neighborhood_query_cells > 0
-                @warn "Ignoring too few query cells: $(n_neighborhood_query_cells) for the neighborhood of the atlas block: $(name_per_atlas_block[atlas_block_index])"
+                @warn (
+                    "Ignoring too few query cells: $(n_neighborhood_query_cells) for the neighborhood of the atlas" *
+                    " block: $(name_per_atlas_block[atlas_block_index])"
+                )
             end
 
         else
@@ -917,9 +925,11 @@ $(CONTRACT2)
                     )
                     n_common_included_lateral = sum(is_lateral_per_common_included_gene)
                     @warn (
-                        "Skipping atlas block: $(name_per_atlas_block[atlas_block_index]): no non-lateral neighborhood markers\n" *
+                        "Skipping atlas block: $(name_per_atlas_block[atlas_block_index]): no non-lateral" *
+                        " neighborhood markers\n" *
                         "  block neighborhood markers: $(n_block_neighborhood_markers)\n" *
-                        "  common+included block neighborhood markers: $(n_common_included_block_neighborhood_markers)\n" *
+                        "  common+included block neighborhood markers:" *
+                        " $(n_common_included_block_neighborhood_markers)\n" *
                         "  common+included lateral genes: $(n_common_included_lateral)\n" *
                         "  common+included genes: $(length(indices_of_common_included_atlas_genes))"
                     )
@@ -1025,7 +1035,8 @@ $(CONTRACT2)
     )
         if mean_per_atlas_block !== nothing
             @debug (
-                "Mean correlation of $(first_qualifier)$(second_qualifier) pertinent marker genes between neighborhood cells and their$(projected_qualifier) projected metacells: " *
+                "Mean correlation of $(first_qualifier)$(second_qualifier) pertinent marker genes between" *
+                " neighborhood cells and their$(projected_qualifier) projected metacells: " *
                 "$(mean(mean_per_atlas_block[mean_per_atlas_block .!= 0]))"  # NOLINT
             ) _group = :mcs_results
         end
