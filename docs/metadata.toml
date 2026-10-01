@@ -1,0 +1,19 @@
+# The package-specific documentation settings, read by `deps/document.jl`.
+
+pages = [
+    "index.md",
+    "gmara.md",
+    "contracts.md",
+    "analyze_cells.md",
+    "analyze_metacells.md",
+    "analyze_genes.md",
+    "compute_blocks.md",
+    "analyze_blocks.md",
+    "compute_modules.md",
+    "analyze_modules.md",
+    "sharpen_metacells.md",
+    "project_cells.md",
+    "pipeline.md",
+    "anndata_format.md",
+    "defaults.md",
+]

@@ -12,7 +12,7 @@
 <!-- AnalyzeBlocks -->
 <g id="node1" class="node">
 <title>AnalyzeBlocks</title>
-<g id="a_node1"><a xlink:href="../analyze_blocks.html" xlink:title="AnalyzeBlocks" target="_top">
+<g id="a_node1"><a xlink:href="analyze_blocks.html" xlink:title="AnalyzeBlocks" target="_top">
 <polygon fill="none" stroke="#ffffff" points="140,-129 48,-129 48,-110 140,-110 140,-129"/>
 <text text-anchor="middle" x="94" y="-115.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeBlocks</text>
 </a>
@@ -21,7 +21,7 @@
 <!-- SharpenMetacells -->
 <g id="node14" class="node">
 <title>SharpenMetacells</title>
-<g id="a_node14"><a xlink:href="../sharpen_metacells.html" xlink:title="SharpenMetacells" target="_top">
+<g id="a_node14"><a xlink:href="sharpen_metacells.html" xlink:title="SharpenMetacells" target="_top">
 <polygon fill="none" stroke="#ffffff" points="261.5,-74 148.5,-74 148.5,-55 261.5,-55 261.5,-74"/>
 <text text-anchor="middle" x="205" y="-60.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">SharpenMetacells</text>
 </a>
@@ -36,7 +36,7 @@
 <!-- AnalyzeGenes -->
 <g id="node2" class="node">
 <title>AnalyzeGenes</title>
-<g id="a_node2"><a xlink:href="../analyze_genes.html" xlink:title="AnalyzeGenes" target="_top">
+<g id="a_node2"><a xlink:href="analyze_genes.html" xlink:title="AnalyzeGenes" target="_top">
 <polygon fill="none" stroke="#ffffff" points="140.5,-184 47.5,-184 47.5,-165 140.5,-165 140.5,-184"/>
 <text text-anchor="middle" x="94" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeGenes</text>
 </a>
@@ -51,7 +51,7 @@
 <!-- ComputeBlocks -->
 <g id="node10" class="node">
 <title>ComputeBlocks</title>
-<g id="a_node10"><a xlink:href="../compute_blocks.html" xlink:title="ComputeBlocks" target="_top">
+<g id="a_node10"><a xlink:href="compute_blocks.html" xlink:title="ComputeBlocks" target="_top">
 <polygon fill="none" stroke="#ffffff" points="100,-74 0,-74 0,-55 100,-55 100,-74"/>
 <text text-anchor="middle" x="50" y="-60.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">ComputeBlocks</text>
 </a>
@@ -66,7 +66,7 @@
 <!-- AnalyzeCells -->
 <g id="node3" class="node">
 <title>AnalyzeCells</title>
-<g id="a_node3"><a xlink:href="../analyze_cells.html" xlink:title="AnalyzeCells" target="_top">
+<g id="a_node3"><a xlink:href="analyze_cells.html" xlink:title="AnalyzeCells" target="_top">
 <polygon fill="none" stroke="#ffffff" points="345.5,-294 262.5,-294 262.5,-275 345.5,-275 345.5,-294"/>
 <text text-anchor="middle" x="304" y="-280.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeCells</text>
 </a>
@@ -75,7 +75,7 @@
 <!-- AnalyzeMetacells -->
 <g id="node5" class="node">
 <title>AnalyzeMetacells</title>
-<g id="a_node5"><a xlink:href="../analyze_metacells.html" xlink:title="AnalyzeMetacells" target="_top">
+<g id="a_node5"><a xlink:href="analyze_metacells.html" xlink:title="AnalyzeMetacells" target="_top">
 <polygon fill="none" stroke="#ffffff" points="247,-239 137,-239 137,-220 247,-220 247,-239"/>
 <text text-anchor="middle" x="192" y="-225.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeMetacells</text>
 </a>
@@ -90,7 +90,7 @@
 <!-- ComputeModules -->
 <g id="node11" class="node">
 <title>ComputeModules</title>
-<g id="a_node11"><a xlink:href="../compute_modules.html" xlink:title="ComputeModules" target="_top">
+<g id="a_node11"><a xlink:href="compute_modules.html" xlink:title="ComputeModules" target="_top">
 <polygon fill="none" stroke="#ffffff" points="430,-184 318,-184 318,-165 430,-165 430,-184"/>
 <text text-anchor="middle" x="374" y="-170.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">ComputeModules</text>
 </a>
@@ -105,7 +105,7 @@
 <!-- ProjectCells -->
 <g id="node13" class="node">
 <title>ProjectCells</title>
-<g id="a_node13"><a xlink:href="../project_cells.html" xlink:title="ProjectCells" target="_top">
+<g id="a_node13"><a xlink:href="project_cells.html" xlink:title="ProjectCells" target="_top">
 <polygon fill="none" stroke="#ffffff" points="342.5,-239 265.5,-239 265.5,-220 342.5,-220 342.5,-239"/>
 <text text-anchor="middle" x="304" y="-225.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">ProjectCells</text>
 </a>
@@ -120,7 +120,7 @@
 <!-- Contracts -->
 <g id="node4" class="node">
 <title>Contracts</title>
-<g id="a_node4"><a xlink:href="../contracts.html" xlink:title="Contracts" target="_top">
+<g id="a_node4"><a xlink:href="contracts.html" xlink:title="Contracts" target="_top">
 <polygon fill="none" stroke="#ffffff" points="335,-349 273,-349 273,-330 335,-330 335,-349"/>
 <text text-anchor="middle" x="304" y="-335.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Contracts</text>
 </a>
@@ -141,7 +141,7 @@
 <!-- AnalyzeModules -->
 <g id="node8" class="node">
 <title>AnalyzeModules</title>
-<g id="a_node8"><a xlink:href="../analyze_modules.html" xlink:title="AnalyzeModules" target="_top">
+<g id="a_node8"><a xlink:href="analyze_modules.html" xlink:title="AnalyzeModules" target="_top">
 <polygon fill="none" stroke="#ffffff" points="262,-129 158,-129 158,-110 262,-110 262,-129"/>
 <text text-anchor="middle" x="210" y="-115.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnalyzeModules</text>
 </a>
@@ -156,7 +156,7 @@
 <!-- Gmara -->
 <g id="node6" class="node">
 <title>Gmara</title>
-<g id="a_node6"><a xlink:href="../gmara.html" xlink:title="Gmara" target="_top">
+<g id="a_node6"><a xlink:href="gmara.html" xlink:title="Gmara" target="_top">
 <polygon fill="none" stroke="#ffffff" points="117.5,-239 70.5,-239 70.5,-220 117.5,-220 117.5,-239"/>
 <text text-anchor="middle" x="94" y="-225.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Gmara</text>
 </a>
@@ -171,7 +171,7 @@
 <!-- Defaults -->
 <g id="node7" class="node">
 <title>Defaults</title>
-<g id="a_node7"><a xlink:href="../defaults.html" xlink:title="Defaults" target="_top">
+<g id="a_node7"><a xlink:href="defaults.html" xlink:title="Defaults" target="_top">
 <polygon fill="none" stroke="#ffffff" points="232,-294 178,-294 178,-275 232,-275 232,-294"/>
 <text text-anchor="middle" x="205" y="-280.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Defaults</text>
 </a>
@@ -198,7 +198,7 @@
 <!-- AnnDataFormat -->
 <g id="node9" class="node">
 <title>AnnDataFormat</title>
-<g id="a_node9"><a xlink:href="../anndata_format.html" xlink:title="AnnDataFormat" target="_top">
+<g id="a_node9"><a xlink:href="anndata_format.html" xlink:title="AnnDataFormat" target="_top">
 <polygon fill="none" stroke="#ffffff" points="454.5,-349 353.5,-349 353.5,-330 454.5,-330 454.5,-349"/>
 <text text-anchor="middle" x="404" y="-335.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">AnnDataFormat</text>
 </a>
@@ -207,7 +207,7 @@
 <!-- Pipeline -->
 <g id="node12" class="node">
 <title>Pipeline</title>
-<g id="a_node12"><a xlink:href="../pipeline.html" xlink:title="Pipeline" target="_top">
+<g id="a_node12"><a xlink:href="pipeline.html" xlink:title="Pipeline" target="_top">
 <polygon fill="none" stroke="#ffffff" points="273.5,-19 220.5,-19 220.5,0 273.5,0 273.5,-19"/>
 <text text-anchor="middle" x="247" y="-5.8" font-family="Sans-Serif" font-size="14.00" fill="#000000">Pipeline</text>
 </a>
