@@ -79,7 +79,7 @@ $(CONTRACT)
     end
 
     distances_between_metacells = get_matrix(daf, "metacell", "metacell", "euclidean_skeleton_fold_distance").array
-    clusters = hclust(distances_between_metacells; linkage = :ward)  # NOJET
+    clusters = hclust(distances_between_metacells; linkage = :ward)
     block_index_per_metacell = cutree(clusters; k = n_blocks)
 
     metacell_indices_per_block = collect_group_members(block_index_per_metacell)

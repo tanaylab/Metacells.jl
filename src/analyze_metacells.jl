@@ -115,7 +115,7 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     UMIs_per_gene_per_metacell = daf["@ gene @ cell :: UMIs |/ metacell =@ >| Sum"].array
-    set_matrix!(daf, "gene", "metacell", "UMIs", bestify(UMIs_per_gene_per_metacell); overwrite)  # NOJET
+    set_matrix!(daf, "gene", "metacell", "UMIs", bestify(UMIs_per_gene_per_metacell); overwrite)
     return nothing
 end
 
@@ -179,14 +179,7 @@ $(CONTRACT)
     @. linear_fraction_per_metacell_per_gene[:, indices_of_included_genes] =
         UMIs_per_metacell_per_included_gene / total_UMIs_per_metacell
 
-    set_matrix!(  # NOJET
-        daf,
-        "metacell",
-        "gene",
-        "linear_fraction",
-        bestify(linear_fraction_per_metacell_per_gene);
-        overwrite,
-    )  # NOJET
+    set_matrix!(daf, "metacell", "gene", "linear_fraction", bestify(linear_fraction_per_metacell_per_gene); overwrite)
 
     return nothing
 end
@@ -228,7 +221,7 @@ $(CONTRACT)
         @check_turbo_matrix(log_fraction_per_metacell_per_gene)
         @check_turbo_matrix(fraction_per_metacell_per_gene)
         n_metacells, n_genes = size(log_fraction_per_metacell_per_gene)
-        parallel_loop_wo_rng(  # NOJET
+        parallel_loop_wo_rng(
             1:n_genes;
             name = "log_linear_fraction_per_gene_per_metacell",
             progress = DebugProgress(n_genes; group = :mcs_loops, desc = "log_linear_fraction_per_gene_per_metacell"),
@@ -277,7 +270,7 @@ $(CONTRACT)
     log_linear_fraction_per_skeleton_per_metacell =
         log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
     n_metacells = axis_length(daf, "metacell")
-    distances_between_metacells = parallel_pairwise(  # NOJET
+    distances_between_metacells = parallel_pairwise(
         Euclidean(),
         log_linear_fraction_per_skeleton_per_metacell;
         dims = 2,
@@ -337,7 +330,7 @@ $(CONTRACT)
 
     confidence_stds = quantile(Normal(), fold_confidence)
 
-    confidence_linear_fractions_per_skeleton_per_metacells =  # NOJET
+    confidence_linear_fractions_per_skeleton_per_metacells =
         Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell))
     @check_turbo_matrix(confidence_linear_fractions_per_skeleton_per_metacells)
     @check_turbo_matrix(linear_fraction_per_skeleton_per_metacell)
@@ -366,7 +359,7 @@ $(CONTRACT)
     end
 
     low_log_linear_fraction_per_skeleton_per_metacell =
-        Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell)) # NOJET
+        Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell))
     @check_turbo_matrix(low_log_linear_fraction_per_skeleton_per_metacell)
     @check_turbo_matrix(linear_fraction_per_skeleton_per_metacell)
     @check_turbo_matrix(confidence_linear_fractions_per_skeleton_per_metacells)
@@ -392,7 +385,7 @@ $(CONTRACT)
     end
 
     high_log_linear_fraction_per_skeleton_per_metacell =
-        Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell)) # NOJET
+        Matrix{Float32}(undef, size(linear_fraction_per_skeleton_per_metacell))
     @check_turbo_matrix(high_log_linear_fraction_per_skeleton_per_metacell)
     @check_turbo_matrix(linear_fraction_per_skeleton_per_metacell)
     @check_turbo_matrix(confidence_linear_fractions_per_skeleton_per_metacells)
@@ -1039,7 +1032,7 @@ function compute_prior_position_per_metacell(;  # UNTESTED
 
     umap_x_per_prev_metacell = get_vector(prev_daf, "metacell", "umap_x").array
     umap_y_per_prev_metacell = get_vector(prev_daf, "metacell", "umap_y").array
-    prev_metacell_index_per_cell = prev_daf["@ cell : metacell ?? 0 : index"].array
+    prev_metacell_index_per_cell = prev_daf["@ cell : metacell ?? 0 : index"].array  # NOJET
 
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
 
@@ -1138,7 +1131,7 @@ $(CONTRACT2)
             return UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
         else
             init = PriorInitialization(compute_prior_position_per_metacell(; daf, prev_daf, rng))
-            return UMAP.fit(  # NOJET
+            return UMAP.fit(
                 distances_between_metacells,
                 2;
                 metric = :precomputed,

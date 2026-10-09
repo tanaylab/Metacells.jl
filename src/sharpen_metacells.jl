@@ -649,7 +649,7 @@ $(CONTRACT2)
         n_blocks,
     )
 
-    name_per_sharp_metacell = group_names(axis_vector(prev_daf, "cell"), cells_of_sharp_metacells; prefix)  # NOJET
+    name_per_sharp_metacell = group_names(axis_vector(prev_daf, "cell"), cells_of_sharp_metacells; prefix)
     sharp_metacell_name_per_cell = fill("", n_cells)
     for (sharp_metacell_name, cells_of_sharp_metacell) in zip(name_per_sharp_metacell, cells_of_sharp_metacells)
         sharp_metacell_name_per_cell[cells_of_sharp_metacell] .= sharp_metacell_name
@@ -1349,7 +1349,7 @@ function compute_local_clusters(;  # UNTESTED
             gene_fraction_regularization,
         )
         grouped_per_prev_block[prev_block_index] = grouped
-        @views group_index_per_block_per_prev_block[:, prev_block_index] .= group_index_per_block
+        @views group_index_per_block_per_prev_block[:, prev_block_index] .= group_index_per_block  # NOJET
         baseline_mean_correlation_per_prev_block[prev_block_index] = Float32(mean_correlation(grouped))
         return nothing
     end
@@ -2913,8 +2913,8 @@ function split_one_cluster!(  # UNTESTED
     new_cluster_index = candidate_solution.k
     @views candidate_solution.centers[1:candidate_solution.n_dims, old_cluster_index] .= sub_kmeans_result.centers[:, 1]
     @views candidate_solution.centers[1:candidate_solution.n_dims, new_cluster_index] .= sub_kmeans_result.centers[:, 2]
-    sub_assignments = assignments(sub_kmeans_result)  # NOJET
-    sub_counts = counts(sub_kmeans_result)  # NOJET
+    sub_assignments = assignments(sub_kmeans_result)
+    sub_counts = counts(sub_kmeans_result)
     old_weight = 0.0
     new_weight = 0.0
     @inbounds for cluster_point_position in 1:n_cluster_points
@@ -3068,8 +3068,8 @@ function rerun_kmeans!(  # UNTESTED
     rerun_solution.is_filled = true
     rerun_solution.k = new_k
     @views rerun_solution.centers[1:rerun_solution.n_dims, 1:new_k] .= kmeans_result.centers
-    copyto!(@view(rerun_solution.assignments[1:rerun_solution.n_points]), assignments(kmeans_result))  # NOJET
-    copyto!(@view(rerun_solution.counts[1:new_k]), counts(kmeans_result))  # NOJET
+    copyto!(@view(rerun_solution.assignments[1:rerun_solution.n_points]), assignments(kmeans_result))
+    copyto!(@view(rerun_solution.counts[1:new_k]), counts(kmeans_result))
     compute_weight_per_cluster!(rerun_solution, weight_per_point)
     # Incremental dispersion if a same-K reference is supplied (post-split rerun: initial centers came from that
     # reference, so cluster identity is preserved and most cells should stay put). Otherwise full recompute.

@@ -203,7 +203,7 @@ Per-cell:
     overwrite::Bool = false,
     insist::Bool = false,
 )::Maybe{AbstractVector{<:AbstractString}}
-    cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")  # NOJET
+    cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")
 
     copy_axis!(; destination = daf, source = cells_daf, axis = "cell", overwrite, insist)
     copy_axis!(; destination = daf, source = cells_daf, axis = "gene", overwrite, insist)
@@ -497,7 +497,7 @@ Nothing is written until all of the above has been verified, so a rejected file 
     type_axis::AbstractString = "type",
     overwrite::Bool = false,
 )::Nothing
-    data_frame = CSV.read(type_colors_csv, DataFrame)  # NOJET
+    data_frame = CSV.read(type_colors_csv, DataFrame)
     column_names = names(data_frame)
     if length(column_names) != 2 || column_names[2] != "color"
         error(chomp("""
@@ -570,7 +570,7 @@ function import_scalars_data(  # UNTESTED
         end
 
         @debug "copy scalar: $(scalar_name) to: $(rename)" _group = :mcs_details
-        copy_scalar!(; destination = daf, source, name = scalar_name, rename, overwrite, insist)
+        copy_scalar!(; destination = daf, source, name = scalar_name, rename, overwrite, insist)  # NOJET
     end
     return nothing
 end

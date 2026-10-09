@@ -227,7 +227,7 @@ function write_set_to_file(
     version::AbstractString,
     cache_dir::AbstractString,
 )::AbstractSet{<:AbstractString}
-    set = GZip.open(cache_dir * "/" * version * "/" * path * ".gz") do file  # NOJET
+    set = GZip.open(cache_dir * "/" * version * "/" * path * ".gz") do file
         text = read(file, String)
         lines = split(text, "\n")
         last_line = pop!(lines)
@@ -267,7 +267,7 @@ function lock_file(path::AbstractString; timeout::Real)::Base.Filesystem.File
     lock_path = path * ".lock"
     while true
         try
-            return Base.Filesystem.open(lock_path, Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL)  # NOJET
+            return Base.Filesystem.open(lock_path, Base.Filesystem.JL_O_CREAT | Base.Filesystem.JL_O_EXCL)
         catch exception
             if exception isa Base.IOError  # UNTESTED
                 if timeout > 0  # UNTESTED

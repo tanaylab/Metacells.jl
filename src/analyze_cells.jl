@@ -242,7 +242,7 @@ function sparse_cell_reference_correlation_per_gene_per_group!(  # UNTESTED
     reference_log_fraction_per_reference_per_thread = [zeros(Float64, n_references) for _ in 1:maxthreadid()]
 
     progress = DebugProgress(n_correlated_genes; group = :mcs_loops, desc = name)
-    parallel_loop_wo_rng(1:n_correlated_genes; name, progress) do correlated_gene_index
+    parallel_loop_wo_rng(1:n_correlated_genes; name, progress) do correlated_gene_index  # NOJET
         cell_gene_index = cell_gene_index_per_correlated_gene[correlated_gene_index]
         reference_gene_index = reference_gene_index_per_correlated_gene[correlated_gene_index]
 

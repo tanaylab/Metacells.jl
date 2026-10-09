@@ -179,7 +179,7 @@ $(CONTRACT)
     return nothing
 end
 
-function fill_vector_of_is_correlated_with_skeleton_per_gene!(;  # NOJET # UNTESTED
+function fill_vector_of_is_correlated_with_skeleton_per_gene!(;  # UNTESTED
     min_gene_correlation::AbstractFloat,
     min_gene_correlation_quantile::AbstractFloat,
     genes_correlation_window::Integer,
@@ -222,7 +222,7 @@ end
 # high enough maximal skeleton correlation, either absolutely (`min_gene_correlation`) or relative to the
 # `min_gene_correlation_quantile` of a rolling window of `genes_correlation_window` markers with a similar maximal
 # skeleton correlation.
-function mark_is_correlated_with_skeleton_per_gene!(;  # NOJET # UNTESTED
+function mark_is_correlated_with_skeleton_per_gene!(;  # UNTESTED
     min_gene_correlation::AbstractFloat,
     min_gene_correlation_quantile::AbstractFloat,
     genes_correlation_window::Integer,
@@ -370,8 +370,7 @@ $(CONTRACT)
         mutable_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"].array))
     @assert_vector(median_log_fraction_per_marker, n_markers)
 
-    abs_fold_per_metacell_per_marker =  # NOJET
-        Matrix{Float32}(undef, size(log_fraction_per_metacell_per_marker))
+    abs_fold_per_metacell_per_marker = Matrix{Float32}(undef, size(log_fraction_per_metacell_per_marker))
     @check_turbo_matrix(abs_fold_per_metacell_per_marker)
     @check_turbo_matrix(log_fraction_per_metacell_per_marker)
     @check_turbo_vector(median_log_fraction_per_marker)
@@ -391,7 +390,7 @@ $(CONTRACT)
     end
     abs_fold_per_marker_per_metacell = flipped(abs_fold_per_metacell_per_marker)
 
-    rank_per_marker = rank_variables(abs_fold_per_marker_per_metacell)  # NOJET
+    rank_per_marker = rank_variables(abs_fold_per_marker_per_metacell)
 
     marker_rank_per_gene = fill(typemax(UInt32), n_genes)
     marker_rank_per_gene[is_marker_per_gene] .= rank_per_marker

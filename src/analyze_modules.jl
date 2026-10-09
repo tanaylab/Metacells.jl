@@ -118,7 +118,7 @@ $(CONTRACT)
         return nothing
     end
 
-    set_matrix!(daf, "module", "block", "n_genes", bestify(n_genes_per_module_per_block); overwrite)  # NOJET
+    set_matrix!(daf, "module", "block", "n_genes", bestify(n_genes_per_module_per_block); overwrite)
     @debug (
         "Mean genes per found module: $(mean(n_genes_per_module_per_block[n_genes_per_module_per_block .!= 0]))"  # NOLINT
     ) _group = :mcs_results
@@ -742,7 +742,7 @@ function maximal_cells_dispersion_of_modules!(;  # UNTESTED
 
     normalized_factor_per_cells .= getindex.(Ref(total_UMIs_per_cell), indices_of_cells)
     total_UMIs_per_cells .= normalized_factor_per_cells
-    normalized_total_UMIs = quantile!(total_UMIs_per_cells, normalized_UMIs_quantile)  # NOJET
+    normalized_total_UMIs = quantile!(total_UMIs_per_cells, normalized_UMIs_quantile)
     @. normalized_factor_per_cells = normalized_total_UMIs / normalized_factor_per_cells
 
     # Single pass: per found module with a positive mean, compute mean + dispersion in the same per-cell loop. Store

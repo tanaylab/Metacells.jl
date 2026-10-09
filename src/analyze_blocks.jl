@@ -279,7 +279,7 @@ $(CONTRACT)
     @views linear_fraction_per_block = linear_fraction_per_block_per_gene[:, indices_of_included_genes]
     @. linear_fraction_per_block = UMIs_per_block_per_included_gene / total_included_UMIs_per_block
 
-    set_matrix!(daf, "block", "gene", "linear_fraction", bestify(linear_fraction_per_block_per_gene); overwrite)  # NOJET
+    set_matrix!(daf, "block", "gene", "linear_fraction", bestify(linear_fraction_per_block_per_gene); overwrite)
 
     return nothing
 end
@@ -1055,7 +1055,7 @@ We only consider genes which are markers in the overall population. We then call
         ),
     ) do block_index
         block_name = name_per_block[block_index]
-        adapter(  # NOJET
+        adapter(
             daf;
             input_axes = [
                 "metacell" => "@ metacell [ block :: is_in_neighborhood @| $(block_name) ]",
@@ -1146,7 +1146,7 @@ We only consider genes which are markers in the overall population. We then call
         ),
     ) do block_index
         block_name = name_per_block[block_index]
-        adapter(  # NOJET
+        adapter(
             daf;
             input_axes = [
                 "metacell" => "@ metacell [ is_in_environment @ block = $(block_name) ]",

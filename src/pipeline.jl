@@ -556,12 +556,12 @@ function run!(  # UNTESTED
     rounds = sharpening_round.rounds
     @assert rounds.n_run_rounds == sharpening_round.index - 1 "the sharpening round: $(sharpening_round.index) was run"
 
-    sharp_daf = complete_chain!(;
+    sharp_daf = complete_chain!(;  # NOJET
         base_daf = sharpening_round.base_daf,
         new_daf = FilesDaf(joinpath(sharpening_round.directory, name), "w"; name),
         name,
     )
-    sharpen_round!(;
+    sharpen_round!(;  # NOJET
         sharp_daf,
         prev_daf = sharpening_round.previous_daf,
         score_daf = sharpening_round.score_daf,
