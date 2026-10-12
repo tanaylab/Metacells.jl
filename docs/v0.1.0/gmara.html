@@ -309,14 +309,32 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
+<code class="language-julia hljs">normalize_gene_name(
+    name::AbstractString;
+    namespace::AbstractString,
+    validate::Bool = false
+)::AbstractString
 </code>
 </pre>
-<p>Normalize a gene name in some namespace. In most namespaces, this means removing the 
+<p>Normalize a gene name in some namespace. Each namespace other than 
+<code>GeneSymbol
+</code> has a pattern for its names (for example, 
+<code>ENSG00000124766
+</code> for 
+<code>EnsemblGene
+</code>). In such a namespace, this removes the 
 <code>.[0-9]
-</code> version suffix from the name. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. The UCSC namespace is an exception in that the 
+</code> version suffix (in the Ensembl and RefSeq namespaces) and any trailing junk which contains no letters or digits (such as a trailing 
+<code>;
+</code>). If the name does not match the pattern, then if 
+<code>validate
+</code> this fails, otherwise this returns the name unchanged. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. In other namespaces, the 
 <code>.[0-9]
-</code> suffix seems to be an inherent part of the (all-lower-case) identifier.
+</code> suffix is part of the name. For example, 
+<code>AC092171.3
+</code> and 
+<code>AC092171.5
+</code> are different genes. An unknown namespace is an error.
 </p>
 <p>The case of a name is never changed, as Gmara names are in mixed case, differing between namespaces; for example, 
 <code>SOX4

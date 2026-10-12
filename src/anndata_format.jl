@@ -735,7 +735,7 @@ function import_matrices_data(  # UNTESTED
             ) _group = :mcs_details
         end
 
-        copy_matrix!(;  # NOJET
+        copy_matrix!(;
             destination = daf,
             source,
             rows_axis,

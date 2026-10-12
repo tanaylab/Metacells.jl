@@ -21,25 +21,63 @@ using HTTP
 using Serialization
 using TanayLabUtilities
 
-"""
-    normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
+# The namespaces whose names have no pattern.
+const FREE_FORM_NAMESPACES = ("GeneSymbol",)
 
-Normalize a gene name in some namespace. In most namespaces, this means removing the `.[0-9]` version suffix from the
-name. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. The UCSC
-namespace is an exception in that the `.[0-9]` suffix seems to be an inherent part of the (all-lower-case) identifier.
+# The pattern of the names in each of the other namespaces.
+const NAMESPACE_PATTERNS = Dict(
+    "EnsemblGene" => raw"(ENS[A-Z]*G|ASMPATCHG)[0-9]{11}",
+    "EnsemblTranscript" => raw"(ENS[A-Z]*T|ASMPATCHT)[0-9]{11}",
+    "EnsemblProtein" => raw"(ENS[A-Z]*P|ASMPATCHP)[0-9]{11}",
+    "HGNC" => raw"HGNC:[0-9]+",
+    "MGI" => raw"MGI:[0-9]+",
+    "RefSeq" => raw"(NM|NR|NP|XM|XR|XP|YP)_[0-9]+",
+    "UCSC" => raw"uc[0-9]{3}[a-z]{3}\.[0-9]+",
+)
+
+# The namespaces whose names may carry a `.<version>` suffix, which is not part of the identity of the gene.
+const VERSIONED_NAMESPACES = ("EnsemblGene", "EnsemblTranscript", "EnsemblProtein", "RefSeq")
+
+# A name in a namespace with a pattern is the pattern, then a `.<version>` suffix in the `VERSIONED_NAMESPACES`, then
+# junk which contains no letters or digits (such as a trailing `;`). Only the pattern is the actual name.
+const NAMESPACE_REGEXES = Dict(
+    namespace => Regex(
+        "^(" * pattern * ")" * (namespace in VERSIONED_NAMESPACES ? raw"(\.[0-9]+)?" : "") * raw"[^A-Za-z0-9]*$",
+    ) for (namespace, pattern) in NAMESPACE_PATTERNS
+)
+
+"""
+    normalize_gene_name(
+        name::AbstractString;
+        namespace::AbstractString,
+        validate::Bool = false
+    )::AbstractString
+
+Normalize a gene name in some namespace. Each namespace other than `GeneSymbol` has a pattern for its names (for
+example, `ENSG00000124766` for `EnsemblGene`). In such a namespace, this removes the `.[0-9]` version suffix (in the
+Ensembl and RefSeq namespaces) and any trailing junk which contains no letters or digits (such as a trailing `;`). If
+the name does not match the pattern, then if `validate` this fails, otherwise this returns the name unchanged. To lookup
+a name in a list or a namespace, you need to normalize the query gene name accordingly. In other namespaces, the
+`.[0-9]` suffix is part of the name. For example, `AC092171.3` and `AC092171.5` are different genes. An unknown
+namespace is an error.
 
 The case of a name is never changed, as Gmara names are in mixed case, differing between namespaces; for example,
 `SOX4` for the human gene and `Sox4` for the mouse one.
 """
-function normalize_gene_name(name::AbstractString; namespace::AbstractString)::AbstractString
-    if namespace == "UCSC"
+function normalize_gene_name(name::AbstractString; namespace::AbstractString, validate::Bool = false)::AbstractString
+    if namespace in FREE_FORM_NAMESPACES
         return name
     end
-    parts = split(name, ".")
-    if length(parts) == 2
-        name = parts[1]
+    regex = get(NAMESPACE_REGEXES, namespace, nothing)
+    if regex === nothing
+        error("unknown Gmara namespace: $(namespace)")
     end
-    return name
+    name_match = match(regex, name)
+    if name_match === nothing
+        @assert !validate "invalid $(namespace) gene name: $(name)"
+        return name
+    end
+    return name_match.captures[1]
 end
 
 """
