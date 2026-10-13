@@ -8,6 +8,7 @@ Metacells.Contracts
 
 ```@docs
 Metacells.Contracts.gene_axis
+Metacells.Contracts.vector_of_ensembl_per_gene
 Metacells.Contracts.vector_of_is_mitochondrial_per_gene
 Metacells.Contracts.vector_of_is_ribosomal_per_gene
 Metacells.Contracts.vector_of_is_excluded_per_gene

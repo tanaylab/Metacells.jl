@@ -89,6 +89,7 @@ export vector_of_color_per_type
 export vector_of_correlation_between_cells_and_projected_metacells_per_gene
 export vector_of_correlation_between_cells_and_projected_punctuated_metacells_per_gene
 export vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
+export vector_of_ensembl_per_gene
 export vector_of_excluded_UMIs_per_cell
 export vector_of_global_flow_order_per_type
 export vector_of_is_base_outlier_per_cell
@@ -163,6 +164,22 @@ This axis is typically created when importing data.
 """
 function gene_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "gene" => (expectation, "Sequenced genes.")
+end
+
+"""
+    vector_of_ensembl_per_gene(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The Ensembl identifier of each gene, or empty if it has none. It is stored as given, so it may have a version suffix
+(which is not part of the identity of the gene).
+
+This vector is populated by [`import_cells_h5ad!`](@ref Metacells.AnnDataFormat.import_cells_h5ad!). If the data has
+no Ensembl identifiers, it can be computed from Gmara using [`fetch_gmara_ensembl_genes`](@ref
+Metacells.Gmara.fetch_gmara_ensembl_genes) and [`collect_ensembl_genes`](@ref Metacells.Gmara.collect_ensembl_genes).
+"""
+function vector_of_ensembl_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("gene", "ensembl") => (expectation, AbstractString, "The Ensembl identifier of each gene.")
 end
 
 ### Genes Masks

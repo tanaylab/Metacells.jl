@@ -256,7 +256,9 @@
 <code>.gz
 </code> suffix for the compressed raw data, 
 <code>.jl_set.gz
-</code> for serialized Julia set objects, and 
+</code> for serialized Julia set objects, 
+<code>.jl_dict.gz
+</code> for serialized Julia dictionary objects, and 
 <code>.lock
 </code> for temporary lock files for coordinating between parallel processes.
 </p>
@@ -324,7 +326,9 @@
 <code>EnsemblGene
 </code>). In such a namespace, this removes the 
 <code>.[0-9]
-</code> version suffix (in the Ensembl and RefSeq namespaces) and any trailing junk which contains no letters or digits (such as a trailing 
+</code> version suffix (in the Ensembl and RefSeq namespaces), the 
+<code>_PAR_Y
+</code> suffix (in the Ensembl namespaces, which GENCODE uses for the copy of a gene in the pseudoautosomal region of chromosome Y), and any trailing junk which contains no letters or digits (such as a trailing 
 <code>;
 </code>). If the name does not match the pattern, then if 
 <code>validate
@@ -391,6 +395,324 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Gmara.GmaraEnsemblGenes">
+<a class="docstring-binding" href="#Metacells.Gmara.GmaraEnsemblGenes">
+<code>Metacells.Gmara.GmaraEnsemblGenes
+</code>
+</a> — 
+<span class="docstring-category">Type
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">struct GmaraEnsemblGenes
+    ensembls_of_name::AbstractDict{&lt;:AbstractString, &lt;:AbstractSet{&lt;:AbstractString}}
+    final_ensembls_of_ensembl::AbstractDict{&lt;:AbstractString, &lt;:AbstractSet{&lt;:AbstractString}}
+end
+</code>
+</pre>
+<p>The mappings of gene names to EnsemblGenes of some version of Gmara for some species, as returned by 
+<a href="gmara.html#Metacells.Gmara.fetch_gmara_ensembl_genes">
+<code>fetch_gmara_ensembl_genes
+</code>
+</a>. These are mappings rather than per-axis-entry vectors, so their names use 
+<code>of
+</code> rather than 
+<code>per
+</code>.
+</p>
+<p>A final EnsemblGene is the end of a chain of replacements of retired identifiers. It is a current gene, or a retired identifier which has no replacement. It is the best identifier there is for the gene.
+</p>
+<ul>
+<li>
+<code>ensembls_of_name
+</code> maps each name of some namespace to its final EnsemblGenes. A name which Gmara knows, but which has no EnsemblGene, maps to an empty set.
+</li>
+<li>
+<code>final_ensembls_of_ensembl
+</code> maps each EnsemblGene identifier Gmara knows to its final EnsemblGenes. A final identifier maps to itself. A retired identifier which was replaced maps to the final EnsemblGenes it was replaced by (several, if it was split).
+</li>
+</ul>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Gmara.fetch_gmara_ensembl_genes">
+<a class="docstring-binding" href="#Metacells.Gmara.fetch_gmara_ensembl_genes">
+<code>Metacells.Gmara.fetch_gmara_ensembl_genes
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">fetch_gmara_ensembl_genes(;
+    species::AbstractString,
+    [namespace::AbstractString = ```&quot;GeneSymbol&quot;```,
+    version::AbstractString = ```&quot;main&quot;```,
+    cache_dir = CACHE_DIR,
+    timeout::Real = TIMEOUT],
+)::GmaraEnsemblGenes
+</code>
+</pre>
+<p>Fetch the mappings of gene names to EnsemblGenes of some 
+<code>version
+</code> of Gmara for some 
+<code>species
+</code>. This returns both the EnsemblGenes of each name of the 
+<code>namespace
+</code>, and the final EnsemblGenes of each EnsemblGene identifier, so both always come from the same species and version. See 
+<a href="gmara.html#Metacells.Gmara.GmaraEnsemblGenes">
+<code>GmaraEnsemblGenes
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Gmara.collect_ensembl_genes">
+<a class="docstring-binding" href="#Metacells.Gmara.collect_ensembl_genes">
+<code>Metacells.Gmara.collect_ensembl_genes
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">collect_ensembl_genes(;
+    names::AbstractVector{&lt;:AbstractString},
+    gmara_ensembl_genes::GmaraEnsemblGenes,
+)::AbstractVector{&lt;:AbstractString}
+</code>
+</pre>
+<p>Return the EnsemblGene of each of the 
+<code>names
+</code>, using the 
+<code>ensembls_of_name
+</code> of the 
+<code>gmara_ensembl_genes
+</code> (see 
+<a href="gmara.html#Metacells.Gmara.fetch_gmara_ensembl_genes">
+<code>fetch_gmara_ensembl_genes
+</code>
+</a>). This is the one EnsemblGene the name maps to, or empty if it maps to none or to several. The names are looked up as given, so in a namespace other than 
+<code>GeneSymbol
+</code> they should be normalized first (see 
+<a href="gmara.html#Metacells.Gmara.normalize_gene_name">
+<code>normalize_gene_name
+</code>
+</a>).
+</p>
+<p>This can be used to set 
+<a href="contracts.html#Metacells.Contracts.vector_of_ensembl_per_gene">
+<code>vector_of_ensembl_per_gene
+</code>
+</a> when the data has no Ensembl identifiers.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Gmara.EnsemblConsistency">
+<a class="docstring-binding" href="#Metacells.Gmara.EnsemblConsistency">
+<code>Metacells.Gmara.EnsemblConsistency
+</code>
+</a> — 
+<span class="docstring-category">Type
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">struct EnsemblConsistency
+    name::AbstractString
+    ensembl::AbstractString
+    normalized_ensembl::Maybe{AbstractString}
+    name_ensembls::AbstractSet{&lt;:AbstractString}
+    final_ensembls::AbstractSet{&lt;:AbstractString}
+end
+</code>
+</pre>
+<p>The consistency of the Ensembl identifier of a gene name with the mappings of Gmara, as returned by 
+<a href="gmara.html#Metacells.Gmara.verify_consistent_ensembl_genes">
+<code>verify_consistent_ensembl_genes
+</code>
+</a>.
+</p>
+<ul>
+<li>
+<code>name
+</code> and 
+<code>ensembl
+</code> are as given.
+</li>
+<li>
+<code>normalized_ensembl
+</code> is the 
+<code>ensembl
+</code> without its suffixes (see 
+<a href="gmara.html#Metacells.Gmara.normalize_gene_name">
+<code>normalize_gene_name
+</code>
+</a>), or 
+<code>nothing
+</code> if it is not in the form of an Ensembl identifier.
+</li>
+<li>
+<code>name_ensembls
+</code> are the final EnsemblGenes Gmara maps the 
+<code>name
+</code> to (see 
+<a href="gmara.html#Metacells.Gmara.GmaraEnsemblGenes">
+<code>GmaraEnsemblGenes
+</code>
+</a>).
+</li>
+<li>
+<code>final_ensembls
+</code> are the final EnsemblGenes Gmara maps the 
+<code>normalized_ensembl
+</code> to.
+</li>
+</ul>
+<p>It also has computed Boolean properties. The first two are true when all is well:
+</p>
+<ul>
+<li>
+<code>is_consistent
+</code>: none of the inconsistency properties listed below is true, so the 
+<code>ensembl
+</code> identifies the gene of the 
+<code>name
+</code>. The identifier may still have suffixes (such as a version).
+</li>
+<li>
+<code>ensembl_is_normalized
+</code>: the 
+<code>ensembl
+</code> is in the form of an Ensembl identifier, and has no suffixes.
+</li>
+</ul>
+<p>The rest say what the inconsistency is. Several of them may be true at once (e.g. for a retired identifier which was replaced by a different gene):
+</p>
+<ul>
+<li>
+<code>name_is_empty
+</code>: the 
+<code>name
+</code> is empty.
+</li>
+<li>
+<code>name_is_unknown
+</code>: the 
+<code>name
+</code> is not empty, and Gmara maps it to no EnsemblGene.
+</li>
+<li>
+<code>ensembl_is_empty
+</code>: the 
+<code>ensembl
+</code> is empty.
+</li>
+<li>
+<code>ensembl_is_invalid
+</code>: the 
+<code>ensembl
+</code> is not empty, and is not in the form of an Ensembl identifier.
+</li>
+<li>
+<code>ensembl_is_unknown
+</code>: Gmara does not know the 
+<code>normalized_ensembl
+</code>.
+</li>
+<li>
+<code>ensembl_is_retired
+</code>: Gmara maps the 
+<code>normalized_ensembl
+</code> to other final EnsemblGenes.
+</li>
+<li>
+<code>ensembl_is_different
+</code>: the 
+<code>name_ensembls
+</code> and the 
+<code>final_ensembls
+</code> are not empty, and have no EnsemblGene in common.
+</li>
+</ul>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Gmara.verify_consistent_ensembl_genes">
+<a class="docstring-binding" href="#Metacells.Gmara.verify_consistent_ensembl_genes">
+<code>Metacells.Gmara.verify_consistent_ensembl_genes
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">verify_consistent_ensembl_genes(;
+    names::AbstractVector{&lt;:AbstractString},
+    ensembl_per_name::AbstractVector{&lt;:AbstractString},
+    gmara_ensembl_genes::GmaraEnsemblGenes,
+)::AbstractVector{EnsemblConsistency}
+</code>
+</pre>
+<p>Verify that the Ensembl identifier of each of the 
+<code>names
+</code> is consistent with the 
+<code>gmara_ensembl_genes
+</code> (see 
+<a href="gmara.html#Metacells.Gmara.fetch_gmara_ensembl_genes">
+<code>fetch_gmara_ensembl_genes
+</code>
+</a>). Returns the 
+<a href="gmara.html#Metacells.Gmara.EnsemblConsistency">
+<code>EnsemblConsistency
+</code>
+</a> of each name, in the same order. This only lists the inconsistencies; it is up to the caller to decide what to do about them.
+</p>
+<p>The names are looked up as given, so in a namespace other than 
+<code>GeneSymbol
+</code> they should be normalized first (see 
+<a href="gmara.html#Metacells.Gmara.normalize_gene_name">
+<code>normalize_gene_name
+</code>
+</a>).
+</p>
+<p>This does not verify that the Ensembl identifiers are unique. To list the identifiers given to more than one name (and the indices of these names), use 
+<code>indices_of_duplicates
+</code> from 
+<code>TanayLabUtilities
+</code>, ignoring the empty identifiers: 
+<code>indices_of_duplicates(ensembl_per_name; empty_value = &quot;&quot;)
+</code>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Gmara.set_gmara_genes_mask!">
 <a class="docstring-binding" href="#Metacells.Gmara.set_gmara_genes_mask!">
 <code>Metacells.Gmara.set_gmara_genes_mask!
@@ -407,8 +729,8 @@
     species::AbstractString,
     namespace::AbstractString,
     [list::Maybe{AbstractString} = ```nothing```,
-    gene_name_property::AbstractString = ```&quot;name&quot;```,
-    property::Maybe{AbstractString} = ```nothing```,
+    name_property::Maybe{AbstractString} = ```nothing```,
+    mask_property::Maybe{AbstractString} = ```nothing```,
     cache_dir = CACHE_DIR,
     timeout::Real = TIMEOUT,
     overwrite::Bool = ```false```]
@@ -425,12 +747,10 @@
 <code>namespace
 </code> for some 
 <code>species
-</code>. We match the 
-<code>gene_name_property
-</code> (by default, just the unique 
-<code>name
-</code> in the gene axis) with the list names and set the result mask as a per-gene 
-<code>property
+</code>. We match the names of the genes in the 
+<code>namespace
+</code> with the list names, and set the result as a per-gene 
+<code>mask_property
 </code> (by default, 
 <span>$is_$
 </span>
@@ -439,9 +759,33 @@
 <code>list
 </code> is 
 <code>nothing
-</code>, this just marks the gene names that exist in the namespace. If 
+</code>, this just marks the gene names that exist in the namespace, and the 
+<code>mask_property
+</code> must be specified. If 
 <code>overwrite
-</code>, this will overwrite an existing property of the.array same name.
+</code>, this will overwrite an existing property of the same name.
+</p>
+<p>The names of the genes in the 
+<code>namespace
+</code> are the per-gene 
+<code>name_property
+</code>. By default, this is 
+<code>name
+</code> (the gene axis entries) for the 
+<code>GeneSymbol
+</code> namespace, and 
+<code>ensembl
+</code> (see 
+<a href="contracts.html#Metacells.Contracts.vector_of_ensembl_per_gene">
+<code>vector_of_ensembl_per_gene
+</code>
+</a>) for the 
+<code>EnsemblGene
+</code> namespace. It must be specified for any other namespace. The names are normalized before they are matched (see 
+<a href="gmara.html#Metacells.Gmara.normalize_gene_name">
+<code>normalize_gene_name
+</code>
+</a>).
 </p>
 <p>Returns the number of genes that are set in the mask.
 </p>
@@ -499,8 +843,32 @@
 </a>
 </li>
 <li>
+<a href="gmara.html#Metacells.Gmara.EnsemblConsistency">
+<code>Metacells.Gmara.EnsemblConsistency
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.GmaraEnsemblGenes">
+<code>Metacells.Gmara.GmaraEnsemblGenes
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.collect_ensembl_genes">
+<code>Metacells.Gmara.collect_ensembl_genes
+</code>
+</a>
+</li>
+<li>
 <a href="gmara.html#Metacells.Gmara.empty_gmara_cache!">
 <code>Metacells.Gmara.empty_gmara_cache!
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.fetch_gmara_ensembl_genes">
+<code>Metacells.Gmara.fetch_gmara_ensembl_genes
 </code>
 </a>
 </li>
@@ -519,6 +887,12 @@
 <li>
 <a href="gmara.html#Metacells.Gmara.set_gmara_genes_mask!">
 <code>Metacells.Gmara.set_gmara_genes_mask!
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.verify_consistent_ensembl_genes">
+<code>Metacells.Gmara.verify_consistent_ensembl_genes
 </code>
 </a>
 </li>

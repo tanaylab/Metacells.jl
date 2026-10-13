@@ -455,27 +455,30 @@ function rank_variables(score_per_variable_per_observation::AbstractMatrix{<:Abs
 end
 
 """
-    fetch_gmara_transcription_factors!(
+    fetch_gmara_vector_of_is_transcription_factor_per_gene!(
         daf::DafWriter;
         species::AbstractString,
         namespace::AbstractString = $(DEFAULT.namespace),
+        name_property::Maybe{AbstractString} = $(DEFAULT.name_property),
         version::AbstractString = $(DEFAULT.version),
         cache_dir = $(DEFAULT.cache_dir),
         timeout::Real = $(DEFAULT.timeout),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Fetch and set [`vector_of_is_transcription_factor_per_gene`](@ref) from `Gmara`.
+Fetch and set [`vector_of_is_transcription_factor_per_gene`](@ref) from `Gmara`. The genes are matched by their names
+in the `namespace`, which are the per-gene `name_property` (see [`set_gmara_genes_mask!`](@ref)).
 
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(
     axes = [gene_axis(RequiredInput)],
-    data = [vector_of_is_transcription_factor_per_gene(CreatedOutput)],
+    data = [vector_of_ensembl_per_gene(OptionalInput), vector_of_is_transcription_factor_per_gene(CreatedOutput)],
 ) function fetch_gmara_vector_of_is_transcription_factor_per_gene!(  # UNTESTED
     daf::DafWriter;
     species::AbstractString,
     namespace::AbstractString = "GeneSymbol",
+    name_property::Maybe{AbstractString} = nothing,
     version::AbstractString = function_default(set_gmara_genes_mask!, :version),
     cache_dir = function_default(set_gmara_genes_mask!, :cache_dir),
     timeout::Real = function_default(set_gmara_genes_mask!, :timeout),
@@ -485,6 +488,7 @@ $(CONTRACT)
         daf;
         species,
         namespace,
+        name_property,
         list = "transcription_factor",
         version,
         cache_dir,
@@ -500,30 +504,42 @@ end
         daf::DafWriter;
         species::AbstractString,
         namespace::AbstractString = $(DEFAULT.namespace),
+        name_property::Maybe{AbstractString} = $(DEFAULT.name_property),
         version::AbstractString = $(DEFAULT.version),
         cache_dir = $(DEFAULT.cache_dir),
         timeout::Real = $(DEFAULT.timeout),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Fetch and set [`vector_of_is_transcription_factor_per_gene`](@ref) from `Gmara`.
+Fetch and set [`vector_of_is_regulator_per_gene`](@ref) from `Gmara`. The genes are matched by their names in the
+`namespace`, which are the per-gene `name_property` (see [`set_gmara_genes_mask!`](@ref)).
 
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(
     axes = [gene_axis(RequiredInput)],
-    data = [vector_of_is_regulator_per_gene(CreatedOutput)],
+    data = [vector_of_ensembl_per_gene(OptionalInput), vector_of_is_regulator_per_gene(CreatedOutput)],
 ) function fetch_gmara_vector_of_is_regulator_per_gene!(  # UNTESTED
     daf::DafWriter;
     species::AbstractString,
     namespace::AbstractString = "GeneSymbol",
+    name_property::Maybe{AbstractString} = nothing,
     version::AbstractString = function_default(set_gmara_genes_mask!, :version),
     cache_dir = function_default(set_gmara_genes_mask!, :cache_dir),
     timeout::Real = function_default(set_gmara_genes_mask!, :timeout),
     overwrite::Bool = false,
 )::Nothing
-    n_regulators =
-        set_gmara_genes_mask!(daf; species, namespace, list = "regulator", version, cache_dir, timeout, overwrite)
+    n_regulators = set_gmara_genes_mask!(
+        daf;
+        species,
+        namespace,
+        name_property,
+        list = "regulator",
+        version,
+        cache_dir,
+        timeout,
+        overwrite,
+    )
     @debug "Regulators: $(n_regulators)" _group = :mcs_results
     return nothing
 end

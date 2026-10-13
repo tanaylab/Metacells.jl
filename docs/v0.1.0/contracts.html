@@ -302,6 +302,44 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_ensembl_per_gene">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_ensembl_per_gene">
+<code>Metacells.Contracts.vector_of_ensembl_per_gene
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_ensembl_per_gene(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The Ensembl identifier of each gene, or empty if it has none. It is stored as given, so it may have a version suffix (which is not part of the identity of the gene).
+</p>
+<p>This vector is populated by 
+<a href="anndata_format.html#Metacells.AnnDataFormat.import_cells_h5ad!">
+<code>import_cells_h5ad!
+</code>
+</a>. If the data has no Ensembl identifiers, it can be computed from Gmara using 
+<a href="gmara.html#Metacells.Gmara.fetch_gmara_ensembl_genes">
+<code>fetch_gmara_ensembl_genes
+</code>
+</a> and 
+<a href="gmara.html#Metacells.Gmara.collect_ensembl_genes">
+<code>collect_ensembl_genes
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.vector_of_is_mitochondrial_per_gene">
 <a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_mitochondrial_per_gene">
 <code>Metacells.Contracts.vector_of_is_mitochondrial_per_gene
@@ -4706,6 +4744,12 @@
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene">
 <code>Metacells.Contracts.vector_of_correlation_between_cells_and_punctuated_metacells_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_ensembl_per_gene">
+<code>Metacells.Contracts.vector_of_ensembl_per_gene
 </code>
 </a>
 </li>

@@ -127,6 +127,7 @@ METACELL_SQUARE_DATA =
         daf::DafWriter;
         cells_h5ad::AbstractString,
         copy_data::Maybe{CopyAnnData} = $(DEFAULT.copy_data),
+        ensembl_property::Maybe{AbstractString} = $(DEFAULT.ensembl_property),
         bestify::Bool = $(DEFAULT.bestify),
         min_sparse_saving_fraction::AbstractFloat = $(DEFAULT.min_sparse_saving_fraction),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -180,6 +181,10 @@ Per-gene:
   - The `fitted` per-gene vector is renamed to `is_fitted` and given the default `false`.
   - The `significant_inner_folds_count` per-gene property is stored as a `UInt32` and given the default 0.
   - The `full_gene_index` property is not copied. Either you import the full (raw) data or you don't.
+  - If the `ensembl_property` is specified, it names the per-gene property holding the Ensembl identifiers (e.g.
+    `gene_ids`). This is renamed to `ensembl` (see
+    [`vector_of_ensembl_per_gene`](@ref Metacells.Contracts.vector_of_ensembl_per_gene)) and given the default empty
+    string. The identifiers are stored as given.
   - All other vectors are copied as-is.
 
 Per-cell:
@@ -198,11 +203,21 @@ Per-cell:
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = nothing,
+    ensembl_property::Maybe{AbstractString} = nothing,
     bestify::Bool = true,
     min_sparse_saving_fraction::AbstractFloat = function_default(copy_matrix!, :min_sparse_saving_fraction),
     overwrite::Bool = false,
     insist::Bool = false,
 )::Maybe{AbstractVector{<:AbstractString}}
+    if ensembl_property !== nothing
+        ensembl_key = ("gene", ensembl_property)
+        if copy_data !== nothing && haskey(copy_data, ensembl_key)
+            error("both the ensembl_property and the copy_data specify the per-gene: $(ensembl_property)")
+        end
+        copy_data = copy_data === nothing ? CopyAnnData() : copy(copy_data)
+        copy_data[ensembl_key] = ("ensembl", "")
+    end
+
     cells_daf = anndata_as_daf(cells_h5ad; name = "cells", obs_is = "cell", var_is = "gene", X_is = "X")
 
     copy_axis!(; destination = daf, source = cells_daf, axis = "cell", overwrite, insist)

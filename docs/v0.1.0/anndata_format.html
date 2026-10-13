@@ -281,6 +281,7 @@
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = ```nothing```,
+    ensembl_property::Maybe{AbstractString} = ```nothing```,
     bestify::Bool = ```true```,
     min_sparse_saving_fraction::AbstractFloat = ```0.25```,
     overwrite::Bool = ```false```,
@@ -424,6 +425,18 @@
 <li>The 
 <code>full_gene_index
 </code> property is not copied. Either you import the full (raw) data or you don&#39;t.
+</li>
+<li>If the 
+<code>ensembl_property
+</code> is specified, it names the per-gene property holding the Ensembl identifiers (e.g. 
+<code>gene_ids
+</code>). This is renamed to 
+<code>ensembl
+</code> (see 
+<a href="contracts.html#Metacells.Contracts.vector_of_ensembl_per_gene">
+<code>vector_of_ensembl_per_gene
+</code>
+</a>) and given the default empty string. The identifiers are stored as given.
 </li>
 <li>All other vectors are copied as-is.
 </li>
