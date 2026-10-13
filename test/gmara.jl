@@ -24,6 +24,10 @@ nested_test("gmara") do
                 @test normalize_gene_name("ENSG00000124766;"; namespace = "EnsemblGene") == "ENSG00000124766"
             end
 
+            nested_test("par") do
+                @test normalize_gene_name("ENSG00000182378.15_PAR_Y;"; namespace = "EnsemblGene") == "ENSG00000182378"
+            end
+
             nested_test("invalid") do
                 @test normalize_gene_name("ERCC-00002"; namespace = "EnsemblGene") == "ERCC-00002"
             end

@@ -38,11 +38,21 @@ const NAMESPACE_PATTERNS = Dict(
 # The namespaces whose names may carry a `.<version>` suffix, which is not part of the identity of the gene.
 const VERSIONED_NAMESPACES = ("EnsemblGene", "EnsemblTranscript", "EnsemblProtein", "RefSeq")
 
-# A name in a namespace with a pattern is the pattern, then a `.<version>` suffix in the `VERSIONED_NAMESPACES`, then
-# junk which contains no letters or digits (such as a trailing `;`). Only the pattern is the actual name.
+# The namespaces whose names may carry a `_PAR_Y` suffix (after the version). GENCODE uses it for the copy of a gene in
+# the pseudoautosomal region of chromosome Y, while Ensembl has a single gene for both copies.
+const PAR_NAMESPACES = ("EnsemblGene", "EnsemblTranscript", "EnsemblProtein")
+
+# A name in a namespace with a pattern is the pattern, then a `.<version>` suffix in the `VERSIONED_NAMESPACES`, then a
+# `_PAR_Y` suffix in the `PAR_NAMESPACES`, then junk which contains no letters or digits (such as a trailing `;`). Only
+# the pattern is the actual name.
 const NAMESPACE_REGEXES = Dict(
     namespace => Regex(
-        "^(" * pattern * ")" * (namespace in VERSIONED_NAMESPACES ? raw"(\.[0-9]+)?" : "") * raw"[^A-Za-z0-9]*$",
+        "^(" *
+        pattern *
+        ")" *
+        (namespace in VERSIONED_NAMESPACES ? raw"(\.[0-9]+)?" : "") *
+        (namespace in PAR_NAMESPACES ? "(_PAR_Y)?" : "") *
+        raw"[^A-Za-z0-9]*$",
     ) for (namespace, pattern) in NAMESPACE_PATTERNS
 )
 
@@ -55,11 +65,12 @@ const NAMESPACE_REGEXES = Dict(
 
 Normalize a gene name in some namespace. Each namespace other than `GeneSymbol` has a pattern for its names (for
 example, `ENSG00000124766` for `EnsemblGene`). In such a namespace, this removes the `.[0-9]` version suffix (in the
-Ensembl and RefSeq namespaces) and any trailing junk which contains no letters or digits (such as a trailing `;`). If
-the name does not match the pattern, then if `validate` this fails, otherwise this returns the name unchanged. To lookup
-a name in a list or a namespace, you need to normalize the query gene name accordingly. In other namespaces, the
-`.[0-9]` suffix is part of the name. For example, `AC092171.3` and `AC092171.5` are different genes. An unknown
-namespace is an error.
+Ensembl and RefSeq namespaces), the `_PAR_Y` suffix (in the Ensembl namespaces, which GENCODE uses for the copy of a
+gene in the pseudoautosomal region of chromosome Y), and any trailing junk which contains no letters or digits (such as
+a trailing `;`). If the name does not match the pattern, then if `validate` this fails, otherwise this returns the name
+unchanged. To lookup a name in a list or a namespace, you need to normalize the query gene name accordingly. In other
+namespaces, the `.[0-9]` suffix is part of the name. For example, `AC092171.3` and `AC092171.5` are different genes. An
+unknown namespace is an error.
 
 The case of a name is never changed, as Gmara names are in mixed case, differing between namespaces; for example,
 `SOX4` for the human gene and `Sox4` for the mouse one.
