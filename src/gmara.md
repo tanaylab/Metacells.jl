@@ -21,6 +21,7 @@ Metacells.Gmara.fetch_gmara_ensembl_genes
 Metacells.Gmara.collect_ensembl_genes
 Metacells.Gmara.EnsemblConsistency
 Metacells.Gmara.verify_consistent_ensembl_genes
+Metacells.Gmara.gmara_genes_mask
 Metacells.Gmara.set_gmara_genes_mask!
 Metacells.Gmara.empty_gmara_cache!
 ```

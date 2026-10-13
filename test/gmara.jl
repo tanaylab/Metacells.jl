@@ -110,6 +110,24 @@ nested_test("gmara") do
                 @test get_vector(daf, "gene", "is_ensembl_transcription_factor").array == [true, false, false]
             end
 
+            nested_test("gmara_genes_mask") do
+                nested_test("symbols") do
+                    names = ["RPS9", "SOX4", "MT-CO1"]
+                    @test gmara_genes_mask(; names, species = "human", list = "ribosomal") == [true, false, false]
+                    @test gmara_genes_mask(; names, species = "human", list = "mitochondrial") == [false, false, true]
+                end
+
+                nested_test("ensembl") do
+                    names = ["ENSG00000170889.12", "ENSG00000124766"]
+                    @test gmara_genes_mask(; names, species = "human", namespace = "EnsemblGene", list = "ribosomal") ==
+                          [true, false]
+                end
+
+                nested_test("none") do
+                    @test gmara_genes_mask(; names = ["SOX4"], species = "human", list = "ribosomal") == [false]
+                end
+            end
+
             nested_test("!name_property") do
                 @test_throws "no name_property specified for the namespace: HGNC" set_gmara_genes_mask!(
                     daf;

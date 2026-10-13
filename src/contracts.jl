@@ -193,8 +193,9 @@ A mask of mitochondrial genes. These genes are typically excluded from the analy
 the biological behaviors of interest, and also have such a large and variable expression level that including them would
 skew the denominator when estimating linear gene expression level fractions.
 
-This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in
-Gmara.
+This vector is created in a supervised way based on biological and technical considerations. It is typically imported
+with the data, as it is one of the decisions made when computing the metacells. To compare it with the Gmara list, use
+[`gmara_genes_mask`](@ref Metacells.Gmara.gmara_genes_mask) with the `mitochondrial` list.
 """
 function vector_of_is_mitochondrial_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_mitochondrial") => (expectation, Bool, "A mask of mitochondrial genes.")
@@ -209,8 +210,9 @@ A mask of ribosomal genes. These genes are typically excluded from the analysis,
 the biological behaviors of interest, they have such a large and variable expression level that including them would
 skew the denominator when estimating linear gene expression level fractions.
 
-This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in
-Gmara.
+This vector is created in a supervised way based on biological and technical considerations. It is typically imported
+with the data, as it is one of the decisions made when computing the metacells. To compare it with the Gmara list, use
+[`gmara_genes_mask`](@ref Metacells.Gmara.gmara_genes_mask) with the `ribosomal` list.
 """
 function vector_of_is_ribosomal_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_ribosomal") => (expectation, Bool, "A mask of ribosomal genes.")
@@ -242,8 +244,15 @@ interest - for example, genes related to cell cycle or stress. Such genes make i
 behaviors of interest. They are therefore masked out during some phases of the analysis. However, unlike excluded genes,
 we still track their expression level and take it into account (e.g., when removing outlier cells from metacells).
 
-This vector is created in a supervised way based on biological considerations. TODO: Add lists in Gmara (cell cycle,
-stress, etc.) so this can be initialized by them.
+This vector is created in a supervised way based on biological considerations. It is typically imported with the data,
+as it is one of the decisions made when computing the metacells. To compare it with the Gmara list, use
+[`gmara_genes_mask`](@ref Metacells.Gmara.gmara_genes_mask) with the `lateral` list. For example, the genes Gmara would
+add are:
+
+```julia
+is_gmara_lateral_per_gene = gmara_genes_mask(; names = axis_vector(daf, "gene"), species, list = "lateral")
+is_gmara_lateral_per_gene .& .!get_vector(daf, "gene", "is_lateral")
+```
 """
 function vector_of_is_lateral_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_lateral") =>

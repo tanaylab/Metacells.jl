@@ -15,6 +15,7 @@ export collect_ensembl_genes
 export empty_gmara_cache!
 export fetch_gmara_ensembl_genes
 export gmara_genes
+export gmara_genes_mask
 export normalize_gene_name
 export set_gmara_genes_mask!
 export verify_consistent_ensembl_genes
@@ -609,6 +610,39 @@ function unlock_file(file::Base.Filesystem.File, path::AbstractString)::Nothing 
 end
 
 """
+    gmara_genes_mask(;
+        names::AbstractVector{<:AbstractString},
+        species::AbstractString,
+        [namespace::AbstractString = $(DEFAULT.namespace),
+        list::Maybe{AbstractString} = $(DEFAULT.list),
+        version::AbstractString = $(DEFAULT.version),
+        cache_dir = CACHE_DIR,
+        timeout::Real = TIMEOUT],
+    )::AbstractVector{Bool}
+
+Return a mask with, for each of the `names` in the `namespace`, whether it is in some `version` of a Gmara `list` for
+some `species`. If `list` is `nothing`, this marks the names that exist in the namespace. The names are normalized
+before they are matched (see [`normalize_gene_name`](@ref)). For example, pass `axis_vector(daf, "gene")` as the
+`names` of the `GeneSymbol` namespace, or the [`vector_of_ensembl_per_gene`](@ref
+Metacells.Contracts.vector_of_ensembl_per_gene) as the `names` of the `EnsemblGene` namespace.
+
+This is useful for comparing a mask with a Gmara list, without changing the data. To set the mask as a per-gene
+property, use [`set_gmara_genes_mask!`](@ref).
+"""
+@logged :mcs_ops @documented function gmara_genes_mask(;
+    names::AbstractVector{<:AbstractString},
+    species::AbstractString,
+    namespace::AbstractString = function_default(gmara_genes, :namespace),
+    list::Maybe{AbstractString} = function_default(gmara_genes, :list),
+    version::AbstractString = function_default(gmara_genes, :version),
+    cache_dir::AbstractString = CACHE_DIR,
+    timeout::Real = TIMEOUT,
+)::AbstractVector{Bool}
+    gmara_names = gmara_genes(; species, namespace, list, version, cache_dir, timeout)
+    return [normalize_gene_name(name; namespace) in gmara_names for name in names]
+end
+
+"""
     set_gmara_genes_mask!(
         daf::DafWriter;
         species::AbstractString,
@@ -652,9 +686,8 @@ Returns the number of genes that are set in the mask.
         end
         mask_property = "is_$(list)"
     end
-    gene_names = get_vector(daf, "gene", name_property).array
-    gmara_names = gmara_genes(; species, namespace, list, version, cache_dir, timeout)
-    is_in_list_per_gene = [normalize_gene_name(gene_name; namespace) in gmara_names for gene_name in gene_names]
+    names = get_vector(daf, "gene", name_property).array
+    is_in_list_per_gene = gmara_genes_mask(; names, species, namespace, list, version, cache_dir, timeout)
     if !any(is_in_list_per_gene)
         error("empty $(mask_property) genes mask loaded from Gmara")  # UNTESTED
     end

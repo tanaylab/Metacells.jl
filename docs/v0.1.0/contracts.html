@@ -358,7 +358,13 @@
 </pre>
 <p>A mask of mitochondrial genes. These genes are typically excluded from the analysis as they are (mostly) unrelated to the biological behaviors of interest, and also have such a large and variable expression level that including them would skew the denominator when estimating linear gene expression level fractions.
 </p>
-<p>This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in Gmara.
+<p>This vector is created in a supervised way based on biological and technical considerations. It is typically imported with the data, as it is one of the decisions made when computing the metacells. To compare it with the Gmara list, use 
+<a href="gmara.html#Metacells.Gmara.gmara_genes_mask">
+<code>gmara_genes_mask
+</code>
+</a> with the 
+<code>mitochondrial
+</code> list.
 </p>
 </div>
 </section>
@@ -384,7 +390,13 @@
 </pre>
 <p>A mask of ribosomal genes. These genes are typically excluded from the analysis, as they aren&#39;t always unrelated to the biological behaviors of interest, they have such a large and variable expression level that including them would skew the denominator when estimating linear gene expression level fractions.
 </p>
-<p>This vector is created in a supervised way based on biological and technical considerations. TODO: Add this list in Gmara.
+<p>This vector is created in a supervised way based on biological and technical considerations. It is typically imported with the data, as it is one of the decisions made when computing the metacells. To compare it with the Gmara list, use 
+<a href="gmara.html#Metacells.Gmara.gmara_genes_mask">
+<code>gmara_genes_mask
+</code>
+</a> with the 
+<code>ribosomal
+</code> list.
 </p>
 </div>
 </section>
@@ -436,8 +448,19 @@
 </pre>
 <p>A mask of genes that are lateral to the biological behaviors of interest. These genes may satisfy all criteria for being in a group of cooperating genes, but the biological behavior they participate in isn&#39;t relevant to the behaviors of interest - for example, genes related to cell cycle or stress. Such genes make it harder to focus on the biological behaviors of interest. They are therefore masked out during some phases of the analysis. However, unlike excluded genes, we still track their expression level and take it into account (e.g., when removing outlier cells from metacells).
 </p>
-<p>This vector is created in a supervised way based on biological considerations. TODO: Add lists in Gmara (cell cycle, stress, etc.) so this can be initialized by them.
+<p>This vector is created in a supervised way based on biological considerations. It is typically imported with the data, as it is one of the decisions made when computing the metacells. To compare it with the Gmara list, use 
+<a href="gmara.html#Metacells.Gmara.gmara_genes_mask">
+<code>gmara_genes_mask
+</code>
+</a> with the 
+<code>lateral
+</code> list. For example, the genes Gmara would add are:
 </p>
+<pre>
+<code class="language-julia hljs">is_gmara_lateral_per_gene = gmara_genes_mask(; names = axis_vector(daf, &quot;gene&quot;), species, list = &quot;lateral&quot;)
+is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_lateral&quot;)
+</code>
+</pre>
 </div>
 </section>
 </details>

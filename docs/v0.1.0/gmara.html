@@ -713,6 +713,74 @@ end
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Gmara.gmara_genes_mask">
+<a class="docstring-binding" href="#Metacells.Gmara.gmara_genes_mask">
+<code>Metacells.Gmara.gmara_genes_mask
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">gmara_genes_mask(;
+    names::AbstractVector{&lt;:AbstractString},
+    species::AbstractString,
+    [namespace::AbstractString = ```&quot;GeneSymbol&quot;```,
+    list::Maybe{AbstractString} = ```nothing```,
+    version::AbstractString = ```&quot;main&quot;```,
+    cache_dir = CACHE_DIR,
+    timeout::Real = TIMEOUT],
+)::AbstractVector{Bool}
+</code>
+</pre>
+<p>Return a mask with, for each of the 
+<code>names
+</code> in the 
+<code>namespace
+</code>, whether it is in some 
+<code>version
+</code> of a Gmara 
+<code>list
+</code> for some 
+<code>species
+</code>. If 
+<code>list
+</code> is 
+<code>nothing
+</code>, this marks the names that exist in the namespace. The names are normalized before they are matched (see 
+<a href="gmara.html#Metacells.Gmara.normalize_gene_name">
+<code>normalize_gene_name
+</code>
+</a>). For example, pass 
+<code>axis_vector(daf, &quot;gene&quot;)
+</code> as the 
+<code>names
+</code> of the 
+<code>GeneSymbol
+</code> namespace, or the 
+<a href="contracts.html#Metacells.Contracts.vector_of_ensembl_per_gene">
+<code>vector_of_ensembl_per_gene
+</code>
+</a> as the 
+<code>names
+</code> of the 
+<code>EnsemblGene
+</code> namespace.
+</p>
+<p>This is useful for comparing a mask with a Gmara list, without changing the data. To set the mask as a per-gene property, use 
+<a href="gmara.html#Metacells.Gmara.set_gmara_genes_mask!">
+<code>set_gmara_genes_mask!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Gmara.set_gmara_genes_mask!">
 <a class="docstring-binding" href="#Metacells.Gmara.set_gmara_genes_mask!">
 <code>Metacells.Gmara.set_gmara_genes_mask!
@@ -875,6 +943,12 @@ end
 <li>
 <a href="gmara.html#Metacells.Gmara.gmara_genes">
 <code>Metacells.Gmara.gmara_genes
+</code>
+</a>
+</li>
+<li>
+<a href="gmara.html#Metacells.Gmara.gmara_genes_mask">
+<code>Metacells.Gmara.gmara_genes_mask
 </code>
 </a>
 </li>
