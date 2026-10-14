@@ -808,7 +808,13 @@
 <code>nothing
 </code> to ignore the data, or a tuple with the name of the destination 
 <code>Daf
-</code> property and an optional value to use for missing entries (raw-only cells and/or genes).
+</code> property and an optional value to use for missing entries (raw-only cells and/or genes). The name of the destination property may be 
+<code>=
+</code>, to keep the name of the source property (e.g., to keep 
+<code>fitted
+</code> as is, rather than renaming it to 
+<code>is_fitted
+</code>).
 </p>
 <p>The key is a 
 <code>PropertyKey

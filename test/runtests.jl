@@ -13,5 +13,6 @@ Random.seed!(123456)
 test_prefixes(ARGS)
 abort_on_first_failure(true)
 
+include("anndata_format.jl")
 include("gmara.jl")
 include("pipeline.jl")

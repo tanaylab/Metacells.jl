@@ -43,6 +43,8 @@ using TanayLabUtilities
 """
 Specify how to copy data from `AnnData` to `Daf`. The value is either `nothing` to ignore the data, or a tuple with the
 name of the destination `Daf` property and an optional value to use for missing entries (raw-only cells and/or genes).
+The name of the destination property may be `=`, to keep the name of the source property (e.g., to keep `fitted` as
+is, rather than renaming it to `is_fitted`).
 
 The key is a `PropertyKey`, which says what kind of data it is as well as its name:
 
@@ -199,7 +201,7 @@ Per-cell:
     It is common to manually call `reconstruct_axis!` on the result to create additional axes (e.g., if the cells were
     collected from a set of batches and some properties are actually per-batch).
 """
-@logged :mcs_ops @documented function import_cells_h5ad!(  # UNTESTED
+@logged :mcs_ops @documented function import_cells_h5ad!(
     daf::DafWriter;
     cells_h5ad::AbstractString,
     copy_data::Maybe{CopyAnnData} = nothing,
@@ -338,7 +340,7 @@ Per-metacell-per-metacell:
 
     It is common to manually call `reconstruct_type!` on the result to create a type axis.
 """
-@logged :mcs_ops @documented function import_metacells_h5ad!(  # UNTESTED
+@logged :mcs_ops @documented function import_metacells_h5ad!(
     daf::DafWriter;
     cells_h5ad::AbstractString,
     metacells_h5ad::AbstractString,
@@ -435,7 +437,7 @@ default of `false`), which is what it was all along.
 The `type_axis` must exist, since it says which types there are; a type with no mask property simply has no genes in
 it. In practice these masks come in a metacells `h5ad` rather than a cells one.
 """
-@logged :mcs_ops @documented function import_gene_masks_per_type!(  # UNTESTED
+@logged :mcs_ops @documented function import_gene_masks_per_type!(
     daf::DafWriter;
     type_axis::AbstractString = "type",
 )::Nothing
@@ -456,7 +458,7 @@ it. In practice these masks come in a metacells `h5ad` rather than a cells one.
     return nothing
 end
 
-function import_mask_matrix(  # UNTESTED
+function import_mask_matrix(
     daf::DafWriter,
     type_axis::AbstractString,
     type_names::AbstractVector{<:AbstractString},
@@ -504,7 +506,7 @@ Data spelling that some other way - `Outliers`, `Doublet`, and the like - should
 
 Nothing is written until all of the above has been verified, so a rejected file leaves the data as it was.
 """
-@logged :mcs_ops @documented function import_type_colors_csv!(  # UNTESTED
+@logged :mcs_ops @documented function import_type_colors_csv!(
     daf::DafWriter;
     type_colors_csv::AbstractString,
     axis::AbstractString = "cell",
@@ -557,7 +559,7 @@ Nothing is written until all of the above has been verified, so a rejected file 
     return nothing
 end
 
-function import_scalars_data(  # UNTESTED
+function import_scalars_data(
     daf::DafWriter,
     source::DafReader;
     copy_data::Maybe{CopyAnnData},
@@ -590,7 +592,7 @@ function import_scalars_data(  # UNTESTED
     return nothing
 end
 
-function import_vectors_data(  # UNTESTED
+function import_vectors_data(
     daf::DafWriter,
     source::DafReader,
     axis::AbstractString,
@@ -643,6 +645,9 @@ function import_vectors_data(  # UNTESTED
         end
 
         rename, empty = data
+        if rename == "="
+            rename = vector_name
+        end
 
         if !overwrite && !insist && has_vector(daf, axis, rename)
             @debug "skip existing $(axis) vector: $(vector_name)" _group = :mcs_details
@@ -685,7 +690,7 @@ function import_vectors_data(  # UNTESTED
     return nothing
 end
 
-function import_matrices_data(  # UNTESTED
+function import_matrices_data(
     daf::DafWriter,
     source::DafReader,
     rows_axis::AbstractString,
@@ -724,6 +729,9 @@ function import_matrices_data(  # UNTESTED
         end
 
         rename, empty = data
+        if rename == "="
+            rename = matrix_name
+        end
 
         relayout = !has_matrix(source, columns_axis, rows_axis, matrix_name; relayout = false)
 
@@ -770,7 +778,7 @@ function import_matrices_data(  # UNTESTED
     return nothing
 end
 
-function copy_metacells_of_cells(  # UNTESTED
+function copy_metacells_of_cells(
     daf::DafWriter,
     cells_h5ad::AbstractString;
     bestify::Bool,
@@ -784,7 +792,7 @@ function copy_metacells_of_cells(  # UNTESTED
     if axis_length(daf, "cell") == size(cells_adata, 1)
         cell_indices = nothing
     else
-        cell_indices = axis_indices(daf, "cell", cells_h5ad.obs_names)
+        cell_indices = axis_indices(daf, "cell", cells_adata.obs_names)
     end
 
     index_per_metacell = axis_dict(daf, "metacell")
