@@ -89,7 +89,7 @@ function normalize_gene_name(name::AbstractString; namespace::AbstractString, va
     if regex === nothing
         error("unknown Gmara namespace: $(namespace)")
     end
-    name_match = match(regex, name)
+    name_match = match(regex, String(name))
     if name_match === nothing
         @assert !validate "invalid $(namespace) gene name: $(name)"
         return name
@@ -357,7 +357,7 @@ end
 
 # Return the `ensembl` without its suffixes, or `nothing` if it is not in the form of an Ensembl identifier.
 function normalized_ensembl_gene(ensembl::AbstractString)::Maybe{AbstractString}
-    ensembl_match = match(NAMESPACE_REGEXES["EnsemblGene"], ensembl)
+    ensembl_match = match(NAMESPACE_REGEXES["EnsemblGene"], String(ensembl))
     if ensembl_match === nothing
         return nothing
     end

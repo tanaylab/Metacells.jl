@@ -20,6 +20,11 @@ nested_test("gmara") do
                 @test normalize_gene_name("ENSG00000124766.5"; namespace = "EnsemblGene") == "ENSG00000124766"
             end
 
+            nested_test("generic") do
+                @test normalize_gene_name(Test.GenericString("ENSG00000124766.5"); namespace = "EnsemblGene") ==
+                      "ENSG00000124766"
+            end
+
             nested_test("junk") do
                 @test normalize_gene_name("ENSG00000124766;"; namespace = "EnsemblGene") == "ENSG00000124766"
             end
@@ -203,6 +208,15 @@ nested_test("gmara") do
                     [:ensembl_is_normalized, :ensembl_is_unknown],
                 ]
                 @test consistencies[4].final_ensembls == Set(["ENSG00000256229"])
+            end
+
+            nested_test("generic") do
+                consistencies = verify_consistent_ensembl_genes(;
+                    names = [Test.GenericString("SOX4")],
+                    ensembl_per_name = [Test.GenericString("ENSG00000124766.5")],
+                    gmara_ensembl_genes = gmara_ensembl_genes,
+                )
+                @test consistencies[1].is_consistent
             end
 
             nested_test("unique") do
