@@ -317,8 +317,8 @@ nested_test("anndata_format") do
             end
 
             nested_test("!unique") do
-                write(type_colors_csv, "type,color\nT1,red\nT2,blue\nT1,green\n")
-                @test_throws "repeated type(s): T1" import_type_colors_csv!(daf; type_colors_csv)
+                write(type_colors_csv, "type,color\nT2,red\nT1,blue\nT2,green\nT1,pink\n")
+                @test_throws "repeated type(s): T1, T2\n" import_type_colors_csv!(daf; type_colors_csv)
                 @test !has_axis(daf, "type")
             end
 

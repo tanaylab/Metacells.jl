@@ -526,25 +526,18 @@ Nothing is written until all of the above has been verified, so a rejected file 
     type_names = string.(data_frame[:, 1])
     colors = string.(data_frame[:, 2])
 
-    seen_type_names = Set{AbstractString}()
-    repeated_type_names = AbstractString[]
-    for type_name in type_names
-        if type_name in seen_type_names
-            push!(repeated_type_names, type_name)
-        else
-            push!(seen_type_names, type_name)
-        end
-    end
-    if !isempty(repeated_type_names)
+    indices_of_repeated_type_names = indices_of_duplicates(type_names)
+    if !isempty(indices_of_repeated_type_names)
         error(chomp("""
-            repeated type(s): $(join(unique(repeated_type_names), ", "))
+            repeated type(s): $(join(sort!(collect(keys(indices_of_repeated_type_names))), ", "))
             in the type colors csv: $(type_colors_csv)
             """))
     end
 
+    listed_type_names = Set(type_names)
     type_per_entry = get_vector(daf, axis, property).array
     unlisted_type_names =
-        [type_name for type_name in unique(type_per_entry) if type_name != "" && !(type_name in seen_type_names)]
+        [type_name for type_name in unique(type_per_entry) if type_name != "" && !(type_name in listed_type_names)]
     if !isempty(unlisted_type_names)
         error(chomp("""
             type(s) of the axis: $(axis)
