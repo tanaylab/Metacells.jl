@@ -6,10 +6,8 @@ module AnalyzeCells
 export cell_group_membership_from_block_neighborhoods
 export compute_vector_of_is_base_outlier_per_cell!
 export compute_vector_of_total_UMIs_per_cell!
-export gather_gene_UMIs_per_region_cell!
 export own_block_punctuated_correlation_per_gene_per_block!
 export sparse_cell_reference_correlation_per_gene_per_group!
-export sum_sparse_UMIs_per_gene_group_per_cell!
 
 using Base.Threads
 using DataAxesFormats
@@ -93,39 +91,11 @@ $(CONTRACT2)
     metacells_daf::DafReader,
     overwrite::Bool = false,
 )::Nothing
-    is_base_outlier_per_cell = bestify(get_vector(metacells_daf, "cell", "metacell").array .== "")
+    is_base_outlier_per_cell = bestify(plain_array(get_vector(metacells_daf, "cell", "metacell")) .== "")
     set_vector!(cells_daf, "cell", "is_base_outlier", is_base_outlier_per_cell; overwrite)
     @debug "Base outlier cells: $(sum(is_base_outlier_per_cell)) out of $(length(is_base_outlier_per_cell))" _group =
         :mcs_results
     return nothing
-end
-
-# Gather each region cell's UMIs of gene `gene_index` into the first `n_region_cells` entries of `UMIs_per_region_cell`
-# (zeroed, then filled). `region_position_per_cell[cell_index]` is the cell's 1-based position in the region, or 0 if
-# the cell is not in the region. `sparse_UMIs_per_cell_per_gene` is the CSC cell-UMIs matrix (rows = cells, columns =
-# genes); walking the gene's column once replaces per-cell random `UMIs_per_cell_per_gene[cell_index, gene_index]`
-# access, each of which is a binary search into the sparse column. Returns whether any region cell has nonzero UMIs of
-# the gene (the all-zero early-exit check the callers need).
-function gather_gene_UMIs_per_region_cell!(  # UNTESTED
-    UMIs_per_region_cell::AbstractVector{<:Real},
-    n_region_cells::Integer,
-    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC,
-    gene_index::Integer,
-    region_position_per_cell::AbstractVector{<:Integer},
-)::Bool
-    @views fill!(UMIs_per_region_cell[1:n_region_cells], 0)
-    row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
-    UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
-    any_nonzero = false
-    @inbounds for stored_index in nzrange(sparse_UMIs_per_cell_per_gene, gene_index)
-        region_position = region_position_per_cell[row_index_per_stored[stored_index]]
-        if region_position > 0
-            stored_UMIs = UMIs_per_stored[stored_index]
-            UMIs_per_region_cell[region_position] = stored_UMIs
-            any_nonzero |= stored_UMIs > 0
-        end
-    end
-    return any_nonzero
 end
 
 # Build the (group X cell) boolean membership matrix for a block-neighborhood grouping: cell `cell` in block
@@ -470,46 +440,6 @@ function own_block_punctuated_correlation_per_gene_per_block!(  # UNTESTED
             gene_UMIs_per_cell[row_index_per_stored[stored_index]] = 0
         end
         return nothing
-    end
-
-    return nothing
-end
-
-# Sum a sparse cell X gene UMIs matrix over gene groups, per target cell, accumulating into
-# `summed_UMIs_per_group_per_cell` (rows indexed by the group, columns by the target cell, prefilled with zeros).
-# `sparse_UMIs_per_cell_per_gene` is a `SparseMatrixCSC` whose columns are the genes; each group's gene columns are
-# walked once - touching only stored non-zeros - and scattered into their cells, rather than gathering a dense per-group
-# submatrix. The target cell of output column `position` is `cell_index_per_position[position]`; a gene contributes to a
-# column only for cells in this set. `cell_position_per_cell` is caller-provided scratch of length `size(sparse, 1)`,
-# all zero on entry and left all zero on exit, so it can be a reused per-thread buffer.
-function sum_sparse_UMIs_per_gene_group_per_cell!(  # UNTESTED
-    summed_UMIs_per_group_per_cell::AbstractMatrix{<:AbstractFloat},
-    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC,
-    cell_index_per_position::AbstractVector{<:Integer},
-    gene_indices_per_group::AbstractVector{<:AbstractVector{<:Integer}},
-    cell_position_per_cell::AbstractVector{<:Integer},
-)::Nothing
-    n_positions = length(cell_index_per_position)
-    row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
-    UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
-
-    @inbounds for position in 1:n_positions
-        cell_position_per_cell[cell_index_per_position[position]] = position
-    end
-
-    @inbounds for (group_index, gene_indices_of_group) in enumerate(gene_indices_per_group)
-        for gene_index in gene_indices_of_group
-            for stored_index in nzrange(sparse_UMIs_per_cell_per_gene, gene_index)
-                position = cell_position_per_cell[row_index_per_stored[stored_index]]
-                if position > 0
-                    summed_UMIs_per_group_per_cell[group_index, position] += UMIs_per_stored[stored_index]
-                end
-            end
-        end
-    end
-
-    @inbounds for position in 1:n_positions
-        cell_position_per_cell[cell_index_per_position[position]] = 0
     end
 
     return nothing

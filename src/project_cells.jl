@@ -23,9 +23,7 @@ using ..Defaults
 
 import Base.Threads.maxthreadid
 import Metacells.AnalyzeCells.cell_group_membership_from_block_neighborhoods
-import Metacells.AnalyzeCells.gather_gene_UMIs_per_region_cell!
 import Metacells.AnalyzeCells.sparse_cell_reference_correlation_per_gene_per_group!
-import Metacells.AnalyzeCells.sum_sparse_UMIs_per_gene_group_per_cell!
 
 # Needed because of JET:
 import Metacells.Contracts.block_axis
@@ -135,14 +133,15 @@ $(CONTRACT2)
     query_gene_index_per_atlas_pertinent_marker, query_gene_index_per_atlas_gene =
         map_query_atlas_genes(; query_daf, atlas_daf)
 
-    UMIs_per_query_cell_per_query_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
+    sparse_UMIs_per_query_cell_per_query_gene =
+        plain_array(get_matrix(query_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_query_cell = plain_array(get_vector(query_daf, "cell", "total_UMIs"))
 
     provisional_block_index_per_query_cell = compute_provisional_projection_per_query_cell!(;
         query_daf,
         atlas_daf,
         gene_fraction_regularization,
-        UMIs_per_query_cell_per_query_gene,
+        sparse_UMIs_per_query_cell_per_query_gene,
         total_UMIs_per_query_cell,
         query_gene_index_per_atlas_pertinent_marker,
     )
@@ -151,7 +150,7 @@ $(CONTRACT2)
         query_daf,
         atlas_daf,
         query_gene_index_per_atlas_gene,
-        UMIs_per_query_cell_per_query_gene,
+        sparse_UMIs_per_query_cell_per_query_gene,
         total_UMIs_per_query_cell,
         provisional_block_index_per_query_cell,
         overwrite,
@@ -171,7 +170,8 @@ function map_query_atlas_genes(;  # UNTESTED
     axis_indices(query_daf, "gene", atlas_in_module_genes)
 
     is_pertinent_marker_per_atlas_gene =
-        get_vector(atlas_daf, "gene", "is_marker").array .& .! get_vector(atlas_daf, "gene", "is_lateral").array
+        plain_array(get_vector(atlas_daf, "gene", "is_marker")) .&
+        .!plain_array(get_vector(atlas_daf, "gene", "is_lateral"))
     atlas_pertinent_marker_genes = atlas_genes[is_pertinent_marker_per_atlas_gene]
 
     query_gene_index_per_atlas_pertinent_marker = axis_indices(query_daf, "gene", atlas_pertinent_marker_genes)
@@ -184,18 +184,18 @@ function compute_provisional_projection_per_query_cell!(;  # UNTESTED
     query_daf::DafWriter,
     atlas_daf::DafReader,
     gene_fraction_regularization::AbstractFloat,
-    UMIs_per_query_cell_per_query_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_query_cell_per_query_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_query_cell::AbstractVector{<:Integer},
     query_gene_index_per_atlas_pertinent_marker::AbstractVector{<:Integer},
 )::AbstractVector{<:Integer}
     n_blocks = axis_length(atlas_daf, "block")
 
-    is_excluded_per_query_cell = get_vector(query_daf, "cell", "is_excluded").array
+    is_excluded_per_query_cell = plain_array(get_vector(query_daf, "cell", "is_excluded"))
 
     linear_fraction_per_block_per_pertinent_marker =
         atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
     linear_fraction_per_block_per_pertinent_marker = flame_timed("linear_fraction_per_block_per_pertinent_marker") do
-        return mutable_array(densify(linear_fraction_per_block_per_pertinent_marker))
+        return plain_array(densify(linear_fraction_per_block_per_pertinent_marker))
     end
 
     log_linear_fraction_per_pertinent_marker_per_block = Matrix{Float32}(
@@ -231,6 +231,9 @@ function compute_provisional_projection_per_query_cell!(;  # UNTESTED
     provisional_block_index_per_query_cell = Vector{UInt32}(undef, n_query_cells)
 
     n_pertinent_neighborhood_markers = length(query_gene_index_per_atlas_pertinent_marker)
+    sparse_UMIs_per_pertinent_marker_per_query_cell =
+        flipped(sparse_UMIs_per_query_cell_per_query_gene[:, query_gene_index_per_atlas_pertinent_marker])
+    all_pertinent_marker_positions = 1:n_pertinent_neighborhood_markers
     log_linear_fraction_per_pertinent_marker_per_thread =
         [Vector{Float32}(undef, n_pertinent_neighborhood_markers) for _ in 1:maxthreadid()]
     UMIs_per_pertinent_marker_per_thread =
@@ -247,18 +250,13 @@ function compute_provisional_projection_per_query_cell!(;  # UNTESTED
         else
             total_query_cell_UMIs = total_UMIs_per_query_cell[query_cell_index]
 
-            # `UMIs_per_query_cell_per_query_gene` is gathered at the pertinent-marker columns - a non-strided fancy
-            # index `@turbo` can't SIMD. Gather into a contiguous buffer with a plain `@inbounds` loop, then SIMD the
-            # costly per-element `log2` over the strided buffers.
             UMIs_per_pertinent_marker = UMIs_per_pertinent_marker_per_thread[threadid()]
-            @inbounds for gene_position in 1:n_pertinent_neighborhood_markers
-                UMIs_per_pertinent_marker[gene_position] = Float32(
-                    UMIs_per_query_cell_per_query_gene[
-                        query_cell_index,
-                        query_gene_index_per_atlas_pertinent_marker[gene_position],
-                    ],
-                )
-            end
+            gather_sparse_column!(
+                UMIs_per_pertinent_marker,
+                sparse_UMIs_per_pertinent_marker_per_query_cell,
+                query_cell_index,
+                all_pertinent_marker_positions,
+            )
 
             log_linear_fraction_per_pertinent_marker = log_linear_fraction_per_pertinent_marker_per_thread[threadid()]
             @check_turbo_vector(UMIs_per_pertinent_marker)
@@ -292,7 +290,7 @@ function compute_final_projection_per_query_cell(;
     query_daf::DafWriter,
     atlas_daf::DafReader,
     query_gene_index_per_atlas_gene::AbstractVector{<:Integer},
-    UMIs_per_query_cell_per_query_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_query_cell_per_query_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_query_cell::AbstractVector{<:Integer},
     provisional_block_index_per_query_cell::AbstractVector{<:Integer},
     overwrite::Bool,
@@ -304,21 +302,21 @@ function compute_final_projection_per_query_cell(;
     name_per_metacell = axis_vector(atlas_daf, "metacell")
 
     module_index_per_atlas_gene_per_block = atlas_daf["@ gene @ block :: module ?? 0 : index"].array
-    is_found_per_module_per_block = get_matrix(atlas_daf, "module", "block", "is_found").array
+    is_found_per_module_per_block = plain_array(get_matrix(atlas_daf, "module", "block", "is_found"))
 
     is_in_neighborhood_per_other_block_per_base_block =
-        get_matrix(atlas_daf, "block", "block", "is_in_neighborhood").array
+        plain_array(get_matrix(atlas_daf, "block", "block", "is_in_neighborhood"))
     block_index_per_metacell = atlas_daf["@ metacell : block : index"].array
 
     mean_linear_fraction_in_environment_cells_per_module_per_block =
-        get_matrix(atlas_daf, "module", "block", "mean_linear_fraction_in_environment_cells").array
+        plain_array(get_matrix(atlas_daf, "module", "block", "mean_linear_fraction_in_environment_cells"))
     std_linear_fraction_in_environment_cells_per_module_per_block =
-        get_matrix(atlas_daf, "module", "block", "std_linear_fraction_in_environment_cells").array
+        plain_array(get_matrix(atlas_daf, "module", "block", "std_linear_fraction_in_environment_cells"))
 
     mean_euclidean_modules_cells_distance_per_metacell =
-        get_vector(atlas_daf, "metacell", "mean_euclidean_modules_cells_distance").array
+        plain_array(get_vector(atlas_daf, "metacell", "mean_euclidean_modules_cells_distance"))
     std_euclidean_modules_cells_distance_per_metacell =
-        get_vector(atlas_daf, "metacell", "std_euclidean_modules_cells_distance").array
+        plain_array(get_vector(atlas_daf, "metacell", "std_euclidean_modules_cells_distance"))
 
     projected_metacell_per_query_cell = Vector{AbstractString}(undef, n_query_cells)
     projected_metacell_per_query_cell .= ""
@@ -326,11 +324,6 @@ function compute_final_projection_per_query_cell(;
 
     next_indices_of_undetermined_query_cells_per_block =
         [findall(provisional_block_index_per_query_cell .== block_index) for block_index in 1:n_blocks]
-
-    # Per-thread scratch for summing each found module's UMIs per cell (a sparse column walk scattered into the cell's
-    # slot) rather than gathering a dense per-module submatrix.
-    sparse_UMIs_per_query_cell_per_query_gene = mutable_array(UMIs_per_query_cell_per_query_gene)::SparseMatrixCSC
-    cell_position_per_query_cell_per_thread = [zeros(Int32, n_query_cells) for _ in 1:maxthreadid()]
 
     spin_lock_per_block = [SpinLock() for _ in 1:n_blocks]
 
@@ -360,7 +353,8 @@ function compute_final_projection_per_query_cell(;
             ) do block_index
                 block_name = name_per_block[block_index]
 
-                indices_of_undetermined_query_cells = indices_of_undetermined_query_cells_per_block[block_index]
+                # The cells of a later phase are collected from all the blocks in parallel, so they are unsorted.
+                indices_of_undetermined_query_cells = sort!(indices_of_undetermined_query_cells_per_block[block_index])
                 n_undetermined_query_cells = length(indices_of_undetermined_query_cells)
                 if n_undetermined_query_cells > 0
                     @views is_in_neighborhood_per_other_block =
@@ -383,7 +377,7 @@ function compute_final_projection_per_query_cell(;
                     @assert n_found_modules > 0
 
                     linear_fraction_per_module_per_metacell =
-                        get_matrix(atlas_daf, "module", "metacell", "$(block_name)_linear_fraction").array
+                        plain_array(get_matrix(atlas_daf, "module", "metacell", "$(block_name)_linear_fraction"))
 
                     linear_fraction_per_found_module_per_candidate_metacell = linear_fraction_per_module_per_metacell[
                         indices_of_found_modules,
@@ -403,12 +397,11 @@ function compute_final_projection_per_query_cell(;
 
                     linear_fraction_per_found_module_per_undetermined_query_cell =
                         zeros(Float32, n_found_modules, n_undetermined_query_cells)
-                    sum_sparse_UMIs_per_gene_group_per_cell!(
+                    sum_sparse_columns_per_group!(
                         linear_fraction_per_found_module_per_undetermined_query_cell,
                         sparse_UMIs_per_query_cell_per_query_gene,
                         indices_of_undetermined_query_cells,
                         query_gene_indices_per_found_module,
-                        cell_position_per_query_cell_per_thread[threadid()],
                     )
                     linear_fraction_per_found_module_per_undetermined_query_cell ./=
                         reshape(total_UMIs_per_undetermined_query_cell, 1, n_undetermined_query_cells)
@@ -527,7 +520,7 @@ function compute_final_projection_per_query_cell(;
     )
 
     projected_metacell_index_per_query_cell = axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell)
-    block_per_metacell = get_vector(atlas_daf, "metacell", "block").array
+    block_per_metacell = plain_array(get_vector(atlas_daf, "metacell", "block"))
     projected_block_per_query_cell = block_per_metacell[projected_metacell_index_per_query_cell]
     set_vector!(query_daf, "cell", "projected_block", projected_block_per_query_cell; overwrite)
 
@@ -599,17 +592,15 @@ $(CONTRACT2)
 
     indices_of_included_query_cells = query_daf["@ cell [ ! is_excluded ] : index"].array
 
-    UMIs_per_query_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
-    @assert issparse(UMIs_per_query_cell_per_gene)
-    sparse_UMIs_per_query_cell_per_gene = mutable_array(UMIs_per_query_cell_per_gene)::SparseMatrixCSC
-    total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
+    sparse_UMIs_per_query_cell_per_gene = plain_array(get_matrix(query_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_query_cell = plain_array(get_vector(query_daf, "cell", "total_UMIs"))
 
-    projected_metacell_per_query_cell = get_vector(query_daf, "cell", "projected_metacell").array
+    projected_metacell_per_query_cell = plain_array(get_vector(query_daf, "cell", "projected_metacell"))
     atlas_metacell_index_per_query_cell =
         axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell; allow_missing = true)
 
-    UMIs_per_atlas_metacell_per_gene = get_matrix(atlas_daf, "metacell", "gene", "UMIs").array
-    total_UMIs_per_atlas_metacell = get_vector(atlas_daf, "metacell", "total_UMIs").array
+    UMIs_per_atlas_metacell_per_gene = plain_array(densify(get_matrix(atlas_daf, "metacell", "gene", "UMIs")))
+    total_UMIs_per_atlas_metacell = plain_array(get_vector(atlas_daf, "metacell", "total_UMIs"))
 
     # All included query cells form a single group, each mapped to its projected atlas metacell (cells without one do
     # not participate); the sparse kernel then correlates each gene over these cells against their projected metacells.
@@ -759,37 +750,35 @@ $(CONTRACT2)
     indices_of_common_included_atlas_genes = axis_indices(atlas_daf, "gene", common_included_genes)
     indices_of_common_included_query_genes = axis_indices(query_daf, "gene", common_included_genes)
 
-    UMIs_per_query_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
-    @assert issparse(UMIs_per_query_cell_per_gene)
-    sparse_UMIs_per_query_cell_per_gene = mutable_array(UMIs_per_query_cell_per_gene)::SparseMatrixCSC
-    total_UMIs_per_query_cell = get_vector(query_daf, "cell", "total_UMIs").array
+    sparse_UMIs_per_query_cell_per_gene = plain_array(get_matrix(query_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_query_cell = plain_array(get_vector(query_daf, "cell", "total_UMIs"))
 
-    projected_metacell_per_query_cell = get_vector(query_daf, "cell", "projected_metacell").array
+    projected_metacell_per_query_cell = plain_array(get_vector(query_daf, "cell", "projected_metacell"))
     atlas_metacell_index_per_query_cell =
         axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell; allow_missing = true)
 
-    projected_block_per_query_cell = get_vector(query_daf, "cell", "projected_block").array
+    projected_block_per_query_cell = plain_array(get_vector(query_daf, "cell", "projected_block"))
     atlas_block_index_per_query_cell =
         axis_indices(atlas_daf, "block", projected_block_per_query_cell; allow_missing = true)
 
-    UMIs_per_atlas_metacell_per_gene = get_matrix(atlas_daf, "metacell", "gene", "UMIs").array
-    total_UMIs_per_atlas_metacell = get_vector(atlas_daf, "metacell", "total_UMIs").array
+    UMIs_per_atlas_metacell_per_gene = plain_array(densify(get_matrix(atlas_daf, "metacell", "gene", "UMIs")))
+    total_UMIs_per_atlas_metacell = plain_array(get_vector(atlas_daf, "metacell", "total_UMIs"))
 
-    is_lateral_per_atlas_gene = get_vector(atlas_daf, "gene", "is_lateral").array
+    is_lateral_per_atlas_gene = plain_array(get_vector(atlas_daf, "gene", "is_lateral"))
     is_lateral_per_common_included_gene = is_lateral_per_atlas_gene[indices_of_common_included_atlas_genes]
 
-    is_marker_per_atlas_gene = get_vector(atlas_daf, "gene", "is_marker").array
+    is_marker_per_atlas_gene = plain_array(get_vector(atlas_daf, "gene", "is_marker"))
     is_marker_per_common_included_gene = is_marker_per_atlas_gene[indices_of_common_included_atlas_genes]
     is_pertinent_marker_per_common_included_gene =
         is_marker_per_common_included_gene .& .! is_lateral_per_common_included_gene
 
     is_in_neighborhood_per_other_block_per_base_block =
-        get_matrix(atlas_daf, "block", "block", "is_in_neighborhood").array
+        plain_array(get_matrix(atlas_daf, "block", "block", "is_in_neighborhood"))
     is_neighborhood_marker_per_atlas_gene_per_atlas_block =
         get_matrix(atlas_daf, "gene", "block", "is_neighborhood_marker"; default = nothing)
     if is_neighborhood_marker_per_atlas_gene_per_atlas_block !== nothing
         is_neighborhood_marker_per_atlas_gene_per_atlas_block =
-            is_neighborhood_marker_per_atlas_gene_per_atlas_block.array
+            plain_array(is_neighborhood_marker_per_atlas_gene_per_atlas_block)
     end
 
     correlation_between_neighborhood_query_cells_and_projected_metacells_per_query_gene_per_atlas_block =
@@ -821,7 +810,7 @@ $(CONTRACT2)
         else
             daf = atlas_daf
         end
-        is_in_bin_per_atlas_gene = get_vector(daf, "gene", "bin").array .== bin
+        is_in_bin_per_atlas_gene = plain_array(get_vector(daf, "gene", "bin")) .== bin
         is_in_bin_per_common_included_gene = is_in_bin_per_atlas_gene[indices_of_common_included_atlas_genes]
         @assert any(is_in_bin_per_common_included_gene)
         @assert !all(is_in_bin_per_common_included_gene)

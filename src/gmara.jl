@@ -686,7 +686,7 @@ Returns the number of genes that are set in the mask.
         end
         mask_property = "is_$(list)"
     end
-    names = get_vector(daf, "gene", name_property).array
+    names = plain_array(get_vector(daf, "gene", name_property))
     is_in_list_per_gene = gmara_genes_mask(; names, species, namespace, list, version, cache_dir, timeout)
     if !any(is_in_list_per_gene)
         error("empty $(mask_property) genes mask loaded from Gmara")  # UNTESTED

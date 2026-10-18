@@ -145,14 +145,14 @@ $(CONTRACT)
 
     n_genes = axis_length(daf, "gene")
 
-    is_skeleton_per_gene = get_vector(daf, "gene", "is_skeleton").array
+    is_skeleton_per_gene = plain_array(get_vector(daf, "gene", "is_skeleton"))
     indices_of_skeletons = findall(is_skeleton_per_gene)
 
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
     indices_of_markers = findall(is_marker_per_gene)
     n_markers = length(indices_of_markers)
 
-    correlation_per_gene_per_gene = get_matrix(daf, "gene", "gene", "correlation_between_markers").array
+    correlation_per_gene_per_gene = plain_array(get_matrix(daf, "gene", "gene", "correlation_between_markers"))
     correlation_per_skeleton_per_marker =
         Matrix{Float32}(correlation_per_gene_per_gene[indices_of_skeletons, indices_of_markers])
 
@@ -359,15 +359,15 @@ $(CONTRACT)
     n_metacells = axis_length(daf, "metacell")
     n_genes = axis_length(daf, "gene")
 
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker")
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
     n_markers = sum(is_marker_per_gene)
 
     log_fraction_per_metacell_per_marker =
-        mutable_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array))
+        plain_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"]))
     @assert_matrix(log_fraction_per_metacell_per_marker, n_metacells, n_markers, Columns)
 
     median_log_fraction_per_marker =
-        mutable_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"].array))
+        plain_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"]))
     @assert_vector(median_log_fraction_per_marker, n_markers)
 
     abs_fold_per_metacell_per_marker = Matrix{Float32}(undef, size(log_fraction_per_metacell_per_marker))
@@ -569,11 +569,11 @@ $(CONTRACT)
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
-    is_regulator_per_gene = get_vector(daf, "gene", "is_regulator").array
-    is_excluded_per_gene = get_vector(daf, "gene", "is_excluded").array
-    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
-    is_forbidden_per_gene = get_vector(daf, "gene", "is_forbidden").array
+    is_regulator_per_gene = plain_array(get_vector(daf, "gene", "is_regulator"))
+    is_excluded_per_gene = plain_array(get_vector(daf, "gene", "is_excluded"))
+    is_lateral_per_gene = plain_array(get_vector(daf, "gene", "is_lateral"))
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
+    is_forbidden_per_gene = plain_array(get_vector(daf, "gene", "is_forbidden"))
 
     is_skeleton_per_gene = is_regulator_per_gene .& is_marker_per_gene
     is_skeleton_per_gene .&= .!is_excluded_per_gene .& .!is_lateral_per_gene .& .!is_forbidden_per_gene
@@ -680,17 +680,17 @@ $(CONTRACT2)
     base_daf::Maybe{DafReader} = nothing,
     regulators_count::Integer = 5,
 )::DataFrame
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
     indices_of_markers = findall(is_marker_per_gene)
 
     gene_name_per_gene = axis_vector(daf, "gene")
     gene_name_per_marker = gene_name_per_gene[indices_of_markers]
-    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
-    is_transcription_factor_per_gene = get_vector(daf, "gene", "is_transcription_factor").array
-    is_regulator_per_gene = get_vector(daf, "gene", "is_regulator").array
-    is_skeleton_per_gene = get_vector(daf, "gene", "is_skeleton").array
+    is_lateral_per_gene = plain_array(get_vector(daf, "gene", "is_lateral"))
+    is_transcription_factor_per_gene = plain_array(get_vector(daf, "gene", "is_transcription_factor"))
+    is_regulator_per_gene = plain_array(get_vector(daf, "gene", "is_regulator"))
+    is_skeleton_per_gene = plain_array(get_vector(daf, "gene", "is_skeleton"))
 
-    correlation_per_gene_per_gene = get_matrix(daf, "gene", "gene", "correlation_between_markers").array
+    correlation_per_gene_per_gene = plain_array(get_matrix(daf, "gene", "gene", "correlation_between_markers"))
     correlation_per_marker_per_marker =
         Matrix{Float32}(correlation_per_gene_per_gene[indices_of_markers, indices_of_markers])
 
@@ -721,7 +721,7 @@ $(CONTRACT2)
 
     data_frame = DataFrame(
         "gene" => gene_name_per_marker,
-        "rank" => get_vector(daf, "gene", "marker_rank").array[indices_of_markers],
+        "rank" => plain_array(get_vector(daf, "gene", "marker_rank"))[indices_of_markers],
         "lat?" => is_lateral_per_gene[indices_of_markers],
         "tf?" => is_transcription_factor_per_gene[indices_of_markers],
         "reg?" => is_regulator_per_gene[indices_of_markers],
@@ -792,10 +792,10 @@ function collect_module_sharing_columns!(  # UNTESTED
         return nothing
     end
 
-    data_frame[!, "$(prefix)_no_mod_f"] = no_module_fraction_per_gene.array[indices_of_markers]
+    data_frame[!, "$(prefix)_no_mod_f"] = plain_array(no_module_fraction_per_gene)[indices_of_markers]
 
     name_per_marker_per_rank, fraction_per_marker_per_rank = top_shared_regulators_per_marker(
-        shared_fraction_per_regulator_per_gene.array,
+        plain_array(shared_fraction_per_regulator_per_gene),
         gene_name_per_gene,
         indices_of_markers,
         regulators_count,
@@ -888,8 +888,8 @@ function correlation_change_per_marker(  # UNTESTED
     property_name::AbstractString,
     indices_of_markers::AbstractVector{<:Integer},
 )::Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}}
-    correlation_per_gene_per_base_block = get_matrix(daf, "gene", "base_block", property_name).array
-    base_correlation_per_gene_per_base_block = get_matrix(base_daf, "gene", "base_block", property_name).array
+    correlation_per_gene_per_base_block = plain_array(get_matrix(daf, "gene", "base_block", property_name))
+    base_correlation_per_gene_per_base_block = plain_array(get_matrix(base_daf, "gene", "base_block", property_name))
     @assert axis_vector(daf, "base_block") == axis_vector(base_daf, "base_block")
     n_base_blocks = size(base_correlation_per_gene_per_base_block, 2)
 
@@ -983,18 +983,18 @@ $(CONTRACT2)
         ),
     ],
 ) function compute_skeleton_report(; daf::DafReader, base_daf::Maybe{DafReader} = nothing)::DataFrame  # UNTESTED
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
     indices_of_markers = findall(is_marker_per_gene)
     n_markers = length(indices_of_markers)
 
-    is_skeleton_per_gene = get_vector(daf, "gene", "is_skeleton").array
+    is_skeleton_per_gene = plain_array(get_vector(daf, "gene", "is_skeleton"))
     indices_of_skeletons = findall(is_skeleton_per_gene)
     n_skeletons = length(indices_of_skeletons)
 
-    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
+    is_lateral_per_gene = plain_array(get_vector(daf, "gene", "is_lateral"))
     gene_name_per_gene = axis_vector(daf, "gene")
 
-    correlation_per_gene_per_gene = get_matrix(daf, "gene", "gene", "correlation_between_markers").array
+    correlation_per_gene_per_gene = plain_array(get_matrix(daf, "gene", "gene", "correlation_between_markers"))
     correlation_per_marker_per_skeleton =
         Matrix{Float32}(correlation_per_gene_per_gene[indices_of_markers, indices_of_skeletons])
 

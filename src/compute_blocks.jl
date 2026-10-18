@@ -72,13 +72,14 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     if n_blocks === nothing
-        distances_between_metacells = get_matrix(daf, "metacell", "metacell", "max_skeleton_fold_distance").array
+        distances_between_metacells = plain_array(get_matrix(daf, "metacell", "metacell", "max_skeleton_fold_distance"))
         clusters = hclust(distances_between_metacells; linkage = :complete)
         block_index_per_metacell = cutree(clusters; h = max_block_span)
         n_blocks = maximum(block_index_per_metacell)
     end
 
-    distances_between_metacells = get_matrix(daf, "metacell", "metacell", "euclidean_skeleton_fold_distance").array
+    distances_between_metacells =
+        plain_array(get_matrix(daf, "metacell", "metacell", "euclidean_skeleton_fold_distance"))
     clusters = hclust(distances_between_metacells; linkage = :ward)
     block_index_per_metacell = cutree(clusters; k = n_blocks)
 

@@ -36,7 +36,6 @@ using ..Defaults
 using ..Contracts
 
 import Base.Threads.maxthreadid
-import Metacells.AnalyzeCells.gather_gene_UMIs_per_region_cell!
 import Random.default_rng
 
 # Needed because of JET:
@@ -114,8 +113,8 @@ $(CONTRACT)
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
-    UMIs_per_gene_per_metacell = daf["@ gene @ cell :: UMIs |/ metacell =@ >| Sum"].array
-    set_matrix!(daf, "gene", "metacell", "UMIs", bestify(UMIs_per_gene_per_metacell); overwrite)
+    UMIs_per_metacell_per_gene = daf["@ cell @ gene :: UMIs -/ metacell =@ >- Sum"].array
+    set_matrix!(daf, "metacell", "gene", "UMIs", bestify(UMIs_per_metacell_per_gene); overwrite)
     return nothing
 end
 
@@ -172,8 +171,8 @@ $(CONTRACT)
     n_metacells = axis_length(daf, "metacell")
 
     indices_of_included_genes = get_query(daf, "@ gene [ ! is_excluded ] : index").array
-    UMIs_per_metacell_per_included_gene = daf["@ metacell @ gene [ ! is_excluded ] :: UMIs"].array
-    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
+    UMIs_per_metacell_per_included_gene = plain_array(daf["@ metacell @ gene [ ! is_excluded ] :: UMIs"])
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
 
     linear_fraction_per_metacell_per_gene = zeros(Float32, n_metacells, n_genes)
     @. linear_fraction_per_metacell_per_gene[:, indices_of_included_genes] =
@@ -208,8 +207,7 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     @assert gene_fraction_regularization >= 0
-    fraction_per_metacell_per_gene =
-        mutable_array(densify(get_matrix(daf, "metacell", "gene", "linear_fraction").array))
+    fraction_per_metacell_per_gene = plain_array(densify(get_matrix(daf, "metacell", "gene", "linear_fraction")))
     empty_dense_matrix!(
         daf,
         "metacell",
@@ -265,7 +263,7 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
 )::Nothing
-    linear_fraction_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"].array
+    linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
     linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
     log_linear_fraction_per_skeleton_per_metacell =
         log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
@@ -324,9 +322,9 @@ $(CONTRACT)
     @assert min_significant_gene_UMIs >= 0
     @assert 0 < fold_confidence < 1
 
-    linear_fraction_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"].array
-    linear_fraction_per_skeleton_per_metacell = Matrix(flip(linear_fraction_per_metacell_per_skeleton))
-    total_UMIs_per_metacell = mutable_array(densify(get_vector(daf, "metacell", "total_UMIs").array))
+    linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
+    linear_fraction_per_skeleton_per_metacell = Matrix(flip(plain_array(linear_fraction_per_metacell_per_skeleton)))
+    total_UMIs_per_metacell = plain_array(densify(get_vector(daf, "metacell", "total_UMIs")))
 
     confidence_stds = quantile(Normal(), fold_confidence)
 
@@ -531,11 +529,11 @@ $(CONTRACT)
     indices_of_grouped_cells = get_query(daf, "@ cell [ metacell ] : index").array
     n_grouped_cells = length(indices_of_grouped_cells)
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    UMIs_per_metacell_per_gene = plain_array(densify(get_matrix(daf, "metacell", "gene", "UMIs")))
 
-    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
+    total_UMIs_per_cell = plain_array(get_vector(daf, "cell", "total_UMIs"))
     total_UMIs_per_grouped_cell = total_UMIs_per_cell[indices_of_grouped_cells]
 
     metacell_index_per_grouped_cell = daf["@ cell : metacell ?? : index"].array
@@ -549,16 +547,6 @@ $(CONTRACT)
         [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
     gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread =
         [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
-
-    # Cell UMIs are gathered per gene via `gather_gene_UMIs_per_region_cell!` (a CSC column walk) rather than random
-    # `[cell, gene]` access; `region_position_per_cell` maps each cell to its position among the grouped cells (0 for
-    # ungrouped cells). It is read-only during the parallel gene loop.
-    @assert issparse(UMIs_per_cell_per_gene)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
-    region_position_per_cell = zeros(Int, axis_length(daf, "cell"))
-    for (grouped_cell_position, cell_index) in enumerate(indices_of_grouped_cells)
-        region_position_per_cell[cell_index] = grouped_cell_position
-    end
 
     parallel_loop_wo_rng(
         1:n_included_genes;
@@ -576,12 +564,11 @@ $(CONTRACT)
             gene_punctuated_metacell_log_fraction_per_grouped_cell_per_thread[threadid()]
 
         # Gather this gene's cell UMIs (CSC column walk) into the cell buffer; all-zero => correlation 0.
-        any_grouped_cell_UMIs = gather_gene_UMIs_per_region_cell!(
+        any_grouped_cell_UMIs = gather_sparse_column!(
             gene_cell_log_fraction_per_grouped_cell,
-            n_grouped_cells,
             sparse_UMIs_per_cell_per_gene,
             gene_index,
-            region_position_per_cell,
+            indices_of_grouped_cells,
         )
         if !any_grouped_cell_UMIs
             correlation_between_cells_and_punctuated_metacells_per_gene[gene_index] = 0.0f0
@@ -642,7 +629,7 @@ $(CONTRACT)
     )
 
     is_pertinent_marker_per_gene =
-        get_vector(daf, "gene", "is_marker").array .& .!get_vector(daf, "gene", "is_lateral").array
+        plain_array(get_vector(daf, "gene", "is_marker")) .& .!plain_array(get_vector(daf, "gene", "is_lateral"))
     @debug (
         "Mean correlation of pertinent marker genes between cells and their punctuated metacells: " *
         "$(mean(correlation_between_cells_and_punctuated_metacells_per_gene[is_pertinent_marker_per_gene]))"
@@ -694,15 +681,14 @@ $(CONTRACT)
 )::Nothing
     gene_fraction_regularization = Float32(gene_fraction_regularization)
     n_genes = axis_length(daf, "gene")
-    n_cells = axis_length(daf, "cell")
 
     # Only marker genes are correlated (every consumer uses a subset of the markers); zero for non-marker genes.
     index_per_included_gene = get_query(daf, "@ gene [ is_marker ] : index").array
     n_included_genes = length(index_per_included_gene)
 
     # The cells which were projected onto some metacell; one which was not is correlated with nothing.
-    projected_metacell_per_cell = get_vector(daf, "cell", "projected_metacell").array
-    metacell_per_cell = get_vector(daf, "cell", "metacell").array
+    projected_metacell_per_cell = plain_array(get_vector(daf, "cell", "projected_metacell"))
+    metacell_per_cell = plain_array(get_vector(daf, "cell", "metacell"))
     indices_of_grouped_cells = findall(projected_metacell_per_cell .!= "")
     n_grouped_cells = length(indices_of_grouped_cells)
 
@@ -714,11 +700,11 @@ $(CONTRACT)
     is_punctuated_per_grouped_cell =
         metacell_per_cell[indices_of_grouped_cells] .== projected_metacell_per_cell[indices_of_grouped_cells]
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    UMIs_per_metacell_per_gene = plain_array(densify(get_matrix(daf, "metacell", "gene", "UMIs")))
 
-    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
+    total_UMIs_per_cell = plain_array(get_vector(daf, "cell", "total_UMIs"))
     total_UMIs_per_grouped_cell = total_UMIs_per_cell[indices_of_grouped_cells]
 
     total_projected_metacell_UMIs_per_grouped_cell =
@@ -731,16 +717,6 @@ $(CONTRACT)
         [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
     gene_projected_metacell_log_fraction_per_grouped_cell_per_thread =
         [Vector{Float32}(undef, n_grouped_cells) for _ in 1:maxthreadid()]
-
-    # Cell UMIs are gathered per gene via `gather_gene_UMIs_per_region_cell!` (a CSC column walk) rather than random
-    # `[cell, gene]` access; `region_position_per_cell` maps each cell to its position among the grouped cells (0 for
-    # ungrouped cells). It is read-only during the parallel gene loop.
-    @assert issparse(UMIs_per_cell_per_gene)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
-    region_position_per_cell = zeros(Int, n_cells)
-    for (grouped_cell_position, cell_index) in enumerate(indices_of_grouped_cells)
-        region_position_per_cell[cell_index] = grouped_cell_position
-    end
 
     parallel_loop_wo_rng(
         1:n_included_genes;
@@ -758,12 +734,11 @@ $(CONTRACT)
             gene_projected_metacell_log_fraction_per_grouped_cell_per_thread[threadid()]
 
         # Gather this gene's cell UMIs (CSC column walk) into the cell buffer; all-zero => correlation 0.
-        any_grouped_cell_UMIs = gather_gene_UMIs_per_region_cell!(
+        any_grouped_cell_UMIs = gather_sparse_column!(
             gene_cell_log_fraction_per_grouped_cell,
-            n_grouped_cells,
             sparse_UMIs_per_cell_per_gene,
             gene_index,
-            region_position_per_cell,
+            indices_of_grouped_cells,
         )
         if !any_grouped_cell_UMIs
             correlation_between_cells_and_projected_punctuated_metacells_per_gene[gene_index] = 0.0f0
@@ -822,7 +797,7 @@ $(CONTRACT)
     )
 
     is_pertinent_marker_per_gene =
-        get_vector(daf, "gene", "is_marker").array .& .!get_vector(daf, "gene", "is_lateral").array
+        plain_array(get_vector(daf, "gene", "is_marker")) .& .!plain_array(get_vector(daf, "gene", "is_lateral"))
     @debug (
         "Mean correlation of pertinent marker genes between cells and their projected punctuated metacells: " *
         "$(mean(correlation_between_cells_and_projected_punctuated_metacells_per_gene[is_pertinent_marker_per_gene]))"
@@ -925,8 +900,8 @@ in a per-gene-per-gene `matrix_name`.
     n_subset_metacells = length(indices_of_subset_metacells)
 
     n_genes = axis_length(daf, "gene")
-    log_fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "log_linear_fraction").array
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
+    log_fraction_per_metacell_per_gene = plain_array(get_matrix(daf, "metacell", "gene", "log_linear_fraction"))
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
     indices_of_markers = findall(is_marker_per_gene)
     n_marker_genes = length(indices_of_markers)
 
@@ -1030,8 +1005,8 @@ function compute_prior_position_per_metacell(;  # UNTESTED
 )::Vector{Vector{Float32}}
     n_metacells = axis_length(daf, "metacell")
 
-    umap_x_per_prev_metacell = get_vector(prev_daf, "metacell", "umap_x").array
-    umap_y_per_prev_metacell = get_vector(prev_daf, "metacell", "umap_y").array
+    umap_x_per_prev_metacell = plain_array(get_vector(prev_daf, "metacell", "umap_x"))
+    umap_y_per_prev_metacell = plain_array(get_vector(prev_daf, "metacell", "umap_y"))
     prev_metacell_index_per_cell = prev_daf["@ cell : metacell ?? 0 : index"].array  # NOJET
 
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
@@ -1125,7 +1100,7 @@ $(CONTRACT2)
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
-    distances_between_metacells = daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"].array
+    distances_between_metacells = plain_array(daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"])
     result = with_global_rng(rng) do
         if prev_daf === nothing
             return UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
@@ -1177,7 +1152,7 @@ $(CONTRACT)
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
-    distances_between_metacells = daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"].array
+    distances_between_metacells = plain_array(daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"])
     result = with_global_rng(rng) do
         return UMAP.fit(distances_between_metacells, 3; metric = :precomputed, min_dist, n_neighbors)
     end

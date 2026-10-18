@@ -162,7 +162,8 @@ nested_test("anndata_format") do
             end
 
             nested_test("!ensembl") do
-                @test_throws "both the ensembl_property and the copy_data specify the per-gene: gene_ids" import_cells_h5ad!(
+                expected_message = "both the ensembl_property and the copy_data specify the per-gene: gene_ids"
+                @test_throws expected_message import_cells_h5ad!(
                     daf;
                     cells_h5ad,
                     copy_data = CopyAnnData(("gene", "gene_ids") => nothing),

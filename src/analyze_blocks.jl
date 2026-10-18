@@ -63,7 +63,6 @@ using ..Contracts
 
 import Base.Threads.maxthreadid
 import ..AnalyzeCells.cell_group_membership_from_block_neighborhoods
-import ..AnalyzeCells.gather_gene_UMIs_per_region_cell!
 import ..AnalyzeCells.sparse_cell_reference_correlation_per_gene_per_group!
 import ..AnalyzeGenes.fill_vector_of_is_correlated_with_skeleton_per_gene!
 
@@ -269,8 +268,8 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     indices_of_included_genes = get_query(daf, "@ gene [ ! is_excluded ] : index").array
-    UMIs_per_block_per_included_gene = daf["@ block @ gene [ ! is_excluded ] :: UMIs"].array
-    total_included_UMIs_per_block = get_vector(daf, "block", "total_UMIs").array
+    UMIs_per_block_per_included_gene = plain_array(daf["@ block @ gene [ ! is_excluded ] :: UMIs"])
+    total_included_UMIs_per_block = plain_array(get_vector(daf, "block", "total_UMIs"))
 
     n_blocks = axis_length(daf, "block")
     n_genes = axis_length(daf, "gene")
@@ -307,7 +306,7 @@ $(CONTRACT)
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     overwrite::Bool = false,
 )::Nothing
-    fraction_per_gene_per_block = mutable_array(densify(get_matrix(daf, "gene", "block", "linear_fraction").array))
+    fraction_per_gene_per_block = plain_array(densify(get_matrix(daf, "gene", "block", "linear_fraction")))
     empty_dense_matrix!(
         daf,
         "gene",
@@ -436,37 +435,46 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
 )::Nothing
     n_cells = axis_length(daf, "cell")
 
-    total_UMIs_per_cell = mutable_array(densify(get_vector(daf, "cell", "total_UMIs").array))
-    UMIs_per_cell_per_pertinent_marker = daf["@ cell @ gene [ is_marker & ! is_lateral ] :: UMIs"].array
-    dense_UMIs_per_pertinent_marker_per_cell = Matrix(flip(UMIs_per_cell_per_pertinent_marker))
-    log_linear_fraction_per_pertinent_marker_per_cell =
-        Matrix{Float32}(undef, size(dense_UMIs_per_pertinent_marker_per_cell))
-    @check_turbo_matrix(dense_UMIs_per_pertinent_marker_per_cell)
-    @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_cell)
-    @check_turbo_vector(total_UMIs_per_cell)
-    n_pertinent_markers, n_cells = size(dense_UMIs_per_pertinent_marker_per_cell)
+    total_UMIs_per_cell = plain_array(densify(get_vector(daf, "cell", "total_UMIs")))
+    is_pertinent_marker_per_gene =
+        plain_array(get_vector(daf, "gene", "is_marker")) .& .!plain_array(get_vector(daf, "gene", "is_lateral"))
+    indices_of_pertinent_markers = findall(is_pertinent_marker_per_gene)
+    n_pertinent_markers = length(indices_of_pertinent_markers)
+
+    # Each pertinent marker's column is filled with the value of zero UMIs, then each stored value is placed by walking
+    # the marker's column of the cell UMIs, rather than reading `[cell, gene]` element by element.
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
+    UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
+    log_linear_fraction_of_zero_per_cell = log2.(0 ./ total_UMIs_per_cell .+ gene_fraction_regularization)
+    log_linear_fraction_per_cell_per_pertinent_marker = Matrix{Float32}(undef, n_cells, n_pertinent_markers)
     parallel_loop_wo_rng(
-        1:n_cells;
-        name = "log_linear_fraction_per_pertinent_marker_per_cell",
+        1:n_pertinent_markers;
+        name = "log_linear_fraction_per_cell_per_pertinent_marker",
         progress = DebugProgress(
-            n_cells;
+            n_pertinent_markers;
             group = :mcs_loops,
-            desc = "log_linear_fraction_per_pertinent_marker_per_cell",
+            desc = "log_linear_fraction_per_cell_per_pertinent_marker",
         ),
-        progress_chunk = 100,
-    ) do cell_index
-        @turbo for pertinent_marker_position in 1:n_pertinent_markers
-            log_linear_fraction_per_pertinent_marker_per_cell[pertinent_marker_position, cell_index] = log2(
-                dense_UMIs_per_pertinent_marker_per_cell[pertinent_marker_position, cell_index] /
-                total_UMIs_per_cell[cell_index] + gene_fraction_regularization,
-            )
+    ) do pertinent_marker_position
+        gene_index = indices_of_pertinent_markers[pertinent_marker_position]
+        @views log_linear_fraction_per_cell =
+            log_linear_fraction_per_cell_per_pertinent_marker[:, pertinent_marker_position]
+        log_linear_fraction_per_cell .= log_linear_fraction_of_zero_per_cell
+        @inbounds for stored_index in nzrange(sparse_UMIs_per_cell_per_gene, gene_index)
+            cell_index = row_index_per_stored[stored_index]
+            log_linear_fraction_per_cell[cell_index] =
+                log2(UMIs_per_stored[stored_index] / total_UMIs_per_cell[cell_index] + gene_fraction_regularization)
         end
         return nothing
     end
+    log_linear_fraction_per_pertinent_marker_per_cell = flipped(log_linear_fraction_per_cell_per_pertinent_marker)
+    @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_cell)
 
     linear_fraction_per_block_per_pertinent_marker =
         daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
-    linear_fraction_per_pertinent_marker_per_block = Matrix(flip(linear_fraction_per_block_per_pertinent_marker))
+    linear_fraction_per_pertinent_marker_per_block =
+        Matrix(flip(plain_array(linear_fraction_per_block_per_pertinent_marker)))
     log_linear_fraction_per_pertinent_marker_per_block =
         Matrix{Float32}(undef, size(linear_fraction_per_pertinent_marker_per_block))
     @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_block)
@@ -654,14 +662,14 @@ $(CONTRACT)
     n_blocks = axis_length(daf, "block")
     name_per_block = axis_vector(daf, "block")
 
-    n_cells_per_block = get_vector(daf, "block", "n_cells").array
+    n_cells_per_block = plain_array(get_vector(daf, "block", "n_cells"))
 
     mean_euclidean_skeleton_fold_distance_per_block_per_block =
-        get_matrix(daf, "block", "block", "mean_euclidean_skeleton_fold_distance")
-    n_metacells_per_block = get_vector(daf, "block", "n_metacells")
-    total_UMIs_per_block = get_vector(daf, "block", "total_UMIs")
+        plain_array(get_matrix(daf, "block", "block", "mean_euclidean_skeleton_fold_distance"))
+    n_metacells_per_block = plain_array(get_vector(daf, "block", "n_metacells"))
+    total_UMIs_per_block = plain_array(get_vector(daf, "block", "total_UMIs"))
     confusion_per_other_block_per_original_block =
-        get_matrix(daf, "block", "block", "confusion_by_closest_by_pertinent_markers").array
+        plain_array(get_matrix(daf, "block", "block", "confusion_by_closest_by_pertinent_markers"))
 
     confusion_fraction_per_block_per_block = Float32.(confusion_per_other_block_per_original_block ./ n_cells_per_block)
     confusion_fraction_per_block_per_block .+= transpose(confusion_fraction_per_block_per_block)
@@ -864,8 +872,9 @@ function compute_vector_of_neighborhood_something_per_block(  # UNTESTED
 )::Nothing
     n_blocks = axis_length(daf, "block")
 
-    value_per_block = get_vector(daf, "block", vector_property).array
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    value_per_block = plain_array(get_vector(daf, "block", vector_property))
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
 
     neighborhood_value_per_block = Vector{UInt32}(undef, n_blocks)
     parallel_loop_wo_rng(
@@ -979,8 +988,8 @@ function compute_vector_of_environment_something_per_block(  # UNTESTED
 )::Nothing
     n_blocks = axis_length(daf, "block")
 
-    value_per_metacell = get_vector(daf, "metacell", vector_property).array
-    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
+    value_per_metacell = plain_array(get_vector(daf, "metacell", vector_property))
+    is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
 
     environment_value_per_block = Vector{UInt32}(undef, n_blocks)
     parallel_loop_wo_rng(
@@ -1034,7 +1043,8 @@ We only consider genes which are markers in the overall population. We then call
     name_per_block = axis_vector(daf, "block")
 
     # Per-block work scales with the neighborhood metacell count; weight blocks heaviest-first by that count.
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
     block_index_per_metacell = daf["@ metacell : block : index"].array
     n_metacells_per_block = zeros(Int, n_blocks)
     for metacell_index in 1:n_metacells
@@ -1075,8 +1085,8 @@ We only consider genes which are markers in the overall population. We then call
                 min_marker_gene_range_fold,
                 min_marker_quantile,
             )
-            full_index_per_gene = get_vector(adapted, "gene", "full_index").array
-            is_neighborhood_marker_per_gene = get_vector(adapted, "gene", "is_marker").array
+            full_index_per_gene = plain_array(get_vector(adapted, "gene", "full_index"))
+            is_neighborhood_marker_per_gene = plain_array(get_vector(adapted, "gene", "is_marker"))
             is_neighborhood_marker_per_gene_per_block[full_index_per_gene, block_index] =
                 is_neighborhood_marker_per_gene
             return nothing
@@ -1131,7 +1141,7 @@ We only consider genes which are markers in the overall population. We then call
     name_per_block = axis_vector(daf, "block")
 
     # Per-block work scales with the environment metacell count; weight blocks heaviest-first by that count.
-    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
+    is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
     n_metacells_in_environment_per_block = vec(sum(is_in_environment_per_metacell_per_block; dims = 1))
 
     is_environment_marker_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
@@ -1166,8 +1176,8 @@ We only consider genes which are markers in the overall population. We then call
                 min_marker_gene_range_fold,
                 min_marker_quantile,
             )
-            full_index_per_gene = get_vector(adapted, "gene", "full_index").array
-            is_environment_marker_per_gene = get_vector(adapted, "gene", "is_marker").array
+            full_index_per_gene = plain_array(get_vector(adapted, "gene", "full_index"))
+            is_environment_marker_per_gene = plain_array(get_vector(adapted, "gene", "is_marker"))
             is_environment_marker_per_gene_per_block[full_index_per_gene, block_index] = is_environment_marker_per_gene
             return nothing
         end
@@ -1222,12 +1232,13 @@ $(CONTRACT)
     n_genes = axis_length(daf, "gene")
     n_blocks = axis_length(daf, "block")
 
-    linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "linear_fraction").array
-    log_linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "log_linear_fraction").array
+    linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "linear_fraction"))
+    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
     median_log_linear_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- Median"].array
     @assert_vector(median_log_linear_fraction_per_gene, n_genes)
 
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
     block_index_per_metacell = daf["@ metacell : block : index"].array
 
     n_metacells = length(block_index_per_metacell)
@@ -1324,12 +1335,12 @@ $(CONTRACT)
     n_genes = axis_length(daf, "gene")
     n_blocks = axis_length(daf, "block")
 
-    linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "linear_fraction").array
-    log_linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "log_linear_fraction").array
+    linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "linear_fraction"))
+    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
     median_log_linear_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- Median"].array
     @assert_vector(median_log_linear_fraction_per_gene, n_genes)
 
-    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
+    is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
     n_metacells_in_environment_per_block = vec(sum(is_in_environment_per_metacell_per_block; dims = 1))
 
     is_environment_distinct_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
@@ -1431,16 +1442,16 @@ $(CONTRACT)
     n_metacells = axis_length(daf, "metacell")
     n_blocks = axis_length(daf, "block")
 
-    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
+    is_lateral_per_gene = plain_array(get_vector(daf, "gene", "is_lateral"))
     block_index_per_metacell = daf["@ metacell : block : index"].array
-    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
-    UMIs_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "UMIs").array
-    linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "linear_fraction").array
-    log_linear_fraction_per_gene_per_metacell = get_matrix(daf, "gene", "metacell", "log_linear_fraction").array
-    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
-    is_environment_marker_per_gene_per_block = get_matrix(daf, "gene", "block", "is_environment_marker").array
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
+    UMIs_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "UMIs"))
+    linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "linear_fraction"))
+    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
+    is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
+    is_environment_marker_per_gene_per_block = plain_array(get_matrix(daf, "gene", "block", "is_environment_marker"))
     is_correlated_with_skeleton_in_environment_per_gene_per_block =
-        get_matrix(daf, "gene", "block", "is_correlated_with_skeleton_in_environment").array
+        plain_array(get_matrix(daf, "gene", "block", "is_correlated_with_skeleton_in_environment"))
 
     is_environment_specific_per_gene_per_metacell = zeros(Bool, n_genes, n_metacells)
 
@@ -1557,22 +1568,24 @@ Compute and set [`matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene
     n_blocks = axis_length(daf, "block")
     n_metacells = axis_length(daf, "metacell")
 
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
     indices_of_markers = findall(is_marker_per_gene)
     n_markers = length(indices_of_markers)
 
-    is_skeletons_per_gene = get_vector(daf, "gene", "is_skeleton").array
+    is_skeletons_per_gene = plain_array(get_vector(daf, "gene", "is_skeleton"))
     n_skeletons = sum(is_skeletons_per_gene)
 
-    log_fraction_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: log_linear_fraction"].array
-    log_fraction_per_metacell_per_marker = daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array
+    log_fraction_per_metacell_per_skeleton =
+        plain_array(daf["@ metacell @ gene [ is_skeleton ] :: log_linear_fraction"])
+    log_fraction_per_metacell_per_marker = plain_array(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"])
 
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
     block_index_per_metacell = daf["@ metacell : block : index"].array
 
     is_correlated_with_skeleton_in_neighborhood_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
 
-    n_neighborhood_metacells_per_block = get_vector(daf, "block", "n_neighborhood_metacells").array
+    n_neighborhood_metacells_per_block = plain_array(get_vector(daf, "block", "n_neighborhood_metacells"))
     max_n_neighborhood_metacells = maximum(n_neighborhood_metacells_per_block)
 
     is_in_neighborhood_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:maxthreadid()]
@@ -1741,21 +1754,22 @@ Compute and set [`matrix_of_is_correlated_with_skeleton_in_environment_per_gene_
     n_blocks = axis_length(daf, "block")
     n_metacells = axis_length(daf, "metacell")
 
-    is_marker_per_gene = get_vector(daf, "gene", "is_marker").array
+    is_marker_per_gene = plain_array(get_vector(daf, "gene", "is_marker"))
     indices_of_markers = findall(is_marker_per_gene)
     n_markers = length(indices_of_markers)
 
-    is_skeletons_per_gene = get_vector(daf, "gene", "is_skeleton").array
+    is_skeletons_per_gene = plain_array(get_vector(daf, "gene", "is_skeleton"))
     n_skeletons = sum(is_skeletons_per_gene)
 
-    log_fraction_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: log_linear_fraction"].array
-    log_fraction_per_metacell_per_marker = daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"].array
+    log_fraction_per_metacell_per_skeleton =
+        plain_array(daf["@ metacell @ gene [ is_skeleton ] :: log_linear_fraction"])
+    log_fraction_per_metacell_per_marker = plain_array(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"])
 
-    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
+    is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
 
     is_correlated_with_skeleton_in_environment_per_gene_per_block = zeros(Bool, n_genes, n_blocks)
 
-    n_environment_metacells_per_block = get_vector(daf, "block", "n_environment_metacells").array
+    n_environment_metacells_per_block = plain_array(get_vector(daf, "block", "n_environment_metacells"))
     max_n_environment_metacells = maximum(n_environment_metacells_per_block)
 
     is_in_environment_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:maxthreadid()]
@@ -1914,24 +1928,23 @@ $(CONTRACT)
     n_genes = axis_length(daf, "gene")
     n_blocks = axis_length(daf, "block")
 
-    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
-    is_neighborhood_marker_per_gene_per_block = get_matrix(daf, "gene", "block", "is_neighborhood_marker").array
+    is_lateral_per_gene = plain_array(get_vector(daf, "gene", "is_lateral"))
+    is_neighborhood_marker_per_gene_per_block = plain_array(get_matrix(daf, "gene", "block", "is_neighborhood_marker"))
 
     # Only marker genes are correlated (the neighborhood-marker means use a subset); zero for non-marker genes.
     indices_of_included_genes = get_query(daf, "@ gene [ is_marker ] : index").array
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    @assert issparse(UMIs_per_cell_per_gene)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
-    UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    UMIs_per_metacell_per_gene = plain_array(densify(get_matrix(daf, "metacell", "gene", "UMIs")))
 
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
-    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
+    total_UMIs_per_cell = plain_array(get_vector(daf, "cell", "total_UMIs"))
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
 
     metacell_index_per_cell = get_query(daf, "@ cell : metacell ?? 0 : index").array
     block_index_per_cell = daf["@ cell : metacell ?? 0 : block : index"].array
 
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
 
     correlation_per_gene_per_block = zeros(Float32, n_genes, n_blocks)
 
@@ -2022,7 +2035,7 @@ function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_
     base_daf::DafReader,
     metacell_index_per_cell::AbstractVector{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_metacell::AbstractVector{<:Integer},
     UMIs_per_metacell_per_gene::AbstractMatrix{<:Integer},
     punctuate::Bool,
@@ -2039,7 +2052,7 @@ function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_
     indices_of_included_genes = get_query(base_daf, "@ gene [ is_marker ] : index").array
 
     is_in_neighborhood_per_other_block_per_base_block =
-        get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
+        plain_array(get_matrix(base_daf, "block", "block", "is_in_neighborhood"))
 
     # Without an explicit mapping, the cells share the base repository's cell axis and each cell's base block is read
     # positionally. Otherwise the caller supplies each cell's base block (via a name join, when the cells are a subset
@@ -2051,12 +2064,7 @@ function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_
     @assert length(metacell_index_per_cell) == n_cells
     @assert length(total_UMIs_per_cell) == n_cells
 
-    # The cell UMIs are gathered per gene via `gather_gene_UMIs_per_region_cell!` (a CSC column walk) rather than random
-    # `[cell, gene]` access; `region_position_per_cell` maps each cell to its position in the current block's
-    # neighborhood (0 outside it).
-    @assert issparse(UMIs_per_cell_per_gene)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
-
+    # Both kernels below walk the gene columns of the cell UMIs, rather than reading `[cell, gene]` element by element.
     if !punctuate && is_punctuated_per_cell === nothing
         # Projected metacells are never the cell's own (no leave-one-out), so each metacell's log expression fraction is
         # constant per metacell. Use the sparse gene-parallel kernel - walk each gene's cell column once and fold the
@@ -2143,9 +2151,9 @@ function log_base_neighborhood_correlation_means(;  # UNTESTED
 )::Nothing
     n_base_blocks = axis_length(base_daf, "block")
     n_genes = axis_length(base_daf, "gene")
-    is_lateral_per_gene = get_vector(base_daf, "gene", "is_lateral").array
+    is_lateral_per_gene = plain_array(get_vector(base_daf, "gene", "is_lateral"))
     is_base_neighborhood_marker_per_gene_per_base_block =
-        get_matrix(base_daf, "gene", "block", "is_neighborhood_marker").array
+        plain_array(get_matrix(base_daf, "gene", "block", "is_neighborhood_marker"))
 
     function mean_over_relevant(mask_per_gene::Union{AbstractVector{Bool}, BitVector})::Vector{Float64}  # UNTESTED
         mean_per_base_block = fill(NaN, n_base_blocks)
@@ -2272,17 +2280,17 @@ $(CONTRACT2)
     base_block_index_per_cell = base_block_index_per_other_cell(base_daf, other_daf)
 
     metacell_index_per_cell = get_query(other_daf, "@ cell : metacell ?? 0 : index").array
-    total_UMIs_per_cell = get_vector(other_daf, "cell", "total_UMIs").array
-    total_UMIs_per_metacell = get_vector(other_daf, "metacell", "total_UMIs").array
-    UMIs_per_cell_per_gene = get_matrix(other_daf, "cell", "gene", "UMIs").array
-    UMIs_per_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_cell = plain_array(get_vector(other_daf, "cell", "total_UMIs"))
+    total_UMIs_per_metacell = plain_array(get_vector(other_daf, "metacell", "total_UMIs"))
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(other_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    UMIs_per_metacell_per_gene = plain_array(densify(get_matrix(other_daf, "metacell", "gene", "UMIs")))
 
     correlation_per_gene_per_base_block, n_participating_cells_per_base_block =
         correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(;
             base_daf,
             metacell_index_per_cell,
             total_UMIs_per_cell,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_metacell,
             UMIs_per_metacell_per_gene,
             punctuate = true,
@@ -2305,7 +2313,7 @@ $(CONTRACT2)
         # The gene `bin` is a cross-validation property of the model (`other_daf`), not of the base repository, which
         # has no bins. It is not part of the contract, so read it from the unwrapped daf.
         daf = other_daf isa DataAxesFormats.Contracts.ContractDaf ? other_daf.daf : other_daf
-        is_in_bin_per_gene = get_vector(daf, "gene", "bin").array .== bin
+        is_in_bin_per_gene = plain_array(get_vector(daf, "gene", "bin")) .== bin
         @assert any(is_in_bin_per_gene)
         @assert !all(is_in_bin_per_gene)
     end
@@ -2377,14 +2385,17 @@ $(CONTRACT2)
     n_base_blocks = axis_length(base_daf, "block")
     n_genes = axis_length(base_daf, "gene")
 
-    is_lateral_per_gene = get_vector(base_daf, "gene", "is_lateral").array
-    is_environment_marker_per_gene_per_base_block = get_matrix(base_daf, "gene", "block", "is_environment_marker").array
-    correlation_per_gene_per_base_block = get_matrix(
-        other_daf,
-        "gene",
-        "base_block",
-        "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
-    ).array
+    is_lateral_per_gene = plain_array(get_vector(base_daf, "gene", "is_lateral"))
+    is_environment_marker_per_gene_per_base_block =
+        plain_array(get_matrix(base_daf, "gene", "block", "is_environment_marker"))
+    correlation_per_gene_per_base_block = plain_array(
+        get_matrix(
+            other_daf,
+            "gene",
+            "base_block",
+            "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
+        ),
+    )
 
     # A base block with no gene to average over is left at zero, which is how a correlation says it measured nothing
     # here - the same way this vector's own matrix marks a gene which says nothing about a block.
@@ -2522,18 +2533,22 @@ $(CONTRACT2)
 
     # Everything here holds the genes in its columns, since the loop below walks the base blocks, the blocks and the
     # regulators of one gene at a time, and a column of them is contiguous where a row of them is a stride apart.
-    base_correlation_per_base_block_per_gene = get_matrix(
-        base_daf,
-        "base_block",
-        "gene",
-        "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
-    ).array
-    correlation_per_base_block_per_gene = get_matrix(
-        other_daf,
-        "base_block",
-        "gene",
-        "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
-    ).array
+    base_correlation_per_base_block_per_gene = plain_array(
+        get_matrix(
+            base_daf,
+            "base_block",
+            "gene",
+            "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
+        ),
+    )
+    correlation_per_base_block_per_gene = plain_array(
+        get_matrix(
+            other_daf,
+            "base_block",
+            "gene",
+            "correlation_between_base_neighborhood_cells_and_punctuated_metacells",
+        ),
+    )
 
     # A gene is written only by the loop iteration which owns it, so the results are shared between the threads rather
     # than accumulated per thread and merged - which at this many threads would cost gigabytes of buffers.
@@ -2686,7 +2701,7 @@ function base_neighborhood_cells_of_base_blocks(base_daf::DafReader, other_daf::
     end
 
     is_in_neighborhood_per_own_base_block_per_base_block =
-        get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
+        plain_array(get_matrix(base_daf, "block", "block", "is_in_neighborhood"))
     n_cells_per_block_per_base_block =
         n_cells_per_block_per_own_base_block * is_in_neighborhood_per_own_base_block_per_base_block
 
@@ -2708,7 +2723,7 @@ function block_module_members(  # UNTESTED
     other_daf::DafReader,
     regulator_position_per_gene::AbstractVector{<:Integer},
 )::Tuple{Matrix{Int32}, Vector{Vector{Vector{Int32}}}}
-    module_per_block_per_gene = get_matrix(other_daf, "block", "gene", "module").array
+    module_per_block_per_gene = plain_array(get_matrix(other_daf, "block", "gene", "module"))
     n_blocks, n_genes = size(module_per_block_per_gene)
 
     module_index_per_block_per_gene = zeros(Int32, n_blocks, n_genes)
@@ -2845,21 +2860,21 @@ $(CONTRACT2)
     base_block_index_per_cell = base_block_index_per_other_cell(base_daf, other_daf)
 
     # Each cell's projected metacell (never a metacell it was a member of, so the metacell is not punctuated below).
-    projected_metacell_name_per_cell = get_vector(other_daf, "cell", "projected_metacell").array
+    projected_metacell_name_per_cell = plain_array(get_vector(other_daf, "cell", "projected_metacell"))
     metacell_index_by_name = axis_dict(other_daf, "metacell")
     metacell_index_per_cell = [get(metacell_index_by_name, name, 0) for name in projected_metacell_name_per_cell]
 
-    total_UMIs_per_cell = get_vector(other_daf, "cell", "total_UMIs").array
-    total_UMIs_per_metacell = get_vector(other_daf, "metacell", "total_UMIs").array
-    UMIs_per_cell_per_gene = get_matrix(other_daf, "cell", "gene", "UMIs").array
-    UMIs_per_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_cell = plain_array(get_vector(other_daf, "cell", "total_UMIs"))
+    total_UMIs_per_metacell = plain_array(get_vector(other_daf, "metacell", "total_UMIs"))
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(other_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    UMIs_per_metacell_per_gene = plain_array(densify(get_matrix(other_daf, "metacell", "gene", "UMIs")))
 
     correlation_per_gene_per_base_block, n_participating_cells_per_base_block =
         correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(;
             base_daf,
             metacell_index_per_cell,
             total_UMIs_per_cell,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_metacell,
             UMIs_per_metacell_per_gene,
             punctuate = false,
@@ -2882,7 +2897,7 @@ $(CONTRACT2)
         # The gene `bin` is a cross-validation property of the model (`other_daf`), not of the base repository, which
         # has no bins. It is not part of the contract, so read it from the unwrapped daf.
         daf = other_daf isa DataAxesFormats.Contracts.ContractDaf ? other_daf.daf : other_daf
-        is_in_bin_per_gene = get_vector(daf, "gene", "bin").array .== bin
+        is_in_bin_per_gene = plain_array(get_vector(daf, "gene", "bin")) .== bin
         @assert any(is_in_bin_per_gene)
         @assert !all(is_in_bin_per_gene)
     end
@@ -2986,7 +3001,7 @@ $(CONTRACT2)
     # Each cell is correlated against its projected metacell; leave-one-out is applied only where that metacell is the
     # cell's own (a member of it), so held-out cells - projected onto a metacell they were never part of - are not
     # punctuated.
-    projected_metacell_name_per_cell = get_vector(other_daf, "cell", "projected_metacell").array
+    projected_metacell_name_per_cell = plain_array(get_vector(other_daf, "cell", "projected_metacell"))
     metacell_index_by_name = axis_dict(other_daf, "metacell")
     metacell_index_per_cell = [get(metacell_index_by_name, name, 0) for name in projected_metacell_name_per_cell]
     own_metacell_index_per_cell = get_query(other_daf, "@ cell : metacell ?? 0 : index").array
@@ -3007,17 +3022,17 @@ $(CONTRACT2)
         "$(n_punctuated_cells) out of $(n_participating_cells) ($(percent(n_punctuated_cells, n_participating_cells)))"
     ) _group = :mcs_results
 
-    total_UMIs_per_cell = get_vector(other_daf, "cell", "total_UMIs").array
-    total_UMIs_per_metacell = get_vector(other_daf, "metacell", "total_UMIs").array
-    UMIs_per_cell_per_gene = get_matrix(other_daf, "cell", "gene", "UMIs").array
-    UMIs_per_metacell_per_gene = get_matrix(other_daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_cell = plain_array(get_vector(other_daf, "cell", "total_UMIs"))
+    total_UMIs_per_metacell = plain_array(get_vector(other_daf, "metacell", "total_UMIs"))
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(other_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    UMIs_per_metacell_per_gene = plain_array(densify(get_matrix(other_daf, "metacell", "gene", "UMIs")))
 
     correlation_per_gene_per_base_block, n_participating_cells_per_base_block =
         correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_base_block(;
             base_daf,
             metacell_index_per_cell,
             total_UMIs_per_cell,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_metacell,
             UMIs_per_metacell_per_gene,
             punctuate = false,
@@ -3041,7 +3056,7 @@ $(CONTRACT2)
         # The gene `bin` is a cross-validation property of the model (`other_daf`), not of the base repository, which
         # has no bins. It is not part of the contract, so read it from the unwrapped daf.
         daf = other_daf isa DataAxesFormats.Contracts.ContractDaf ? other_daf.daf : other_daf
-        is_in_bin_per_gene = get_vector(daf, "gene", "bin").array .== bin
+        is_in_bin_per_gene = plain_array(get_vector(daf, "gene", "bin")) .== bin
         @assert any(is_in_bin_per_gene)
         @assert !all(is_in_bin_per_gene)
     end
@@ -3077,21 +3092,21 @@ function log_projected_base_neighborhood_correlation_means(;  # UNTESTED
 
     base_block_index_per_cell = base_block_index_per_other_cell(base_daf, query_daf)
 
-    projected_metacell_name_per_cell = get_vector(query_daf, "cell", "projected_metacell").array
+    projected_metacell_name_per_cell = plain_array(get_vector(query_daf, "cell", "projected_metacell"))
     atlas_metacell_index_by_name = axis_dict(atlas_daf, "metacell")
     atlas_metacell_index_per_cell =
         [get(atlas_metacell_index_by_name, name, 0) for name in projected_metacell_name_per_cell]
 
-    total_UMIs_per_cell = get_vector(query_daf, "cell", "total_UMIs").array
-    UMIs_per_cell_per_gene = get_matrix(query_daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_atlas_metacell = get_vector(atlas_daf, "metacell", "total_UMIs").array
-    UMIs_per_atlas_metacell_per_gene = get_matrix(atlas_daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_cell = plain_array(get_vector(query_daf, "cell", "total_UMIs"))
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(query_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_atlas_metacell = plain_array(get_vector(atlas_daf, "metacell", "total_UMIs"))
+    UMIs_per_atlas_metacell_per_gene = plain_array(densify(get_matrix(atlas_daf, "metacell", "gene", "UMIs")))
 
     if bin === nothing
         is_in_bin_per_gene = nothing
     else
         # The gene `bin` is a cross-validation property of the model (`atlas_daf`); it is not part of any contract.
-        is_in_bin_per_gene = get_vector(atlas_daf, "gene", "bin").array .== bin
+        is_in_bin_per_gene = plain_array(get_vector(atlas_daf, "gene", "bin")) .== bin
         @assert any(is_in_bin_per_gene)
         @assert !all(is_in_bin_per_gene)
     end
@@ -3101,7 +3116,7 @@ function log_projected_base_neighborhood_correlation_means(;  # UNTESTED
             base_daf,
             metacell_index_per_cell = atlas_metacell_index_per_cell,
             total_UMIs_per_cell,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_metacell = total_UMIs_per_atlas_metacell,
             UMIs_per_metacell_per_gene = UMIs_per_atlas_metacell_per_gene,
             punctuate = false,
@@ -3165,14 +3180,15 @@ $(CONTRACT)
 
     n_blocks = axis_length(daf, "block")
 
-    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
+    is_lateral_per_gene = plain_array(get_vector(daf, "gene", "is_lateral"))
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_cell = plain_array(get_vector(daf, "cell", "total_UMIs"))
     block_index_per_cell = daf["@ cell : metacell ?? 0 : block : index"].array
 
-    is_neighborhood_marker_per_gene_per_block = get_matrix(daf, "gene", "block", "is_neighborhood_marker").array
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_neighborhood_marker_per_gene_per_block = plain_array(get_matrix(daf, "gene", "block", "is_neighborhood_marker"))
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
 
     n_neighborhood_markers_per_block = vec(sum(is_neighborhood_marker_per_gene_per_block; dims = 1))
     @assert_vector(n_neighborhood_markers_per_block, n_blocks)
@@ -3181,7 +3197,7 @@ $(CONTRACT)
     correlation_between_max_neighborhood_markers =
         Matrix{Float32}(undef, max_n_neighborhood_markers, max_n_neighborhood_markers)
 
-    n_neighborhood_cells_per_block = get_vector(daf, "block", "n_neighborhood_cells").array
+    n_neighborhood_cells_per_block = plain_array(get_vector(daf, "block", "n_neighborhood_cells"))
     max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
 
     most_correlated_gene_per_gene_per_block = Matrix{AbstractString}(undef, n_genes, n_blocks)
@@ -3257,16 +3273,16 @@ $(CONTRACT)
             progress_chunk = 100,
         ) do pertinent_neighborhood_marker_position
             gene_index = indices_of_pertinent_neighborhood_markers[pertinent_neighborhood_marker_position]
-            for (neighborhood_cell_position, cell_index) in enumerate(indices_of_neighborhood_cells)
-                log_fraction_per_neighborhood_cell_per_pertinent_neighborhood_marker[
-                    neighborhood_cell_position,
-                    pertinent_neighborhood_marker_position,
-                ] = UMIs_per_cell_per_gene[cell_index, gene_index] / total_UMIs_per_cell[cell_index]
-            end
             @views col = log_fraction_per_neighborhood_cell_per_pertinent_neighborhood_marker[
                 :,
                 pertinent_neighborhood_marker_position,
             ]
+            gather_sparse_column!(col, sparse_UMIs_per_cell_per_gene, gene_index, indices_of_neighborhood_cells)
+            for (neighborhood_cell_position, cell_index) in enumerate(indices_of_neighborhood_cells)
+                # The gathered `Float32` UMIs are exact, so this rounds like `UMIs / total_UMIs`.
+                col[neighborhood_cell_position] =
+                    Float64(col[neighborhood_cell_position]) / total_UMIs_per_cell[cell_index]
+            end
             @check_turbo_vector(col)
             @turbo for neighborhood_cell_position in 1:n_neighborhood_cells
                 col[neighborhood_cell_position] = log2(col[neighborhood_cell_position] + gene_fraction_regularization)
@@ -3379,7 +3395,6 @@ function compute_correlation_with_most_for_base_block!(;  # UNTESTED
     n_cells = length(base_block_index_per_cell)
     is_correlated_per_gene = BitVector(undef, n_genes)
     is_in_base_neighborhood_per_cell = BitVector(undef, n_cells)
-    region_position_per_cell = zeros(Int, n_cells)
     indices_of_max_correlated_genes = Vector{Int}(undef, n_max_correlated_genes)
     friend_indices_of_max_correlated_genes = Vector{Int}(undef, n_max_correlated_genes)
     indices_of_max_base_neighborhood_cells = Vector{Int}(undef, max_n_base_neighborhood_cells)
@@ -3427,11 +3442,7 @@ function compute_correlation_with_most_for_base_block!(;  # UNTESTED
     @views total_punctuated_metacell_UMIs_per_base_neighborhood_cell =
         total_punctuated_metacell_UMIs_per_max_base_neighborhood_cell[1:n_base_neighborhood_cells]
 
-    # Cell UMIs are gathered per gene via `gather_gene_UMIs_per_region_cell!` (a CSC column walk) rather than random
-    # `[cell, gene]` access; `region_position_per_cell` maps each cell to its position in this base neighborhood (0
-    # outside it).
     for (base_neighborhood_cell_position, cell_index) in enumerate(indices_of_base_neighborhood_cells)
-        region_position_per_cell[cell_index] = base_neighborhood_cell_position
         other_metacell_index = other_metacell_index_per_cell[cell_index]
         other_metacell_index_per_base_neighborhood_cell[base_neighborhood_cell_position] = other_metacell_index
         cell_total_UMIs = total_UMIs_per_cell[cell_index]
@@ -3452,12 +3463,11 @@ function compute_correlation_with_most_for_base_block!(;  # UNTESTED
         friend_relevant_gene_position = relevant_gene_position_per_gene[friend_gene_index]
 
         # Gather this gene's cell UMIs (CSC column walk) into the cell buffer; all-zero => correlation 0.
-        any_base_neighborhood_cell_UMIs = gather_gene_UMIs_per_region_cell!(
+        any_base_neighborhood_cell_UMIs = gather_sparse_column!(
             cell_log_fraction_per_base_neighborhood_cell,
-            n_base_neighborhood_cells,
             sparse_UMIs_per_cell_per_gene,
             gene_index,
-            region_position_per_cell,
+            indices_of_base_neighborhood_cells,
         )
         if !any_base_neighborhood_cell_UMIs
             correlation_with_most_per_gene[gene_index] = 0
@@ -3466,12 +3476,11 @@ function compute_correlation_with_most_for_base_block!(;  # UNTESTED
 
         # Gather the friend gene's cell UMIs into the metacell buffer (reused in place below for its punctuated
         # fraction).
-        gather_gene_UMIs_per_region_cell!(
+        gather_sparse_column!(
             punctuated_metacell_log_fraction_per_base_neighborhood_cell,
-            n_base_neighborhood_cells,
             sparse_UMIs_per_cell_per_gene,
             friend_gene_index,
-            region_position_per_cell,
+            indices_of_base_neighborhood_cells,
         )
 
         all_zero_base_neighborhood_punctuated_metacell_UMIs = true
@@ -3619,8 +3628,8 @@ $(CONTRACT2)
     else
         other_metacell_index_per_cell = other_metacell_index_per_base_cell(base_daf, other_daf)
     end
-    total_UMIs_per_other_metacell = get_vector(other_daf, "metacell", "total_UMIs").array
-    UMIs_per_other_metacell_per_full_gene = get_matrix(other_daf, "metacell", "gene", "UMIs").array
+    total_UMIs_per_other_metacell = plain_array(get_vector(other_daf, "metacell", "total_UMIs"))
+    UMIs_per_other_metacell_per_full_gene = plain_array(densify(get_matrix(other_daf, "metacell", "gene", "UMIs")))
 
     n_base_blocks = axis_length(base_daf, "block")
 
@@ -3630,16 +3639,16 @@ $(CONTRACT2)
         copy_axis!(source = base_daf, destination = other_daf, axis = "block", rename = "base_block"; overwrite)
     end
 
-    UMIs_per_cell_per_gene = get_matrix(base_daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(base_daf, "cell", "total_UMIs").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(base_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_cell = plain_array(get_vector(base_daf, "cell", "total_UMIs"))
 
     base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
 
     is_in_base_neighborhood_per_other_block_per_base_block =
-        get_matrix(base_daf, "block", "block", "is_in_neighborhood").array
+        plain_array(get_matrix(base_daf, "block", "block", "is_in_neighborhood"))
 
     most_correlated_gene_in_base_neighborhood_per_gene_per_base_block =
-        get_matrix(base_daf, "gene", "block", "most_correlated_gene_in_neighborhood").array
+        plain_array(get_matrix(base_daf, "gene", "block", "most_correlated_gene_in_neighborhood"))
     n_most_correlated_gene_per_base_block =
         vec(count(!isempty, most_correlated_gene_in_base_neighborhood_per_gene_per_base_block; dims = 1))
     @assert_vector(n_most_correlated_gene_per_base_block, n_base_blocks)
@@ -3672,11 +3681,8 @@ $(CONTRACT2)
 
     total_correlated_genes = count(!isempty, most_correlated_gene_in_base_neighborhood_per_gene_per_base_block)
 
-    n_neighborhood_cells_per_block = get_vector(base_daf, "block", "n_neighborhood_cells").array
+    n_neighborhood_cells_per_block = plain_array(get_vector(base_daf, "block", "n_neighborhood_cells"))
     max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
-
-    @assert issparse(UMIs_per_cell_per_gene)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
 
     # Parallel over base blocks (heaviest first so no large block is left for last); each writes its own column of the
     # correlation matrix and its per-block mean into disjoint slots, and allocates its own per-block scratch. The gene
@@ -3765,13 +3771,15 @@ $(CONTRACT)
     @assert 0 <= min_strong_linear_fraction <= 1
     @assert axis_vector(daf, "block") == axis_vector(daf, "base_block")
 
-    linear_fraction_per_gene_per_block = get_matrix(daf, "gene", "block", "linear_fraction").array
-    correlation_with_most_per_gene_per_base_block = get_matrix(
-        daf,
-        "gene",
-        "base_block",
-        "correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells",
-    ).array
+    linear_fraction_per_gene_per_block = plain_array(get_matrix(daf, "gene", "block", "linear_fraction"))
+    correlation_with_most_per_gene_per_base_block = plain_array(
+        get_matrix(
+            daf,
+            "gene",
+            "base_block",
+            "correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells",
+        ),
+    )
 
     is_strong_per_gene_per_block =
         (linear_fraction_per_gene_per_block .>= min_strong_linear_fraction) .&
@@ -3994,9 +4002,10 @@ $(CONTRACT)
     @assert max_environment_metacell_relative_distance >= 0
     @assert 0 < environment_distance_base_quantile <= 1
 
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
     mean_distance_per_metacell_per_block =
-        get_matrix(daf, "metacell", "block", "mean_euclidean_skeleton_fold_distance").array
+        plain_array(get_matrix(daf, "metacell", "block", "mean_euclidean_skeleton_fold_distance"))
     block_index_per_metacell = daf["@ metacell : block : index"].array
 
     n_blocks = axis_length(daf, "block")

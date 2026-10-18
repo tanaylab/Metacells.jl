@@ -158,7 +158,7 @@ end
 end
 
 @kwdef struct DispersionContext
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer}
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer}
     total_UMIs_per_cell::AbstractVector{<:Integer}
     block_cell_indices::AbstractVector{<:Integer}
     is_found_per_module::BitVector
@@ -175,7 +175,7 @@ end
     grouped_per_prev_block::AbstractVector{GroupedSeriesCorrelations{Float32}}
     baseline_mean_correlation_per_prev_block::AbstractVector{Float32}
     group_index_per_block_per_prev_block::AbstractMatrix{<:Integer}
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer}
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer}
     total_UMIs_per_cell::AbstractVector{<:Integer}
     gene_fraction_regularization::Float32
     # Per-walkable-block (assigned per work item before the `compute_delta_correlation` call).
@@ -368,7 +368,7 @@ $(CONTRACT2)
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
-    @assert min_cells_in_metacell >= 0
+    @assert min_cells_in_metacell >= 1
     @assert max_cells_in_metacell >= 2 * min_cells_in_metacell
     @assert 0 < target_cell_total_UMIs_quantile < 1
     @assert min_metacell_total_UMIs > 0
@@ -388,30 +388,31 @@ $(CONTRACT2)
     n_prev_metacells = axis_length(prev_daf, "metacell")
     name_per_block = axis_vector(prev_daf, "block")
 
-    UMIs_per_cell_per_gene = get_matrix(prev_daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = mutable_array(densify(get_vector(prev_daf, "cell", "total_UMIs").array))
+    # All the steps below read the cell UMIs, so they are read once into plain storage, which is held until the end.
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(prev_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_cell = plain_array(densify(get_vector(prev_daf, "cell", "total_UMIs")))
 
     mean_linear_fraction_in_environment_cells_per_module_per_block =
-        get_matrix(prev_daf, "module", "block", "mean_linear_fraction_in_environment_cells").array
+        plain_array(get_matrix(prev_daf, "module", "block", "mean_linear_fraction_in_environment_cells"))
     std_linear_fraction_in_environment_cells_per_module_per_block =
-        get_matrix(prev_daf, "module", "block", "std_linear_fraction_in_environment_cells").array
+        plain_array(get_matrix(prev_daf, "module", "block", "std_linear_fraction_in_environment_cells"))
 
     # The z-score regularization is specified in UMIs; convert it to a linear fraction using the mean total UMIs of a
     # cell in each block's neighborhood.
     mean_total_UMIs_in_neighborhood_cells_per_block =
-        get_vector(prev_daf, "block", "total_neighborhood_UMIs").array ./
-        get_vector(prev_daf, "block", "n_neighborhood_cells").array
+        plain_array(get_vector(prev_daf, "block", "total_neighborhood_UMIs")) ./
+        plain_array(get_vector(prev_daf, "block", "n_neighborhood_cells"))
     std_fraction_regularization_per_block =
         Float32.(std_UMIs_regularization ./ mean_total_UMIs_in_neighborhood_cells_per_block)
 
     is_in_neighborhood_per_other_block_per_prev_block =
-        get_matrix(prev_daf, "block", "block", "is_in_neighborhood").array
-    is_found_per_module_per_block = get_matrix(prev_daf, "module", "block", "is_found").array
+        plain_array(get_matrix(prev_daf, "block", "block", "is_in_neighborhood"))
+    is_found_per_module_per_block = plain_array(get_matrix(prev_daf, "module", "block", "is_found"))
     module_index_per_gene_per_block = prev_daf["@ gene @ block :: module ?? 0 : index"].array
 
     block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
-    is_base_outlier_per_cell = get_vector(prev_daf, "cell", "is_base_outlier").array
-    is_excluded_per_cell = get_vector(prev_daf, "cell", "is_excluded").array
+    is_base_outlier_per_cell = plain_array(get_vector(prev_daf, "cell", "is_base_outlier"))
+    is_excluded_per_cell = plain_array(get_vector(prev_daf, "cell", "is_excluded"))
     closest_block_index_per_cell = prev_daf["@ cell : block.closest_by_pertinent_markers : index"].array
     # Base outliers and excluded cells are never clustered. Every other cell gets a block: grouped cells use their
     # metacell's block; round outliers (lost their metacell in a previous sharpening round) use the closest block by
@@ -444,7 +445,7 @@ $(CONTRACT2)
         return nothing
     end
 
-    n_metacells_per_block = get_vector(prev_daf, "block", "n_metacells").array
+    n_metacells_per_block = plain_array(get_vector(prev_daf, "block", "n_metacells"))
     block_index_per_metacell = prev_daf["@ metacell : block : index"].array
     max_cells_dispersion_per_metacell = prev_daf["@ module @ metacell :: cells_dispersion >- Max"].array
     @assert_vector(max_cells_dispersion_per_metacell, n_prev_metacells)
@@ -466,7 +467,7 @@ $(CONTRACT2)
 
     mean_metacell_cells_per_block = n_cells_per_block ./ max.(n_target_metacells_per_block, 1)
 
-    n_modules_per_block = get_vector(prev_daf, "block", "n_modules").array
+    n_modules_per_block = plain_array(get_vector(prev_daf, "block", "n_modules"))
     max_n_block_modules = maximum(n_modules_per_block)
     n_neighborhood_cells_per_block = [
         sum(
@@ -514,7 +515,7 @@ $(CONTRACT2)
         n_cells_per_block,
         n_neighborhood_cells_per_block,
         block_index_per_cell,
-        UMIs_per_cell_per_gene,
+        sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         mean_metacell_cells_per_block,
         is_in_neighborhood_per_other_block_per_prev_block,
@@ -573,17 +574,17 @@ $(CONTRACT2)
     # The tie-break evaluates against the previous round (prev_daf), so its blocks are the prev blocks.
     prev_block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
     is_in_prev_neighborhood_per_other_prev_block_per_prev_block = is_in_neighborhood_per_other_block_per_prev_block
-    is_lateral_per_gene = get_vector(prev_daf, "gene", "is_lateral").array
+    is_lateral_per_gene = plain_array(get_vector(prev_daf, "gene", "is_lateral"))
     is_neighborhood_marker_per_gene_per_prev_block =
-        get_matrix(prev_daf, "gene", "block", "is_neighborhood_marker").array
+        plain_array(get_matrix(prev_daf, "gene", "block", "is_neighborhood_marker"))
     n_prev_blocks = n_blocks
 
     # Per prev block, the genes whose correlation series the tie-break evaluates, as raw (global) gene indices: the
     # pertinent (non-lateral) markers of the prev block's neighborhood. This is the gene set
     # `compute_matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block!` averages
     # over, so the tie-break optimizes the measure the analysis reports. Consumed by `build_grouped_for_prev_block`
-    # (for reading `UMIs_per_cell_per_gene` columns) and by `precompute_walkable_indirection` (to build each walkable
-    # block's gene subspace).
+    # (for reading `sparse_UMIs_per_cell_per_gene` columns) and by `precompute_walkable_indirection` (to build each
+    # walkable block's gene subspace).
     pertinent_neighborhood_marker_gene_indices_per_prev_block = Vector{Vector{Int}}(undef, n_prev_blocks)
     is_pertinent_neighborhood_marker_per_gene = BitVector(undef, n_genes)
     for prev_block_index in 1:n_prev_blocks
@@ -595,7 +596,7 @@ $(CONTRACT2)
 
     local_clusters_per_block = compute_local_clusters(;
         prev_daf,
-        UMIs_per_cell_per_gene,
+        sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         min_cells_in_metacell,
         max_cells_in_metacell,
@@ -639,7 +640,7 @@ $(CONTRACT2)
         mean_linear_fraction_in_environment_cells_per_module_per_block,
         std_linear_fraction_in_environment_cells_per_module_per_block,
         std_fraction_regularization_per_block,
-        UMIs_per_cell_per_gene,
+        sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         name_per_block,
         name_per_module = axis_vector(prev_daf, "module"),
@@ -694,7 +695,7 @@ function compute_preferred_block_index_per_cell_per_block(;  # UNTESTED
     n_cells_per_block::AbstractVector{<:Integer},
     n_neighborhood_cells_per_block::AbstractVector{<:Integer},
     block_index_per_cell::AbstractVector{<:Integer},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     mean_metacell_cells_per_block::AbstractVector{<:AbstractFloat},
     is_in_neighborhood_per_other_block_per_prev_block::Union{AbstractMatrix{Bool}, BitMatrix},
@@ -711,7 +712,7 @@ function compute_preferred_block_index_per_cell_per_block(;  # UNTESTED
     n_blocks = length(name_per_block)
     n_modules = axis_length(prev_daf, "module")
 
-    n_modules_per_block = get_vector(prev_daf, "block", "n_modules").array
+    n_modules_per_block = plain_array(get_vector(prev_daf, "block", "n_modules"))
     max_n_block_modules = maximum(n_modules_per_block)
 
     max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
@@ -786,7 +787,7 @@ function compute_preferred_block_index_per_cell_per_block(;  # UNTESTED
             mean_linear_fraction_in_environment_cells_per_module_per_block,
             std_linear_fraction_in_environment_cells_per_module_per_block,
             std_fraction_regularization_per_block,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
             region_position_per_cell_per_thread,
@@ -980,7 +981,7 @@ end
 
 function compute_local_clusters(;  # UNTESTED
     prev_daf::DafReader,
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     min_cells_in_metacell::Integer,
     max_cells_in_metacell::Integer,
@@ -1023,7 +1024,7 @@ function compute_local_clusters(;  # UNTESTED
     n_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
     max_n_block_cells = maximum(n_cells_per_block)
 
-    n_modules_per_block = get_vector(prev_daf, "block", "n_modules").array
+    n_modules_per_block = plain_array(get_vector(prev_daf, "block", "n_modules"))
     max_n_block_modules = maximum(n_modules_per_block)
 
     is_found_per_module_per_thread = [BitVector(undef, n_modules) for _ in 1:maxthreadid()]
@@ -1084,7 +1085,7 @@ function compute_local_clusters(;  # UNTESTED
             mean_linear_fraction_in_environment_cells_per_module_per_block,
             std_linear_fraction_in_environment_cells_per_module_per_block,
             std_fraction_regularization_per_block,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
             region_position_per_cell_per_thread,
@@ -1099,7 +1100,7 @@ function compute_local_clusters(;  # UNTESTED
         @views weight_per_block_cell = total_UMIs_per_cell[block_cell_indices]
 
         dispersion_context = DispersionContext(;
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             block_cell_indices,
             is_found_per_module,
@@ -1231,7 +1232,7 @@ function compute_local_clusters(;  # UNTESTED
             grouped_per_prev_block,
             baseline_mean_correlation_per_prev_block,
             group_index_per_block_per_prev_block,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             gene_fraction_regularization = Float32(gene_fraction_regularization),
             # Per-walkable-block fields - re-assigned per work item.
@@ -1261,7 +1262,7 @@ function compute_local_clusters(;  # UNTESTED
     # per (changed_walkable, affected prev block) without re-populating - the two-pass split eliminates the populate
     # redundancy that a parallel-by-prev-block commit would otherwise pay. The `UMI_per_friend_per_block_cell`
     # cache (filled once below) lets every populate call read this walkable block's UMIs straight from a sequential
-    # Float32 column instead of indexing the global `UMIs_per_cell_per_gene` matrix on every (cell, friend gene).
+    # Float32 column instead of indexing the global `sparse_UMIs_per_cell_per_gene` matrix on every (cell, friend gene).
     variable_per_block_cell_per_friend_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
     is_active_per_block_cell_per_walkable_block = Vector{Vector{Bool}}(undef, n_walkable_blocks)
     UMI_per_friend_per_block_cell_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
@@ -1280,8 +1281,7 @@ function compute_local_clusters(;  # UNTESTED
         UMIs_fill_weight_per_walkable_block[walkable_position] = n_block_cells * n_friends
     end
 
-    # One-time fill of the per-walkable UMI cache. Outer friend_position so each `UMIs_per_cell_per_gene[:, gene_index]`
-    # column is touched contiguously; inner block_cell scatter reads only within that already-loaded column.
+    # One-time fill of the per-walkable UMI cache, gathering the block cells from the column of each friend gene.
     parallel_loop_wo_rng(
         1:n_walkable_blocks;
         weights = UMIs_fill_weight_per_walkable_block,
@@ -1296,14 +1296,9 @@ function compute_local_clusters(;  # UNTESTED
         block_cell_indices = block_cell_indices_per_block[block_index]
         gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
         UMI_per_friend_per_block_cell = UMI_per_friend_per_block_cell_per_walkable_block[walkable_position]
-        n_block_cells = length(block_cell_indices)
-        n_friends = length(gene_index_per_friend)
-        @inbounds for friend_position in 1:n_friends
-            gene_index = gene_index_per_friend[friend_position]
-            for block_cell_position in 1:n_block_cells
-                UMI_per_friend_per_block_cell[friend_position, block_cell_position] =
-                    Float32(UMIs_per_cell_per_gene[block_cell_indices[block_cell_position], gene_index])
-            end
+        for (friend_position, gene_index) in enumerate(gene_index_per_friend)
+            @views UMI_per_block_cell = UMI_per_friend_per_block_cell[friend_position, :]
+            gather_sparse_column!(UMI_per_block_cell, sparse_UMIs_per_cell_per_gene, gene_index, block_cell_indices)
         end
         return nothing
     end
@@ -1317,7 +1312,7 @@ function compute_local_clusters(;  # UNTESTED
     (total_UMIs_per_baseline_metacell, UMIs_per_gene_per_baseline_metacell, baseline_metacell_index_per_cell, _) =
         compute_baseline_metacell_aggregates(
             local_clusters_per_block,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             n_genes,
             n_cells,
@@ -1343,13 +1338,13 @@ function compute_local_clusters(;  # UNTESTED
             baseline_metacell_index_per_cell,
             total_UMIs_per_baseline_metacell,
             UMIs_per_gene_per_baseline_metacell,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             pertinent_neighborhood_marker_gene_indices,
             gene_fraction_regularization,
         )
         grouped_per_prev_block[prev_block_index] = grouped
-        @views group_index_per_block_per_prev_block[:, prev_block_index] .= group_index_per_block  # NOJET
+        @views group_index_per_block_per_prev_block[:, prev_block_index] .= group_index_per_block
         baseline_mean_correlation_per_prev_block[prev_block_index] = Float32(mean_correlation(grouped))
         return nothing
     end
@@ -1620,7 +1615,7 @@ end
 # of the most-deviant module instance. A metacell is never emptied - every outlier names the metacell it was ejected
 # from, so if all the cells of a metacell are outliers, none of them is.
 #
-# The loop is parallel over module instances. `UMIs_per_cell_per_gene` is a CSC sparse matrix whose columns are genes,
+# The loop is parallel over module instances. `sparse_UMIs_per_cell_per_gene` is a CSC matrix whose columns are genes,
 # so each instance walks only the nonzeros of its module's gene columns (the cells that actually express it); cells with
 # no UMIs of the module cannot be deviant for it (their fold is non-positive), so they are never visited. Per thread we
 # reuse a dense `actual_per_cell` accumulator and a `is_touched_per_cell` mask, tracking the touched cells (and
@@ -1629,7 +1624,7 @@ end
 # the per-cell maximum at the end.
 function compute_outlier_certificates(;  # UNTESTED
     cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     is_found_per_module_per_block::AbstractMatrix{Bool},
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
@@ -1640,11 +1635,6 @@ function compute_outlier_certificates(;  # UNTESTED
     n_cells::Integer,
 )::OutlierCertificates
     n_sharp_metacells = length(cells_of_sharp_metacells)
-
-    # The sparse-column sweep requires a CSC matrix whose columns are genes; unwrap the read-only Daf matrix to its
-    # underlying `SparseMatrixCSC` (no copy).
-    @assert issparse(UMIs_per_cell_per_gene)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
 
     # Allocated once with the "not an outlier" defaults; the candidate reduction below fills in the outlier cells.
     is_outlier_per_cell = falses(n_cells)
@@ -1846,7 +1836,7 @@ function eject_outliers!(;  # UNTESTED
     mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     name_per_block::AbstractVector{<:AbstractString},
     name_per_module::AbstractVector{<:AbstractString},
@@ -1858,7 +1848,7 @@ function eject_outliers!(;  # UNTESTED
     while true
         outlier_certificates = compute_outlier_certificates(;
             cells_of_sharp_metacells,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             is_found_per_module_per_block,
             module_index_per_gene_per_block,
@@ -1903,7 +1893,7 @@ function eject_outliers!(;  # UNTESTED
             mean_linear_fraction_in_environment_cells_per_module_per_block,
             std_linear_fraction_in_environment_cells_per_module_per_block,
             std_fraction_regularization_per_block,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             n_cells,
             n_genes,
@@ -1962,7 +1952,7 @@ function relocate_dissolved_metacell_cells!(;  # UNTESTED
     mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     n_cells::Integer,
     n_genes::Integer,
@@ -2024,7 +2014,7 @@ function relocate_dissolved_metacell_cells!(;  # UNTESTED
             mean_linear_fraction_in_environment_cells_per_module_per_block,
             std_linear_fraction_in_environment_cells_per_module_per_block,
             std_fraction_regularization_per_block,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
             region_position_per_cell_per_thread,
@@ -2114,7 +2104,7 @@ function build_grouped_for_prev_block(;  # UNTESTED
     baseline_metacell_index_per_cell::AbstractVector{<:Integer},
     total_UMIs_per_baseline_metacell::AbstractVector{<:Integer},
     UMIs_per_gene_per_baseline_metacell::AbstractMatrix{<:Integer},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     pertinent_neighborhood_marker_gene_indices::AbstractVector{<:Integer},
     gene_fraction_regularization::AbstractFloat,
@@ -2170,6 +2160,23 @@ function build_grouped_for_prev_block(;  # UNTESTED
     fixed_per_point_per_series = Matrix{Float32}(undef, n_points, n_series)
     variable_per_point_per_series = Matrix{Float32}(undef, n_points, n_series)
     is_active_per_point = Vector{Bool}(undef, n_points)
+
+    # The marker UMIs of the cells are gathered into `variable_per_point_per_series`, which the loop below overwrites.
+    # The cells of each group are sorted, as `gather_sparse_column!` requires.
+    for (series_index, marker_gene_index) in enumerate(pertinent_neighborhood_marker_gene_indices)
+        first_point_index = 1
+        for n_group_points in n_points_per_group
+            last_point_index = first_point_index + n_group_points - 1
+            @views gather_sparse_column!(
+                variable_per_point_per_series[first_point_index:last_point_index, series_index],
+                sparse_UMIs_per_cell_per_gene,
+                marker_gene_index,
+                cell_indices_in_order[first_point_index:last_point_index],
+            )
+            first_point_index = last_point_index + 1
+        end
+    end
+
     regularization = Float32(gene_fraction_regularization)
     for point_index in 1:n_points
         cell_index = cell_indices_in_order[point_index]
@@ -2182,7 +2189,7 @@ function build_grouped_for_prev_block(;  # UNTESTED
 
         for series_index in 1:n_series
             marker_gene_index = pertinent_neighborhood_marker_gene_indices[series_index]
-            cell_marker_UMIs = Int(UMIs_per_cell_per_gene[cell_index, marker_gene_index])
+            cell_marker_UMIs = Int(variable_per_point_per_series[point_index, series_index])
             fixed_per_point_per_series[point_index, series_index] =
                 log2(Float32(cell_marker_UMIs) / Float32(cell_total) + regularization)
 
@@ -2218,7 +2225,7 @@ end
 # `local_clusters === nothing` contribute no baseline metacells.
 function compute_baseline_metacell_aggregates(  # UNTESTED
     local_clusters_per_block::AbstractVector{Maybe{LocalClusters}},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     n_genes::Integer,
     n_cells::Integer,
@@ -2235,10 +2242,8 @@ function compute_baseline_metacell_aggregates(  # UNTESTED
         end
     end
 
-    total_UMIs_per_baseline_metacell = Vector{UInt32}(undef, n_baseline_metacells)
-    UMIs_per_gene_per_baseline_metacell = Matrix{UInt32}(undef, n_baseline_metacells, n_genes)
+    total_UMIs_per_baseline_metacell = zeros(UInt32, n_baseline_metacells)
     baseline_metacell_index_per_cell = zeros(UInt32, n_cells)
-    cell_indices_per_baseline_metacell = [Int[] for _ in 1:n_baseline_metacells]
 
     for block_index in 1:n_blocks
         local_clusters = local_clusters_per_block[block_index]
@@ -2250,38 +2255,18 @@ function compute_baseline_metacell_aggregates(  # UNTESTED
             cluster_index = local_clusters.cluster_index_per_block_cell[block_cell_position]
             cell_index = local_clusters.block_cell_indices[block_cell_position]
             baseline_metacell_index = block_first_baseline_metacell + cluster_index - 1
-            push!(cell_indices_per_baseline_metacell[baseline_metacell_index], cell_index)
             baseline_metacell_index_per_cell[cell_index] = UInt32(baseline_metacell_index)
+            total_UMIs_per_baseline_metacell[baseline_metacell_index] += UInt32(total_UMIs_per_cell[cell_index])
         end
     end
 
-    n_cells_per_baseline_metacell = length.(cell_indices_per_baseline_metacell)
-    parallel_loop_wo_rng(
-        1:n_baseline_metacells;
-        policy = :greedy,
-        weights = n_cells_per_baseline_metacell,
-        name = "compute_baseline_metacell_aggregates",
-        progress = DebugProgress(
-            sum(n_cells_per_baseline_metacell);
-            group = :mcs_loops,
-            desc = "baseline_metacell_aggregates",
-        ),
-    ) do baseline_metacell_index
-        cell_indices = cell_indices_per_baseline_metacell[baseline_metacell_index]
-        baseline_metacell_total = zero(UInt32)
-        @inbounds for cell_index in cell_indices
-            baseline_metacell_total += UInt32(total_UMIs_per_cell[cell_index])
-        end
-        total_UMIs_per_baseline_metacell[baseline_metacell_index] = baseline_metacell_total
-        @inbounds for gene_index in 1:n_genes
-            gene_sum = zero(UInt32)
-            for cell_index in cell_indices
-                gene_sum += UInt32(UMIs_per_cell_per_gene[cell_index, gene_index])
-            end
-            UMIs_per_gene_per_baseline_metacell[baseline_metacell_index, gene_index] = gene_sum
-        end
-        return nothing
-    end
+    UMIs_per_gene_per_baseline_metacell = compute_grouped_reduction(
+        Sum(; type = UInt32),
+        sparse_UMIs_per_cell_per_gene,
+        baseline_metacell_index_per_cell,
+        n_baseline_metacells,
+    )
+    @assert_matrix(UMIs_per_gene_per_baseline_metacell, n_baseline_metacells, n_genes, Columns)
 
     return (
         total_UMIs_per_baseline_metacell,
@@ -2431,7 +2416,7 @@ function setup_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
     std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     z_score_accumulator_pool::Channel{Vector{Float32}},
     region_position_per_cell_per_thread::AbstractVector{<:AbstractVector{<:Integer}},
@@ -2458,7 +2443,7 @@ function setup_z_score_per_found_module_per_region_cell!(;  # UNTESTED
 
     compute_z_score_per_found_module_per_region_cell!(;
         z_score_per_found_module_per_region_cell,
-        UMIs_per_cell_per_gene,
+        sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         is_found_per_module,
         indices_of_region_cells,
@@ -2475,7 +2460,7 @@ end
 
 function compute_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     is_found_per_module::BitVector,
     indices_of_region_cells::AbstractVector{<:Integer},
@@ -2494,8 +2479,6 @@ function compute_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     # `[cell, gene]` access); `region_position_per_cell` maps each cell to its position among the region cells (0
     # otherwise). Owned by this outer (block) task and captured read-only by the nested found-module loop, so it is
     # indexed by the outer task's thread and reset once that loop is done.
-    @assert issparse(UMIs_per_cell_per_gene)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
     row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
     UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
     region_position_per_cell = region_position_per_cell_per_thread[threadid()]
@@ -2611,7 +2594,7 @@ function compute_cluster_dispersion!(  # UNTESTED
         cells_dispersion_per_module = dispersion_scratches.cells_dispersion_per_module,
         mean_normalized_per_module = dispersion_scratches.mean_normalized_per_module,
         indices_of_cells = indices_of_cluster_cells,
-        UMIs_per_cell_per_gene = dispersion_context.UMIs_per_cell_per_gene,
+        sparse_UMIs_per_cell_per_gene = dispersion_context.sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell = dispersion_context.total_UMIs_per_cell,
         is_found_per_module = dispersion_context.is_found_per_module,
         gene_indices_per_module = dispersion_context.gene_indices_per_module,
@@ -4122,7 +4105,7 @@ $(CONTRACT2)
 
     function push_type_flow!(daf::DafReader, name::AbstractString)::Nothing  # UNTESTED
         @assert has_matrix(daf, "type", "type", name) "missing the $(name) matrix"
-        push!(n_cells_per_prev_type_per_type_per_transition, get_matrix(daf, "type", "type", name).array)
+        push!(n_cells_per_prev_type_per_type_per_transition, plain_array(get_matrix(daf, "type", "type", name)))
         return nothing
     end
 

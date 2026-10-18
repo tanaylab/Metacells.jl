@@ -20,7 +20,6 @@ using ..AnalyzeCells
 using ..Contracts
 
 import Base.Threads.maxthreadid
-import Metacells.AnalyzeCells.sum_sparse_UMIs_per_gene_group_per_cell!
 import Random.default_rng
 
 # Needed because of JET:
@@ -140,16 +139,17 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
     name_per_block = axis_vector(daf, "block")
     name_per_gene = axis_vector(daf, "gene")
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    is_lateral_per_gene = get_vector(daf, "gene", "is_lateral").array
-    is_skeleton_per_gene = get_vector(daf, "gene", "is_skeleton").array
-    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
-    is_environment_marker_per_gene_per_block = get_matrix(daf, "gene", "block", "is_environment_marker").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    is_lateral_per_gene = plain_array(get_vector(daf, "gene", "is_lateral"))
+    is_skeleton_per_gene = plain_array(get_vector(daf, "gene", "is_skeleton"))
+    is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
+    is_environment_marker_per_gene_per_block = plain_array(get_matrix(daf, "gene", "block", "is_environment_marker"))
     is_correlated_with_skeletons_in_environment_per_gene_per_block =
-        get_matrix(daf, "gene", "block", "is_correlated_with_skeleton_in_environment").array
-    is_environment_distinct_per_gene_per_block = get_matrix(daf, "gene", "block", "is_environment_distinct").array
+        plain_array(get_matrix(daf, "gene", "block", "is_correlated_with_skeleton_in_environment"))
+    is_environment_distinct_per_gene_per_block =
+        plain_array(get_matrix(daf, "gene", "block", "is_environment_distinct"))
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
-    log_fraction_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "log_linear_fraction").array
+    log_fraction_per_metacell_per_gene = plain_array(get_matrix(daf, "metacell", "gene", "log_linear_fraction"))
 
     genes_indices_of_anchor_index_per_block = Vector{Dict{Int, Vector{Int}}}(undef, n_blocks)
 
@@ -192,8 +192,6 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
     # are used first for the block's lateral environment marker genes and then for its local genes; the two are never
     # needed at the same time.
     n_cells = length(metacell_index_per_cell)
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
-    cell_position_per_cell_per_thread = [zeros(Int32, n_cells) for _ in 1:maxthreadid()]
     is_in_environment_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
     cluster_masks_per_thread = [ClusterMasks(; n_genes = max_n_kmeans_gene_points) for _ in 1:maxthreadid()]
     is_selected_per_gene_per_thread = [Vector{Bool}(undef, n_genes) for _ in 1:maxthreadid()]
@@ -232,7 +230,6 @@ Compute and set [`vector_of_anchor_per_module`](@ref), [`matrix_of_is_found_per_
             min_strong_cells,
             kmeans_rounds,
             kmeans_buffers = kmeans_buffers_per_thread[threadid()],
-            cell_position_per_cell = cell_position_per_cell_per_thread[threadid()],
             cluster_masks = cluster_masks_per_thread[threadid()],
             is_in_environment_per_cell = is_in_environment_per_cell_per_thread[threadid()],
             is_selected_per_gene = is_selected_per_gene_per_thread[threadid()],
@@ -308,7 +305,6 @@ function compute_block_modules!(;  # UNTESTED
     min_strong_cells::Integer,
     kmeans_rounds::Integer,
     kmeans_buffers::Tuple{KMeansBuffers, KMeansBuffers},
-    cell_position_per_cell::AbstractVector{<:Integer},
     cluster_masks::ClusterMasks,
     is_in_environment_per_cell::BitVector,
     is_selected_per_gene::AbstractVector{Bool},
@@ -676,12 +672,11 @@ function compute_block_modules!(;  # UNTESTED
             ]
             cluster_UMIs_per_active_cluster_per_environment_cell =
                 zeros(Float32, length(active_cluster_indices), n_environment_cells)
-            sum_sparse_UMIs_per_gene_group_per_cell!(
+            sum_sparse_columns_per_group!(
                 cluster_UMIs_per_active_cluster_per_environment_cell,
                 sparse_UMIs_per_cell_per_gene,
                 indices_of_environment_cells,
                 gene_indices_per_active_cluster,
-                cell_position_per_cell,
             )
 
             weakest_cluster_index = nothing

@@ -467,7 +467,7 @@ function import_mask_matrix(
     mask_vectors = Vector{SparseVector{Bool}}()
     for type_name in type_names
         mask_name = "$(prefix)_gene_of_$(type_name)"
-        mask_vector = get_vector(daf, "gene", mask_name; default = false)
+        mask_vector = plain_array(get_vector(daf, "gene", mask_name; default = false))
         @assert eltype(mask_vector) == Bool
         if !(mask_vector isa SparseVector{Bool})
             mask_vector = SparseVector{Bool}(mask_vector)
@@ -535,7 +535,7 @@ Nothing is written until all of the above has been verified, so a rejected file 
     end
 
     listed_type_names = Set(type_names)
-    type_per_entry = get_vector(daf, axis, property).array
+    type_per_entry = plain_array(get_vector(daf, axis, property))
     unlisted_type_names =
         [type_name for type_name in unique(type_per_entry) if type_name != "" && !(type_name in listed_type_names)]
     if !isempty(unlisted_type_names)
@@ -647,9 +647,8 @@ function import_vectors_data(
             continue
         end
 
-        vector = get_vector(source, axis, vector_name).array
         if endswith(vector_name, "_module")
-            vector = vector .+ 1
+            vector = plain_array(get_vector(source, axis, vector_name)) .+ 1
             set_vector!(source, axis, vector_name, vector; overwrite = true)
         end
 

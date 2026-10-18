@@ -26,7 +26,6 @@ using ..Contracts
 using ..Defaults
 
 import Base.Threads.maxthreadid
-import Metacells.AnalyzeCells.sum_sparse_UMIs_per_gene_group_per_cell!
 import Random.default_rng
 
 # Needed because of JET:
@@ -160,10 +159,11 @@ $(CONTRACT)
     n_modules = axis_length(daf, "module")
     name_per_block = axis_vector(daf, "block")
 
-    UMIs_per_metacell_per_gene = get_matrix(daf, "metacell", "gene", "UMIs").array
-    total_UMIs_per_metacell = get_vector(daf, "metacell", "total_UMIs").array
+    UMIs_per_metacell_per_gene = plain_array(densify(get_matrix(daf, "metacell", "gene", "UMIs")))
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
 
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
     block_index_per_metacell = daf["@ metacell : block : index"].array
 
     module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
@@ -263,15 +263,16 @@ $(CONTRACT)
     n_blocks = axis_length(daf, "block")
     n_modules = axis_length(daf, "module")
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_cell = plain_array(densify(get_vector(daf, "cell", "total_UMIs")))
 
     module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
 
-    is_in_neighborhood_per_other_block_per_base_block = get_matrix(daf, "block", "block", "is_in_neighborhood").array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
     block_index_per_cell = daf["@ cell : metacell ?? 0 : block : index"].array
 
-    n_cells, n_genes = size(UMIs_per_cell_per_gene)
+    n_cells, n_genes = size(sparse_UMIs_per_cell_per_gene)
     mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     is_in_neighborhood_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
@@ -289,8 +290,8 @@ $(CONTRACT)
     max_n_neighborhood_cells = maximum(n_cells_in_neighborhood_per_block)
 
     # Channel pool of per-neighborhood-cell Float32 accumulators for the nested parallel-over-modules loop. Each inner
-    # task takes one for its module's gene-outer fill, then puts it back. Sized to `nthreads()` because each take/put
-    # is a single non-yielding scope.
+    # task takes one for its module, then puts it back. Sized to `nthreads()` because each take/put is a single
+    # non-yielding scope.
     module_UMIs_accumulator_pool = Channel{Vector{Float32}}(nthreads())
     for _ in 1:nthreads()
         put!(module_UMIs_accumulator_pool, Vector{Float32}(undef, max_n_neighborhood_cells))
@@ -341,16 +342,16 @@ $(CONTRACT)
             end
             module_UMIs_per_neighborhood_cell = take!(module_UMIs_accumulator_pool)
             try
-                @views fill!(module_UMIs_per_neighborhood_cell[1:n_neighborhood_cells], 0.0f0)
-                # `UMIs_per_cell_per_gene` is a sparse matrix; `@turbo` can't SIMD the gather, so use a plain
-                # `@inbounds` scalar accumulate.
-                @inbounds for gene_index in gene_indices_in_module
-                    for neighborhood_cell_position in 1:n_neighborhood_cells
-                        cell_index = indices_of_neighborhood_cells[neighborhood_cell_position]
-                        module_UMIs_per_neighborhood_cell[neighborhood_cell_position] +=
-                            UMIs_per_cell_per_gene[cell_index, gene_index]
-                    end
-                end
+                # The module's genes are a single group of columns, summed into the neighborhood cells.
+                @views module_UMIs_per_neighborhood_cell_matrix =
+                    reshape(module_UMIs_per_neighborhood_cell[1:n_neighborhood_cells], 1, n_neighborhood_cells)
+                module_UMIs_per_neighborhood_cell_matrix .= 0.0f0
+                sum_sparse_columns_per_group!(
+                    module_UMIs_per_neighborhood_cell_matrix,
+                    sparse_UMIs_per_cell_per_gene,
+                    indices_of_neighborhood_cells,
+                    view(gene_indices_per_module, module_index:module_index),
+                )
                 sum_fractions = 0.0
                 sum_squared_fractions = 0.0
                 @inbounds for neighborhood_cell_position in 1:n_neighborhood_cells
@@ -438,15 +439,15 @@ $(CONTRACT)
     n_modules = axis_length(daf, "module")
     n_metacells = axis_length(daf, "metacell")
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_cell = plain_array(densify(get_vector(daf, "cell", "total_UMIs")))
 
     module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
 
-    is_in_environment_per_metacell_per_block = get_matrix(daf, "metacell", "block", "is_in_environment").array
+    is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
 
-    n_cells, n_genes = size(UMIs_per_cell_per_gene)
+    n_cells, n_genes = size(sparse_UMIs_per_cell_per_gene)
     mean_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     std_linear_fraction_per_module_per_block = Matrix{Float32}(undef, n_modules, n_blocks)
     is_in_environment_per_metacell_per_thread = [BitVector(undef, n_metacells) for _ in 1:maxthreadid()]
@@ -464,8 +465,8 @@ $(CONTRACT)
     max_n_environment_cells = maximum(n_cells_in_environment_per_block)
 
     # Channel pool of per-environment-cell Float32 accumulators for the nested parallel-over-modules loop. Each inner
-    # task takes one for its module's gene-outer fill, then puts it back. Sized to `nthreads()` because each take/put
-    # is a single non-yielding scope.
+    # task takes one for its module, then puts it back. Sized to `nthreads()` because each take/put is a single
+    # non-yielding scope.
     module_UMIs_accumulator_pool = Channel{Vector{Float32}}(nthreads())
     for _ in 1:nthreads()
         put!(module_UMIs_accumulator_pool, Vector{Float32}(undef, max_n_environment_cells))
@@ -517,16 +518,16 @@ $(CONTRACT)
             end
             module_UMIs_per_environment_cell = take!(module_UMIs_accumulator_pool)
             try
-                @views fill!(module_UMIs_per_environment_cell[1:n_environment_cells], 0.0f0)
-                # `UMIs_per_cell_per_gene` is a sparse matrix; `@turbo` can't SIMD the gather, so use a plain
-                # `@inbounds` scalar accumulate.
-                @inbounds for gene_index in gene_indices_in_module
-                    for environment_cell_position in 1:n_environment_cells
-                        cell_index = indices_of_environment_cells[environment_cell_position]
-                        module_UMIs_per_environment_cell[environment_cell_position] +=
-                            UMIs_per_cell_per_gene[cell_index, gene_index]
-                    end
-                end
+                # The module's genes are a single group of columns, summed into the environment cells.
+                @views module_UMIs_per_environment_cell_matrix =
+                    reshape(module_UMIs_per_environment_cell[1:n_environment_cells], 1, n_environment_cells)
+                module_UMIs_per_environment_cell_matrix .= 0.0f0
+                sum_sparse_columns_per_group!(
+                    module_UMIs_per_environment_cell_matrix,
+                    sparse_UMIs_per_cell_per_gene,
+                    indices_of_environment_cells,
+                    view(gene_indices_per_module, module_index:module_index),
+                )
                 sum_fractions = 0.0
                 sum_squared_fractions = 0.0
                 @inbounds for environment_cell_position in 1:n_environment_cells
@@ -617,15 +618,15 @@ $(CONTRACT)
     name_per_module = axis_vector(daf, "module")
 
     block_index_per_metacell = daf["@ metacell : block : index"].array
-    module_per_gene_per_block = daf["@ gene @ block :: module"].array
+    module_per_gene_per_block = plain_array(daf["@ gene @ block :: module"])
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
 
     mean_distance_per_metacell = zeros(Float32, n_metacells)
     std_distance_per_metacell = zeros(Float32, n_metacells)
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
-    n_cells_per_metacell = get_vector(daf, "metacell", "n_cells").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_cell = plain_array(get_vector(daf, "cell", "total_UMIs"))
+    n_cells_per_metacell = plain_array(get_vector(daf, "metacell", "n_cells"))
     max_n_metacell_cells = maximum(n_cells_per_metacell)
 
     indices_of_metacell_max_cells_per_thread = [Vector{Int}(undef, max_n_metacell_cells) for _ in 1:maxthreadid()]
@@ -647,9 +648,6 @@ $(CONTRACT)
             end
         end
     end
-
-    sparse_UMIs_per_cell_per_gene = mutable_array(UMIs_per_cell_per_gene)::SparseMatrixCSC
-    cell_position_per_cell_per_thread = [zeros(Int32, n_cells) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_metacells;
@@ -678,12 +676,11 @@ $(CONTRACT)
 
         gene_indices_per_module = gene_indices_per_module_per_block[block_index]
         module_UMIs_per_module_per_cell = zeros(Float32, n_modules, n_metacell_cells)
-        sum_sparse_UMIs_per_gene_group_per_cell!(
+        sum_sparse_columns_per_group!(
             module_UMIs_per_module_per_cell,
             sparse_UMIs_per_cell_per_gene,
             indices_of_metacell_cells,
             gene_indices_per_module,
-            cell_position_per_cell_per_thread[threadid()],
         )
         fraction_per_module_per_cell =
             module_UMIs_per_module_per_cell ./ reshape(total_UMIs_per_metacell_cell, 1, n_metacell_cells)
@@ -720,7 +717,7 @@ function maximal_cells_dispersion_of_modules!(;  # UNTESTED
     cells_dispersion_per_module::AbstractVector{<:AbstractFloat},
     mean_normalized_per_module::AbstractVector{<:AbstractFloat},
     indices_of_cells::AbstractVector{<:Integer},
-    UMIs_per_cell_per_gene::AbstractMatrix{<:Integer},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     is_found_per_module::Union{AbstractVector{Bool}, BitVector},
     gene_indices_per_module::AbstractVector{<:AbstractVector{<:Integer}},
@@ -747,7 +744,9 @@ function maximal_cells_dispersion_of_modules!(;  # UNTESTED
 
     # Single pass: per found module with a positive mean, compute mean + dispersion in the same per-cell loop. Store
     # both in scratch. Track max mean so the effective threshold can be derived from the data after the loop instead of
-    # iterating thresholds.
+    # iterating thresholds. The module UMIs of each cell are summed into the total UMIs buffer, whose content
+    # `quantile!` has already reordered.
+    module_UMIs_per_cells = reshape(total_UMIs_per_cells, 1, n_cells)
     n_modules = length(is_found_per_module)
     max_mean_normalized_module_UMIs = 0.0
     for module_index in 1:n_modules
@@ -755,17 +754,18 @@ function maximal_cells_dispersion_of_modules!(;  # UNTESTED
             continue
         end
 
-        gene_indices_in_module = gene_indices_per_module[module_index]
+        module_UMIs_per_cells .= 0
+        sum_sparse_columns_per_group!(
+            module_UMIs_per_cells,
+            sparse_UMIs_per_cell_per_gene,
+            indices_of_cells,
+            view(gene_indices_per_module, module_index:module_index),
+        )
 
         sum_normalized_module_UMIs = 0.0
         sum_squared_normalized_module_UMIs = 0.0
         for cell_position in 1:n_cells
-            cell_index = indices_of_cells[cell_position]
-            module_UMIs = 0
-            for gene_index in gene_indices_in_module
-                module_UMIs += UMIs_per_cell_per_gene[cell_index, gene_index]
-            end
-            normalized_module_UMIs = module_UMIs * normalized_factor_per_cells[cell_position]
+            normalized_module_UMIs = module_UMIs_per_cells[cell_position] * normalized_factor_per_cells[cell_position]
             sum_normalized_module_UMIs += normalized_module_UMIs
             sum_squared_normalized_module_UMIs += normalized_module_UMIs * normalized_module_UMIs
         end
@@ -862,11 +862,11 @@ $(CONTRACT)
     block_index_per_metacell = daf["@ metacell : block : index"].array
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
     module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
-    is_found_per_module_per_block = get_matrix(daf, "module", "block", "is_found").array
+    is_found_per_module_per_block = plain_array(get_matrix(daf, "module", "block", "is_found"))
 
-    UMIs_per_cell_per_gene = get_matrix(daf, "cell", "gene", "UMIs").array
-    total_UMIs_per_cell = get_vector(daf, "cell", "total_UMIs").array
-    n_cells_per_metacell = get_vector(daf, "metacell", "n_cells").array
+    sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
+    total_UMIs_per_cell = plain_array(densify(get_vector(daf, "cell", "total_UMIs")))
+    n_cells_per_metacell = plain_array(get_vector(daf, "metacell", "n_cells"))
     max_n_metacell_cells = maximum(n_cells_per_metacell)
 
     max_cells_dispersion_per_per_metacell = zeros(Float32, n_metacells)
@@ -931,7 +931,7 @@ $(CONTRACT)
             cells_dispersion_per_module,
             mean_normalized_per_module = mean_normalized_per_module_per_thread[threadid()],
             indices_of_cells = indices_of_metacell_cells,
-            UMIs_per_cell_per_gene,
+            sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             is_found_per_module,
             gene_indices_per_module = gene_indices_per_module_per_block[block_index],
