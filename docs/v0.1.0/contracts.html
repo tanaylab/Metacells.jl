@@ -3269,9 +3269,9 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
-<a class="docstring-binding" href="#Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
-<code>Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell
+<summary id="Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell">
+<code>Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -3280,20 +3280,16 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">tensor_of_linear_fraction_per_block_per_module_per_metacell(
+<code class="language-julia hljs">tensor_of_mean_cells_z_score_per_block_per_module_per_metacell(
     expectation::ContractExpectation
 )::Pair{TensorKey, DataSpecification}
 </code>
 </pre>
-<p>The linear fraction of the UMIs of each block&#39;s found module genes out of the total UMIs in each metacell. We actually only compute this for metacells in the neighborhood of the block, as each block&#39;s modules are not expected to apply outside this neighborhood. The rest of the entries are zero. Still, this is a tensor with a lot of data, and even with sparse representation, it has non-trivial storage overhead. It is needed for projecting query cells onto an atlas.
-</p>
-<p>
-<code>compute_linear_fraction_of_modules_in_metacells!
-</code>
+<p>The mean of the z-scores of the cells of each metacell, for each block&#39;s found modules. This is the center of the metacell in the space sharpening clusters cells in. That is, the z-scores are computed relative to the block&#39;s environment cells, using the same regularization as sharpening. We actually only compute this for metacells in the neighborhood of the block, as each block&#39;s modules are not expected to apply outside this neighborhood. The rest of the entries are zero. Still, this is a tensor with a lot of data, and even with sparse representation, it has non-trivial storage overhead. It is needed for projecting query cells onto an atlas.
 </p>
 <p>This matrix is populated by 
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
-<code>compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!">
+<code>compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!
 </code>
 </a>.
 </p>
@@ -3439,7 +3435,7 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>In each metacell, the mean of the euclidean distances of between its cells and the metacell&#39;s linear fraction of the modules of the metacell&#39;s block&#39;s neighborhood.
+<p>In each metacell, the mean of the euclidean distances between its cells and the metacell. The distances use the z-scores of the found modules of the metacell&#39;s block, relative to the block&#39;s environment cells.
 </p>
 <p>This matrix is populated by 
 <a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
@@ -3469,9 +3465,43 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>In each metacell, the standard deviation of the euclidean distance of between its cells and the metacell&#39;s linear fraction of the modules of the metacell&#39;s block&#39;s neighborhood.
+<p>In each metacell, the standard deviation of the euclidean distances between its cells and the metacell. The distances use the z-scores of the found modules of the metacell&#39;s block, relative to the block&#39;s environment cells.
 </p>
 <p>This matrix is populated by 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
+<code>compute_stats_of_euclidean_modules_cells_distance_per_metacell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell">
+<code>Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_metacell_modules_z_score_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>The z score of the distance between each cell and its own metacell modules. This is computed the same way as the 
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<code>vector_of_projected_modules_z_score_per_cell
+</code>
+</a>, so its distribution describes how well cells fit the metacells they belong to. Cells which do not belong to any metacell have an infinite z score.
+</p>
+<p>This vector is populated by 
 <a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
 <code>compute_stats_of_euclidean_modules_cells_distance_per_metacell!
 </code>
@@ -4717,8 +4747,8 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
-<code>Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell
+<a href="contracts.html#Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell">
+<code>Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
 </code>
 </a>
 </li>
@@ -4887,6 +4917,12 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene">
 <code>Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell">
+<code>Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell
 </code>
 </a>
 </li>

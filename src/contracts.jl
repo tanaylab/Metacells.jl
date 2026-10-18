@@ -79,7 +79,7 @@ export metacell_axis
 export module_axis
 export prev_block_axis
 export projected_block_axis
-export tensor_of_linear_fraction_per_block_per_module_per_metacell
+export tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
 export type_axis
 export vector_of_anchor_per_module
 export vector_of_prev_block_per_metacell
@@ -109,6 +109,7 @@ export vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated
 export vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene
 export vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
 export vector_of_mean_euclidean_modules_cells_distance_per_metacell
+export vector_of_metacell_modules_z_score_per_cell
 export vector_of_metacell_per_cell
 export vector_of_mitochondrial_UMIs_per_cell
 export vector_of_n_cells_per_block
@@ -1852,27 +1853,27 @@ function matrix_of_n_genes_per_module_per_block(expectation::ContractExpectation
 end
 
 """
-    tensor_of_linear_fraction_per_block_per_module_per_metacell(
+    tensor_of_mean_cells_z_score_per_block_per_module_per_metacell(
         expectation::ContractExpectation
     )::Pair{TensorKey, DataSpecification}
 
-The linear fraction of the UMIs of each block's found module genes out of the total UMIs in each metacell. We actually
-only compute this for metacells in the neighborhood of the block, as each block's modules are not expected to apply
-outside this neighborhood. The rest of the entries are zero. Still, this is a tensor with a lot of data, and even with
-sparse representation, it has non-trivial storage overhead. It is needed for projecting query cells onto an atlas.
+The mean of the z-scores of the cells of each metacell, for each block's found modules. This is the center of the
+metacell in the space sharpening clusters cells in. That is, the z-scores are computed relative to the block's
+environment cells, using the same regularization as sharpening. We actually only compute this for metacells in the
+neighborhood of the block, as each block's modules are not expected to apply outside this neighborhood. The rest of the
+entries are zero. Still, this is a tensor with a lot of data, and even with sparse representation, it has non-trivial
+storage overhead. It is needed for projecting query cells onto an atlas.
 
-`compute_linear_fraction_of_modules_in_metacells!`
-
-This matrix is populated by [`compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!`](@ref
-Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!).
+This matrix is populated by [`compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!`](@ref
+Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!).
 """
-function tensor_of_linear_fraction_per_block_per_module_per_metacell(  # untested
+function tensor_of_mean_cells_z_score_per_block_per_module_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{TensorKey, DataSpecification}
-    return ("block", "module", "metacell", "linear_fraction") => (
+    return ("block", "module", "metacell", "mean_cells_z_score") => (
         expectation,
         StorageFloat,
-        "The linear fraction of the UMIs of each block's found module genes out of the total UMIs in each metacell.",
+        "The mean of the z-scores of the cells of each metacell, for each block's found modules.",
     )
 end
 
@@ -1961,8 +1962,8 @@ end
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
-In each metacell, the mean of the euclidean distances of between its cells and the metacell's linear fraction of the
-modules of the metacell's block's neighborhood.
+In each metacell, the mean of the euclidean distances between its cells and the metacell. The distances use the z-scores
+of the found modules of the metacell's block, relative to the block's environment cells.
 
 This matrix is populated by [`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!).
@@ -1973,8 +1974,8 @@ function vector_of_mean_euclidean_modules_cells_distance_per_metacell(  # untest
     return ("metacell", "mean_euclidean_modules_cells_distance") => (
         expectation,
         StorageFloat,
-        "In each metacell, the mean of the euclidean distances of between its cells and the metacell's linear" *
-        " fraction of the modules of the metacell's block's neighborhood.",
+        "In each metacell, the mean of the euclidean distances between its cells and the metacell. The distances use" *
+        " the z-scores of the found modules of the metacell's block, relative to the block's environment cells.",
     )
 end
 
@@ -1983,8 +1984,8 @@ end
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
-In each metacell, the standard deviation of the euclidean distance of between its cells and the metacell's linear
-fraction of the modules of the metacell's block's neighborhood.
+In each metacell, the standard deviation of the euclidean distances between its cells and the metacell. The distances
+use the z-scores of the found modules of the metacell's block, relative to the block's environment cells.
 
 This matrix is populated by [`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref
 Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!).
@@ -1995,8 +1996,9 @@ function vector_of_std_euclidean_modules_cells_distance_per_metacell(  # unteste
     return ("metacell", "std_euclidean_modules_cells_distance") => (
         expectation,
         StorageFloat,
-        "In each metacell, the standard deviation of the euclidean distances of between its cells and the metacell's" *
-        " linear fraction of the modules of the metacell's block's neighborhood.",
+        "In each metacell, the standard deviation of the euclidean distances between its cells and the metacell. The" *
+        " distances use the z-scores of the found modules of the metacell's block, relative to the block's" *
+        " environment cells.",
     )
 end
 
@@ -2075,6 +2077,28 @@ function vector_of_projected_modules_z_score_per_cell(  # untested
         expectation,
         StorageFloat,
         "The z score of the distance between each query cell and its projected atlas metacell modules.",
+    )
+end
+
+"""
+    vector_of_metacell_modules_z_score_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The z score of the distance between each cell and its own metacell modules. This is computed the same way as the
+[`vector_of_projected_modules_z_score_per_cell`](@ref), so its distribution describes how well cells fit the metacells
+they belong to. Cells which do not belong to any metacell have an infinite z score.
+
+This vector is populated by [`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref
+Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!).
+"""
+function vector_of_metacell_modules_z_score_per_cell(  # untested
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("cell", "metacell_modules_z_score") => (
+        expectation,
+        StorageFloat,
+        "The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).",
     )
 end
 

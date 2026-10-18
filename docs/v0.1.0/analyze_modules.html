@@ -454,6 +454,7 @@
 <pre>
 <code class="language-julia hljs">compute_stats_of_euclidean_modules_cells_distance_per_metacell!(
     daf::DafWriter;
+    std_UMIs_regularization::AbstractFloat = ```2.0```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -462,11 +463,29 @@
 <a href="contracts.html#Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell">
 <code>vector_of_mean_euclidean_modules_cells_distance_per_metacell
 </code>
-</a> and 
+</a>, 
 <a href="contracts.html#Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell">
 <code>vector_of_std_euclidean_modules_cells_distance_per_metacell
 </code>
-</a>.
+</a> and 
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell">
+<code>vector_of_metacell_modules_z_score_per_cell
+</code>
+</a>. The distance between a cell and its metacell is measured in the space sharpening clusters cells in. That is, it is the Euclidean distance between the cell&#39;s z-scores of the found modules of the metacell&#39;s block and the metacell&#39;s 
+<a href="contracts.html#Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell">
+<code>tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
+</code>
+</a>. The z-scores are computed as in 
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!">
+<code>compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!
+</code>
+</a>, using the same 
+<code>std_UMIs_regularization
+</code>. The z score of each cell is its distance minus the mean distance of its metacell&#39;s cells, divided by their standard deviation. This is computed the same way 
+<a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
+<code>compute_cells_projection!
+</code>
+</a> computes the z score of a query cell relative to its projected metacell.
 </p>
 <p>
 <strong>Inputs
@@ -509,8 +528,20 @@
 </strong>::AbstractString (required): The unique block each metacell belongs to.
 </p>
 <p>
-<strong>metacell @ n_cells
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
+<strong>block @ n_modules
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of found modules in each block.
+</p>
+<p>
+<strong>block @ total
+<em>neighborhood
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
 </p>
 <p>
 <strong>cell @ total_UMIs
@@ -525,8 +556,38 @@
 </strong>::AbstractString (required): The module each gene belongs to in each block.
 </p>
 <p>
+<strong>block, module @ is_found
+</strong>::Bool (required): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, module @ mean
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The mean of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>block, module @ std
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
 <strong>gene, cell @ UMIs
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>Tensors
+</strong>
+</p>
+<p>
+<strong>block; module, metacell @ mean
+<em>cells
+</em>z_score
+</strong>::Union{Float32, Float64} (required): The mean of the z-scores of the cells of each metacell, for each block&#39;s found modules.
 </p>
 <p>
 <strong>Outputs
@@ -542,7 +603,7 @@
 </em>modules
 <em>cells
 </em>distance
-</strong>::Union{Float32, Float64} (created): In each metacell, the mean of the euclidean distances of between its cells and the metacell&#39;s linear fraction of the modules of the metacell&#39;s block&#39;s neighborhood.
+</strong>::Union{Float32, Float64} (created): In each metacell, the mean of the euclidean distances between its cells and the metacell. The distances use the z-scores of the found modules of the metacell&#39;s block, relative to the block&#39;s environment cells.
 </p>
 <p>
 <strong>metacell @ std
@@ -550,7 +611,76 @@
 </em>modules
 <em>cells
 </em>distance
-</strong>::Union{Float32, Float64} (created): In each metacell, the standard deviation of the euclidean distances of between its cells and the metacell&#39;s linear fraction of the modules of the metacell&#39;s block&#39;s neighborhood.
+</strong>::Union{Float32, Float64} (created): In each metacell, the standard deviation of the euclidean distances between its cells and the metacell. The distances use the z-scores of the found modules of the metacell&#39;s block, relative to the block&#39;s environment cells.
+</p>
+<p>
+<strong>cell @ metacell
+<em>modules
+</em>z_score
+</strong>::Union{Float32, Float64} (created): The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff">
+<a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff">
+<code>Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_projected_modules_z_score_cutoff(
+    daf::DafReader;
+    rejected_fraction::AbstractFloat = ```0.01```,
+)::AbstractFloat
+</code>
+</pre>
+<p>Compute a cutoff for the 
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<code>vector_of_projected_modules_z_score_per_cell
+</code>
+</a> of query cells projected onto this (atlas) 
+<code>daf
+</code>. This is the z score which only 
+<code>rejected_fraction
+</code> of the atlas cells exceed, using their 
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell">
+<code>vector_of_metacell_modules_z_score_per_cell
+</code>
+</a>. That is, a query cell above the cutoff fits its projected metacell worse than all but 
+<code>rejected_fraction
+</code> of the atlas cells fit their own metacell. Atlas cells which do not belong to any metacell are ignored.
+</p>
+<p>This makes no assumption about the distribution of the z scores, which is not normal. It also makes no assumption about the query cells. It only describes how well the atlas cells fit their own metacells.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+<em>modules
+</em>z_score
+</strong>::Union{Float32, Float64} (required): The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).
 </p>
 </div>
 </section>
@@ -792,9 +922,9 @@
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
-<a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
-<code>Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!
+<summary id="Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!">
+<code>Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -803,17 +933,20 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!(
+<code class="language-julia hljs">compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!(
     daf::DafWriter;
+    std_UMIs_regularization::AbstractFloat = ```2.0```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
 <p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell">
-<code>tensor_of_linear_fraction_per_block_per_module_per_metacell
+<a href="contracts.html#Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell">
+<code>tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
 </code>
-</a>.
+</a>. The z-score of each cell is computed the same way sharpening computes it. That is, it is relative to the mean and standard deviation of the block&#39;s environment cells, regularized by 
+<code>std_UMIs_regularization
+</code>. This regularization is given in UMIs, and is converted to a linear fraction using the mean total UMIs of the cells in the block&#39;s neighborhood.
 </p>
 <p>
 <strong>Inputs
@@ -840,34 +973,78 @@
 </strong> (required): Sequenced genes.
 </p>
 <p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
 <strong>Vectors
 </strong>
 </p>
 <p>
-<strong>metacell @ total_UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
 </p>
 <p>
 <strong>metacell @ block
 </strong>::AbstractString (required): The unique block each metacell belongs to.
 </p>
 <p>
-<strong>Matrices
-</strong>
+<strong>block @ n_modules
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of found modules in each block.
 </p>
 <p>
-<strong>gene, metacell @ UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+<strong>block @ total
+<em>neighborhood
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>Matrices
+</strong>
 </p>
 <p>
 <strong>block, gene @ module
 </strong>::AbstractString (required): The module each gene belongs to in each block.
 </p>
 <p>
+<strong>block, module @ is_found
+</strong>::Bool (required): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, module @ mean
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The mean of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>block, module @ std
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
 <strong>block, block @ is
 <em>in
 </em>neighborhood
 </strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
 </p>
 <p>
 <strong>Outputs
@@ -878,8 +1055,10 @@
 </strong>
 </p>
 <p>
-<strong>block; module, metacell @ linear_fraction
-</strong>::Union{Float32, Float64} (created): The linear fraction of the UMIs of each block&#39;s found module genes out of the total UMIs in each metacell.
+<strong>block; module, metacell @ mean
+<em>cells
+</em>z_score
+</strong>::Union{Float32, Float64} (created): The mean of the z-scores of the cells of each metacell, for each block&#39;s found modules.
 </p>
 </div>
 </section>
@@ -913,6 +1092,12 @@
 </a>
 </li>
 <li>
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff">
+<code>Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff
+</code>
+</a>
+</li>
+<li>
 <a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
 <code>Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!
 </code>
@@ -931,8 +1116,8 @@
 </a>
 </li>
 <li>
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!">
-<code>Metacells.AnalyzeModules.compute_tensor_of_linear_fraction_per_block_per_module_per_metacell!
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!">
+<code>Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!
 </code>
 </a>
 </li>

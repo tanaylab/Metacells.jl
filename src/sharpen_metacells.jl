@@ -23,7 +23,9 @@ using ..AnalyzeModules
 using ..Contracts
 using ..Defaults
 
+import ..AnalyzeModules.compute_std_fraction_regularization_per_block
 import ..AnalyzeModules.maximal_cells_dispersion_of_modules!
+import ..AnalyzeModules.setup_z_score_per_found_module_per_region_cell!
 
 import Base.Threads.maxthreadid
 import ProgressMeter.next!
@@ -362,7 +364,10 @@ $(CONTRACT2)
     sharpening_round::Integer,
     improvement_half_life::Maybe{Integer} = 2,
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
-    std_UMIs_regularization::AbstractFloat = 2.0,
+    std_UMIs_regularization::AbstractFloat = function_default(
+        compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!,
+        :std_UMIs_regularization,
+    ),
     min_outlier_fold::AbstractFloat = 3.0,
     outlier_UMIs_regularization::AbstractFloat = 2.0,
     rng::AbstractRNG = default_rng(),
@@ -397,13 +402,8 @@ $(CONTRACT2)
     std_linear_fraction_in_environment_cells_per_module_per_block =
         plain_array(get_matrix(prev_daf, "module", "block", "std_linear_fraction_in_environment_cells"))
 
-    # The z-score regularization is specified in UMIs; convert it to a linear fraction using the mean total UMIs of a
-    # cell in each block's neighborhood.
-    mean_total_UMIs_in_neighborhood_cells_per_block =
-        plain_array(get_vector(prev_daf, "block", "total_neighborhood_UMIs")) ./
-        plain_array(get_vector(prev_daf, "block", "n_neighborhood_cells"))
     std_fraction_regularization_per_block =
-        Float32.(std_UMIs_regularization ./ mean_total_UMIs_in_neighborhood_cells_per_block)
+        compute_std_fraction_regularization_per_block(prev_daf; std_UMIs_regularization)
 
     is_in_neighborhood_per_other_block_per_prev_block =
         plain_array(get_matrix(prev_daf, "block", "block", "is_in_neighborhood"))
@@ -735,7 +735,6 @@ function compute_preferred_block_index_per_cell_per_block(;  # UNTESTED
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_neighborhood_cells))
     end
-    region_position_per_cell_per_thread = [zeros(Int, n_cells) for _ in 1:maxthreadid()]
 
     max_n_neighborhood_clusters = maximum(1:n_blocks) do block_index
         n_clusters =
@@ -748,7 +747,7 @@ function compute_preferred_block_index_per_cell_per_block(;  # UNTESTED
     preferred_block_index_per_max_neighborhood_cell_per_thread =
         [Vector{Int}(undef, max_n_neighborhood_cells) for _ in 1:maxthreadid()]
 
-    parallel_loop_with_rng(  # NOJET
+    parallel_loop_with_rng(
         1:n_blocks;
         rng,
         weights = n_neighborhood_cells_per_block,
@@ -790,7 +789,6 @@ function compute_preferred_block_index_per_cell_per_block(;  # UNTESTED
             sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
-            region_position_per_cell_per_thread,
             n_genes,
             n_modules,
         )
@@ -1039,7 +1037,6 @@ function compute_local_clusters(;  # UNTESTED
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_block_cells))
     end
-    region_position_per_cell_per_thread = [zeros(Int, n_cells) for _ in 1:maxthreadid()]
 
     # `DispersionScratches` channel pool for the nested parallel dispersion loops (compute_all_dispersions! /
     # compute_changed_dispersions!) and the serial split-then-disperse path in `split_one_cluster!`. Sized to
@@ -1088,7 +1085,6 @@ function compute_local_clusters(;  # UNTESTED
             sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
-            region_position_per_cell_per_thread,
             n_genes,
             n_modules,
         )
@@ -1984,7 +1980,6 @@ function relocate_dissolved_metacell_cells!(;  # UNTESTED
     for _ in 1:nthreads()
         put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_block_cells))
     end
-    region_position_per_cell_per_thread = [zeros(Int, n_cells) for _ in 1:maxthreadid()]
 
     # Parallel over the blocks that dissolved a metacell (each writes only its own cells, so the shared
     # `sharp_metacell_index_per_cell` is not contended). The inner z-score fill is nested-parallel over the block's
@@ -2017,7 +2012,6 @@ function relocate_dissolved_metacell_cells!(;  # UNTESTED
             sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             z_score_accumulator_pool,
-            region_position_per_cell_per_thread,
             n_genes,
             n_modules,
         )
@@ -2398,147 +2392,6 @@ function precompute_walkable_indirection(  # UNTESTED
         friend_position_per_series_per_prev_block_per_walkable_block,
         block_cell_position_per_point_per_prev_block_per_walkable_block,
     )
-end
-
-# Fill `z_score_per_found_module_per_region_cell` (rows = the block's found modules in `findall(is_found_per_module)`
-# order, columns = the given region cells) with the environment-normalized z-score of each found module's linear
-# fraction - the space cells are clustered in. Fills the caller's `is_found_per_module` buffer from the block, and
-# returns the per-module gene index lists (the inverted `module_index_per_gene`, reused by callers). This is the shared
-# setup around [`compute_z_score_per_found_module_per_region_cell!`](@ref); the caller owns (and sizes) the reused
-# buffers.
-function setup_z_score_per_found_module_per_region_cell!(;  # UNTESTED
-    z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
-    is_found_per_module::BitVector,
-    block_index::Integer,
-    indices_of_region_cells::AbstractVector{<:Integer},
-    is_found_per_module_per_block::Union{AbstractMatrix{Bool}, BitMatrix},
-    module_index_per_gene_per_block::AbstractMatrix{<:Integer},
-    mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
-    std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
-    std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
-    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
-    total_UMIs_per_cell::AbstractVector{<:Integer},
-    z_score_accumulator_pool::Channel{Vector{Float32}},
-    region_position_per_cell_per_thread::AbstractVector{<:AbstractVector{<:Integer}},
-    n_genes::Integer,
-    n_modules::Integer,
-)::Vector{Vector{Int}}
-    is_found_per_module .= @view is_found_per_module_per_block[:, block_index]
-
-    # Invert `module_index_per_gene` once per block: parallel-over-found-modules in compute_z_score reads the list
-    # directly instead of rebuilding a per-call `is_gene_in_module` BitVector.
-    @views module_index_per_gene = module_index_per_gene_per_block[:, block_index]
-    gene_indices_per_module = [Int[] for _ in 1:n_modules]
-    for gene_index in 1:n_genes
-        module_index = module_index_per_gene[gene_index]
-        if module_index > 0
-            push!(gene_indices_per_module[module_index], gene_index)
-        end
-    end
-
-    @views mean_linear_fraction_in_environment_cells_per_module =
-        mean_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
-    @views std_linear_fraction_in_environment_cells_per_module =
-        std_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
-
-    compute_z_score_per_found_module_per_region_cell!(;
-        z_score_per_found_module_per_region_cell,
-        sparse_UMIs_per_cell_per_gene,
-        total_UMIs_per_cell,
-        is_found_per_module,
-        indices_of_region_cells,
-        gene_indices_per_module,
-        z_score_accumulator_pool,
-        region_position_per_cell_per_thread,
-        mean_linear_fraction_in_environment_cells_per_module,
-        std_linear_fraction_in_environment_cells_per_module,
-        std_fraction_regularization = std_fraction_regularization_per_block[block_index],
-    )
-
-    return gene_indices_per_module
-end
-
-function compute_z_score_per_found_module_per_region_cell!(;  # UNTESTED
-    z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
-    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
-    total_UMIs_per_cell::AbstractVector{<:Integer},
-    is_found_per_module::BitVector,
-    indices_of_region_cells::AbstractVector{<:Integer},
-    gene_indices_per_module::AbstractVector{<:AbstractVector{<:Integer}},
-    z_score_accumulator_pool::Channel{Vector{Float32}},
-    region_position_per_cell_per_thread::AbstractVector{<:AbstractVector{<:Integer}},
-    mean_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
-    std_linear_fraction_in_environment_cells_per_module::AbstractVector{<:AbstractFloat},
-    std_fraction_regularization::AbstractFloat,
-)::Nothing
-    n_region_cells = length(indices_of_region_cells)
-    found_module_indices = findall(is_found_per_module)
-    n_found_modules = length(found_module_indices)
-
-    # A module's UMIs are accumulated per region cell by walking the nonzeros of each of its gene columns (no random
-    # `[cell, gene]` access); `region_position_per_cell` maps each cell to its position among the region cells (0
-    # otherwise). Owned by this outer (block) task and captured read-only by the nested found-module loop, so it is
-    # indexed by the outer task's thread and reset once that loop is done.
-    row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
-    UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
-    region_position_per_cell = region_position_per_cell_per_thread[threadid()]
-    for (region_cell_position, cell_index) in enumerate(indices_of_region_cells)
-        region_position_per_cell[cell_index] = region_cell_position
-    end
-
-    # Parallel over found modules - each fills its own row of the z-score matrix (disjoint writes). Per task, take an
-    # accumulator vector from the pool (contiguous Float32, sized to max region cells), do gene-outer / cell-inner
-    # `@turbo` accumulation into it (each UMI column visited once and amortized across all region cells), then
-    # normalize + write the strided row into the z-score matrix and return the accumulator to the pool. Weight
-    # dispatch by each found module's gene count so the biggest modules go first.
-    n_genes_per_found_module = [length(gene_indices_per_module[found_module_indices[k]]) for k in 1:n_found_modules]
-    parallel_loop_wo_rng(
-        1:n_found_modules;
-        nested = true,
-        policy = :greedy,
-        weights = n_genes_per_found_module,
-        name = "compute_z_score_per_found_module_per_region_cell",
-    ) do found_module_position
-        module_index = found_module_indices[found_module_position]
-        gene_indices_in_module = gene_indices_per_module[module_index]
-        accumulator = take!(z_score_accumulator_pool)
-        try
-            @views fill!(accumulator[1:n_region_cells], 0.0f0)
-            # Walk only the nonzeros of the module's gene columns, mapping each to its region cell; the downstream
-            # z-score normalization below operates on dense buffers and stays `@turbo`.
-            @inbounds for gene_index in gene_indices_in_module
-                for stored_index in nzrange(sparse_UMIs_per_cell_per_gene, gene_index)
-                    region_position = region_position_per_cell[row_index_per_stored[stored_index]]
-                    if region_position > 0
-                        accumulator[region_position] += UMIs_per_stored[stored_index]
-                    end
-                end
-            end
-            mean_linear_fraction = mean_linear_fraction_in_environment_cells_per_module[module_index]
-            std_linear_fraction = std_linear_fraction_in_environment_cells_per_module[module_index]
-            @assert std_linear_fraction > 0
-            @check_turbo_vector(accumulator)
-            @check_turbo_vector(indices_of_region_cells)
-            @check_turbo_vector(total_UMIs_per_cell)
-            @check_turbo_matrix(z_score_per_found_module_per_region_cell)
-            @turbo for region_cell_position in 1:n_region_cells
-                cell_index = indices_of_region_cells[region_cell_position]
-                delta_fraction =
-                    accumulator[region_cell_position] / total_UMIs_per_cell[cell_index] - mean_linear_fraction
-                z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] =
-                    (delta_fraction + copysign(std_fraction_regularization, delta_fraction)) /
-                    (std_linear_fraction + std_fraction_regularization)
-            end
-        finally
-            put!(z_score_accumulator_pool, accumulator)
-        end
-        return nothing
-    end
-
-    for cell_index in indices_of_region_cells
-        region_position_per_cell[cell_index] = 0
-    end
-    return nothing
 end
 
 # Copy all fields and the active-range data from source to target.

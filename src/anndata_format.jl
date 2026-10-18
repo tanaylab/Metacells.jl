@@ -596,7 +596,7 @@ function import_vectors_data(
     overwrite::Bool,
     insist::Bool,
 )::Nothing
-    for vector_name in vectors_set(source, axis)
+    for vector_name in vectors_set(source, axis)  # NOJET
         data = nothing
         key = (axis, vector_name)
 
@@ -694,7 +694,7 @@ function import_matrices_data(
     overwrite::Bool,
     insist::Bool,
 )::Nothing
-    for matrix_name in matrices_set(source, rows_axis, columns_axis; relayout = false)
+    for matrix_name in matrices_set(source, rows_axis, columns_axis; relayout = false)  # NOJET
         data = nothing
 
         # A matrix is imported in both layouts, so naming it in either order means the same matrix.

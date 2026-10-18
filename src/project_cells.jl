@@ -18,12 +18,15 @@ using StatsBase
 using TanayLabUtilities
 
 using ..AnalyzeCells
+using ..AnalyzeModules
 using ..Contracts
 using ..Defaults
 
 import Base.Threads.maxthreadid
 import Metacells.AnalyzeCells.cell_group_membership_from_block_neighborhoods
 import Metacells.AnalyzeCells.sparse_cell_reference_correlation_per_gene_per_group!
+import Metacells.AnalyzeModules.compute_std_fraction_regularization_per_block
+import Metacells.AnalyzeModules.compute_z_score_per_found_module_per_region_cell!
 
 # Needed because of JET:
 import Metacells.Contracts.block_axis
@@ -42,7 +45,7 @@ import Metacells.Contracts.matrix_of_std_linear_fraction_in_environment_cells_pe
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.module_axis
 import Metacells.Contracts.projected_block_axis
-import Metacells.Contracts.tensor_of_linear_fraction_per_block_per_module_per_metacell
+import Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
 import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
 import Metacells.Contracts.vector_of_is_excluded_per_cell
@@ -50,10 +53,12 @@ import Metacells.Contracts.vector_of_is_excluded_per_gene
 import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_is_marker_per_gene
 import Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_projected_block_per_cell
 import Metacells.Contracts.vector_of_projected_metacell_per_cell
 import Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
 import Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
+import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 
@@ -62,6 +67,7 @@ import Metacells.Contracts.vector_of_total_UMIs_per_metacell
         query_daf::DafWriter,
         atlas_daf::DafReader,
         gene_fraction_regularization::Real = $(DEFAULT.gene_fraction_regularization),
+        std_UMIs_regularization::AbstractFloat = $(DEFAULT.std_UMIs_regularization),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
@@ -78,9 +84,13 @@ pick the best metacell in the `atlas_daf` for each cell of the `query_daf`, we:
   - Otherwise, we just look for the closest metacell in the original block (using that block's modules) and settle for
     that.
 
-Distances are computed on the log (base 2) of the gene expression using the `gene_fraction_regularization` to handle
-zero fractions. We also compute the z-score (final distance between the cell and projected metacell, minus the mean
-distance of the cells in the metacell, divided by their standard deviation). If this is too large, then the query cell
+The provisional block is picked using the log (base 2) of the expression of the marker genes, using the
+`gene_fraction_regularization` to handle zero fractions. The metacells are compared using the z-scores of the found
+modules, computed the same way sharpening computes them, using the same `std_UMIs_regularization` (see
+[`compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!`](@ref)). Each metacell is represented by the
+mean z-scores of its cells. We also compute the z-score of the final distance between the cell and its projected
+metacell, relative to the mean and standard deviation of the distances of the metacell's own cells (see
+[`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref)). If this is too large, then the query cell
 isn't a good match for anything in the atlas.
 
 # Query
@@ -117,10 +127,12 @@ $(CONTRACT2)
         matrix_of_module_per_gene_per_block(RequiredInput),
         matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
         matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block(RequiredInput),
-        tensor_of_linear_fraction_per_block_per_module_per_metacell(RequiredInput),
+        tensor_of_mean_cells_z_score_per_block_per_module_per_metacell(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_block(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
+        vector_of_total_neighborhood_UMIs_per_block(RequiredInput),
+        vector_of_n_neighborhood_cells_per_block(RequiredInput),
         vector_of_mean_euclidean_modules_cells_distance_per_metacell(RequiredInput),
         vector_of_std_euclidean_modules_cells_distance_per_metacell(RequiredInput),
     ],
@@ -128,6 +140,10 @@ $(CONTRACT2)
     query_daf::DafWriter,
     atlas_daf::DafReader,
     gene_fraction_regularization::Real = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
+    std_UMIs_regularization::AbstractFloat = function_default(
+        compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!,
+        :std_UMIs_regularization,
+    ),
     overwrite::Bool = false,
 )::Nothing
     query_gene_index_per_atlas_pertinent_marker, query_gene_index_per_atlas_gene =
@@ -153,6 +169,7 @@ $(CONTRACT2)
         sparse_UMIs_per_query_cell_per_query_gene,
         total_UMIs_per_query_cell,
         provisional_block_index_per_query_cell,
+        std_UMIs_regularization,
         overwrite,
     )
 
@@ -293,10 +310,12 @@ function compute_final_projection_per_query_cell(;
     sparse_UMIs_per_query_cell_per_query_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_query_cell::AbstractVector{<:Integer},
     provisional_block_index_per_query_cell::AbstractVector{<:Integer},
+    std_UMIs_regularization::AbstractFloat,
     overwrite::Bool,
 )::Nothing
     n_query_cells = axis_length(query_daf, "cell")
 
+    n_modules = axis_length(atlas_daf, "module")
     n_blocks = axis_length(atlas_daf, "block")
     name_per_block = axis_vector(atlas_daf, "block")
     name_per_metacell = axis_vector(atlas_daf, "metacell")
@@ -312,6 +331,8 @@ function compute_final_projection_per_query_cell(;
         plain_array(get_matrix(atlas_daf, "module", "block", "mean_linear_fraction_in_environment_cells"))
     std_linear_fraction_in_environment_cells_per_module_per_block =
         plain_array(get_matrix(atlas_daf, "module", "block", "std_linear_fraction_in_environment_cells"))
+    std_fraction_regularization_per_block =
+        compute_std_fraction_regularization_per_block(atlas_daf; std_UMIs_regularization)
 
     mean_euclidean_modules_cells_distance_per_metacell =
         plain_array(get_vector(atlas_daf, "metacell", "mean_euclidean_modules_cells_distance"))
@@ -324,6 +345,13 @@ function compute_final_projection_per_query_cell(;
 
     next_indices_of_undetermined_query_cells_per_block =
         [findall(provisional_block_index_per_query_cell .== block_index) for block_index in 1:n_blocks]
+
+    # Channel pool of per-query-cell Float32 accumulators for `compute_z_score_per_found_module_per_region_cell!`'s
+    # nested parallel-over-found-modules loop, as in sharpening.
+    z_score_accumulator_pool = Channel{Vector{Float32}}(nthreads())
+    for _ in 1:nthreads()
+        put!(z_score_accumulator_pool, Vector{Float32}(undef, n_query_cells))
+    end
 
     spin_lock_per_block = [SpinLock() for _ in 1:n_blocks]
 
@@ -371,65 +399,50 @@ function compute_final_projection_per_query_cell(;
                     end
 
                     @views module_index_per_atlas_gene = module_index_per_atlas_gene_per_block[:, block_index]
-                    @views is_found_per_module = is_found_per_module_per_block[:, block_index]
+                    is_found_per_module = BitVector(view(is_found_per_module_per_block, :, block_index))
                     indices_of_found_modules = findall(is_found_per_module)
                     n_found_modules = length(indices_of_found_modules)
                     @assert n_found_modules > 0
 
-                    linear_fraction_per_module_per_metacell =
-                        plain_array(get_matrix(atlas_daf, "module", "metacell", "$(block_name)_linear_fraction"))
-
-                    linear_fraction_per_found_module_per_candidate_metacell = linear_fraction_per_module_per_metacell[
+                    mean_cells_z_score_per_module_per_metacell =
+                        plain_array(get_matrix(atlas_daf, "module", "metacell", "$(block_name)_mean_cells_z_score"))
+                    z_score_per_found_module_per_candidate_metacell = mean_cells_z_score_per_module_per_metacell[
                         indices_of_found_modules,
                         indices_of_candidate_metacells,
                     ]
 
                     @views module_index_per_atlas_gene = module_index_per_atlas_gene_per_block[:, block_index]
-                    total_UMIs_per_undetermined_query_cell =
-                        total_UMIs_per_query_cell[indices_of_undetermined_query_cells]
-
-                    query_gene_indices_per_found_module = map(indices_of_found_modules) do found_module_index
+                    query_gene_indices_per_module = [Int[] for _ in 1:n_modules]
+                    for found_module_index in indices_of_found_modules
                         indices_of_found_module_atlas_genes =
                             findall(module_index_per_atlas_gene .== found_module_index)
                         @assert !isempty(indices_of_found_module_atlas_genes)
-                        return query_gene_index_per_atlas_gene[indices_of_found_module_atlas_genes]
+                        query_gene_indices_per_module[found_module_index] =
+                            query_gene_index_per_atlas_gene[indices_of_found_module_atlas_genes]
                     end
 
-                    linear_fraction_per_found_module_per_undetermined_query_cell =
-                        zeros(Float32, n_found_modules, n_undetermined_query_cells)
-                    sum_sparse_columns_per_group!(
-                        linear_fraction_per_found_module_per_undetermined_query_cell,
-                        sparse_UMIs_per_query_cell_per_query_gene,
-                        indices_of_undetermined_query_cells,
-                        query_gene_indices_per_found_module,
-                    )
-                    linear_fraction_per_found_module_per_undetermined_query_cell ./=
-                        reshape(total_UMIs_per_undetermined_query_cell, 1, n_undetermined_query_cells)
-
-                    mean_linear_fraction_in_environment_cells_per_found_module =
-                        mean_linear_fraction_in_environment_cells_per_module_per_block[
-                            indices_of_found_modules,
-                            block_index,
-                        ]
-                    std_linear_fraction_in_environment_cells_per_found_module =
-                        std_linear_fraction_in_environment_cells_per_module_per_block[
-                            indices_of_found_modules,
-                            block_index,
-                        ]
-                    @assert !any(std_linear_fraction_in_environment_cells_per_found_module .== 0)
-                    std_linear_fraction_in_environment_cells_per_found_module[std_linear_fraction_in_environment_cells_per_found_module .== 0] .=
-                        Inf32
-                    z_score_per_found_module_per_candidate_metacell =
-                        (
-                            linear_fraction_per_found_module_per_candidate_metacell .-
-                            mean_linear_fraction_in_environment_cells_per_found_module
-                        ) ./ std_linear_fraction_in_environment_cells_per_found_module
-
                     z_score_per_found_module_per_undetermined_query_cell =
-                        (
-                            linear_fraction_per_found_module_per_undetermined_query_cell .-
-                            mean_linear_fraction_in_environment_cells_per_found_module
-                        ) ./ std_linear_fraction_in_environment_cells_per_found_module
+                        Matrix{Float32}(undef, n_found_modules, n_undetermined_query_cells)
+                    compute_z_score_per_found_module_per_region_cell!(;
+                        z_score_per_found_module_per_region_cell = z_score_per_found_module_per_undetermined_query_cell,
+                        sparse_UMIs_per_cell_per_gene = sparse_UMIs_per_query_cell_per_query_gene,
+                        total_UMIs_per_cell = total_UMIs_per_query_cell,
+                        is_found_per_module,
+                        indices_of_region_cells = indices_of_undetermined_query_cells,
+                        gene_indices_per_module = query_gene_indices_per_module,
+                        z_score_accumulator_pool,
+                        mean_linear_fraction_in_environment_cells_per_module = view(
+                            mean_linear_fraction_in_environment_cells_per_module_per_block,
+                            :,
+                            block_index,
+                        ),
+                        std_linear_fraction_in_environment_cells_per_module = view(
+                            std_linear_fraction_in_environment_cells_per_module_per_block,
+                            :,
+                            block_index,
+                        ),
+                        std_fraction_regularization = std_fraction_regularization_per_block[block_index],
+                    )
 
                     distances_between_candidate_metacells_and_undetermined_query_cells =
                         flame_timed("pairwise.Euclidean") do
