@@ -29,7 +29,7 @@ Metacells.AnalyzeMetacells.compute_vector_of_type_per_metacell_by_cells!
 ## Distances
 
 ```@docs
-Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!
 ```
 
 ## Correlations

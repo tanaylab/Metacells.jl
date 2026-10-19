@@ -77,7 +77,7 @@ Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell
 ### Metacells Distances
 
 ```@docs
-Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
+Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
 ```
 
 ### Metacells Correlations
@@ -123,8 +123,8 @@ Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
 ### Blocks Distances
 
 ```@docs
-Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
-Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block
+Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
 ```
 
 ### Blocks Confusion

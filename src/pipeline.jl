@@ -105,11 +105,11 @@ $(CONTRACT2)
 """
 @logged :mcs_ops @computation (
     function_contract(compute_vector_of_is_skeleton_per_gene!) |>
-    function_contract(compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!) |>
+    function_contract(compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!) |>
     function_contract(compute_metacells_2d_umap!) |>
     function_contract(compute_metacells_blocks!) |>
-    function_contract(compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!) |>
-    function_contract(compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!) |>
+    function_contract(compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!) |>
+    function_contract(compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!) |>
     function_contract(compute_vector_of_n_metacells_per_block!) |>
     function_contract(compute_vector_of_n_cells_per_block!) |>
     function_contract(compute_matrix_of_UMIs_per_gene_per_block!) |>
@@ -147,13 +147,13 @@ $(CONTRACT2)
 )::Nothing
     # Which genes predict the rest, and the geometry of the metacells which follows from them.
     compute_vector_of_is_skeleton_per_gene!(daf; overwrite)
-    compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(daf; overwrite)
+    compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!(daf; overwrite)
     compute_metacells_2d_umap!(daf; prev_daf, rng, overwrite)
 
     # The blocks - regions of the manifold the metacells fall into - and what each is made of.
     compute_metacells_blocks!(daf; prefix, overwrite)
-    compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(daf; overwrite)
-    compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(daf; overwrite)
+    compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!(daf; overwrite)
+    compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!(daf; overwrite)
     compute_vector_of_n_metacells_per_block!(daf; overwrite)
     compute_vector_of_n_cells_per_block!(daf; overwrite)
     compute_matrix_of_UMIs_per_gene_per_block!(daf; overwrite)

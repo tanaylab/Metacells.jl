@@ -298,7 +298,7 @@
 <li>We then make it symmetric by adding it to its transpose.
 </li>
 </ul>
-<p>For each block, we sort all blocks by the normalized symmetric confusion score. To break ties (especially for zero confusion), we use the mean distance between the blocks. We then pick the first few blocks to be in the neighborhood.
+<p>For each block, we sort all blocks by the normalized symmetric confusion score. To break ties (especially for zero confusion), we use the root mean square distance between the blocks. We then pick the first few blocks to be in the neighborhood.
 </p>
 <ul>
 <li>All blocks that have a symmetric normalized confusion fraction of at least 
@@ -361,12 +361,12 @@
 </strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells which are included in each column (block) and are closest to each (row) block.
 </p>
 <p>
-<strong>block, block @ mean
+<strong>block, block @ rms
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (required): The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.
+</strong>::Union{Float32, Float64} (required): The root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks.
 </p>
 <p>
 <strong>Outputs
@@ -420,11 +420,11 @@
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_in_environment_per_metacell_per_block">
 <code>matrix_of_is_in_environment_per_metacell_per_block
 </code>
-</a>. The environment of each block starts with all the metacells of the blocks in its neighborhood, and adds any metacell whose mean distance to the block&#39;s metacells is at most 
+</a>. The environment of each block starts with all the metacells of the blocks in its neighborhood, and adds any metacell whose root mean square distance to the block&#39;s metacells is at most 
 <code>max_environment_metacell_relative_distance
 </code> times the block&#39;s basis distance: the 
 <code>environment_distance_base_quantile
-</code> quantile of the mean distance of the block&#39;s neighborhood metacells to the block metacells. This larger (environment) region of the manifold gives us more metacells for estimating local gene programs (modules).
+</code> quantile of the root mean square distance of the block&#39;s neighborhood metacells to the block metacells. This larger (environment) region of the manifold gives us more metacells for estimating local gene programs (modules).
 </p>
 <p>
 <strong>Inputs
@@ -461,12 +461,12 @@
 </strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
 </p>
 <p>
-<strong>metacell, block @ mean
+<strong>metacell, block @ rms
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (required): The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</strong>::Union{Float32, Float64} (required): The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
 </p>
 <p>
 <strong>Outputs
@@ -2462,9 +2462,9 @@
 </h2>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!">
-<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -2473,21 +2473,22 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(
+<code class="language-julia hljs">function compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!(
     daf::DafWriter;
-    overwrite::Bool = false,
+    gene_fraction_regularization::AbstractFloat = ```0.0001```,
+    overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
 <p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
-<code>matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
+<a href="contracts.html#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<code>matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block
 </code>
-</a>, the mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. The block&#39;s own metacells are included, so reducing this over each block&#39;s metacells (see 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
-<code>compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
+</a>, the root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. The block&#39;s own metacells are included. Reducing this over each block&#39;s metacells (see 
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!">
+<code>compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!
 </code>
-</a>) gives the mean distance between the blocks, with the mean distance between the metacells inside each block on the diagonal.
+</a>) gives the root mean square distance between the blocks.
 </p>
 <p>
 <strong>Inputs
@@ -2496,6 +2497,10 @@
 <p>
 <strong>Axes
 </strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
 </p>
 <p>
 <strong>metacell
@@ -2510,6 +2515,10 @@
 </strong>
 </p>
 <p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
 <strong>metacell @ block
 </strong>::AbstractString (required): The unique block each metacell belongs to.
 </p>
@@ -2518,10 +2527,8 @@
 </strong>
 </p>
 <p>
-<strong>metacell, metacell @ euclidean
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
 </p>
 <p>
 <strong>Outputs
@@ -2532,12 +2539,12 @@
 </strong>
 </p>
 <p>
-<strong>metacell, block @ mean
+<strong>metacell, block @ rms
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</strong>::Union{Float32, Float64} (created): The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
 </p>
 </div>
 </section>
@@ -2545,9 +2552,9 @@
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
-<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
+<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!">
+<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -2556,21 +2563,21 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(
+<code class="language-julia hljs">function compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!(
     daf::DafWriter;
-    overwrite::Bool = false,
+    overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
 <p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
-<code>matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+<a href="contracts.html#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks">
+<code>matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
 </code>
-</a>, the mean Euclidean skeleton genes fractions distance between the metacells of the blocks, by reducing 
-<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
-<code>matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
+</a>, the root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks. This is the root of the mean of the squares of 
+<a href="contracts.html#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<code>matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block
 </code>
-</a> over the metacells of each block. The diagonal is the mean distance between the metacells inside each block.
+</a> over the metacells of each block. The diagonal is the root mean square distance between the metacells inside each block.
 </p>
 <p>
 <strong>Inputs
@@ -2601,12 +2608,12 @@
 </strong>
 </p>
 <p>
-<strong>metacell, block @ mean
+<strong>metacell, block @ rms
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (required): The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</strong>::Union{Float32, Float64} (required): The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
 </p>
 <p>
 <strong>Outputs
@@ -2617,12 +2624,12 @@
 </strong>
 </p>
 <p>
-<strong>block, block @ mean
+<strong>block, block @ rms
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.
+</strong>::Union{Float32, Float64} (created): The root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks.
 </p>
 </div>
 </section>
@@ -4446,20 +4453,20 @@
 </a>
 </li>
 <li>
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
-</code>
-</a>
-</li>
-<li>
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!
-</code>
-</a>
-</li>
-<li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!
+</code>
+</a>
+</li>
+<li>
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!">
+<code>Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!
 </code>
 </a>
 </li>

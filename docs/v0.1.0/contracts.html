@@ -257,7 +257,7 @@
 </code>). For square symmetric matrices, we use 
 <code>matrix_of_something_between_axis
 </code> (e.g., 
-<code>matrix_of_euclidean_skeleton_fold_distance_between_metacells
+<code>matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
 </code>). We also allow for 
 <code>tensor_of_something_per_axis_per_axis_per_axis
 </code> - these are simply a set of matrices, one for each entry of the first axis, whose names are 
@@ -1443,9 +1443,9 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </h3>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
-<code>Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
+<summary id="Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell">
+<code>Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1454,16 +1454,16 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">matrix_of_euclidean_skeleton_fold_distance_between_metacells(
+<code class="language-julia hljs">matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell(
     expectation::ContractExpectation
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The Euclidean distance between the log of the fraction of the skeleton genes between the metacells. This is a symmetric matrix with zeros in the diagonal.
+<p>The Euclidean distance between the log of the fraction of the skeleton genes of each metacell (column) and each of its nearest neighbor metacells (rows). This is a sparse matrix with the same number of non-zero entries in each column. A zero entry means the row metacell is not one of the nearest neighbors of the column metacell. The matrix is not symmetric.
 </p>
 <p>This matrix is computed by 
-<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
-<code>compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!">
+<code>compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!
 </code>
 </a>.
 </p>
@@ -1971,9 +1971,9 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </h3>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
-<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
+<summary id="Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -1982,20 +1982,20 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(
+<code class="language-julia hljs">matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block(
     expectation::ContractExpectation
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. This includes the metacells inside the block, so reducing it over each block&#39;s metacells gives the 
-<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
-<code>matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+<p>The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. This includes the metacells inside the block. The root of the mean of the squares over each block&#39;s metacells gives the 
+<a href="contracts.html#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks">
+<code>matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
 </code>
 </a>.
 </p>
 <p>This matrix may be computed by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!">
-<code>compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!">
+<code>compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!
 </code>
 </a>.
 </p>
@@ -2005,9 +2005,9 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
-<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
+<summary id="Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks">
+<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks">
+<code>Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -2016,16 +2016,16 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(
+<code class="language-julia hljs">matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks(
     expectation::ContractExpectation
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>The mean Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a symmetric matrix, and the diagonal is the mean distance between the metacells inside each block.
+<p>The root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a symmetric matrix, and the diagonal is the root mean square distance between the metacells inside each block.
 </p>
 <p>This matrix may be computed by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!">
-<code>compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
+<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!">
+<code>compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!
 </code>
 </a>.
 </p>
@@ -4489,12 +4489,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
-<code>Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
-</code>
-</a>
-</li>
-<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 </code>
@@ -4567,6 +4561,12 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </a>
 </li>
 <li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell">
+<code>Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
+</code>
+</a>
+</li>
+<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
 </code>
@@ -4587,18 +4587,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell">
 <code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks">
-<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block">
-<code>Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
 </code>
 </a>
 </li>
@@ -4671,6 +4659,18 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_n_genes_per_module_per_block">
 <code>Metacells.Contracts.matrix_of_n_genes_per_module_per_block
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks">
+<code>Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block">
+<code>Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block
 </code>
 </a>
 </li>

@@ -247,11 +247,11 @@
 <code>max_fold_min_confidence_UMIs
 </code>). That is, when we have a high fold factor, we are pretty certain the metacells truly have a significant difference in the expression of the skeleton gene. This distances matrix is only computed for this purpose and is not stored.
 </p>
-<p>The actual blocks are computed using K-means on the log of the skeleton genes fractions of the metacells, using the same regularization as 
-<a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
-<code>matrix_of_euclidean_skeleton_fold_distance_between_metacells
+<p>The actual blocks are computed using K-means on the log of the skeleton genes fractions of the metacells, using the 
+<a href="defaults.html#Metacells.Defaults.GENE_FRACTION_REGULARIZATION_FOR_CELLS">
+<code>GENE_FRACTION_REGULARIZATION_FOR_CELLS
 </code>
-</a>. If 
+</a> regularization. If 
 <code>n_blocks
 </code> is not specified, K-means starts from the centroids of the hierarchical clustering blocks. Otherwise, it starts from 
 <code>:kmpp

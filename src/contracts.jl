@@ -19,7 +19,7 @@ in both compared metacells is too low (below 40).
 Naming convention is `vector_of_something_per_axis` for vectors (e.g., `vector_of_metacell_per_cell`) and
 `matrix_of_something_per_axis_per_axis` for matrices (e.g., `vector_of_UMIs_per_gene_per_cell`). For square symmetric
 matrices, we use `matrix_of_something_between_axis` (e.g.,
-`matrix_of_euclidean_skeleton_fold_distance_between_metacells`). We also allow for
+`matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks`). We also allow for
 `tensor_of_something_per_axis_per_axis_per_axis` - these are simply a set of matrices, one for each entry of the first
 axis, whose names are `entry_something`.
 """
@@ -41,7 +41,6 @@ export matrix_of_correlation_between_markers_per_gene_per_gene
 export matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
 export matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
 export matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
-export matrix_of_euclidean_skeleton_fold_distance_between_metacells
 export matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 export matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 export matrix_of_is_environment_distinct_per_gene_per_block
@@ -54,12 +53,11 @@ export matrix_of_is_neighborhood_distinct_per_gene_per_block
 export matrix_of_is_neighborhood_marker_per_gene_per_block
 export matrix_of_is_strong_per_gene_per_base_block
 export matrix_of_is_strong_per_gene_per_block
+export matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
 export matrix_of_linear_fraction_per_gene_per_block
 export matrix_of_linear_fraction_per_gene_per_metacell
 export matrix_of_log_linear_fraction_per_gene_per_block
 export matrix_of_log_linear_fraction_per_gene_per_metacell
-export matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
-export matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
 export matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 export matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_module_per_gene_per_block
@@ -70,6 +68,8 @@ export matrix_of_n_cells_per_prev_block_per_block
 export matrix_of_n_cells_per_prev_block_type_per_block_type
 export matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
 export matrix_of_n_genes_per_module_per_block
+export matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
+export matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block
 export matrix_of_std_linear_fraction_in_environment_cells_per_module_per_block
 export matrix_of_std_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_UMIs_per_gene_per_block
@@ -792,23 +792,26 @@ end
 ### Metacells Distances
 
 """
-    matrix_of_euclidean_skeleton_fold_distance_between_metacells(
+    matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell(
         expectation::ContractExpectation
     )::Pair{MatrixKey, DataSpecification}
 
-The Euclidean distance between the log of the fraction of the skeleton genes between the metacells. This is a symmetric
-matrix with zeros in the diagonal.
+The Euclidean distance between the log of the fraction of the skeleton genes of each metacell (column) and each of its
+nearest neighbor metacells (rows). This is a sparse matrix with the same number of non-zero entries in each column. A
+zero entry means the row metacell is not one of the nearest neighbors of the column metacell. The matrix is not
+symmetric.
 
-This matrix is computed by [`compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!`](@ref
-Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!).
+This matrix is computed by [`compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!`](@ref
+Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!).
 """
-function matrix_of_euclidean_skeleton_fold_distance_between_metacells(  # untested
+function matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
-    return ("metacell", "metacell", "euclidean_skeleton_fold_distance") => (
+    return ("metacell", "metacell", "knn_euclidean_skeleton_fold_distance") => (
         expectation,
         StorageFloat,
-        "The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.",
+        "The Euclidean distance between the log of the fraction of the skeleton genes of each metacell and each of" *
+        " its nearest neighbor metacells.",
     )
 end
 
@@ -1113,45 +1116,46 @@ end
 ### Blocks Distances
 
 """
-    matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(
+    matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks(
         expectation::ContractExpectation
     )::Pair{MatrixKey, DataSpecification}
 
-The mean Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a symmetric matrix,
-and the diagonal is the mean distance between the metacells inside each block.
+The root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks. This is a
+symmetric matrix, and the diagonal is the root mean square distance between the metacells inside each block.
 
-This matrix may be computed by [`compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!).
+This matrix may be computed by [`compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!).
 """
-function matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(  # untested
+function matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
-    return ("block", "block", "mean_euclidean_skeleton_fold_distance") => (
+    return ("block", "block", "rms_euclidean_skeleton_fold_distance") => (
         expectation,
         StorageFloat,
-        "The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.",
+        "The root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks.",
     )
 end
 
 """
-    matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(
+    matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block(
         expectation::ContractExpectation
     )::Pair{MatrixKey, DataSpecification}
 
-The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. This
-includes the metacells inside the block, so reducing it over each block's metacells gives the
-[`matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks`](@ref).
+The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each
+block. This includes the metacells inside the block. The root of the mean of the squares over each block's metacells
+gives the [`matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks`](@ref).
 
-This matrix may be computed by [`compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!).
+This matrix may be computed by [`compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!`](@ref
+Metacells.AnalyzeBlocks.compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!).
 """
-function matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(  # untested
+function matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block(  # untested
     expectation::ContractExpectation,
 )::Pair{MatrixKey, DataSpecification}
-    return ("metacell", "block", "mean_euclidean_skeleton_fold_distance") => (
+    return ("metacell", "block", "rms_euclidean_skeleton_fold_distance") => (
         expectation,
         StorageFloat,
-        "The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.",
+        "The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the" *
+        " metacells of each block.",
     )
 end
 

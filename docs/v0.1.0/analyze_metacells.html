@@ -762,9 +762,9 @@
 </h2>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
-<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
-<code>Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+<summary id="Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!">
+<a class="docstring-binding" href="#Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!
 </code>
 </a> — 
 <span class="docstring-category">Function
@@ -773,17 +773,21 @@
 <section>
 <div>
 <pre>
-<code class="language-julia hljs">function compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(
+<code class="language-julia hljs">function compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!(
     daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = ```0.0001```,
+    n_neighbors::Integer = ```15```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
 </pre>
 <p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
-<code>matrix_of_euclidean_skeleton_fold_distance_between_metacells
+<a href="contracts.html#Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell">
+<code>matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
 </code>
-</a>.
+</a>. Each metacell gets its 
+<code>n_neighbors
+</code> nearest other metacells.
 </p>
 <div class="admonition is-info" id="Note-ecf5441cfe130967">
 <header class="admonition-header">Note
@@ -836,10 +840,12 @@
 </strong>
 </p>
 <p>
-<strong>metacell, metacell @ euclidean
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+<strong>metacell, metacell @ knn
+<em>euclidean
+</em>skeleton
+<em>fold
+</em>distance
+</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes of each metacell and each of its nearest neighbor metacells.
 </p>
 </div>
 </section>
@@ -1226,7 +1232,15 @@
 <a href="contracts.html#Metacells.Contracts.vector_of_umap_y_per_metacell">
 <code>vector_of_umap_y_per_metacell
 </code>
-</a> by computing a 2D UMAP projection from the Euclidean skeleton fold distance between metacells.
+</a> by computing a 2D UMAP projection from the 
+<code>n_neighbors
+</code> nearest neighbors of each metacell in 
+<a href="contracts.html#Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell">
+<code>matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
+</code>
+</a>. The 
+<code>n_neighbors
+</code> must not be more than the number of neighbors stored there.
 </p>
 <p>If 
 <code>prev_daf
@@ -1289,10 +1303,12 @@
 </strong>
 </p>
 <p>
-<strong>metacell, metacell @ euclidean
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+<strong>metacell, metacell @ knn
+<em>euclidean
+</em>skeleton
+<em>fold
+</em>distance
+</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes of each metacell and each of its nearest neighbor metacells.
 </p>
 <p>
 <strong>Outputs
@@ -1388,7 +1404,15 @@
 <a href="contracts.html#Metacells.Contracts.vector_of_umap_w_per_metacell">
 <code>vector_of_umap_w_per_metacell
 </code>
-</a> by computing a 3D UMAP projection from the Euclidean skeleton fold distance between metacells.
+</a> by computing a 3D UMAP projection from the 
+<code>n_neighbors
+</code> nearest neighbors of each metacell in 
+<a href="contracts.html#Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell">
+<code>matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
+</code>
+</a>. The 
+<code>n_neighbors
+</code> must not be more than the number of neighbors stored there.
 </p>
 <p>
 <strong>Inputs
@@ -1407,10 +1431,12 @@
 </strong>
 </p>
 <p>
-<strong>metacell, metacell @ euclidean
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
+<strong>metacell, metacell @ knn
+<em>euclidean
+</em>skeleton
+<em>fold
+</em>distance
+</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes of each metacell and each of its nearest neighbor metacells.
 </p>
 <p>
 <strong>Outputs
@@ -1470,8 +1496,8 @@
 </a>
 </li>
 <li>
-<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!">
-<code>Metacells.AnalyzeMetacells.compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!">
+<code>Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!
 </code>
 </a>
 </li>

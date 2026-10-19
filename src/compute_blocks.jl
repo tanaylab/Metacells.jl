@@ -66,11 +66,11 @@ the compared metacells isn't at least `max_fold_min_significant_gene_UMIs`. We a
 have a significant difference in the expression of the skeleton gene. This distances matrix is only computed for this
 purpose and is not stored.
 
-The actual blocks are computed using K-means on the log of the skeleton genes fractions of the metacells, using the same
-regularization as [`matrix_of_euclidean_skeleton_fold_distance_between_metacells`](@ref). If `n_blocks` is not
-specified, K-means starts from the centroids of the hierarchical clustering blocks. Otherwise, it starts from `:kmpp`
-seeds chosen using the `rng`. Therefore, specifying `n_blocks` gives different blocks than the automatic method, even
-if the number of blocks is the same. Blocks which end up empty are dropped.
+The actual blocks are computed using K-means on the log of the skeleton genes fractions of the metacells, using the
+[`GENE_FRACTION_REGULARIZATION_FOR_CELLS`](@ref) regularization. If `n_blocks` is not specified, K-means starts from the
+centroids of the hierarchical clustering blocks. Otherwise, it starts from `:kmpp` seeds chosen using the `rng`.
+Therefore, specifying `n_blocks` gives different blocks than the automatic method, even if the number of blocks is the
+same. Blocks which end up empty are dropped.
 
 $(CONTRACT)
 """

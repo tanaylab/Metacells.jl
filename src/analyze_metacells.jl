@@ -6,7 +6,7 @@ module AnalyzeMetacells
 export compute_matrix_of_UMIs_per_gene_per_metacell!
 export compute_matrix_of_correlation_between_markers_per_gene_per_gene!
 export compute_matrix_of_correlation_per_gene_per_gene_of_subset_of_metacells!
-export compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!
+export compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!
 export compute_matrix_of_linear_fraction_per_gene_per_metacell!
 export compute_matrix_of_log_linear_fraction_per_gene_per_metacell!
 export compute_metacells_2d_umap!
@@ -24,6 +24,7 @@ using Distances
 using Distributions
 using LoopVectorization
 using MultipleTesting
+using NearestNeighbors
 using TanayLabUtilities
 using Random
 using SparseArrays
@@ -40,8 +41,8 @@ import Random.default_rng
 # Needed because of JET:
 import Metacells.Contracts.cell_axis
 import Metacells.Contracts.gene_axis
-import Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
 import Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
+import Metacells.Contracts.matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_UMIs_per_gene_per_cell
@@ -235,12 +236,15 @@ $(CONTRACT)
 end
 
 """
-    function compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(
+    function compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!(
         daf::DafWriter;
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        n_neighbors::Integer = $(DEFAULT.n_neighbors),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set [`matrix_of_euclidean_skeleton_fold_distance_between_metacells`](@ref).
+Compute and set [`matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell`](@ref). Each metacell gets
+its `n_neighbors` nearest other metacells.
 
 !!! note
 
@@ -254,29 +258,64 @@ $(CONTRACT)
     data = [
         vector_of_is_skeleton_per_gene(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
-        matrix_of_euclidean_skeleton_fold_distance_between_metacells(CreatedOutput),
+        matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell(CreatedOutput),
     ],
-) function compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(  # UNTESTED
+) function compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!(  # UNTESTED
     daf::DafWriter;
     gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
+    n_neighbors::Integer = 15,
     overwrite::Bool = false,
 )::Nothing
+    n_metacells = axis_length(daf, "metacell")
+    @assert 0 < n_neighbors < n_metacells
     linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
     linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
     log_linear_fraction_per_skeleton_per_metacell =
         log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
-    n_metacells = axis_length(daf, "metacell")
-    distances_between_metacells = parallel_pairwise(
-        Euclidean(),
-        log_linear_fraction_per_skeleton_per_metacell;
-        dims = 2,
+    tree = KDTree(log_linear_fraction_per_skeleton_per_metacell)
+
+    neighbor_index_per_edge = Vector{Int}(undef, n_neighbors * n_metacells)
+    distance_per_edge = Vector{eltype(log_linear_fraction_per_skeleton_per_metacell)}(undef, n_neighbors * n_metacells)
+    parallel_loop_wo_rng(
+        1:n_metacells;
+        name = "knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell",
         progress = DebugProgress(
             n_metacells;
             group = :mcs_loops,
-            desc = "euclidean_skeleton_fold_distance_between_metacells",
+            desc = "knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell",
         ),
+        progress_chunk = 100,
+    ) do metacell_index
+        neighbor_index_per_neighbor, distance_per_neighbor = knn(
+            tree,
+            view(log_linear_fraction_per_skeleton_per_metacell, :, metacell_index),
+            n_neighbors,
+            false,
+            ==(metacell_index),
+        )
+        order_per_neighbor = sortperm(neighbor_index_per_neighbor)
+        edge_indices = ((metacell_index - 1) * n_neighbors + 1):(metacell_index * n_neighbors)
+        neighbor_index_per_edge[edge_indices] .= neighbor_index_per_neighbor[order_per_neighbor]
+        distance_per_edge[edge_indices] .= distance_per_neighbor[order_per_neighbor]
+        return nothing
+    end
+    @assert all(distance_per_edge .> 0)
+
+    knn_distance_per_metacell_per_metacell = SparseMatrixCSC(
+        n_metacells,
+        n_metacells,
+        collect(1:n_neighbors:(n_neighbors * n_metacells + 1)),
+        neighbor_index_per_edge,
+        distance_per_edge,
     )
-    set_matrix!(daf, "metacell", "metacell", "euclidean_skeleton_fold_distance", distances_between_metacells; overwrite)
+    set_matrix!(
+        daf,
+        "metacell",
+        "metacell",
+        "knn_euclidean_skeleton_fold_distance",
+        knn_distance_per_metacell_per_metacell;
+        overwrite,
+    )
     return nothing
 end
 
@@ -834,6 +873,40 @@ function compute_prior_position_per_metacell(;  # UNTESTED
     return position_per_metacell
 end
 
+# The `n_neighbors` nearest neighbors of each metacell of `daf`, taken from the stored
+# `knn_euclidean_skeleton_fold_distance`, as a graph `UMAP` can fit from.
+function umap_knn_graph(daf::DafReader, n_neighbors::Integer)::UMAP.NND.HeapKNNGraph  # UNTESTED
+    knn_distance_per_metacell_per_metacell =  # NOJET
+        plain_array(get_matrix(daf, "metacell", "metacell", "knn_euclidean_skeleton_fold_distance"))
+    n_metacells = size(knn_distance_per_metacell_per_metacell, 2)
+    n_stored_neighbors = length(nzrange(knn_distance_per_metacell_per_metacell, 1))
+    @assert 0 < n_neighbors <= n_stored_neighbors
+    neighbor_index_per_stored_neighbor = rowvals(knn_distance_per_metacell_per_metacell)
+    distance_per_stored_neighbor = nonzeros(knn_distance_per_metacell_per_metacell)
+
+    neighbor_index_per_neighbor_per_metacell = Matrix{Int}(undef, n_neighbors, n_metacells)
+    distance_per_neighbor_per_metacell = Matrix{Float32}(undef, n_neighbors, n_metacells)
+    for metacell_index in 1:n_metacells
+        stored_neighbor_indices = nzrange(knn_distance_per_metacell_per_metacell, metacell_index)
+        @assert length(stored_neighbor_indices) == n_stored_neighbors
+        nearest_stored_neighbor_indices = stored_neighbor_indices[partialsortperm(  # NOJET
+            view(distance_per_stored_neighbor, stored_neighbor_indices),
+            1:n_neighbors,
+        )]
+        neighbor_index_per_neighbor_per_metacell[:, metacell_index] .=
+            neighbor_index_per_stored_neighbor[nearest_stored_neighbor_indices]
+        distance_per_neighbor_per_metacell[:, metacell_index] .=
+            distance_per_stored_neighbor[nearest_stored_neighbor_indices]
+    end
+
+    return UMAP.NND.HeapKNNGraph(
+        1:n_metacells,
+        Euclidean(),
+        neighbor_index_per_neighbor_per_metacell,
+        distance_per_neighbor_per_metacell,
+    )
+end
+
 """
     function compute_metacells_2d_umap!(
         daf::DafWriter;
@@ -845,7 +918,9 @@ end
     )::Nothing
 
 Compute and set [`vector_of_umap_x_per_metacell`](@ref) and [`vector_of_umap_y_per_metacell`](@ref) by computing a 2D
-UMAP projection from the Euclidean skeleton fold distance between metacells.
+UMAP projection from the `n_neighbors` nearest neighbors of each metacell in
+[`matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell`](@ref). The `n_neighbors` must not be more
+than the number of neighbors stored there.
 
 If `prev_daf` (the previous round's repository over the same cells) is given, the projection is seeded with each
 metacell's mean position of the `prev_daf` metacells of its cells, instead of UMAP's spectral initialization, so
@@ -868,7 +943,7 @@ $(CONTRACT2)
 @logged :mcs_ops @computation Contract(;
     axes = [metacell_axis(RequiredInput), cell_axis(OptionalInput)],
     data = [
-        matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
+        matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell(RequiredInput),
         vector_of_metacell_per_cell(OptionalInput),
         vector_of_umap_x_per_metacell(CreatedOutput),
         vector_of_umap_y_per_metacell(CreatedOutput),
@@ -889,21 +964,13 @@ $(CONTRACT2)
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
-    distances_between_metacells = plain_array(daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"])
+    knn_graph = umap_knn_graph(daf, n_neighbors)
     result = with_global_rng(rng) do
         if prev_daf === nothing
-            return UMAP.fit(distances_between_metacells, 2; metric = :precomputed, min_dist, n_neighbors)
+            return UMAP.fit(knn_graph, 2; metric = :precomputed, min_dist, n_neighbors)
         else
             init = PriorInitialization(compute_prior_position_per_metacell(; daf, prev_daf, rng))
-            return UMAP.fit(
-                distances_between_metacells,
-                2;
-                metric = :precomputed,
-                min_dist,
-                n_neighbors,
-                init,
-                n_epochs = 200,
-            )
+            return UMAP.fit(knn_graph, 2; metric = :precomputed, min_dist, n_neighbors, init, n_epochs = 200)
         end
     end
     set_vector!(daf, "metacell", "umap_x", Float32[point[1] for point in result.embedding]; overwrite)
@@ -921,15 +988,16 @@ end
     )::Nothing
 
 Compute and set [`vector_of_umap_u_per_metacell`](@ref), [`vector_of_umap_v_per_metacell`](@ref) and
-[`vector_of_umap_w_per_metacell`](@ref) by computing a 3D UMAP projection from the Euclidean skeleton fold distance
-between metacells.
+[`vector_of_umap_w_per_metacell`](@ref) by computing a 3D UMAP projection from the `n_neighbors` nearest neighbors of
+each metacell in [`matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell`](@ref). The `n_neighbors`
+must not be more than the number of neighbors stored there.
 
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
     axes = [metacell_axis(RequiredInput)],
     data = [
-        matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
+        matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell(RequiredInput),
         vector_of_umap_u_per_metacell(CreatedOutput),
         vector_of_umap_v_per_metacell(CreatedOutput),
         vector_of_umap_w_per_metacell(CreatedOutput),
@@ -941,9 +1009,9 @@ $(CONTRACT)
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
-    distances_between_metacells = plain_array(daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance"])
+    knn_graph = umap_knn_graph(daf, n_neighbors)
     result = with_global_rng(rng) do
-        return UMAP.fit(distances_between_metacells, 3; metric = :precomputed, min_dist, n_neighbors)
+        return UMAP.fit(knn_graph, 3; metric = :precomputed, min_dist, n_neighbors)
     end
     set_vector!(daf, "metacell", "umap_u", Float32[point[1] for point in result.embedding]; overwrite)
     set_vector!(daf, "metacell", "umap_v", Float32[point[2] for point in result.embedding]; overwrite)

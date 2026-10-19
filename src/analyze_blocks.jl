@@ -24,9 +24,9 @@ export compute_matrix_of_is_neighborhood_marker_per_gene_per_block!
 export compute_matrix_of_is_strong_per_gene_per_block!
 export compute_matrix_of_linear_fraction_per_gene_per_block!
 export compute_matrix_of_log_linear_fraction_per_gene_per_block!
-export compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!
-export compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!
 export compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
+export compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!
+export compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!
 export compute_matrix_of_UMIs_per_gene_per_block!
 export compute_vector_of_block_closest_by_pertinent_markers_per_cell!
 export compute_vector_of_mean_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_base_block!
@@ -80,7 +80,6 @@ import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells
 import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
 import Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
-import Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
 import Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.matrix_of_is_environment_distinct_per_gene_per_block
@@ -98,10 +97,10 @@ import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_block
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_block
 import Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
-import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
-import Metacells.Contracts.matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
 import Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
 import Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
+import Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks
+import Metacells.Contracts.matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block
 import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell
 import Metacells.Contracts.vector_of_block_per_metacell
@@ -334,75 +333,135 @@ $(CONTRACT)
 end
 
 """
-    function compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(
+    function compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!(
         daf::DafWriter;
-        overwrite::Bool = false,
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set [`matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block`](@ref), the mean Euclidean
-skeleton genes fractions distance between each metacell and the metacells of each block. The block's own metacells are
-included, so reducing this over each block's metacells (see
-[`compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!`](@ref)) gives the mean distance between the
-blocks, with the mean distance between the metacells inside each block on the diagonal.
+Compute and set [`matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block`](@ref), the root mean square
+of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block. The block's
+own metacells are included. Reducing this over each block's metacells (see
+[`compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!`](@ref)) gives the root mean square distance
+between the blocks.
 
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
-    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
-        matrix_of_euclidean_skeleton_fold_distance_between_metacells(RequiredInput),
+        vector_of_is_skeleton_per_gene(RequiredInput),
+        matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
-        matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(CreatedOutput),
+        matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block(CreatedOutput),
     ],
-) function compute_matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block!(  # UNTESTED
+) function compute_matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block!(  # UNTESTED
     daf::DafWriter;
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_CELLS,
     overwrite::Bool = false,
 )::Nothing
-    mean_distance_per_metacell_per_block =
-        daf["@ metacell @ metacell :: euclidean_skeleton_fold_distance |/ block =@ >| Mean"].array
+    linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
+    linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
+    log_linear_fraction_per_skeleton_per_metacell =
+        log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
+    block_index_per_metacell = daf["@ metacell : block : index"].array
+
+    n_skeletons, n_metacells = size(log_linear_fraction_per_skeleton_per_metacell)
+    n_blocks = axis_length(daf, "block")
+    rms_distance_per_metacell_per_block = Matrix{Float32}(undef, n_metacells, n_blocks)
+    @check_turbo_matrix(log_linear_fraction_per_skeleton_per_metacell)
+    @check_turbo_matrix(rms_distance_per_metacell_per_block)
+
+    parallel_loop_wo_rng(
+        1:n_blocks;
+        name = "rms_euclidean_skeleton_fold_distance_per_metacell_per_block",
+        progress = DebugProgress(
+            n_blocks;
+            group = :mcs_loops,
+            desc = "rms_euclidean_skeleton_fold_distance_per_metacell_per_block",
+        ),
+    ) do block_index
+        block_metacell_indices = findall(==(block_index), block_index_per_metacell)
+        centroid_per_skeleton =
+            vec(sum(view(log_linear_fraction_per_skeleton_per_metacell, :, block_metacell_indices); dims = 2))
+        centroid_per_skeleton ./= length(block_metacell_indices)
+        @check_turbo_vector(centroid_per_skeleton)
+
+        @turbo for metacell_index in 1:n_metacells
+            squared_distance = 0.0f0
+            for skeleton_index in 1:n_skeletons
+                difference =
+                    log_linear_fraction_per_skeleton_per_metacell[skeleton_index, metacell_index] -
+                    centroid_per_skeleton[skeleton_index]
+                squared_distance += difference * difference
+            end
+            rms_distance_per_metacell_per_block[metacell_index, block_index] = squared_distance
+        end
+
+        # The mean squared distance from the block's metacells is the squared distance from their centroid plus their
+        # mean squared distance from it.
+        @views rms_distance_per_metacell = rms_distance_per_metacell_per_block[:, block_index]
+        block_variance = sum(rms_distance_per_metacell[block_metacell_indices]) / length(block_metacell_indices)
+        rms_distance_per_metacell .= sqrt.(rms_distance_per_metacell .+ block_variance)
+        return nothing
+    end
+
     set_matrix!(
         daf,
         "metacell",
         "block",
-        "mean_euclidean_skeleton_fold_distance",
-        mean_distance_per_metacell_per_block;
+        "rms_euclidean_skeleton_fold_distance",
+        rms_distance_per_metacell_per_block;
         overwrite,
     )
     return nothing
 end
 
 """
-    function compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(
+    function compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!(
         daf::DafWriter;
-        overwrite::Bool = false,
+        overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set [`matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks`](@ref), the mean Euclidean skeleton
-genes fractions distance between the metacells of the blocks, by reducing
-[`matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block`](@ref) over the metacells of each block. The
-diagonal is the mean distance between the metacells inside each block.
+Compute and set [`matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks`](@ref), the root mean square of the
+Euclidean skeleton genes fractions distance between the metacells of the blocks. This is the root of the mean of the
+squares of [`matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block`](@ref) over the metacells of each
+block. The diagonal is the root mean square distance between the metacells inside each block.
 
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
     axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
-        matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(RequiredInput),
+        matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
-        matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(CreatedOutput),
+        matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks(CreatedOutput),
     ],
-) function compute_matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks!(  # UNTESTED
+) function compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!(  # UNTESTED
     daf::DafWriter;
     overwrite::Bool = false,
 )::Nothing
-    mean_distance_per_block_per_block =
-        daf["@ block @ metacell :: mean_euclidean_skeleton_fold_distance |/ block =@ >| Mean"].array
+    rms_distance_per_metacell_per_block =
+        plain_array(get_matrix(daf, "metacell", "block", "rms_euclidean_skeleton_fold_distance"))
+    block_index_per_metacell = daf["@ metacell : block : index"].array
+    n_blocks = axis_length(daf, "block")
+
+    sum_squared_distance_per_block_per_block = zeros(Float64, n_blocks, n_blocks)
+    n_metacells_per_block = zeros(Int, n_blocks)
+    for (metacell_index, block_index) in enumerate(block_index_per_metacell)
+        @views sum_squared_distance_per_block_per_block[block_index, :] .+=
+            rms_distance_per_metacell_per_block[metacell_index, :] .^ 2
+        n_metacells_per_block[block_index] += 1
+    end
+    rms_distance_per_block_per_block =
+        Float32.(sqrt.(sum_squared_distance_per_block_per_block ./ n_metacells_per_block))
+
     set_matrix!(
         daf,
         "block",
         "block",
-        "mean_euclidean_skeleton_fold_distance",
-        mean_distance_per_block_per_block;
+        "rms_euclidean_skeleton_fold_distance",
+        rms_distance_per_block_per_block;
         overwrite,
     )
     return nothing
@@ -603,7 +662,8 @@ Compute and set [`matrix_of_is_in_neighborhood_per_block_per_block`](@ref).
   - We then make it symmetric by adding it to its transpose.
 
 For each block, we sort all blocks by the normalized symmetric confusion score. To break ties (especially for zero
-confusion), we use the mean distance between the blocks. We then pick the first few blocks to be in the neighborhood.
+confusion), we use the root mean square distance between the blocks. We then pick the first few blocks to be in the
+neighborhood.
 
   - All blocks that have a symmetric normalized confusion fraction of at least `min_neighbour_confusion_fractions` are
     included, but we stop if we exceed `max_blocks_in_neighborhood`, `max_metacells_in_neighborhood`, or
@@ -621,7 +681,7 @@ $(CONTRACT)
         matrix_of_confusion_by_closest_by_pertinent_markers_per_block_per_block(RequiredInput),
         vector_of_total_UMIs_per_block(RequiredInput),
         vector_of_n_metacells_per_block(RequiredInput),
-        matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks(RequiredInput),
+        matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks(RequiredInput),
         matrix_of_is_in_neighborhood_per_block_per_block(CreatedOutput),
     ],
 ) function compute_matrix_of_is_in_neighborhood_per_block_per_block!(  # UNTESTED
@@ -644,8 +704,8 @@ $(CONTRACT)
 
     n_cells_per_block = plain_array(get_vector(daf, "block", "n_cells"))
 
-    mean_euclidean_skeleton_fold_distance_per_block_per_block =
-        plain_array(get_matrix(daf, "block", "block", "mean_euclidean_skeleton_fold_distance"))
+    rms_euclidean_skeleton_fold_distance_per_block_per_block =
+        plain_array(get_matrix(daf, "block", "block", "rms_euclidean_skeleton_fold_distance"))
     n_metacells_per_block = plain_array(get_vector(daf, "block", "n_metacells"))
     total_UMIs_per_block = plain_array(get_vector(daf, "block", "total_UMIs"))
     confusion_per_other_block_per_original_block =
@@ -666,7 +726,7 @@ $(CONTRACT)
         ordered_block_indices = ordered_block_indices_per_thread[threadid()]
         @views confusion_fraction_per_other_block = confusion_fraction_per_block_per_block[:, base_block_index]
         @views fold_distance_per_other_block =
-            mean_euclidean_skeleton_fold_distance_per_block_per_block[:, base_block_index]
+            rms_euclidean_skeleton_fold_distance_per_block_per_block[:, base_block_index]
 
         for block_index in 1:n_blocks
             priority_per_other_block[block_index] =
@@ -3957,11 +4017,11 @@ end
     )::Nothing
 
 Compute and set [`matrix_of_is_in_environment_per_metacell_per_block`](@ref). The environment of each block starts with
-all the metacells of the blocks in its neighborhood, and adds any metacell whose mean distance to the block's metacells
-is at most `max_environment_metacell_relative_distance` times the block's basis distance: the
-`environment_distance_base_quantile` quantile of the mean distance of the block's neighborhood metacells to the block
-metacells. This larger (environment) region of the manifold gives us more metacells for estimating local gene programs
-(modules).
+all the metacells of the blocks in its neighborhood, and adds any metacell whose root mean square distance to the
+block's metacells is at most `max_environment_metacell_relative_distance` times the block's basis distance: the
+`environment_distance_base_quantile` quantile of the root mean square distance of the block's neighborhood metacells to
+the block metacells. This larger (environment) region of the manifold gives us more metacells for estimating local gene
+programs (modules).
 
 $(CONTRACT)
 """
@@ -3969,7 +4029,7 @@ $(CONTRACT)
     axes = [block_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
-        matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block(RequiredInput),
+        matrix_of_rms_euclidean_skeleton_fold_distance_per_metacell_per_block(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
         matrix_of_is_in_environment_per_metacell_per_block(CreatedOutput),
     ],
@@ -3984,8 +4044,8 @@ $(CONTRACT)
 
     is_in_neighborhood_per_other_block_per_base_block =
         plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
-    mean_distance_per_metacell_per_block =
-        plain_array(get_matrix(daf, "metacell", "block", "mean_euclidean_skeleton_fold_distance"))
+    rms_distance_per_metacell_per_block =
+        plain_array(get_matrix(daf, "metacell", "block", "rms_euclidean_skeleton_fold_distance"))
     block_index_per_metacell = daf["@ metacell : block : index"].array
 
     n_blocks = axis_length(daf, "block")
@@ -3996,10 +4056,10 @@ $(CONTRACT)
     # Seed each block's environment with the metacells of the blocks in its neighborhood.
     is_in_environment_per_metacell_per_block = copy(is_in_neighborhood_per_metacell_per_block)
 
-    # Add any metacell whose mean distance to a block's metacells is within the relative threshold of the block's basis
-    # distance: the `environment_distance_base_quantile` quantile of the mean distance of the block's neighborhood
-    # metacells to the block's metacells. Per-block work scales with the neighborhood metacell count; weight blocks
-    # heaviest-first by that count.
+    # Add any metacell whose root mean square distance to a block's metacells is within the relative threshold of the
+    # block's basis distance: the `environment_distance_base_quantile` quantile of the root mean square distance of the
+    # block's neighborhood metacells to the block's metacells. Per-block work scales with the neighborhood metacell
+    # count; weight blocks heaviest-first by that count.
     n_neighborhood_metacells_per_block = vec(sum(is_in_neighborhood_per_metacell_per_block; dims = 1))
     basis_distance_per_block = Vector{Float32}(undef, n_blocks)
     parallel_loop_wo_rng(
@@ -4012,14 +4072,14 @@ $(CONTRACT)
         ),
     ) do block_index
         @views is_in_neighborhood_per_metacell = is_in_neighborhood_per_metacell_per_block[:, block_index]
-        @views mean_distance_per_metacell = mean_distance_per_metacell_per_block[:, block_index]
-        distance_per_neighborhood_metacell = mean_distance_per_metacell[is_in_neighborhood_per_metacell]
+        @views rms_distance_per_metacell = rms_distance_per_metacell_per_block[:, block_index]
+        distance_per_neighborhood_metacell = rms_distance_per_metacell[is_in_neighborhood_per_metacell]
         basis_distance_per_block[block_index] =
             quantile(distance_per_neighborhood_metacell, environment_distance_base_quantile)  # NOLINT
         return nothing
     end
     threshold_per_block = max_environment_metacell_relative_distance .* basis_distance_per_block
-    is_in_environment_per_metacell_per_block .|= mean_distance_per_metacell_per_block .<= transpose(threshold_per_block)
+    is_in_environment_per_metacell_per_block .|= rms_distance_per_metacell_per_block .<= transpose(threshold_per_block)
 
     set_matrix!(
         daf,

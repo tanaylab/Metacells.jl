@@ -661,26 +661,28 @@
 </strong>
 </p>
 <p>
-<strong>metacell, metacell @ euclidean
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
-</p>
-<p>
-<strong>metacell, block @ mean
+<strong>metacell, metacell @ knn
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes of each metacell and each of its nearest neighbor metacells.
 </p>
 <p>
-<strong>block, block @ mean
+<strong>metacell, block @ rms
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.
+</strong>::Union{Float32, Float64} (created): The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</p>
+<p>
+<strong>block, block @ rms
+<em>euclidean
+</em>skeleton
+<em>fold
+</em>distance
+</strong>::Union{Float32, Float64} (created): The root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks.
 </p>
 <p>
 <strong>gene, block @ UMIs
@@ -1375,26 +1377,28 @@
 </strong>::Union{Float32, Float64} (created): The correlation between the log expression of pairs of marker genes across the metacells.
 </p>
 <p>
-<strong>metacell, metacell @ euclidean
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
-</p>
-<p>
-<strong>metacell, block @ mean
+<strong>metacell, metacell @ knn
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</strong>::Union{Float32, Float64} (created): The Euclidean distance between the log of the fraction of the skeleton genes of each metacell and each of its nearest neighbor metacells.
 </p>
 <p>
-<strong>block, block @ mean
+<strong>metacell, block @ rms
 <em>euclidean
 </em>skeleton
 <em>fold
 </em>distance
-</strong>::Union{Float32, Float64} (created): The mean Euclidean skeleton genes fractions distance between the metacells of the blocks.
+</strong>::Union{Float32, Float64} (created): The root mean square of the Euclidean skeleton genes fractions distance between each metacell and the metacells of each block.
+</p>
+<p>
+<strong>block, block @ rms
+<em>euclidean
+</em>skeleton
+<em>fold
+</em>distance
+</strong>::Union{Float32, Float64} (created): The root mean square of the Euclidean skeleton genes fractions distance between the metacells of the blocks.
 </p>
 <p>
 <strong>gene, block @ UMIs
