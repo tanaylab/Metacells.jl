@@ -1262,32 +1262,22 @@ function compute_local_clusters(;  # UNTESTED
     # updates this to whatever candidate it picks.
     chosen_candidate_index_per_walkable_block = fill(1, n_walkable_blocks)
 
-    # Per-walkable-block scratches sized to that walkable block's own dimensions. Pass A (parallel argmax) populates
-    # the variable + is_active scratches for every changed walkable block; Pass B (parallel `replace_group!`) reads them
-    # per (changed_walkable, affected prev block) without re-populating - the two-pass split eliminates the populate
-    # redundancy that a parallel-by-prev-block commit would otherwise pay. The `UMI_per_pertinent_marker_per_block_cell`
-    # cache (filled once below) lets every populate call read this walkable block's UMIs straight from a sequential
-    # Float32 column instead of indexing the global `sparse_UMIs_per_cell_per_gene` matrix on every (cell, pertinent
-    # marker).
-    variable_per_block_cell_per_pertinent_marker_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
-    is_active_per_block_cell_per_walkable_block = Vector{Vector{Bool}}(undef, n_walkable_blocks)
-    UMI_per_pertinent_marker_per_block_cell_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
+    # The `UMI_per_pertinent_marker_per_block_cell` cache (filled once below) holds each walkable block's UMIs as a
+    # sparse matrix whose columns are the block's cells, so every populate call walks a cell's non-zero pertinent
+    # markers instead of indexing the global `sparse_UMIs_per_cell_per_gene` matrix on every (cell, pertinent marker).
+    UMI_per_pertinent_marker_per_block_cell_per_walkable_block =
+        Vector{typeof(sparse_UMIs_per_cell_per_gene)}(undef, n_walkable_blocks)
     n_block_cells_per_walkable_block = Vector{Int}(undef, n_walkable_blocks)
     UMIs_fill_weight_per_walkable_block = Vector{Int}(undef, n_walkable_blocks)
     for walkable_position in 1:n_walkable_blocks
         block_index = walkable_block_indices[walkable_position]
         n_block_cells = solution_candidates_per_block[block_index].n_points
         n_pertinent_markers = length(gene_index_per_pertinent_marker_per_walkable_block[walkable_position])
-        variable_per_block_cell_per_pertinent_marker_per_walkable_block[walkable_position] =
-            Matrix{Float32}(undef, n_block_cells, n_pertinent_markers)
-        is_active_per_block_cell_per_walkable_block[walkable_position] = Vector{Bool}(undef, n_block_cells)
-        UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position] =
-            Matrix{Float32}(undef, n_pertinent_markers, n_block_cells)
         n_block_cells_per_walkable_block[walkable_position] = n_block_cells
         UMIs_fill_weight_per_walkable_block[walkable_position] = n_block_cells * n_pertinent_markers
     end
 
-    # One-time fill of the per-walkable UMI cache, gathering the block cells from the column of each pertinent marker.
+    # One-time fill of the per-walkable UMI cache.
     parallel_loop_wo_rng(
         1:n_walkable_blocks;
         weights = UMIs_fill_weight_per_walkable_block,
@@ -1301,12 +1291,9 @@ function compute_local_clusters(;  # UNTESTED
         block_index = walkable_block_indices[walkable_position]
         block_cell_indices = block_cell_indices_per_block[block_index]
         gene_index_per_pertinent_marker = gene_index_per_pertinent_marker_per_walkable_block[walkable_position]
-        UMI_per_pertinent_marker_per_block_cell =
-            UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position]
-        for (pertinent_marker_position, gene_index) in enumerate(gene_index_per_pertinent_marker)
-            @views UMI_per_block_cell = UMI_per_pertinent_marker_per_block_cell[pertinent_marker_position, :]
-            gather_sparse_column!(UMI_per_block_cell, sparse_UMIs_per_cell_per_gene, gene_index, block_cell_indices)
-        end
+        UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position] = SparseMatrixCSC(
+            transpose(sparse_UMIs_per_cell_per_gene[block_cell_indices, gene_index_per_pertinent_marker]),
+        )
         return nothing
     end
 
@@ -1454,7 +1441,7 @@ function compute_local_clusters(;  # UNTESTED
             local_clusters_per_block[block_index] =
                 build_local_clusters_from_candidate(chosen, block_cell_indices_per_block[block_index])
 
-            # Populate this walkable's persistent variable + mask scratch under the chosen candidate.
+            # Populate this thread's variable + mask scratch under the chosen candidate. It is consumed right below.
             delta_context = delta_context_per_thread[threadid()]
             delta_context.walkable_block_index = block_index
             delta_context.block_cell_indices = block_cell_indices_per_block[block_index]
@@ -1471,8 +1458,8 @@ function compute_local_clusters(;  # UNTESTED
                 solution_candidates.n_points,
                 delta_context,
                 UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position],
-                variable_per_block_cell_per_pertinent_marker_per_walkable_block[walkable_position],
-                is_active_per_block_cell_per_walkable_block[walkable_position],
+                delta_context.variable_per_block_cell_per_pertinent_marker,
+                delta_context.is_active_per_block_cell,
             )
 
             # Apply the change directly to each affected prev block's grouped correlations under its lock.
@@ -1490,8 +1477,8 @@ function compute_local_clusters(;  # UNTESTED
                     replace_group!(
                         grouped_for_prev_block,
                         group_index_in_prev_block,
-                        variable_per_block_cell_per_pertinent_marker_per_walkable_block[walkable_position],
-                        is_active_per_block_cell_per_walkable_block[walkable_position],
+                        delta_context.variable_per_block_cell_per_pertinent_marker,
+                        delta_context.is_active_per_block_cell,
                         block_cell_position_per_point,
                         pertinent_marker_position_per_series,
                     )
@@ -2554,15 +2541,15 @@ end
 # Fill `variable_per_block_cell_per_pertinent_marker` and `is_active_per_block_cell` with `candidate`'s punctuated
 # cluster-mean log-fractions over the walkable block's cells × pertinent markers; cells in single-cell or
 # zero-punctuated-total clusters are masked off and their variable values zeroed. Uses `delta_context`'s per-thread
-# cluster-aggregate scratches and reads the walkable block's UMIs out of the pre-filled per-walkable
-# `UMI_per_pertinent_marker_per_block_cell` cache (Float32, pertinent-marker-major) - no scattered indexing into the
-# global UMI matrix on each call. Allocation-free; the supplied output buffers may be per-thread (for Phase 2
-# evaluation, overwritten per work item) or per-walkable-block (for Pass A, kept alive into Pass B).
+# cluster-aggregate scratches and reads the walkable block's UMIs out of the pre-filled per-walkable sparse
+# `UMI_per_pertinent_marker_per_block_cell` cache (a column per block cell) - no scattered indexing into the global UMI
+# matrix on each call. Allocation-free; the supplied output buffers are the thread's `delta_context`
+# scratches, overwritten by each call.
 function populate_candidate_scratches!(  # UNTESTED
     candidate::SolutionCandidate,
     n_block_cells::Integer,
     delta_context::DeltaCorrelationContext,
-    UMI_per_pertinent_marker_per_block_cell::AbstractMatrix{Float32},
+    UMI_per_pertinent_marker_per_block_cell::SparseMatrixCSC{<:Integer},
     variable_per_block_cell_per_pertinent_marker::AbstractMatrix{Float32},
     is_active_per_block_cell::AbstractVector{Bool},
 )::Nothing
@@ -2575,22 +2562,24 @@ function populate_candidate_scratches!(  # UNTESTED
     @views fill!(total_UMIs_per_max_cluster[1:k], 0.0)
     @views fill!(UMIs_per_pertinent_marker_per_max_cluster[1:n_pertinent_markers, 1:k], 0.0)
 
-    @check_turbo_matrix(UMI_per_pertinent_marker_per_block_cell)
     @check_turbo_matrix(UMIs_per_pertinent_marker_per_max_cluster)
     @check_turbo_matrix(variable_per_block_cell_per_pertinent_marker)
 
+    pertinent_marker_position_per_stored = rowvals(UMI_per_pertinent_marker_per_block_cell)
+    UMIs_per_stored = nonzeros(UMI_per_pertinent_marker_per_block_cell)
+
     # Per K-candidate cluster: total UMIs of the block's cells in the cluster + per-pertinent-marker UMI sums (only over
-    # the walkable block's pertinent-marker subspace, not the full relevant gene set). The inner pertinent marker loop
-    # is contiguous on both `UMI_per_pertinent_marker_per_block_cell` (pertinent-marker-major Float32 column read) and
-    # `UMIs_per_pertinent_marker_per_max_cluster` (pertinent-marker-major Float64 column accumulate) - SIMD via
-    # `@turbo`.
+    # the walkable block's pertinent-marker subspace, not the full relevant gene set), walking each cell's non-zero
+    # pertinent markers.
     @inbounds for block_cell_position in 1:n_block_cells
         cluster_index = candidate.assignments[block_cell_position]
         cell_index = delta_context.block_cell_indices[block_cell_position]
         total_UMIs_per_max_cluster[cluster_index] += Float64(delta_context.total_UMIs_per_cell[cell_index])
-        @turbo for pertinent_marker_position in 1:n_pertinent_markers
-            UMIs_per_pertinent_marker_per_max_cluster[pertinent_marker_position, cluster_index] +=
-                Float64(UMI_per_pertinent_marker_per_block_cell[pertinent_marker_position, block_cell_position])
+        for stored_index in nzrange(UMI_per_pertinent_marker_per_block_cell, block_cell_position)
+            UMIs_per_pertinent_marker_per_max_cluster[
+                pertinent_marker_position_per_stored[stored_index],
+                cluster_index,
+            ] += Float64(UMIs_per_stored[stored_index])
         end
     end
 
@@ -2607,23 +2596,31 @@ function populate_candidate_scratches!(  # UNTESTED
         punctuated_total_per_block_cell[block_cell_position] = is_active ? punctuated_total : 1.0
     end
 
-    # Punctuated cluster-mean log-fraction per (block cell, pertinent marker). The inner pertinent marker loop reads
-    # contiguous pertinent-marker-major columns and writes strided into `variable_per_block_cell_per_pertinent_marker`
-    # (scatter store) - @turbo SIMDs the branchless arithmetic with `ifelse` selecting 0 for inactive cells.
+    # Punctuated cluster-mean log-fraction per (block cell, pertinent marker). First assume the cell has no UMIs of each
+    # pertinent marker (writing strided into `variable_per_block_cell_per_pertinent_marker` - @turbo SIMDs the
+    # branchless arithmetic with `ifelse` selecting 0 for inactive cells), then redo the cell's non-zero pertinent
+    # markers.
     regularization = delta_context.gene_fraction_regularization
     @inbounds for block_cell_position in 1:n_block_cells
         cluster_index = candidate.assignments[block_cell_position]
         is_active = is_active_per_block_cell[block_cell_position]
         punctuated_total = punctuated_total_per_block_cell[block_cell_position]
         @turbo for pertinent_marker_position in 1:n_pertinent_markers
-            cell_pertinent_marker_UMIs =
-                Float64(UMI_per_pertinent_marker_per_block_cell[pertinent_marker_position, block_cell_position])
             cluster_pertinent_marker_UMIs =
                 UMIs_per_pertinent_marker_per_max_cluster[pertinent_marker_position, cluster_index]
-            punctuated_pertinent_marker = cluster_pertinent_marker_UMIs - cell_pertinent_marker_UMIs
-            result = log2(Float32(punctuated_pertinent_marker / punctuated_total) + regularization)
+            result = log2(Float32(cluster_pertinent_marker_UMIs / punctuated_total) + regularization)
             variable_per_block_cell_per_pertinent_marker[block_cell_position, pertinent_marker_position] =
                 ifelse(is_active, result, 0.0f0)
+        end
+        if is_active
+            for stored_index in nzrange(UMI_per_pertinent_marker_per_block_cell, block_cell_position)
+                pertinent_marker_position = pertinent_marker_position_per_stored[stored_index]
+                punctuated_pertinent_marker =
+                    UMIs_per_pertinent_marker_per_max_cluster[pertinent_marker_position, cluster_index] -
+                    Float64(UMIs_per_stored[stored_index])
+                variable_per_block_cell_per_pertinent_marker[block_cell_position, pertinent_marker_position] =
+                    log2(Float32(punctuated_pertinent_marker / punctuated_total) + regularization)
+            end
         end
     end
     return nothing
@@ -2638,7 +2635,7 @@ function compute_delta_correlation(  # UNTESTED
     candidate::SolutionCandidate,
     n_block_cells::Integer,
     delta_context::DeltaCorrelationContext,
-    UMI_per_pertinent_marker_per_block_cell::AbstractMatrix{Float32},
+    UMI_per_pertinent_marker_per_block_cell::SparseMatrixCSC{<:Integer},
 )::Float64
     variable_per_block_cell_per_pertinent_marker = delta_context.variable_per_block_cell_per_pertinent_marker
     is_active_per_block_cell = delta_context.is_active_per_block_cell
