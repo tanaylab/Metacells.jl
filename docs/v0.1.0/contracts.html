@@ -3751,162 +3751,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </h2>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(
-    expectation::ContractExpectation
-)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>The most correlated neighborhood marker gene of each neighborhood marker gene per block.
-</p>
-<p>This is sparse, we actually only compute it for the non-lateral neighborhood markers.
-</p>
-<p>This matrix may be populated by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!">
-<code>compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(
-    expectation::ContractExpectation
-)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood marker gene per block. The pool we rank against is just the pertinent (non-lateral) neighborhood markers of the block whose correlation-with-most is non-zero. Genes outside that pool, and genes in the pool whose correlation-with-most is zero, are stored as zero, so the matrix is sparse.
-</p>
-<p>This matrix is populated by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!">
-<code>compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
-<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their punctuated metacells (metacells minus the correlated cell) of each base neighborhood.
-</p>
-<p>We use this as a poor man&#39;s cross validation; we use the set of cells in the base neighborhoods. We measure the correlation between the expression of these genes in the base and alternative punctuated metacells. The absolute correlation values are of less interest than the difference between different genes, and the difference between the alternative metacells. Ideally &quot;relevant&quot; genes would have high correlations while &quot;irrelevant&quot; genes would not, and &quot;improved&quot; metacells would have higher correlation than the base metacells.
-</p>
-<p>These matrices can be populated by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
-<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_is_strong_per_gene_per_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_strong_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_is_strong_per_gene_per_block
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">matrix_of_is_strong_per_gene_per_block(
-    expectation::ContractExpectation
-)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>A mask of strong genes (well-expressed in the block and with positive correlation-with-most) per block. A gene is flagged strong in a block when its expression is at or above a minimum in the block and it has a correlation with another gene. The mask is computed once on the base (round-0) repository and reused as a fixed yardstick across subsequent sharpening rounds.
-</p>
-<p>This matrix is populated by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_strong_per_gene_per_block!">
-<code>compute_matrix_of_is_strong_per_gene_per_block!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_is_strong_per_gene_per_base_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_strong_per_gene_per_base_block">
-<code>Metacells.Contracts.matrix_of_is_strong_per_gene_per_base_block
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">matrix_of_is_strong_per_gene_per_base_block(
-    expectation::ContractExpectation
-)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>A copy of 
-<a href="contracts.html#Metacells.Contracts.matrix_of_is_strong_per_gene_per_block">
-<code>matrix_of_is_strong_per_gene_per_block
-</code>
-</a> from the base repository, copied into the alternative. This provides access to the round-0 strong-gene mask on the 
-<a href="contracts.html#Metacells.Contracts.base_block_axis">
-<code>base_block_axis
-</code>
-</a> of subsequent sharpening rounds.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
 <summary id="Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
 <a class="docstring-binding" href="#Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
 <code>Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
@@ -4325,10 +4169,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
 <code>compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
 </code>
-</a> or by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!">
-<code>compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!
-</code>
 </a>.
 </p>
 </div>
@@ -4483,12 +4323,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </a>
 </li>
 <li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block">
-<code>Metacells.Contracts.matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
-</code>
-</a>
-</li>
-<li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 </code>
@@ -4545,18 +4379,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_is_strong_per_gene_per_base_block">
-<code>Metacells.Contracts.matrix_of_is_strong_per_gene_per_base_block
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_is_strong_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_is_strong_per_gene_per_block
 </code>
 </a>
 </li>
@@ -4623,18 +4445,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_module_status_per_gene_per_block">
 <code>Metacells.Contracts.matrix_of_module_status_per_gene_per_block
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 </code>
 </a>
 </li>

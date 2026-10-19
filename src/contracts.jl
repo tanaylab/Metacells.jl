@@ -40,7 +40,6 @@ export matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_meta
 export matrix_of_correlation_between_markers_per_gene_per_gene
 export matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block
 export matrix_of_correlation_between_neighborhood_cells_and_punctuated_metacells_per_gene_per_block
-export matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 export matrix_of_is_correlated_with_skeleton_in_environment_per_gene_per_block
 export matrix_of_is_correlated_with_skeleton_in_neighborhood_per_gene_per_block
 export matrix_of_is_environment_distinct_per_gene_per_block
@@ -51,8 +50,6 @@ export matrix_of_is_in_environment_per_metacell_per_block
 export matrix_of_is_in_neighborhood_per_block_per_block
 export matrix_of_is_neighborhood_distinct_per_gene_per_block
 export matrix_of_is_neighborhood_marker_per_gene_per_block
-export matrix_of_is_strong_per_gene_per_base_block
-export matrix_of_is_strong_per_gene_per_block
 export matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
 export matrix_of_linear_fraction_per_gene_per_block
 export matrix_of_linear_fraction_per_gene_per_metacell
@@ -62,8 +59,6 @@ export matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
 export matrix_of_mean_linear_fraction_in_neighborhood_cells_per_module_per_block
 export matrix_of_module_per_gene_per_block
 export matrix_of_module_status_per_gene_per_block
-export matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block
-export matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block
 export matrix_of_n_cells_per_prev_block_per_block
 export matrix_of_n_cells_per_prev_block_type_per_block_type
 export matrix_of_n_cells_per_prev_metacell_type_per_metacell_type
@@ -2146,52 +2141,6 @@ end
 ## Quality Control
 
 """
-    matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(
-        expectation::ContractExpectation
-    )::Pair{MatrixKey, DataSpecification}
-
-The most correlated neighborhood marker gene of each neighborhood marker gene per block.
-
-This is sparse, we actually only compute it for the non-lateral neighborhood markers.
-
-This matrix may be populated by [`compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!).
-"""
-function matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block(  # untested
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "block", "most_correlated_gene_in_neighborhood") => (
-        expectation,
-        AbstractString,
-        "The most correlated neighborhood marker gene of each neighborhood marker gene per block.",
-    )
-end
-
-"""
-    matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(
-        expectation::ContractExpectation
-    )::Pair{MatrixKey, DataSpecification}
-
-The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base) neighborhood
-marker gene per block. The pool we rank against is just the pertinent (non-lateral) neighborhood markers of the block
-whose correlation-with-most is non-zero. Genes outside that pool, and genes in the pool whose correlation-with-most is
-zero, are stored as zero, so the matrix is sparse.
-
-This matrix is populated by [`compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_most_correlated_gene_in_neighborhood_per_gene_per_block!).
-"""
-function matrix_of_most_correlated_quantile_per_gene_in_neighborhood_per_gene_per_block(  # untested
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "block", "most_correlated_quantile_in_neighborhood") => (
-        expectation,
-        AbstractFloat,
-        "The fraction of pertinent neighborhood markers with no higher correlation-with-most than each (base)" *
-        " neighborhood marker gene per block.",
-    )
-end
-
-"""
     base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}
 
 A copy of the base [`block_axis`](@ref), copied into the alternative. This is needed to store per-base-block quality
@@ -2199,10 +2148,7 @@ control data. Such data is more directly comparable between the alternative meta
 
 This axis is typically created by
 [`compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!)
-or by
-[`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
+Metacells.AnalyzeBlocks.compute_matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
 """
 function base_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "base_block" => (expectation, "A copy of the base [`block_axis`](@ref), copied into the alternative.")
@@ -2220,71 +2166,6 @@ Metacells.SharpenMetacells.compute_matrix_of_n_cells_per_prev_block_per_block!).
 function prev_block_axis(expectation::ContractExpectation)::Pair{AxisKey, AxisSpecification}  # untested
     return "prev_block" =>
         (expectation, "A copy of the previous round's [`block_axis`](@ref), copied into the alternative.")
-end
-
-"""
-    matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(
-        expectation::ContractExpectation,
-    )::Pair{MatrixKey, DataSpecification}
-
-The correlation of each gene with the most correlated other gene between the cells of a base neighborhood and their
-punctuated metacells (metacells minus the correlated cell) of each base neighborhood.
-
-We use this as a poor man's cross validation; we use the set of cells in the base neighborhoods. We measure the
-correlation between the expression of these genes in the base and alternative punctuated metacells. The absolute
-correlation values are of less interest than the difference between different genes, and the difference between the
-alternative metacells. Ideally "relevant" genes would have high correlations while "irrelevant" genes would not, and
-"improved" metacells would have higher correlation than the base metacells.
-
-These matrices can be populated by
-[`compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block!).
-"""
-function matrix_of_correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block(  # untested
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "base_block", "correlation_with_most_between_base_neighborhood_cells_and_punctuated_metacells") => (
-        expectation,
-        StorageFloat,
-        "The correlation of each gene with the most correlated other gene between the cells of a base neighborhood" *
-        " and their punctuated metacells of each base neighborhood.",
-    )
-end
-
-"""
-    matrix_of_is_strong_per_gene_per_block(
-        expectation::ContractExpectation
-    )::Pair{MatrixKey, DataSpecification}
-
-A mask of strong genes (well-expressed in the block and with positive correlation-with-most) per block. A gene is
-flagged strong in a block when its expression is at or above a minimum in the block and it has a correlation with
-another gene. The mask is computed once on the base (round-0) repository and reused as a fixed yardstick across
-subsequent sharpening rounds.
-
-This matrix is populated by [`compute_matrix_of_is_strong_per_gene_per_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_is_strong_per_gene_per_block!).
-"""
-function matrix_of_is_strong_per_gene_per_block(expectation::ContractExpectation)::Pair{MatrixKey, DataSpecification}  # untested
-    return ("gene", "block", "is_strong") => (
-        expectation,
-        Bool,
-        "A mask of strong genes (well-expressed in the block and with positive correlation-with-most) per block.",
-    )
-end
-
-"""
-    matrix_of_is_strong_per_gene_per_base_block(
-        expectation::ContractExpectation
-    )::Pair{MatrixKey, DataSpecification}
-
-A copy of [`matrix_of_is_strong_per_gene_per_block`](@ref) from the base repository, copied into the alternative. This
-provides access to the round-0 strong-gene mask on the [`base_block_axis`](@ref) of subsequent sharpening rounds.
-"""
-function matrix_of_is_strong_per_gene_per_base_block(  # untested
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-    return ("gene", "base_block", "is_strong") =>
-        (expectation, Bool, "A copy of [`matrix_of_is_strong_per_gene_per_block`](@ref) from the base repository.")
 end
 
 """
