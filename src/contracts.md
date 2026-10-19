@@ -78,7 +78,6 @@ Metacells.Contracts.matrix_of_is_environment_specific_per_gene_per_metacell
 
 ```@docs
 Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells
-Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
 ```
 
 ### Metacells Correlations

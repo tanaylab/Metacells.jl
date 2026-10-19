@@ -105,7 +105,6 @@ $(CONTRACT2)
 """
 @logged :mcs_ops @computation (
     function_contract(compute_vector_of_is_skeleton_per_gene!) |>
-    function_contract(compute_matrix_of_max_skeleton_fold_distance_between_metacells!) |>
     function_contract(compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!) |>
     function_contract(compute_metacells_2d_umap!) |>
     function_contract(compute_metacells_blocks!) |>
@@ -148,7 +147,6 @@ $(CONTRACT2)
 )::Nothing
     # Which genes predict the rest, and the geometry of the metacells which follows from them.
     compute_vector_of_is_skeleton_per_gene!(daf; overwrite)
-    compute_matrix_of_max_skeleton_fold_distance_between_metacells!(daf; overwrite)
     compute_matrix_of_euclidean_skeleton_fold_distance_between_metacells!(daf; overwrite)
     compute_metacells_2d_umap!(daf; prev_daf, rng, overwrite)
 

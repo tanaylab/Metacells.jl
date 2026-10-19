@@ -58,7 +58,6 @@ export matrix_of_linear_fraction_per_gene_per_block
 export matrix_of_linear_fraction_per_gene_per_metacell
 export matrix_of_log_linear_fraction_per_gene_per_block
 export matrix_of_log_linear_fraction_per_gene_per_metacell
-export matrix_of_max_skeleton_fold_distance_between_metacells
 export matrix_of_mean_euclidean_skeleton_fold_distance_between_blocks
 export matrix_of_mean_euclidean_skeleton_fold_distance_per_metacell_per_block
 export matrix_of_mean_linear_fraction_in_environment_cells_per_module_per_block
@@ -831,28 +830,6 @@ function matrix_of_correlation_between_markers_per_gene_per_gene(  # untested
         expectation,
         StorageFloat,
         "The correlation between the log expression of pairs of marker genes across the metacells.",
-    )
-end
-
-"""
-    matrix_of_max_skeleton_fold_distance_between_metacells(
-        expectation::ContractExpectation
-    )::Pair{MatrixKey, DataSpecification}
-
-The maximal significant fold factor between the fraction of skeleton genes between the metacells. This uses heuristics
-to require the fold factor be based on a sufficient number of UMIs to be robust. This is a symmetric matrix with
-zeros in the diagonal.
-
-This matrix may be populated by [`compute_matrix_of_max_skeleton_fold_distance_between_metacells!`](@ref
-Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!).
-"""
-function matrix_of_max_skeleton_fold_distance_between_metacells(  # untested
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}
-    return ("metacell", "metacell", "max_skeleton_fold_distance") => (
-        expectation,
-        StorageFloat,
-        "The maximal significant fold factor between the fraction of skeleton genes between the metacells.",
     )
 end
 

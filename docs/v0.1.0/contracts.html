@@ -1471,36 +1471,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </section>
 </details>
 </article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
-<code>Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">matrix_of_max_skeleton_fold_distance_between_metacells(
-    expectation::ContractExpectation
-)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>The maximal significant fold factor between the fraction of skeleton genes between the metacells. This uses heuristics to require the fold factor be based on a sufficient number of UMIs to be robust. This is a symmetric matrix with zeros in the diagonal.
-</p>
-<p>This matrix may be populated by 
-<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_max_skeleton_fold_distance_between_metacells!">
-<code>compute_matrix_of_max_skeleton_fold_distance_between_metacells!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
 <h3 id="Metacells-Correlations">
 <a class="docs-heading-anchor" href="#Metacells-Correlations">Metacells Correlations
 </a>
@@ -4617,12 +4587,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell">
 <code>Metacells.Contracts.matrix_of_log_linear_fraction_per_gene_per_metacell
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
-<code>Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells
 </code>
 </a>
 </li>

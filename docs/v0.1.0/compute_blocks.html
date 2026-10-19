@@ -209,6 +209,10 @@
     daf::DafWriter;
     n_blocks::Integer = ```nothing```,
     max_block_span::Real = ```2```,
+    max_fold_gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    max_fold_min_significant_gene_UMIs::Integer = ```40```,
+    max_fold_confidence::AbstractFloat = ```0.9```,
+    max_fold_min_confidence_UMIs::Real = ```3```,
     prefix::AbstractString = ```&quot;B&quot;```,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = ```false```,
@@ -227,17 +231,21 @@
 </p>
 <p>If 
 <code>n_blocks
-</code> is not specified, we decide on the number of blocks by using hierarchical clustering based on the maximal skeleton fold distance between the metacells in each cluster of 
-<code>max_block_span
-</code> (that is, 
+</code> is not specified, we decide on the number of blocks by using hierarchical clustering (
 <code>hclust
 </code> with 
 <code>:complete
-</code> linkage using the 
-<a href="contracts.html#Metacells.Contracts.matrix_of_max_skeleton_fold_distance_between_metacells">
-<code>matrix_of_max_skeleton_fold_distance_between_metacells
-</code>
-</a>.
+</code> linkage) based on the maximal skeleton fold distance between the metacells, such that the distance between the metacells in each cluster is at most 
+<code>max_block_span
+</code>. For computing this fold factor, we add the 
+<code>max_fold_gene_fraction_regularization
+</code> to deal with zero fractions. We ignore &quot;insignificant&quot; genes whose total UMIs in the compared metacells isn&#39;t at least 
+<code>max_fold_min_significant_gene_UMIs
+</code>. We also reduce the distance using the 
+<code>max_fold_confidence
+</code> based on the number of UMIs used to estimate the expression in the metacells (but at least 
+<code>max_fold_min_confidence_UMIs
+</code>). That is, when we have a high fold factor, we are pretty certain the metacells truly have a significant difference in the expression of the skeleton gene. This distances matrix is only computed for this purpose and is not stored.
 </p>
 <p>The actual blocks are computed using K-means on the log of the skeleton genes fractions of the metacells, using the same regularization as 
 <a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
@@ -278,6 +286,10 @@
 </strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
 </p>
 <p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -286,10 +298,8 @@
 </strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
 </p>
 <p>
-<strong>metacell, metacell @ max
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (required): The maximal significant fold factor between the fraction of skeleton genes between the metacells.
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
 </p>
 <p>
 <strong>Outputs
