@@ -49,7 +49,6 @@ export compute_vector_of_type_per_metacell_by_blocks!
 
 using Base.Threads
 using DataAxesFormats
-using Distances
 using LinearAlgebra
 using LoopVectorization
 using SparseArrays
@@ -439,75 +438,56 @@ Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
     is_pertinent_marker_per_gene =
         plain_array(get_vector(daf, "gene", "is_marker")) .& .!plain_array(get_vector(daf, "gene", "is_lateral"))
     indices_of_pertinent_markers = findall(is_pertinent_marker_per_gene)
-    n_pertinent_markers = length(indices_of_pertinent_markers)
 
-    # Each pertinent marker's column is filled with the value of zero UMIs, then each stored value is placed by walking
-    # the marker's column of the cell UMIs, rather than reading `[cell, gene]` element by element.
+    # The distances use `log2(1 + fraction / regularization)`. This differs from `log2(fraction + regularization)` by
+    # the same constant for every entry, so the Euclidean distances are the same, but zero fractions stay zero. Each
+    # cell's pertinent markers are a column of a transposed sparse copy, so the work for a cell is proportional to its
+    # non-zero UMIs. The squared distance to a block is `|cell|² + |block|² - 2 cell · block`; the `|cell|²` term is the
+    # same for all blocks, so it is skipped when picking the closest block.
     sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
-    row_index_per_stored = rowvals(sparse_UMIs_per_cell_per_gene)
-    UMIs_per_stored = nonzeros(sparse_UMIs_per_cell_per_gene)
-    log_linear_fraction_of_zero_per_cell = log2.(0 ./ total_UMIs_per_cell .+ gene_fraction_regularization)
-    log_linear_fraction_per_cell_per_pertinent_marker = Matrix{Float32}(undef, n_cells, n_pertinent_markers)
-    parallel_loop_wo_rng(
-        1:n_pertinent_markers;
-        name = "log_linear_fraction_per_cell_per_pertinent_marker",
-        progress = DebugProgress(
-            n_pertinent_markers;
-            group = :mcs_loops,
-            desc = "log_linear_fraction_per_cell_per_pertinent_marker",
-        ),
-    ) do pertinent_marker_position
-        gene_index = indices_of_pertinent_markers[pertinent_marker_position]
-        @views log_linear_fraction_per_cell =
-            log_linear_fraction_per_cell_per_pertinent_marker[:, pertinent_marker_position]
-        log_linear_fraction_per_cell .= log_linear_fraction_of_zero_per_cell
-        @inbounds for stored_index in nzrange(sparse_UMIs_per_cell_per_gene, gene_index)
-            cell_index = row_index_per_stored[stored_index]
-            log_linear_fraction_per_cell[cell_index] =
-                log2(UMIs_per_stored[stored_index] / total_UMIs_per_cell[cell_index] + gene_fraction_regularization)
-        end
-        return nothing
-    end
-    log_linear_fraction_per_pertinent_marker_per_cell = flipped(log_linear_fraction_per_cell_per_pertinent_marker)
-    @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_cell)
+    sparse_UMIs_per_pertinent_marker_per_cell =
+        SparseMatrixCSC(transpose(sparse_UMIs_per_cell_per_gene[:, indices_of_pertinent_markers]))
+    pertinent_marker_position_per_stored = rowvals(sparse_UMIs_per_pertinent_marker_per_cell)
+    UMIs_per_stored = nonzeros(sparse_UMIs_per_pertinent_marker_per_cell)
 
     linear_fraction_per_block_per_pertinent_marker =
         daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
-    linear_fraction_per_pertinent_marker_per_block =
-        Matrix(flip(plain_array(linear_fraction_per_block_per_pertinent_marker)))
-    log_linear_fraction_per_pertinent_marker_per_block =
-        Matrix{Float32}(undef, size(linear_fraction_per_pertinent_marker_per_block))
-    @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_block)
-    @check_turbo_matrix(linear_fraction_per_pertinent_marker_per_block)
-    n_pertinent_markers_for_blocks, n_blocks_for_markers = size(log_linear_fraction_per_pertinent_marker_per_block)
-    parallel_loop_wo_rng(
-        1:n_blocks_for_markers;
-        name = "log_linear_fraction_per_pertinent_marker_per_block",
-        progress = DebugProgress(
-            n_blocks_for_markers;
-            group = :mcs_loops,
-            desc = "log_linear_fraction_per_pertinent_marker_per_block",
-        ),
-    ) do block_index
-        @turbo for pertinent_marker_position in 1:n_pertinent_markers_for_blocks
-            log_linear_fraction_per_pertinent_marker_per_block[pertinent_marker_position, block_index] = log2(
-                linear_fraction_per_pertinent_marker_per_block[pertinent_marker_position, block_index] +
-                gene_fraction_regularization,
-            )
-        end
-        return nothing
+    shifted_log_linear_fraction_per_block_per_pertinent_marker = log2.(
+        1 .+
+        Float64.(Matrix(plain_array(densify(linear_fraction_per_block_per_pertinent_marker)))) ./
+        gene_fraction_regularization,
+    )
+    squared_norm_per_block = vec(sum(abs2, shifted_log_linear_fraction_per_block_per_pertinent_marker; dims = 2))
+    n_blocks = length(squared_norm_per_block)
+
+    score_per_block_per_thread = [Vector{Float64}(undef, n_blocks) for _ in 1:maxthreadid()]
+    @check_turbo_matrix(shifted_log_linear_fraction_per_block_per_pertinent_marker)
+    for score_per_block in score_per_block_per_thread
+        @check_turbo_vector(score_per_block)
     end
 
     closest_block_index_per_cell = Vector{Int32}(undef, n_cells)
-    parallel_pairwise_closest(
-        Euclidean(),
-        log_linear_fraction_per_pertinent_marker_per_block,
-        log_linear_fraction_per_pertinent_marker_per_cell;
-        closest_index = closest_block_index_per_cell,
-        dims = 2,
+    parallel_loop_wo_rng(
+        1:n_cells;
+        name = "closest_block_per_cell",
         progress = DebugProgress(n_cells; group = :mcs_loops, desc = "closest_block_per_cell"),
         progress_chunk = 100,
-    )
+    ) do cell_index
+        score_per_block = score_per_block_per_thread[threadid()]
+        score_per_block .= squared_norm_per_block
+        scale = 1.0 / (total_UMIs_per_cell[cell_index] * gene_fraction_regularization)
+        @inbounds for stored_index in nzrange(sparse_UMIs_per_pertinent_marker_per_cell, cell_index)
+            twice_shifted_log_linear_fraction = 2 * log2(1 + UMIs_per_stored[stored_index] * scale)
+            pertinent_marker_position = pertinent_marker_position_per_stored[stored_index]
+            @turbo for block_index in 1:n_blocks
+                score_per_block[block_index] -=
+                    twice_shifted_log_linear_fraction *
+                    shifted_log_linear_fraction_per_block_per_pertinent_marker[block_index, pertinent_marker_position]
+            end
+        end
+        closest_block_index_per_cell[cell_index] = argmin(score_per_block)
+        return nothing
+    end
 
     name_per_block = axis_vector(daf, "block")
     closest_block_name_per_cell = name_per_block[closest_block_index_per_cell]

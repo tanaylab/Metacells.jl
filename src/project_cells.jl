@@ -205,56 +205,35 @@ function compute_provisional_projection_per_query_cell!(;  # UNTESTED
     total_UMIs_per_query_cell::AbstractVector{<:Integer},
     query_gene_index_per_atlas_pertinent_marker::AbstractVector{<:Integer},
 )::AbstractVector{<:Integer}
-    n_blocks = axis_length(atlas_daf, "block")
-
     is_excluded_per_query_cell = plain_array(get_vector(query_daf, "cell", "is_excluded"))
 
+    # As in `compute_vector_of_block_closest_by_pertinent_markers_per_cell!`: the distances use
+    # `log2(1 + fraction / regularization)`, so zero fractions stay zero and each query cell's work is proportional to
+    # its non-zero UMIs, and the `|cell|²` term of the squared distance is skipped as it is the same for all blocks.
     linear_fraction_per_block_per_pertinent_marker =
         atlas_daf["@ block @ gene [ is_marker & ! is_lateral ] :: linear_fraction"].array
-    linear_fraction_per_block_per_pertinent_marker = flame_timed("linear_fraction_per_block_per_pertinent_marker") do
-        return plain_array(densify(linear_fraction_per_block_per_pertinent_marker))
-    end
-
-    log_linear_fraction_per_pertinent_marker_per_block = Matrix{Float32}(
-        undef,
-        size(linear_fraction_per_block_per_pertinent_marker, 2),
-        size(linear_fraction_per_block_per_pertinent_marker, 1),
+    shifted_log_linear_fraction_per_block_per_pertinent_marker = log2.(
+        1 .+
+        Float64.(Matrix(plain_array(densify(linear_fraction_per_block_per_pertinent_marker)))) ./
+        gene_fraction_regularization,
     )
+    squared_norm_per_block = vec(sum(abs2, shifted_log_linear_fraction_per_block_per_pertinent_marker; dims = 2))
+    n_blocks = length(squared_norm_per_block)
 
-    @check_turbo_matrix(log_linear_fraction_per_pertinent_marker_per_block)
-    @check_turbo_matrix(linear_fraction_per_block_per_pertinent_marker)
-    n_pertinent_markers = size(linear_fraction_per_block_per_pertinent_marker, 2)
-    n_blocks = size(linear_fraction_per_block_per_pertinent_marker, 1)
-    parallel_loop_wo_rng(
-        1:n_blocks;
-        name = "log_linear_fraction_per_pertinent_marker_per_block",
-        progress = DebugProgress(
-            n_blocks;
-            group = :mcs_loops,
-            desc = "log_linear_fraction_per_pertinent_marker_per_block",
-        ),
-    ) do block_index
-        @turbo for pertinent_marker_position in 1:n_pertinent_markers
-            log_linear_fraction_per_pertinent_marker_per_block[pertinent_marker_position, block_index] = log2(
-                linear_fraction_per_block_per_pertinent_marker[block_index, pertinent_marker_position] +
-                gene_fraction_regularization,
-            )
-        end
-        return nothing
+    sparse_UMIs_per_pertinent_marker_per_query_cell = SparseMatrixCSC(
+        transpose(sparse_UMIs_per_query_cell_per_query_gene[:, query_gene_index_per_atlas_pertinent_marker]),
+    )
+    pertinent_marker_position_per_stored = rowvals(sparse_UMIs_per_pertinent_marker_per_query_cell)
+    UMIs_per_stored = nonzeros(sparse_UMIs_per_pertinent_marker_per_query_cell)
+
+    score_per_block_per_thread = [Vector{Float64}(undef, n_blocks) for _ in 1:maxthreadid()]
+    @check_turbo_matrix(shifted_log_linear_fraction_per_block_per_pertinent_marker)
+    for score_per_block in score_per_block_per_thread
+        @check_turbo_vector(score_per_block)
     end
 
     n_query_cells = axis_length(query_daf, "cell")
-
     provisional_block_index_per_query_cell = Vector{UInt32}(undef, n_query_cells)
-
-    n_pertinent_neighborhood_markers = length(query_gene_index_per_atlas_pertinent_marker)
-    sparse_UMIs_per_pertinent_marker_per_query_cell =
-        flipped(sparse_UMIs_per_query_cell_per_query_gene[:, query_gene_index_per_atlas_pertinent_marker])
-    all_pertinent_marker_positions = 1:n_pertinent_neighborhood_markers
-    log_linear_fraction_per_pertinent_marker_per_thread =
-        [Vector{Float32}(undef, n_pertinent_neighborhood_markers) for _ in 1:maxthreadid()]
-    UMIs_per_pertinent_marker_per_thread =
-        [Vector{Float32}(undef, n_pertinent_neighborhood_markers) for _ in 1:maxthreadid()]
 
     parallel_loop_wo_rng(
         1:n_query_cells;
@@ -265,37 +244,21 @@ function compute_provisional_projection_per_query_cell!(;  # UNTESTED
         if is_excluded_per_query_cell[query_cell_index]
             provisional_block_index_per_query_cell[query_cell_index] = 0
         else
-            total_query_cell_UMIs = total_UMIs_per_query_cell[query_cell_index]
-
-            UMIs_per_pertinent_marker = UMIs_per_pertinent_marker_per_thread[threadid()]
-            gather_sparse_column!(
-                UMIs_per_pertinent_marker,
-                sparse_UMIs_per_pertinent_marker_per_query_cell,
-                query_cell_index,
-                all_pertinent_marker_positions,
-            )
-
-            log_linear_fraction_per_pertinent_marker = log_linear_fraction_per_pertinent_marker_per_thread[threadid()]
-            @check_turbo_vector(UMIs_per_pertinent_marker)
-            @check_turbo_vector(log_linear_fraction_per_pertinent_marker)
-            @turbo for gene_position in 1:n_pertinent_neighborhood_markers
-                log_linear_fraction_per_pertinent_marker[gene_position] = log2(
-                    UMIs_per_pertinent_marker[gene_position] / total_query_cell_UMIs + gene_fraction_regularization,
-                )
+            score_per_block = score_per_block_per_thread[threadid()]
+            score_per_block .= squared_norm_per_block
+            scale = 1.0 / (total_UMIs_per_query_cell[query_cell_index] * gene_fraction_regularization)
+            @inbounds for stored_index in nzrange(sparse_UMIs_per_pertinent_marker_per_query_cell, query_cell_index)
+                twice_shifted_log_linear_fraction = 2 * log2(1 + UMIs_per_stored[stored_index] * scale)
+                pertinent_marker_position = pertinent_marker_position_per_stored[stored_index]
+                @turbo for block_index in 1:n_blocks
+                    score_per_block[block_index] -=
+                        twice_shifted_log_linear_fraction * shifted_log_linear_fraction_per_block_per_pertinent_marker[
+                            block_index,
+                            pertinent_marker_position,
+                        ]
+                end
             end
-
-            distances_to_blocks = flame_timed("pairwise.Euclidean") do
-                return vec(
-                    pairwise(
-                        Euclidean(),
-                        Ref(log_linear_fraction_per_pertinent_marker),
-                        eachcol(log_linear_fraction_per_pertinent_marker_per_block),
-                    ),
-                )
-            end
-            @assert_vector(distances_to_blocks, n_blocks)
-
-            provisional_block_index_per_query_cell[query_cell_index] = argmin(distances_to_blocks)
+            provisional_block_index_per_query_cell[query_cell_index] = argmin(score_per_block)
         end
         return nothing
     end
