@@ -89,7 +89,7 @@ $(CONTRACT)
         mean_log_linear_fraction_per_skeleton_per_block = reduce(
             hcat,
             [
-                vec(mean(view(log_linear_fraction_per_skeleton_per_metacell, :, metacell_indices); dims = 2)) for
+                vec(mean(view(log_linear_fraction_per_skeleton_per_metacell, :, metacell_indices); dims = 2)) for  # NOLINT
                 metacell_indices in collect_group_members(seed_block_index_per_metacell)
             ],
         )

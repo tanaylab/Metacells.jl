@@ -66,13 +66,13 @@ called `X` alongside the `X` matrix, and saying which of them is meant is the wh
     of the destination. That is, `("cell", "amp_batch_id") => ("batch", nothing)` reads "the `obs` column called
     `amp_batch_id`, which is per cell, becomes the per-cell property `batch`".
 """
-CopyAnnData = Dict{PropertyKey, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
+const CopyAnnData = Dict{PropertyKey, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
 
 # What is copied by default, for one kind of data at a time - so these are keyed by name alone, the kind being decided
 # by which import they are handed to.
-BaseCopyAnnData = Dict{AbstractString, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
+const BaseCopyAnnData = Dict{AbstractString, Maybe{Tuple{AbstractString, Maybe{StorageScalar}}}}
 
-GENE_VECTORS_DATA = BaseCopyAnnData([
+const GENE_VECTORS_DATA = BaseCopyAnnData([
     "correction_factor" => ("correction_factor", Float32(0.0)),
     "full_gene_index" => nothing,
     "fitted" => ("is_fitted", false),
@@ -80,7 +80,7 @@ GENE_VECTORS_DATA = BaseCopyAnnData([
     "*" => ("=", nothing),
 ])
 
-CELL_VECTORS_DATA = BaseCopyAnnData([
+const CELL_VECTORS_DATA = BaseCopyAnnData([
     "dissolve" => ("is_dissolved", false),
     "full_cell_index" => nothing,
     "metacell" => nothing,
@@ -91,9 +91,9 @@ CELL_VECTORS_DATA = BaseCopyAnnData([
     "*" => ("=", nothing),
 ])
 
-CELL_MATRICES_DATA = BaseCopyAnnData(["X" => ("UMIs", UInt32(0))])
+const CELL_MATRICES_DATA = BaseCopyAnnData(["X" => ("UMIs", UInt32(0))])
 
-METACELL_VECTORS_DATA = BaseCopyAnnData([
+const METACELL_VECTORS_DATA = BaseCopyAnnData([
     "metacells_level" => ("level", UInt32(0)),
     "similar" => ("is_similar", false),
     "grouped" => ("n_cell", UInt32(0)),
@@ -106,7 +106,7 @@ METACELL_VECTORS_DATA = BaseCopyAnnData([
     "*" => ("=", nothing),
 ])
 
-METACELL_MATRICES_DATA = BaseCopyAnnData([
+const METACELL_MATRICES_DATA = BaseCopyAnnData([
     "X" => ("geomean_fraction", Float32(0.0)),
     "corrected_fraction" => ("corrected_geomean_fraction", Float32(0.0)),
     "essential" => ("is_essential", false),
@@ -121,7 +121,7 @@ METACELL_MATRICES_DATA = BaseCopyAnnData([
     "*" => ("=", nothing),
 ])
 
-METACELL_SQUARE_DATA =
+const METACELL_SQUARE_DATA =
     BaseCopyAnnData(["obs_outgoing_weights" => ("outgoing_weights", Float32(0)), "*" => ("=", nothing)])
 
 """

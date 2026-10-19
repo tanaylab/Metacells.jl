@@ -300,7 +300,7 @@ $(CONTRACT2)
     return nothing
 end
 
-SHARPEN_ROUND_PREV_CONTRACT =
+const SHARPEN_ROUND_PREV_CONTRACT =
     renamed_contract(function_contract(sharpen_metacells!, 2) |> function_contract(analyze_metacells!, 2), "prev_daf")
 
 """

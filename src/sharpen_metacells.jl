@@ -184,13 +184,13 @@ end
     walkable_block_index::Int
     block_cell_indices::AbstractVector{<:Integer}
     affected_prev_block_indices::AbstractVector{<:Integer}
-    gene_index_per_friend::AbstractVector{<:Integer}
-    friend_position_per_series_per_prev_block::Dict{Int, Vector{Int}}
+    gene_index_per_pertinent_marker::AbstractVector{<:Integer}
+    pertinent_marker_position_per_series_per_prev_block::Dict{Int, Vector{Int}}
     block_cell_position_per_point_per_prev_block::Dict{Int, Vector{Int}}
     # Per-thread scratch (sized to the walkable blocks' maxima).
     total_UMIs_per_max_cluster::Vector{Float64}
-    UMIs_per_friend_per_max_cluster::Matrix{Float64}
-    variable_per_block_cell_per_friend::Matrix{Float32}
+    UMIs_per_pertinent_marker_per_max_cluster::Matrix{Float64}
+    variable_per_block_cell_per_pertinent_marker::Matrix{Float32}
     is_active_per_block_cell::Vector{Bool}
     punctuated_total_per_block_cell::Vector{Float64}
 end
@@ -1180,8 +1180,8 @@ function compute_local_clusters(;  # UNTESTED
 
     (
         affected_prev_block_indices_per_walkable_block,
-        gene_index_per_friend_per_walkable_block,
-        friend_position_per_series_per_prev_block_per_walkable_block,
+        gene_index_per_pertinent_marker_per_walkable_block,
+        pertinent_marker_position_per_series_per_prev_block_per_walkable_block,
         block_cell_position_per_point_per_prev_block_per_walkable_block,
     ) = precompute_walkable_indirection(
         walkable_block_indices,
@@ -1204,7 +1204,7 @@ function compute_local_clusters(;  # UNTESTED
     walkable_position_per_work_item = Int[]
     candidate_index_per_work_item = Int[]
     n_block_cells_per_work_item = Int[]
-    max_n_friends = 0
+    max_n_pertinent_markers = 0
     max_n_walkable_block_cells = 0
     for walkable_position in 1:n_walkable_blocks
         block_index = walkable_block_indices[walkable_position]
@@ -1212,7 +1212,8 @@ function compute_local_clusters(;  # UNTESTED
         n_candidates = length(solution_candidates.candidates)
         n_block_cells = solution_candidates.n_points
         max_n_walkable_block_cells = max(max_n_walkable_block_cells, n_block_cells)
-        max_n_friends = max(max_n_friends, length(gene_index_per_friend_per_walkable_block[walkable_position]))
+        max_n_pertinent_markers =
+            max(max_n_pertinent_markers, length(gene_index_per_pertinent_marker_per_walkable_block[walkable_position]))
         for candidate_index in 1:n_candidates
             push!(walkable_position_per_work_item, walkable_position)
             push!(candidate_index_per_work_item, candidate_index)
@@ -1235,13 +1236,21 @@ function compute_local_clusters(;  # UNTESTED
             walkable_block_index = 0,
             block_cell_indices = Int[],
             affected_prev_block_indices = Int[],
-            gene_index_per_friend = Int[],
-            friend_position_per_series_per_prev_block = Dict{Int, Vector{Int}}(),
+            gene_index_per_pertinent_marker = Int[],
+            pertinent_marker_position_per_series_per_prev_block = Dict{Int, Vector{Int}}(),
             block_cell_position_per_point_per_prev_block = Dict{Int, Vector{Int}}(),
             # Per-thread scratch.
             total_UMIs_per_max_cluster = Vector{Float64}(undef, max_n_kmeans_clusters),
-            UMIs_per_friend_per_max_cluster = Matrix{Float64}(undef, max_n_friends, max_n_kmeans_clusters),
-            variable_per_block_cell_per_friend = Matrix{Float32}(undef, max_n_walkable_block_cells, max_n_friends),
+            UMIs_per_pertinent_marker_per_max_cluster = Matrix{Float64}(
+                undef,
+                max_n_pertinent_markers,
+                max_n_kmeans_clusters,
+            ),
+            variable_per_block_cell_per_pertinent_marker = Matrix{Float32}(
+                undef,
+                max_n_walkable_block_cells,
+                max_n_pertinent_markers,
+            ),
             is_active_per_block_cell = Vector{Bool}(undef, max_n_walkable_block_cells),
             punctuated_total_per_block_cell = Vector{Float64}(undef, max_n_walkable_block_cells),
         ) for _ in 1:maxthreadid()
@@ -1256,28 +1265,29 @@ function compute_local_clusters(;  # UNTESTED
     # Per-walkable-block scratches sized to that walkable block's own dimensions. Pass A (parallel argmax) populates
     # the variable + is_active scratches for every changed walkable block; Pass B (parallel `replace_group!`) reads them
     # per (changed_walkable, affected prev block) without re-populating - the two-pass split eliminates the populate
-    # redundancy that a parallel-by-prev-block commit would otherwise pay. The `UMI_per_friend_per_block_cell`
+    # redundancy that a parallel-by-prev-block commit would otherwise pay. The `UMI_per_pertinent_marker_per_block_cell`
     # cache (filled once below) lets every populate call read this walkable block's UMIs straight from a sequential
-    # Float32 column instead of indexing the global `sparse_UMIs_per_cell_per_gene` matrix on every (cell, friend gene).
-    variable_per_block_cell_per_friend_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
+    # Float32 column instead of indexing the global `sparse_UMIs_per_cell_per_gene` matrix on every (cell, pertinent
+    # marker).
+    variable_per_block_cell_per_pertinent_marker_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
     is_active_per_block_cell_per_walkable_block = Vector{Vector{Bool}}(undef, n_walkable_blocks)
-    UMI_per_friend_per_block_cell_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
+    UMI_per_pertinent_marker_per_block_cell_per_walkable_block = Vector{Matrix{Float32}}(undef, n_walkable_blocks)
     n_block_cells_per_walkable_block = Vector{Int}(undef, n_walkable_blocks)
     UMIs_fill_weight_per_walkable_block = Vector{Int}(undef, n_walkable_blocks)
     for walkable_position in 1:n_walkable_blocks
         block_index = walkable_block_indices[walkable_position]
         n_block_cells = solution_candidates_per_block[block_index].n_points
-        n_friends = length(gene_index_per_friend_per_walkable_block[walkable_position])
-        variable_per_block_cell_per_friend_per_walkable_block[walkable_position] =
-            Matrix{Float32}(undef, n_block_cells, n_friends)
+        n_pertinent_markers = length(gene_index_per_pertinent_marker_per_walkable_block[walkable_position])
+        variable_per_block_cell_per_pertinent_marker_per_walkable_block[walkable_position] =
+            Matrix{Float32}(undef, n_block_cells, n_pertinent_markers)
         is_active_per_block_cell_per_walkable_block[walkable_position] = Vector{Bool}(undef, n_block_cells)
-        UMI_per_friend_per_block_cell_per_walkable_block[walkable_position] =
-            Matrix{Float32}(undef, n_friends, n_block_cells)
+        UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position] =
+            Matrix{Float32}(undef, n_pertinent_markers, n_block_cells)
         n_block_cells_per_walkable_block[walkable_position] = n_block_cells
-        UMIs_fill_weight_per_walkable_block[walkable_position] = n_block_cells * n_friends
+        UMIs_fill_weight_per_walkable_block[walkable_position] = n_block_cells * n_pertinent_markers
     end
 
-    # One-time fill of the per-walkable UMI cache, gathering the block cells from the column of each friend gene.
+    # One-time fill of the per-walkable UMI cache, gathering the block cells from the column of each pertinent marker.
     parallel_loop_wo_rng(
         1:n_walkable_blocks;
         weights = UMIs_fill_weight_per_walkable_block,
@@ -1290,10 +1300,11 @@ function compute_local_clusters(;  # UNTESTED
     ) do walkable_position
         block_index = walkable_block_indices[walkable_position]
         block_cell_indices = block_cell_indices_per_block[block_index]
-        gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
-        UMI_per_friend_per_block_cell = UMI_per_friend_per_block_cell_per_walkable_block[walkable_position]
-        for (friend_position, gene_index) in enumerate(gene_index_per_friend)
-            @views UMI_per_block_cell = UMI_per_friend_per_block_cell[friend_position, :]
+        gene_index_per_pertinent_marker = gene_index_per_pertinent_marker_per_walkable_block[walkable_position]
+        UMI_per_pertinent_marker_per_block_cell =
+            UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position]
+        for (pertinent_marker_position, gene_index) in enumerate(gene_index_per_pertinent_marker)
+            @views UMI_per_block_cell = UMI_per_pertinent_marker_per_block_cell[pertinent_marker_position, :]
             gather_sparse_column!(UMI_per_block_cell, sparse_UMIs_per_cell_per_gene, gene_index, block_cell_indices)
         end
         return nothing
@@ -1385,16 +1396,17 @@ function compute_local_clusters(;  # UNTESTED
                 delta_context.block_cell_indices = block_cell_indices_per_block[block_index]
                 delta_context.affected_prev_block_indices =
                     affected_prev_block_indices_per_walkable_block[walkable_position]
-                delta_context.gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
-                delta_context.friend_position_per_series_per_prev_block =
-                    friend_position_per_series_per_prev_block_per_walkable_block[walkable_position]
+                delta_context.gene_index_per_pertinent_marker =
+                    gene_index_per_pertinent_marker_per_walkable_block[walkable_position]
+                delta_context.pertinent_marker_position_per_series_per_prev_block =
+                    pertinent_marker_position_per_series_per_prev_block_per_walkable_block[walkable_position]
                 delta_context.block_cell_position_per_point_per_prev_block =
                     block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position]
                 delta_per_work_item[work_index] = compute_delta_correlation(
                     candidate,
                     solution_candidates.n_points,
                     delta_context,
-                    UMI_per_friend_per_block_cell_per_walkable_block[walkable_position],
+                    UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position],
                 )
             end
             return nothing
@@ -1448,37 +1460,40 @@ function compute_local_clusters(;  # UNTESTED
             delta_context.block_cell_indices = block_cell_indices_per_block[block_index]
             delta_context.affected_prev_block_indices =
                 affected_prev_block_indices_per_walkable_block[walkable_position]
-            delta_context.gene_index_per_friend = gene_index_per_friend_per_walkable_block[walkable_position]
-            delta_context.friend_position_per_series_per_prev_block =
-                friend_position_per_series_per_prev_block_per_walkable_block[walkable_position]
+            delta_context.gene_index_per_pertinent_marker =
+                gene_index_per_pertinent_marker_per_walkable_block[walkable_position]
+            delta_context.pertinent_marker_position_per_series_per_prev_block =
+                pertinent_marker_position_per_series_per_prev_block_per_walkable_block[walkable_position]
             delta_context.block_cell_position_per_point_per_prev_block =
                 block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position]
             populate_candidate_scratches!(
                 chosen,
                 solution_candidates.n_points,
                 delta_context,
-                UMI_per_friend_per_block_cell_per_walkable_block[walkable_position],
-                variable_per_block_cell_per_friend_per_walkable_block[walkable_position],
+                UMI_per_pertinent_marker_per_block_cell_per_walkable_block[walkable_position],
+                variable_per_block_cell_per_pertinent_marker_per_walkable_block[walkable_position],
                 is_active_per_block_cell_per_walkable_block[walkable_position],
             )
 
             # Apply the change directly to each affected prev block's grouped correlations under its lock.
+            pertinent_marker_position_per_series_per_prev_block =
+                pertinent_marker_position_per_series_per_prev_block_per_walkable_block[walkable_position]
             for prev_block_index in affected_prev_block_indices_per_walkable_block[walkable_position]
                 group_index_in_prev_block = group_index_per_block_per_prev_block[block_index, prev_block_index]
                 @assert group_index_in_prev_block > 0
                 grouped_for_prev_block = grouped_per_prev_block[prev_block_index]
                 block_cell_position_per_point =
                     block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position][prev_block_index]
-                friend_position_per_series =
-                    friend_position_per_series_per_prev_block_per_walkable_block[walkable_position][prev_block_index]
+                pertinent_marker_position_per_series =
+                    pertinent_marker_position_per_series_per_prev_block[prev_block_index]
                 lock(lock_per_prev_block[prev_block_index]) do
                     replace_group!(
                         grouped_for_prev_block,
                         group_index_in_prev_block,
-                        variable_per_block_cell_per_friend_per_walkable_block[walkable_position],
+                        variable_per_block_cell_per_pertinent_marker_per_walkable_block[walkable_position],
                         is_active_per_block_cell_per_walkable_block[walkable_position],
                         block_cell_position_per_point,
-                        friend_position_per_series,
+                        pertinent_marker_position_per_series,
                     )
                     baseline_mean_correlation_per_prev_block[prev_block_index] =
                         Float32(mean_correlation(grouped_for_prev_block))
@@ -2271,15 +2286,15 @@ function compute_baseline_metacell_aggregates(  # UNTESTED
 end
 
 # Per walkable block, precompute the indirection vectors the delta-correlation scoring will need: which prev blocks'
-# correlations the block can affect, the block's friend-gene subspace (column axis for the per-(block, K-candidate)
-# log-fill cache), and per (block, affected prev block) the (column position in the block's friend subspace, the
-# block's `block_cell_position` per point) maps.
+# correlations the block can affect, the block's pertinent-marker subspace (column axis for the per-(block,
+# K-candidate) log-fill cache), and per (block, affected prev block) the (column position in the block's
+# pertinent-marker subspace, the block's `block_cell_position` per point) maps.
 #   * `affected_prev_block_indices_per_walkable_block[walkable_position]`: list of prev blocks whose neighborhoods
 #     overlap any of the block's cells.
-#   * `gene_index_per_friend_per_walkable_block[walkable_position]`: the block's friend-gene subspace (global gene index
-#     per column).
-#   * `friend_position_per_series_per_prev_block_per_walkable_block[walkable_position][prev_block_index]`: per (block, prev block), the
-#     block's friend column for each of the prev block's series genes.
+#   * `gene_index_per_pertinent_marker_per_walkable_block[walkable_position]`: the block's pertinent-marker subspace
+#     (global gene index per column). It is the union of the pertinent neighborhood markers of the affected prev blocks.
+#   * `pertinent_marker_position_per_series_per_prev_block_per_walkable_block[walkable_position][prev_block_index]`:
+#     per (block, prev block), the block's pertinent-marker column for each of the prev block's series genes.
 #   * `block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position][prev_block_index]`: per (block, prev block), the block's
 #     `block_cell_position`s of the cells in the prev block's neighborhood, in the block's canonical block-cell order.
 #     Row indirection for the indirect-gather query.
@@ -2295,16 +2310,16 @@ function precompute_walkable_indirection(  # UNTESTED
     n_walkable_blocks = length(walkable_block_indices)
 
     affected_prev_block_indices_per_walkable_block = Vector{Vector{Int}}(undef, n_walkable_blocks)
-    gene_index_per_friend_per_walkable_block = Vector{Vector{Int}}(undef, n_walkable_blocks)
-    friend_position_per_series_per_prev_block_per_walkable_block =
+    gene_index_per_pertinent_marker_per_walkable_block = Vector{Vector{Int}}(undef, n_walkable_blocks)
+    pertinent_marker_position_per_series_per_prev_block_per_walkable_block =
         Vector{Dict{Int, Vector{Int}}}(undef, n_walkable_blocks)
     block_cell_position_per_point_per_prev_block_per_walkable_block =
         Vector{Dict{Int, Vector{Int}}}(undef, n_walkable_blocks)
 
     is_prev_block_of_block_per_thread = [BitVector(undef, n_prev_blocks) for _ in 1:maxthreadid()]
     is_affected_prev_block_per_thread = [BitVector(undef, n_prev_blocks) for _ in 1:maxthreadid()]
-    is_friend_gene_for_walkable_block_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
-    friend_position_per_gene_per_thread = [zeros(Int, n_genes) for _ in 1:maxthreadid()]
+    is_pertinent_marker_for_walkable_block_per_thread = [BitVector(undef, n_genes) for _ in 1:maxthreadid()]
+    pertinent_marker_position_per_gene_per_thread = [zeros(Int, n_genes) for _ in 1:maxthreadid()]
 
     n_block_cells_per_walkable_block =
         [length(block_cell_indices_per_block[block_index]) for block_index in walkable_block_indices]
@@ -2342,30 +2357,31 @@ function precompute_walkable_indirection(  # UNTESTED
         affected_prev_block_indices_per_walkable_block[walkable_position] = affected_prev_block_indices
 
         # Gene subspace for this walkable block: union of the series genes across its affected prev blocks.
-        is_friend_gene_for_walkable_block = is_friend_gene_for_walkable_block_per_thread[threadid()]
-        friend_position_per_gene = friend_position_per_gene_per_thread[threadid()]
-        fill!(is_friend_gene_for_walkable_block, false)
+        is_pertinent_marker_for_walkable_block = is_pertinent_marker_for_walkable_block_per_thread[threadid()]
+        pertinent_marker_position_per_gene = pertinent_marker_position_per_gene_per_thread[threadid()]
+        fill!(is_pertinent_marker_for_walkable_block, false)
         for prev_block_index in affected_prev_block_indices
-            for friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index]
-                is_friend_gene_for_walkable_block[friend_gene_index] = true
+            for pertinent_marker_gene_index in
+                pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index]
+                is_pertinent_marker_for_walkable_block[pertinent_marker_gene_index] = true
             end
         end
-        fill!(friend_position_per_gene, 0)
-        gene_index_per_friend = Int[]
+        fill!(pertinent_marker_position_per_gene, 0)
+        gene_index_per_pertinent_marker = Int[]
         for gene_index in 1:n_genes
-            if is_friend_gene_for_walkable_block[gene_index]
-                push!(gene_index_per_friend, gene_index)
-                friend_position_per_gene[gene_index] = length(gene_index_per_friend)
+            if is_pertinent_marker_for_walkable_block[gene_index]
+                push!(gene_index_per_pertinent_marker, gene_index)
+                pertinent_marker_position_per_gene[gene_index] = length(gene_index_per_pertinent_marker)
             end
         end
-        gene_index_per_friend_per_walkable_block[walkable_position] = gene_index_per_friend
+        gene_index_per_pertinent_marker_per_walkable_block[walkable_position] = gene_index_per_pertinent_marker
 
-        friend_position_per_series_per_prev_block = Dict{Int, Vector{Int}}()
+        pertinent_marker_position_per_series_per_prev_block = Dict{Int, Vector{Int}}()
         block_cell_position_per_point_per_prev_block = Dict{Int, Vector{Int}}()
         for prev_block_index in affected_prev_block_indices
-            friend_position_per_series_per_prev_block[prev_block_index] = [
-                friend_position_per_gene[friend_gene_index] for
-                friend_gene_index in pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index]
+            pertinent_marker_position_per_series_per_prev_block[prev_block_index] = [
+                pertinent_marker_position_per_gene[pertinent_marker_gene_index] for pertinent_marker_gene_index in
+                pertinent_neighborhood_marker_gene_indices_per_prev_block[prev_block_index]
             ]
             @views is_in_prev_neighborhood_for_prev_block =
                 is_in_prev_neighborhood_per_other_prev_block_per_prev_block[:, prev_block_index]
@@ -2379,8 +2395,8 @@ function precompute_walkable_indirection(  # UNTESTED
             end
             block_cell_position_per_point_per_prev_block[prev_block_index] = block_cell_position_per_point
         end
-        friend_position_per_series_per_prev_block_per_walkable_block[walkable_position] =
-            friend_position_per_series_per_prev_block
+        pertinent_marker_position_per_series_per_prev_block_per_walkable_block[walkable_position] =
+            pertinent_marker_position_per_series_per_prev_block
         block_cell_position_per_point_per_prev_block_per_walkable_block[walkable_position] =
             block_cell_position_per_point_per_prev_block
         return nothing
@@ -2388,8 +2404,8 @@ function precompute_walkable_indirection(  # UNTESTED
 
     return (
         affected_prev_block_indices_per_walkable_block,
-        gene_index_per_friend_per_walkable_block,
-        friend_position_per_series_per_prev_block_per_walkable_block,
+        gene_index_per_pertinent_marker_per_walkable_block,
+        pertinent_marker_position_per_series_per_prev_block_per_walkable_block,
         block_cell_position_per_point_per_prev_block_per_walkable_block,
     )
 end
@@ -2535,45 +2551,46 @@ function compute_changed_dispersions!(  # UNTESTED
     return nothing
 end
 
-# Fill `variable_per_block_cell_per_friend` and `is_active_per_block_cell` with `candidate`'s punctuated
-# cluster-mean log-fractions over the walkable block's cells × friend genes; cells in single-cell or zero-punctuated-
-# total clusters are masked off and their variable values zeroed. Uses `delta_context`'s per-thread cluster-aggregate
-# scratches and reads the walkable block's UMIs out of the pre-filled per-walkable
-# `UMI_per_friend_per_block_cell` cache (Float32, friend-position-major) - no scattered indexing into the
+# Fill `variable_per_block_cell_per_pertinent_marker` and `is_active_per_block_cell` with `candidate`'s punctuated
+# cluster-mean log-fractions over the walkable block's cells × pertinent markers; cells in single-cell or
+# zero-punctuated-total clusters are masked off and their variable values zeroed. Uses `delta_context`'s per-thread
+# cluster-aggregate scratches and reads the walkable block's UMIs out of the pre-filled per-walkable
+# `UMI_per_pertinent_marker_per_block_cell` cache (Float32, pertinent-marker-major) - no scattered indexing into the
 # global UMI matrix on each call. Allocation-free; the supplied output buffers may be per-thread (for Phase 2
 # evaluation, overwritten per work item) or per-walkable-block (for Pass A, kept alive into Pass B).
 function populate_candidate_scratches!(  # UNTESTED
     candidate::SolutionCandidate,
     n_block_cells::Integer,
     delta_context::DeltaCorrelationContext,
-    UMI_per_friend_per_block_cell::AbstractMatrix{Float32},
-    variable_per_block_cell_per_friend::AbstractMatrix{Float32},
+    UMI_per_pertinent_marker_per_block_cell::AbstractMatrix{Float32},
+    variable_per_block_cell_per_pertinent_marker::AbstractMatrix{Float32},
     is_active_per_block_cell::AbstractVector{Bool},
 )::Nothing
-    n_friends = length(delta_context.gene_index_per_friend)
+    n_pertinent_markers = length(delta_context.gene_index_per_pertinent_marker)
     k = candidate.k
 
     total_UMIs_per_max_cluster = delta_context.total_UMIs_per_max_cluster
-    UMIs_per_friend_per_max_cluster = delta_context.UMIs_per_friend_per_max_cluster
+    UMIs_per_pertinent_marker_per_max_cluster = delta_context.UMIs_per_pertinent_marker_per_max_cluster
     punctuated_total_per_block_cell = delta_context.punctuated_total_per_block_cell
     @views fill!(total_UMIs_per_max_cluster[1:k], 0.0)
-    @views fill!(UMIs_per_friend_per_max_cluster[1:n_friends, 1:k], 0.0)
+    @views fill!(UMIs_per_pertinent_marker_per_max_cluster[1:n_pertinent_markers, 1:k], 0.0)
 
-    @check_turbo_matrix(UMI_per_friend_per_block_cell)
-    @check_turbo_matrix(UMIs_per_friend_per_max_cluster)
-    @check_turbo_matrix(variable_per_block_cell_per_friend)
+    @check_turbo_matrix(UMI_per_pertinent_marker_per_block_cell)
+    @check_turbo_matrix(UMIs_per_pertinent_marker_per_max_cluster)
+    @check_turbo_matrix(variable_per_block_cell_per_pertinent_marker)
 
-    # Per K-candidate cluster: total UMIs of the block's cells in the cluster + per-friend-gene UMI sums (only over
-    # the walkable block's friend-gene subspace, not the full relevant gene set). Inner `friend` loop is contiguous on
-    # both `UMI_per_friend_per_block_cell` (friend-major Float32 column read) and `UMIs_per_friend_per_max_cluster`
-    # (friend-major Float64 column accumulate) - SIMD via `@turbo`.
+    # Per K-candidate cluster: total UMIs of the block's cells in the cluster + per-pertinent-marker UMI sums (only over
+    # the walkable block's pertinent-marker subspace, not the full relevant gene set). The inner pertinent marker loop
+    # is contiguous on both `UMI_per_pertinent_marker_per_block_cell` (pertinent-marker-major Float32 column read) and
+    # `UMIs_per_pertinent_marker_per_max_cluster` (pertinent-marker-major Float64 column accumulate) - SIMD via
+    # `@turbo`.
     @inbounds for block_cell_position in 1:n_block_cells
         cluster_index = candidate.assignments[block_cell_position]
         cell_index = delta_context.block_cell_indices[block_cell_position]
         total_UMIs_per_max_cluster[cluster_index] += Float64(delta_context.total_UMIs_per_cell[cell_index])
-        @turbo for friend_position in 1:n_friends
-            UMIs_per_friend_per_max_cluster[friend_position, cluster_index] +=
-                Float64(UMI_per_friend_per_block_cell[friend_position, block_cell_position])
+        @turbo for pertinent_marker_position in 1:n_pertinent_markers
+            UMIs_per_pertinent_marker_per_max_cluster[pertinent_marker_position, cluster_index] +=
+                Float64(UMI_per_pertinent_marker_per_block_cell[pertinent_marker_position, block_cell_position])
         end
     end
 
@@ -2590,20 +2607,23 @@ function populate_candidate_scratches!(  # UNTESTED
         punctuated_total_per_block_cell[block_cell_position] = is_active ? punctuated_total : 1.0
     end
 
-    # Punctuated cluster-mean log-fraction per (block cell, friend gene). Inner `friend` loop reads contiguous friend-
-    # major columns and writes strided into `variable_per_block_cell_per_friend` (scatter store) - @turbo SIMDs the
-    # branchless arithmetic with `ifelse` selecting 0 for inactive cells.
+    # Punctuated cluster-mean log-fraction per (block cell, pertinent marker). The inner pertinent marker loop reads
+    # contiguous pertinent-marker-major columns and writes strided into `variable_per_block_cell_per_pertinent_marker`
+    # (scatter store) - @turbo SIMDs the branchless arithmetic with `ifelse` selecting 0 for inactive cells.
     regularization = delta_context.gene_fraction_regularization
     @inbounds for block_cell_position in 1:n_block_cells
         cluster_index = candidate.assignments[block_cell_position]
         is_active = is_active_per_block_cell[block_cell_position]
         punctuated_total = punctuated_total_per_block_cell[block_cell_position]
-        @turbo for friend_position in 1:n_friends
-            cell_friend_UMIs = Float64(UMI_per_friend_per_block_cell[friend_position, block_cell_position])
-            cluster_friend_UMIs = UMIs_per_friend_per_max_cluster[friend_position, cluster_index]
-            punctuated_friend = cluster_friend_UMIs - cell_friend_UMIs
-            result = log2(Float32(punctuated_friend / punctuated_total) + regularization)
-            variable_per_block_cell_per_friend[block_cell_position, friend_position] = ifelse(is_active, result, 0.0f0)
+        @turbo for pertinent_marker_position in 1:n_pertinent_markers
+            cell_pertinent_marker_UMIs =
+                Float64(UMI_per_pertinent_marker_per_block_cell[pertinent_marker_position, block_cell_position])
+            cluster_pertinent_marker_UMIs =
+                UMIs_per_pertinent_marker_per_max_cluster[pertinent_marker_position, cluster_index]
+            punctuated_pertinent_marker = cluster_pertinent_marker_UMIs - cell_pertinent_marker_UMIs
+            result = log2(Float32(punctuated_pertinent_marker / punctuated_total) + regularization)
+            variable_per_block_cell_per_pertinent_marker[block_cell_position, pertinent_marker_position] =
+                ifelse(is_active, result, 0.0f0)
         end
     end
     return nothing
@@ -2618,16 +2638,16 @@ function compute_delta_correlation(  # UNTESTED
     candidate::SolutionCandidate,
     n_block_cells::Integer,
     delta_context::DeltaCorrelationContext,
-    UMI_per_friend_per_block_cell::AbstractMatrix{Float32},
+    UMI_per_pertinent_marker_per_block_cell::AbstractMatrix{Float32},
 )::Float64
-    variable_per_block_cell_per_friend = delta_context.variable_per_block_cell_per_friend
+    variable_per_block_cell_per_pertinent_marker = delta_context.variable_per_block_cell_per_pertinent_marker
     is_active_per_block_cell = delta_context.is_active_per_block_cell
     populate_candidate_scratches!(
         candidate,
         n_block_cells,
         delta_context,
-        UMI_per_friend_per_block_cell,
-        variable_per_block_cell_per_friend,
+        UMI_per_pertinent_marker_per_block_cell,
+        variable_per_block_cell_per_pertinent_marker,
         is_active_per_block_cell,
     )
     return query_delta_correlation_from_scratches(delta_context)
@@ -2637,7 +2657,7 @@ end
 # already populated for some candidate via `populate_candidate_scratches!`) plus the per-walkable indirections, sums
 # the per-affected-prev-block delta against the cached baseline mean correlations. Allocation-free.
 function query_delta_correlation_from_scratches(delta_context::DeltaCorrelationContext)::Float64  # UNTESTED
-    variable_per_block_cell_per_friend = delta_context.variable_per_block_cell_per_friend
+    variable_per_block_cell_per_pertinent_marker = delta_context.variable_per_block_cell_per_pertinent_marker
     is_active_per_block_cell = delta_context.is_active_per_block_cell
 
     # Sum per-prev-block delta: query each affected prev block's grouped correlations with the block's candidate
@@ -2652,15 +2672,16 @@ function query_delta_correlation_from_scratches(delta_context::DeltaCorrelationC
         end
         grouped_for_prev_block = delta_context.grouped_per_prev_block[prev_block_index]
         block_cell_position_per_point = delta_context.block_cell_position_per_point_per_prev_block[prev_block_index]
-        friend_position_per_series = delta_context.friend_position_per_series_per_prev_block[prev_block_index]
+        pertinent_marker_position_per_series =
+            delta_context.pertinent_marker_position_per_series_per_prev_block[prev_block_index]
 
         new_mean_correlation = mean_correlation_if_group_replaced(
             grouped_for_prev_block,
             group_index_in_prev_block,
-            variable_per_block_cell_per_friend,
+            variable_per_block_cell_per_pertinent_marker,
             is_active_per_block_cell,
             block_cell_position_per_point,
-            friend_position_per_series,
+            pertinent_marker_position_per_series,
         )
         delta +=
             Float64(new_mean_correlation) -
@@ -3708,7 +3729,7 @@ function fill_type_flow_insertion!(  # UNTESTED
 end
 
 # How many evaluated moves to lump into a single advance of the progress of the type order search.
-MOVES_PROGRESS_CHUNK = 100
+MOVES_PROGRESS_CHUNK::Int = 100
 
 # Improve the `type_per_position` order in place by repeatedly applying the best crossing-reducing move (exchanging the
 # types at two positions, or moving one type to another position), until reaching a local optimum. Returns the local

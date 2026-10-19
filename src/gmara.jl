@@ -122,9 +122,9 @@ parameter to the functions.
 """
 TIMEOUT::Real = parse(Int, get(ENV, "METACELLS_GMARA_TIMEOUT", "10"))
 
-CACHE_IN_MEMORY = Dict{AbstractString, Any}()
+const CACHE_IN_MEMORY = Dict{AbstractString, Any}()
 
-CACHE_LOCK = ReadWriteLock()
+const CACHE_LOCK = ReadWriteLock()
 
 """
     empty_gmara_cache!()::Nothing

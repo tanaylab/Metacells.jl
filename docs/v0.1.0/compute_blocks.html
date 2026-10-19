@@ -210,6 +210,7 @@
     n_blocks::Integer = ```nothing```,
     max_block_span::Real = ```2```,
     prefix::AbstractString = ```&quot;B&quot;```,
+    rng::AbstractRNG = default_rng(),
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -238,13 +239,19 @@
 </code>
 </a>.
 </p>
-<p>The actual blocks are computed using hierarchical clustering with 
-<code>:ward
-</code> linkage based on the euclidean skeleton distance between the metacells (that is, using the 
+<p>The actual blocks are computed using K-means on the log of the skeleton genes fractions of the metacells, using the same regularization as 
 <a href="contracts.html#Metacells.Contracts.matrix_of_euclidean_skeleton_fold_distance_between_metacells">
 <code>matrix_of_euclidean_skeleton_fold_distance_between_metacells
 </code>
-</a>).
+</a>. If 
+<code>n_blocks
+</code> is not specified, K-means starts from the centroids of the hierarchical clustering blocks. Otherwise, it starts from 
+<code>:kmpp
+</code> seeds chosen using the 
+<code>rng
+</code>. Therefore, specifying 
+<code>n_blocks
+</code> gives different blocks than the automatic method, even if the number of blocks is the same. Blocks which end up empty are dropped.
 </p>
 <p>
 <strong>Inputs
@@ -259,20 +266,30 @@
 </strong> (required): Minimal-sized groups of cells for robust point estimates.
 </p>
 <p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
 <strong>Matrices
 </strong>
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
 </p>
 <p>
 <strong>metacell, metacell @ max
 <em>skeleton
 </em>fold_distance
 </strong>::Union{Float32, Float64} (required): The maximal significant fold factor between the fraction of skeleton genes between the metacells.
-</p>
-<p>
-<strong>metacell, metacell @ euclidean
-<em>skeleton
-</em>fold_distance
-</strong>::Union{Float32, Float64} (required): The Euclidean distance between the log of the fraction of the skeleton genes between the metacells.
 </p>
 <p>
 <strong>Outputs
