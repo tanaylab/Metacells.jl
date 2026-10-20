@@ -374,7 +374,6 @@ $(CONTRACT)
     @check_turbo_matrix(abs_fold_per_metacell_per_marker)
     @check_turbo_matrix(log_fraction_per_metacell_per_marker)
     @check_turbo_vector(median_log_fraction_per_marker)
-    n_metacells, n_markers = size(log_fraction_per_metacell_per_marker)
     parallel_loop_wo_rng(
         1:n_markers;
         name = "abs_fold_per_metacell_per_marker",

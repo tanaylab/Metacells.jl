@@ -720,15 +720,15 @@ in a per-gene-per-gene `matrix_name`.
     matrix_name::AbstractString,
     overwrite::Bool = false,
 )::Nothing
-    if metacells_subset === nothing
-        indices_of_subset_metacells = collect(1:axis_length(daf, "metacell"))
+    indices_of_subset_metacells = if metacells_subset === nothing
+        collect(1:axis_length(daf, "metacell"))
     else
         if metacells_subset isa QueryString
             @assert is_axis_query(metacells_subset)
             @assert query_axis_name(metacells_subset) == "metacell"
             metacells_subset = get_query(daf, metacells_subset)
         end
-        indices_of_subset_metacells = findall(metacells_subset)
+        findall(metacells_subset)
     end
     n_subset_metacells = length(indices_of_subset_metacells)
 
@@ -881,7 +881,7 @@ end
 # The `n_neighbors` nearest neighbors of each metacell of `daf`, taken from the stored
 # `knn_euclidean_skeleton_fold_distance`, as a graph `UMAP` can fit from.
 function umap_knn_graph(daf::DafReader, n_neighbors::Integer)::UMAP.NND.HeapKNNGraph  # UNTESTED
-    knn_distance_per_metacell_per_metacell =  # NOJET
+    knn_distance_per_metacell_per_metacell =
         plain_array(get_matrix(daf, "metacell", "metacell", "knn_euclidean_skeleton_fold_distance"))
     n_metacells = size(knn_distance_per_metacell_per_metacell, 2)
     n_stored_neighbors = length(nzrange(knn_distance_per_metacell_per_metacell, 1))

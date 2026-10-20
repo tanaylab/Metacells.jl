@@ -2076,8 +2076,10 @@ function correlation_between_base_neighborhood_cells_and_metacells_per_gene_per_
     # Without an explicit mapping, the cells share the base repository's cell axis and each cell's base block is read
     # positionally. Otherwise the caller supplies each cell's base block (via a name join, when the cells are a subset
     # of the base repository - cross validation on held-out cells).
-    if base_block_index_per_cell === nothing
-        base_block_index_per_cell = base_daf["@ cell : metacell ?? 0 : block : index"].array
+    base_block_index_per_cell = if base_block_index_per_cell === nothing
+        base_daf["@ cell : metacell ?? 0 : block : index"].array
+    else
+        base_block_index_per_cell
     end
     n_cells = length(base_block_index_per_cell)
     @assert length(metacell_index_per_cell) == n_cells
@@ -2198,10 +2200,10 @@ function log_base_neighborhood_correlation_means(;  # UNTESTED
     end
 
     if is_in_bin_per_gene === nothing
-        mean_per_base_block = mean_over_relevant(trues(n_genes))
+        all_mean_per_base_block = mean_over_relevant(trues(n_genes))
         @debug (
             "Mean correlation of base neighborhood pertinent marker genes between base neighborhood cells and their " *
-            "$(metacells_qualifier) metacells: $(log_mean(mean_per_base_block))"
+            "$(metacells_qualifier) metacells: $(log_mean(all_mean_per_base_block))"
         ) _group = :mcs_results
     else
         in_bin_mean_per_base_block = mean_over_relevant(is_in_bin_per_gene)

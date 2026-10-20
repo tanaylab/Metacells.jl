@@ -322,9 +322,9 @@ function compute_final_projection_per_query_cell(;
 
     for phase in 1:3
         phase_name = "final_projection_per_cell.phase_$(phase)"
+        indices_of_undetermined_query_cells_per_block = next_indices_of_undetermined_query_cells_per_block
+        deferred_indices_of_undetermined_query_cells_per_block = [Int32[] for _ in 1:n_blocks]
         flame_timed(phase_name) do
-            indices_of_undetermined_query_cells_per_block = next_indices_of_undetermined_query_cells_per_block
-            next_indices_of_undetermined_query_cells_per_block = [Int32[] for _ in 1:n_blocks]
             @debug (
                 "Determined: $(n_determined_query_cells[]) $(percent(n_determined_query_cells[], n_query_cells))" *
                 " Phase $(phase)..."
@@ -446,7 +446,7 @@ function compute_final_projection_per_query_cell(;
                                 try
                                     lock(spin_lock_per_block[target_block_index])
                                     push!(
-                                        next_indices_of_undetermined_query_cells_per_block[target_block_index],
+                                        deferred_indices_of_undetermined_query_cells_per_block[target_block_index],
                                         query_cell_index,
                                     )
                                 finally
@@ -482,6 +482,7 @@ function compute_final_projection_per_query_cell(;
                 return nothing
             end
         end
+        next_indices_of_undetermined_query_cells_per_block = deferred_indices_of_undetermined_query_cells_per_block
     end
 
     @assert n_determined_query_cells[] == n_query_cells

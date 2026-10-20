@@ -410,19 +410,19 @@ $(CONTRACT2)
     is_found_per_module_per_block = plain_array(get_matrix(prev_daf, "module", "block", "is_found"))
     module_index_per_gene_per_block = prev_daf["@ gene @ block :: module ?? 0 : index"].array
 
-    block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
+    metacell_block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
     is_base_outlier_per_cell = plain_array(get_vector(prev_daf, "cell", "is_base_outlier"))
     is_excluded_per_cell = plain_array(get_vector(prev_daf, "cell", "is_excluded"))
     closest_block_index_per_cell = prev_daf["@ cell : block.closest_by_pertinent_markers : index"].array
     # Base outliers and excluded cells are never clustered. Every other cell gets a block: grouped cells use their
     # metacell's block; round outliers (lost their metacell in a previous sharpening round) use the closest block by
     # pertinent markers as a synthetic previous block.
-    block_index_per_cell = ifelse.(
+    pre_migration_block_index_per_cell = ifelse.(
         is_base_outlier_per_cell .| is_excluded_per_cell,
-        zero(eltype(block_index_per_cell)),
-        ifelse.(block_index_per_cell .> 0, block_index_per_cell, closest_block_index_per_cell),
+        zero(eltype(metacell_block_index_per_cell)),
+        ifelse.(metacell_block_index_per_cell .> 0, metacell_block_index_per_cell, closest_block_index_per_cell),
     )
-    n_cells_per_block = [count(==(block_index), block_index_per_cell) for block_index in 1:n_blocks]
+    n_cells_per_block = [count(==(block_index), pre_migration_block_index_per_cell) for block_index in 1:n_blocks]
 
     # Floor on metacell size (in cells) needed for each block to clear `min_metacell_total_UMIs`, assuming each cell
     # contributes at the `target_cell_total_UMIs_quantile` of the block's per-cell UMI distribution.
@@ -433,7 +433,7 @@ $(CONTRACT2)
         weights = n_cells_per_block,
         progress = DebugProgress(sum(n_cells_per_block); group = :mcs_loops, desc = "target_min_cells_per_block"),
     ) do block_index
-        @views block_total_UMIs_per_cell = total_UMIs_per_cell[block_index_per_cell .== block_index]
+        @views block_total_UMIs_per_cell = total_UMIs_per_cell[pre_migration_block_index_per_cell .== block_index]
         if isempty(block_total_UMIs_per_cell)
             target_min_cells_per_block[block_index] = min_cells_in_metacell
         else
@@ -471,17 +471,17 @@ $(CONTRACT2)
     max_n_block_modules = maximum(n_modules_per_block)
     n_neighborhood_cells_per_block = [
         sum(
-            (block_index_per_cell .> 0) .& getindex.(
+            (pre_migration_block_index_per_cell .> 0) .& getindex.(
                 Ref(is_in_neighborhood_per_other_block_per_prev_block[:, block_index]),
-                max.(block_index_per_cell, 1),
+                max.(pre_migration_block_index_per_cell, 1),
             ),
         ) for block_index in 1:n_blocks
     ]
     max_n_neighborhood_cells = maximum(n_neighborhood_cells_per_block)
 
     n_genes = size(module_index_per_gene_per_block, 1)
-    max_n_kmeans_points = max(max_n_neighborhood_cells, maximum(n_cells_per_block))
-    max_n_kmeans_clusters =
+    pre_max_n_kmeans_points = max(max_n_neighborhood_cells, maximum(n_cells_per_block))
+    pre_max_n_kmeans_clusters =
         2 * maximum(
             max(
                 Int(
@@ -502,8 +502,8 @@ $(CONTRACT2)
             kmeans_buffer_pool,
             KMeansBuffers{Float32}(;
                 n_dims = max_n_block_modules,
-                max_k = max_n_kmeans_clusters,
-                n_points = max_n_kmeans_points,
+                max_k = pre_max_n_kmeans_clusters,
+                n_points = pre_max_n_kmeans_points,
             ),
         )
     end
@@ -514,7 +514,7 @@ $(CONTRACT2)
         name_per_block,
         n_cells_per_block,
         n_neighborhood_cells_per_block,
-        block_index_per_cell,
+        block_index_per_cell = pre_migration_block_index_per_cell,
         sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         mean_metacell_cells_per_block,
@@ -529,8 +529,10 @@ $(CONTRACT2)
         rng,
     )
 
-    block_index_per_cell =
-        compute_preferred_block_index_of_cells(; block_index_per_cell, preferred_block_index_per_cell_per_block)
+    block_index_per_cell = compute_preferred_block_index_of_cells(;
+        block_index_per_cell = pre_migration_block_index_per_cell,
+        preferred_block_index_per_cell_per_block,
+    )
 
     # Post-migration blocks can have more cells than pre-migration; grow the pre-migration `kmeans_buffer_pool` if
     # needed (`kmeans_sizes_max_buffers_per_thread` is allocated once below, after the maxes are final).
@@ -543,9 +545,9 @@ $(CONTRACT2)
                 1,
             ) for block_index in 1:n_blocks
         )
-    if post_max_n_kmeans_points > max_n_kmeans_points || post_max_n_kmeans_clusters > max_n_kmeans_clusters
-        max_n_kmeans_points = max(max_n_kmeans_points, post_max_n_kmeans_points)
-        max_n_kmeans_clusters = max(max_n_kmeans_clusters, post_max_n_kmeans_clusters)
+    max_n_kmeans_points = max(pre_max_n_kmeans_points, post_max_n_kmeans_points)
+    max_n_kmeans_clusters = max(pre_max_n_kmeans_clusters, post_max_n_kmeans_clusters)
+    if max_n_kmeans_points > pre_max_n_kmeans_points || max_n_kmeans_clusters > pre_max_n_kmeans_clusters
         # The pool holds references to the old (smaller) buffers. Rebuild to match the new maxes. Only fires when at
         # least one of the maxes actually grew (gated by the surrounding `if`).
         close(kmeans_buffer_pool)
@@ -1204,16 +1206,14 @@ function compute_local_clusters(;  # UNTESTED
     walkable_position_per_work_item = Int[]
     candidate_index_per_work_item = Int[]
     n_block_cells_per_work_item = Int[]
-    max_n_pertinent_markers = 0
-    max_n_walkable_block_cells = 0
+    max_n_pertinent_markers = maximum(length, gene_index_per_pertinent_marker_per_walkable_block; init = 0)
+    max_n_walkable_block_cells =
+        maximum(block_index -> solution_candidates_per_block[block_index].n_points, walkable_block_indices; init = 0)
     for walkable_position in 1:n_walkable_blocks
         block_index = walkable_block_indices[walkable_position]
         solution_candidates = solution_candidates_per_block[block_index]
         n_candidates = length(solution_candidates.candidates)
         n_block_cells = solution_candidates.n_points
-        max_n_walkable_block_cells = max(max_n_walkable_block_cells, n_block_cells)
-        max_n_pertinent_markers =
-            max(max_n_pertinent_markers, length(gene_index_per_pertinent_marker_per_walkable_block[walkable_position]))
         for candidate_index in 1:n_candidates
             push!(walkable_position_per_work_item, walkable_position)
             push!(candidate_index_per_work_item, candidate_index)
@@ -1347,12 +1347,11 @@ function compute_local_clusters(;  # UNTESTED
     @debug "Baseline mean correlation: $(baseline_correlation)" _group = :mcs_results
 
     epsilon = 1e-6
-    if improvement_half_life === nothing
-        cooldown_margin_per_k_distance = 0.0
+    cooldown_margin_per_k_distance = if improvement_half_life === nothing
+        0.0
     else
         max_cooldown_margin_per_k_distance = 100 * epsilon
-        cooldown_margin_per_k_distance =
-            max_cooldown_margin_per_k_distance * (1 - 2.0^(-(sharpening_round - 1) / improvement_half_life))
+        max_cooldown_margin_per_k_distance * (1 - 2.0^(-(sharpening_round - 1) / improvement_half_life))
     end
     @debug "Cooldown margin per K distance: $(cooldown_margin_per_k_distance)" _group = :mcs_results
     pass_index = 0

@@ -418,20 +418,20 @@ function get_parsed_file(
     timeout::Real,
 )::Any
     cache_key = version * "/" * path * "." * kind
-    parsed = lock_read(CACHE_LOCK) do
+    cached = lock_read(CACHE_LOCK) do
         return get(CACHE_IN_MEMORY, cache_key, nothing)
     end
-    if parsed === nothing
-        parsed = lock(CACHE_LOCK) do
-            parsed = get(CACHE_IN_MEMORY, cache_key, nothing)
-            if parsed === nothing
-                parsed = load_parsed_file(path; kind, version, cache_dir, timeout)
-                CACHE_IN_MEMORY[cache_key] = parsed
-            end
-            return parsed
-        end
+    if cached !== nothing
+        return cached
     end
-    return parsed
+    return lock(CACHE_LOCK) do
+        parsed = get(CACHE_IN_MEMORY, cache_key, nothing)
+        if parsed === nothing
+            parsed = load_parsed_file(path; kind, version, cache_dir, timeout)
+            CACHE_IN_MEMORY[cache_key] = parsed
+        end
+        return parsed
+    end
 end
 
 function load_parsed_file(
