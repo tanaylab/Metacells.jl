@@ -49,8 +49,9 @@ import Metacells.Contracts.vector_of_total_UMIs_per_metacell
     )::Nothing
 
 Choose the focus metacells of the `full_daf`. Create the focus [`metacell_axis`](@ref) of the `focus_daf` with the
-focus metacells, its [`cell_axis`](@ref) with their cells, and its [`gene_axis`](@ref) with all the genes. Set its
-[`vector_of_is_skeleton_per_gene`](@ref) to the skeleton genes that are still markers of the focus metacells.
+focus metacells, and its [`cell_axis`](@ref) with their cells. Create its [`gene_axis`](@ref) with all the genes,
+unless it already has one, e.g. from a base repository of gene masks. Set its [`vector_of_is_skeleton_per_gene`](@ref)
+to the skeleton genes that are still markers of the focus metacells.
 
 This works in passes, until a pass drops no metacell. Each pass:
 
@@ -93,7 +94,7 @@ $(CONTRACT2)
     ],
 ) Contract(
     name = "focus_daf",
-    axes = [metacell_axis(CreatedOutput), cell_axis(CreatedOutput), gene_axis(CreatedOutput)],
+    axes = [metacell_axis(CreatedOutput), cell_axis(CreatedOutput), gene_axis(GuaranteedOutput)],
     data = [vector_of_is_skeleton_per_gene(CreatedOutput)],
 ) function compute_focus_metacells!(;  # UNTESTED
     full_daf::DafReader,
@@ -277,7 +278,11 @@ $(CONTRACT2)
 
     add_axis!(focus_daf, "metacell", name_per_metacell[is_focus_per_metacell]; overwrite)
     add_axis!(focus_daf, "cell", axis_vector(full_daf, "cell")[is_focus_per_cell]; overwrite)
-    add_axis!(focus_daf, "gene", axis_vector(full_daf, "gene"); overwrite)
+    if has_axis(focus_daf, "gene")
+        @assert axis_vector(focus_daf, "gene") == axis_vector(full_daf, "gene")
+    else
+        add_axis!(focus_daf, "gene", axis_vector(full_daf, "gene"))
+    end
     set_vector!(focus_daf, "gene", "is_skeleton", is_skeleton_per_gene; overwrite)
     return nothing
 end
