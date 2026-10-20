@@ -835,7 +835,7 @@ function compute_prior_position_per_metacell(;  # UNTESTED
 
     umap_x_per_prev_metacell = plain_array(get_vector(prev_daf, "metacell", "umap_x"))
     umap_y_per_prev_metacell = plain_array(get_vector(prev_daf, "metacell", "umap_y"))
-    prev_metacell_index_per_cell = prev_daf["@ cell : metacell ?? 0 : index"].array
+    prev_metacell_index_per_cell = prev_daf["@ cell : metacell ?? 0 : index"].array  # NOJET
 
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
 

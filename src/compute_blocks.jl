@@ -150,7 +150,8 @@ function compute_max_skeleton_fold_distance_between_metacells(  # UNTESTED
     fold_confidence::AbstractFloat,
     min_confidence_UMIs::Real,
 )::Matrix{Float32}
-    linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
+    linear_fraction_per_metacell_per_skeleton =  # NOJET
+        plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
     linear_fraction_per_skeleton_per_metacell = Matrix(flip(plain_array(linear_fraction_per_metacell_per_skeleton)))
     total_UMIs_per_metacell = plain_array(densify(get_vector(daf, "metacell", "total_UMIs")))
 

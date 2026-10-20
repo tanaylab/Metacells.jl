@@ -467,7 +467,9 @@ function import_mask_matrix(
     mask_vectors = Vector{SparseVector{Bool}}()
     for type_name in type_names
         mask_name = "$(prefix)_gene_of_$(type_name)"
-        mask_vector = plain_array(get_vector(daf, "gene", mask_name; default = false))
+        named_mask_vector = get_vector(daf, "gene", mask_name; default = false)
+        @assert named_mask_vector !== nothing
+        mask_vector = plain_array(named_mask_vector)
         @assert eltype(mask_vector) == Bool
         if !(mask_vector isa SparseVector{Bool})
             mask_vector = SparseVector{Bool}(mask_vector)
@@ -596,7 +598,7 @@ function import_vectors_data(
     overwrite::Bool,
     insist::Bool,
 )::Nothing
-    for vector_name in vectors_set(source, axis)  # NOJET
+    for vector_name in vectors_set(source, axis)
         data = nothing
         key = (axis, vector_name)
 
@@ -694,7 +696,7 @@ function import_matrices_data(
     overwrite::Bool,
     insist::Bool,
 )::Nothing
-    for matrix_name in matrices_set(source, rows_axis, columns_axis; relayout = false)  # NOJET
+    for matrix_name in matrices_set(source, rows_axis, columns_axis; relayout = false)
         data = nothing
 
         # A matrix is imported in both layouts, so naming it in either order means the same matrix.
