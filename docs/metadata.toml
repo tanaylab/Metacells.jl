@@ -14,6 +14,7 @@ pages = [
     "sharpen_metacells.md",
     "project_cells.md",
     "pipeline.md",
+    "focus.md",
     "anndata_format.md",
     "defaults.md",
 ]

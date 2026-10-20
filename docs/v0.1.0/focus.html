@@ -1,0 +1,496 @@
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Focus · Metacells.jl v0.1.0
+</title>
+<meta name="title" content="Focus · Metacells.jl v0.1.0"/>
+<meta property="og:title" content="Focus · Metacells.jl v0.1.0"/>
+<meta property="twitter:title" content="Focus · Metacells.jl v0.1.0"/>
+<meta name="description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="og:description" content="Documentation for Metacells.jl v0.1.0."/>
+<meta property="twitter:description" content="Documentation for Metacells.jl v0.1.0."/>
+<script data-outdated-warner src="assets/warner.js">
+</script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/>
+<script>documenterBaseURL="."
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js">
+</script>
+<script src="search_index.js">
+</script>
+<script src="siteinfo.js">
+</script>
+<script src="../versions.js">
+</script>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/>
+<link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/>
+<script src="assets/themeswap.js">
+</script>
+</head>
+<body>
+<div id="documenter">
+<nav class="docs-sidebar">
+<div class="docs-package-name">
+<span class="docs-autofit">
+<a href="index.html">Metacells.jl v0.1.0
+</a>
+</span>
+</div>
+<button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)
+</button>
+<ul class="docs-menu">
+<li>
+<a class="tocitem" href="index.html">Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="gmara.html">Gmara
+</a>
+</li>
+<li>
+<a class="tocitem" href="contracts.html">Contracts
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_cells.html">Analyze Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_metacells.html">Analyze Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_genes.html">Analyze Genes
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_blocks.html">Compute Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_blocks.html">Analyze Blocks
+</a>
+</li>
+<li>
+<a class="tocitem" href="compute_modules.html">Compute Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="analyze_modules.html">Analyze Modules
+</a>
+</li>
+<li>
+<a class="tocitem" href="sharpen_metacells.html">Sharpen Metacells
+</a>
+</li>
+<li>
+<a class="tocitem" href="project_cells.html">Project Cells
+</a>
+</li>
+<li>
+<a class="tocitem" href="pipeline.html">Pipeline
+</a>
+</li>
+<li class="is-active">
+<a class="tocitem" href="focus.html">Focus
+</a>
+<ul class="internal">
+<li>
+<a class="tocitem" href="#Metacells">
+<span>Metacells
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Index">
+<span>Index
+</span>
+</a>
+</li>
+</ul>
+</li>
+<li>
+<a class="tocitem" href="anndata_format.html">AnnData Format
+</a>
+</li>
+<li>
+<a class="tocitem" href="defaults.html">Defaults
+</a>
+</li>
+</ul>
+<div class="docs-version-selector field has-addons">
+<div class="control">
+<span class="docs-label button is-static is-size-7">Version
+</span>
+</div>
+<div class="docs-selector control is-expanded">
+<div class="select is-fullwidth is-size-7">
+<select id="documenter-version-selector">
+</select>
+</div>
+</div>
+</div>
+</nav>
+<div class="docs-main">
+<header class="docs-navbar">
+<a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#">
+</a>
+<nav class="breadcrumb">
+<ul class="is-hidden-mobile">
+<li class="is-active">
+<a href="focus.html">Focus
+</a>
+</li>
+</ul>
+<ul class="is-hidden-tablet">
+<li class="is-active">
+<a href="focus.html">Focus
+</a>
+</li>
+</ul>
+</nav>
+<div class="docs-right">
+<a class="docs-navbar-link" href="https://github.com/tanaylab/Metacells.jl/blob/main{path}?plain=1#L{line}" title="View the repository on GitHub">
+<span class="docs-icon fa-brands">
+</span>
+<span class="docs-label is-hidden-touch">GitHub
+</span>
+</a>
+<a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings">
+</a>
+<a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings">
+</a>
+</div>
+</header>
+<article class="content" id="documenter-page">
+<h1 id="Focus">
+<a class="docs-heading-anchor" href="#Focus">Focus
+</a>
+<a id="Focus-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Focus" title="Permalink">
+</a>
+</h1>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Focus">
+<a class="docstring-binding" href="#Metacells.Focus">
+<code>Metacells.Focus
+</code>
+</a> — 
+<span class="docstring-category">Module
+</span>
+</summary>
+<section>
+<div>
+<p>Reduce a large set of metacells to a smaller, non-redundant focus set, for analyzing large data sets.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Metacells">
+<a class="docs-heading-anchor" href="#Metacells">Metacells
+</a>
+<a id="Metacells-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Metacells" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Focus.compute_focus_metacells!">
+<a class="docstring-binding" href="#Metacells.Focus.compute_focus_metacells!">
+<code>Metacells.Focus.compute_focus_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_focus_metacells!(;
+    full_daf::DafReader,
+    focus_daf::DafWriter,
+    max_redundant_fold::Real = ```0.5```,
+    n_neighbors::Integer = ```15```,
+    gene_fraction_regularization::AbstractFloat = ```0.0001```,
+    max_fold_gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
+    max_fold_min_significant_gene_UMIs::Integer = ```40```,
+    max_fold_confidence::AbstractFloat = ```0.9```,
+    max_fold_min_confidence_UMIs::Real = ```3```,
+    min_marker_gene_max_fraction::AbstractFloat = ```0.0001```,
+    min_marker_gene_range_fold::Real = ```2```,
+    min_marker_quantile::Real = ```0```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Choose the focus metacells of the 
+<code>full_daf
+</code>. Create the focus 
+<a href="contracts.html#Metacells.Contracts.metacell_axis">
+<code>metacell_axis
+</code>
+</a> of the 
+<code>focus_daf
+</code> with the focus metacells, its 
+<a href="contracts.html#Metacells.Contracts.cell_axis">
+<code>cell_axis
+</code>
+</a> with their cells, and its 
+<a href="contracts.html#Metacells.Contracts.gene_axis">
+<code>gene_axis
+</code>
+</a> with all the genes. Set its 
+<a href="contracts.html#Metacells.Contracts.vector_of_is_skeleton_per_gene">
+<code>vector_of_is_skeleton_per_gene
+</code>
+</a> to the skeleton genes that are still markers of the focus metacells.
+</p>
+<p>This works in passes, until a pass drops no metacell. Each pass:
+</p>
+<ul>
+<li>Keeps only the skeleton genes that are still markers of the remaining metacells, using the 
+<code>min_marker_gene_max_fraction
+</code>, 
+<code>min_marker_gene_range_fold
+</code> and 
+<code>min_marker_quantile
+</code> (see 
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!">
+<code>compute_vector_of_is_marker_per_gene!
+</code>
+</a>).
+</li>
+<li>Finds the 
+<code>n_neighbors
+</code> nearest neighbors of each remaining metacell, using the Euclidean distance between the log of the fractions of the skeleton genes, adding the 
+<code>gene_fraction_regularization
+</code> (see 
+<a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!">
+<code>compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!
+</code>
+</a>).
+</li>
+<li>Computes the maximal confident fold of the skeleton genes between each metacell and each of its neighbors, using the 
+<code>max_fold_gene_fraction_regularization
+</code>, 
+<code>max_fold_min_significant_gene_UMIs
+</code>, 
+<code>max_fold_confidence
+</code> and 
+<code>max_fold_min_confidence_UMIs
+</code> (see 
+<a href="compute_blocks.html#Metacells.ComputeBlocks.compute_metacells_blocks!">
+<code>compute_metacells_blocks!
+</code>
+</a>).
+</li>
+<li>Considers the pairs whose maximal fold is at most 
+<code>max_redundant_fold
+</code>, in ascending order of the fold. If both metacells of a pair are still there, drops the one with fewer cells. On a tie, it drops the one with fewer UMIs, and on a tie, the one with the higher index.
+</li>
+</ul>
+<p>This only creates the axes and the skeleton genes mask of the 
+<code>focus_daf
+</code>. To populate the rest of the data, use 
+<code>copy_all!(; source = full_daf, destination = focus_daf, insist = false)
+</code>. This copies everything else, restricted to the focus metacells and cells, and keeps the focus skeleton genes mask.
+</p>
+<p>
+<strong>Full
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (required): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>gene, metacell @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>Focus
+</strong>
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (created): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (created): Sequenced single cells.
+</p>
+<p>
+<strong>gene
+</strong> (created): Sequenced genes.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (created): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Index">
+<a class="docs-heading-anchor" href="#Index">Index
+</a>
+<a id="Index-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Index" title="Permalink">
+</a>
+</h2>
+<ul>
+<li>
+<a href="focus.html#Metacells.Focus">
+<code>Metacells.Focus
+</code>
+</a>
+</li>
+<li>
+<a href="focus.html#Metacells.Focus.compute_focus_metacells!">
+<code>Metacells.Focus.compute_focus_metacells!
+</code>
+</a>
+</li>
+</ul>
+</article>
+<nav class="docs-footer">
+<a class="docs-footer-prevpage" href="pipeline.html">« Pipeline
+</a>
+<a class="docs-footer-nextpage" href="anndata_format.html">AnnData Format »
+</a>
+<div class="flexbox-break">
+</div>
+<p class="footer-message">Powered by 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> and the 
+<a href="https://julialang.org/">Julia Programming Language
+</a>.
+</p>
+</nav>
+</div>
+<div class="modal" id="documenter-settings">
+<div class="modal-background">
+</div>
+<div class="modal-card">
+<header class="modal-card-head">
+<p class="modal-card-title">Settings
+</p>
+<button class="delete">
+</button>
+</header>
+<section class="modal-card-body">
+<p>
+<label class="label">Theme
+</label>
+<div class="select">
+<select id="documenter-themepicker">
+<option value="auto">Automatic (OS)
+</option>
+<option value="documenter-light">documenter-light
+</option>
+<option value="documenter-dark">documenter-dark
+</option>
+<option value="catppuccin-latte">catppuccin-latte
+</option>
+<option value="catppuccin-frappe">catppuccin-frappe
+</option>
+<option value="catppuccin-macchiato">catppuccin-macchiato
+</option>
+<option value="catppuccin-mocha">catppuccin-mocha
+</option>
+</select>
+</div>
+</p>
+<hr/>
+<p>This document was generated with 
+<a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl
+</a> version 1.19.0. Using Julia version 1.12.6.
+</p>
+</section>
+<footer class="modal-card-foot">
+</footer>
+</div>
+</div>
+</div>
+</body>
+</html>

@@ -235,6 +235,36 @@ $(CONTRACT)
     return nothing
 end
 
+# The `n_neighbors` nearest other points (columns) of each point, by Euclidean distance. The edges of each point are
+# consecutive in the result, `n_neighbors` per point, sorted by the neighbor index.
+function nearest_neighbors_per_point(  # UNTESTED
+    point_per_dimension_per_point::AbstractMatrix{T},
+    n_neighbors::Integer,
+)::Tuple{Vector{Int}, Vector{T}} where {T <: AbstractFloat}
+    n_points = size(point_per_dimension_per_point, 2)
+    @assert 0 < n_neighbors < n_points
+    tree = KDTree(point_per_dimension_per_point)  # NOJET
+
+    neighbor_index_per_edge = Vector{Int}(undef, n_neighbors * n_points)
+    distance_per_edge = Vector{T}(undef, n_neighbors * n_points)
+    parallel_loop_wo_rng(  # NOJET
+        1:n_points;
+        name = "nearest_neighbors_per_point",
+        progress = DebugProgress(n_points; group = :mcs_loops, desc = "nearest_neighbors_per_point"),
+        progress_chunk = 100,
+    ) do point_index
+        neighbor_index_per_neighbor, distance_per_neighbor =
+            knn(tree, view(point_per_dimension_per_point, :, point_index), n_neighbors, false, ==(point_index))
+        order_per_neighbor = sortperm(neighbor_index_per_neighbor)
+        edge_indices = ((point_index - 1) * n_neighbors + 1):(point_index * n_neighbors)
+        neighbor_index_per_edge[edge_indices] .= neighbor_index_per_neighbor[order_per_neighbor]
+        distance_per_edge[edge_indices] .= distance_per_neighbor[order_per_neighbor]
+        return nothing
+    end
+
+    return (neighbor_index_per_edge, distance_per_edge)
+end
+
 """
     function compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!(
         daf::DafWriter;
@@ -272,33 +302,8 @@ $(CONTRACT)
     linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
     log_linear_fraction_per_skeleton_per_metacell =
         log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
-    tree = KDTree(log_linear_fraction_per_skeleton_per_metacell)
-
-    neighbor_index_per_edge = Vector{Int}(undef, n_neighbors * n_metacells)
-    distance_per_edge = Vector{eltype(log_linear_fraction_per_skeleton_per_metacell)}(undef, n_neighbors * n_metacells)
-    parallel_loop_wo_rng(
-        1:n_metacells;
-        name = "knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell",
-        progress = DebugProgress(
-            n_metacells;
-            group = :mcs_loops,
-            desc = "knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell",
-        ),
-        progress_chunk = 100,
-    ) do metacell_index
-        neighbor_index_per_neighbor, distance_per_neighbor = knn(
-            tree,
-            view(log_linear_fraction_per_skeleton_per_metacell, :, metacell_index),
-            n_neighbors,
-            false,
-            ==(metacell_index),
-        )
-        order_per_neighbor = sortperm(neighbor_index_per_neighbor)
-        edge_indices = ((metacell_index - 1) * n_neighbors + 1):(metacell_index * n_neighbors)
-        neighbor_index_per_edge[edge_indices] .= neighbor_index_per_neighbor[order_per_neighbor]
-        distance_per_edge[edge_indices] .= distance_per_neighbor[order_per_neighbor]
-        return nothing
-    end
+    neighbor_index_per_edge, distance_per_edge =
+        nearest_neighbors_per_point(log_linear_fraction_per_skeleton_per_metacell, n_neighbors)
     @assert all(distance_per_edge .> 0)
 
     knn_distance_per_metacell_per_metacell = SparseMatrixCSC(

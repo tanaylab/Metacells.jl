@@ -340,7 +340,9 @@ level of the skeleton genes is sufficient to reasonably estimate the expression 
 assume that these metacells are "very similar" (will be in the same block), without looking at the rest of the genes.
 
 This vector is populated by [`compute_vector_of_is_skeleton_per_gene!`](@ref
-Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!).
+Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!). In a focus repository, it is populated by
+[`compute_focus_metacells!`](@ref Metacells.Focus.compute_focus_metacells!), and holds only the skeleton genes that
+are still markers of the focus metacells.
 """
 function vector_of_is_skeleton_per_gene(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
     return ("gene", "is_skeleton") =>

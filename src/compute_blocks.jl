@@ -33,6 +33,7 @@ import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_is_skeleton_per_gene
 import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 
+# The low and high log of the confidence interval of the linear fraction of each skeleton gene in each metacell.
 @kwdef struct ConfidenceIntervals
     low_log_linear_fraction_per_skeleton_per_metacell::AbstractMatrix{<:AbstractFloat}
     high_log_linear_fraction_per_skeleton_per_metacell::AbstractMatrix{<:AbstractFloat}
@@ -154,7 +155,84 @@ function compute_max_skeleton_fold_distance_between_metacells(  # UNTESTED
         plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
     linear_fraction_per_skeleton_per_metacell = Matrix(flip(plain_array(linear_fraction_per_metacell_per_skeleton)))
     total_UMIs_per_metacell = plain_array(densify(get_vector(daf, "metacell", "total_UMIs")))
+    confidence_intervals = compute_confidence_intervals(;
+        linear_fraction_per_skeleton_per_metacell,
+        total_UMIs_per_metacell,
+        gene_fraction_regularization,
+        fold_confidence,
+        min_confidence_UMIs,
+    )
+    low_log_linear_fraction_per_skeleton_per_metacell =
+        confidence_intervals.low_log_linear_fraction_per_skeleton_per_metacell
+    high_log_linear_fraction_per_skeleton_per_metacell =
+        confidence_intervals.high_log_linear_fraction_per_skeleton_per_metacell
 
+    UMIs_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: UMIs"].array
+    UMIs_per_skeleton_per_metacell = flip(UMIs_per_metacell_per_skeleton)
+
+    n_skeletons, n_metacells = size(UMIs_per_skeleton_per_metacell)
+
+    distances_between_metacells = Matrix{Float32}(undef, n_metacells, n_metacells)
+    distances_between_metacells[1, 1] = 0.0
+
+    parallel_loop_wo_rng(
+        reverse(2:(n_metacells));
+        progress = DebugProgress(
+            n_metacells - 1;
+            group = :mcs_loops,
+            desc = "max_skeleton_fold_distance_between_metacells",
+        ),
+    ) do base_metacell_index
+        distances_between_metacells[base_metacell_index, base_metacell_index] = 0.0
+
+        @views base_metacell_UMIs_per_skeleton = vec(UMIs_per_skeleton_per_metacell[:, base_metacell_index])
+        @views base_metacell_low_log_linear_fraction_per_skeleton =
+            vec(low_log_linear_fraction_per_skeleton_per_metacell[:, base_metacell_index])
+        @views base_metacell_high_log_linear_fraction_per_skeleton =
+            vec(high_log_linear_fraction_per_skeleton_per_metacell[:, base_metacell_index])
+
+        n_other_metacells = base_metacell_index - 1
+        index_per_other_metacell = 1:(base_metacell_index - 1)
+        @views UMIs_per_skeleton_per_other_metacells = UMIs_per_skeleton_per_metacell[:, index_per_other_metacell]
+        @views low_log_linear_fraction_per_skeleton_per_other_metacells =
+            low_log_linear_fraction_per_skeleton_per_metacell[:, index_per_other_metacell]
+        @views high_log_linear_fraction_per_skeleton_per_other_metacells =
+            high_log_linear_fraction_per_skeleton_per_metacell[:, index_per_other_metacell]
+
+        significant_fold_per_skeleton_per_other_metacell = confident_gene_distance.(
+            min_significant_gene_UMIs,
+            base_metacell_UMIs_per_skeleton,
+            base_metacell_low_log_linear_fraction_per_skeleton,
+            base_metacell_high_log_linear_fraction_per_skeleton,
+            UMIs_per_skeleton_per_other_metacells,
+            low_log_linear_fraction_per_skeleton_per_other_metacells,
+            high_log_linear_fraction_per_skeleton_per_other_metacells,
+        )
+        @assert_matrix(significant_fold_per_skeleton_per_other_metacell, n_skeletons, n_other_metacells, Columns)
+
+        distances_between_base_and_other_metacells =
+            vec(maximum(significant_fold_per_skeleton_per_other_metacell; dims = 1))
+        @assert_vector(distances_between_base_and_other_metacells, n_other_metacells)
+
+        distances_between_metacells[index_per_other_metacell, base_metacell_index] .=
+            distances_between_base_and_other_metacells
+        distances_between_metacells[base_metacell_index, index_per_other_metacell] .=
+            distances_between_base_and_other_metacells
+        return nothing
+    end
+
+    return distances_between_metacells
+end
+
+# The low and high log of the confidence interval of the linear fraction of each skeleton gene in each metacell. See
+# `compute_metacells_blocks!` for the meaning of the parameters.
+function compute_confidence_intervals(;  # UNTESTED
+    linear_fraction_per_skeleton_per_metacell::AbstractMatrix{<:AbstractFloat},
+    total_UMIs_per_metacell::AbstractVector{<:Real},
+    gene_fraction_regularization::AbstractFloat,
+    fold_confidence::AbstractFloat,
+    min_confidence_UMIs::Real,
+)::ConfidenceIntervals
     confidence_stds = quantile(Normal(), fold_confidence)
 
     confidence_linear_fractions_per_skeleton_per_metacells =
@@ -235,61 +313,10 @@ function compute_max_skeleton_fold_distance_between_metacells(  # UNTESTED
         return nothing
     end
 
-    UMIs_per_metacell_per_skeleton = daf["@ metacell @ gene [ is_skeleton ] :: UMIs"].array
-    UMIs_per_skeleton_per_metacell = flip(UMIs_per_metacell_per_skeleton)
-
-    n_skeletons, n_metacells = size(UMIs_per_skeleton_per_metacell)
-
-    distances_between_metacells = Matrix{Float32}(undef, n_metacells, n_metacells)
-    distances_between_metacells[1, 1] = 0.0
-
-    parallel_loop_wo_rng(
-        reverse(2:(n_metacells));
-        progress = DebugProgress(
-            n_metacells - 1;
-            group = :mcs_loops,
-            desc = "max_skeleton_fold_distance_between_metacells",
-        ),
-    ) do base_metacell_index
-        distances_between_metacells[base_metacell_index, base_metacell_index] = 0.0
-
-        @views base_metacell_UMIs_per_skeleton = vec(UMIs_per_skeleton_per_metacell[:, base_metacell_index])
-        @views base_metacell_low_log_linear_fraction_per_skeleton =
-            vec(low_log_linear_fraction_per_skeleton_per_metacell[:, base_metacell_index])
-        @views base_metacell_high_log_linear_fraction_per_skeleton =
-            vec(high_log_linear_fraction_per_skeleton_per_metacell[:, base_metacell_index])
-
-        n_other_metacells = base_metacell_index - 1
-        index_per_other_metacell = 1:(base_metacell_index - 1)
-        @views UMIs_per_skeleton_per_other_metacells = UMIs_per_skeleton_per_metacell[:, index_per_other_metacell]
-        @views low_log_linear_fraction_per_skeleton_per_other_metacells =
-            low_log_linear_fraction_per_skeleton_per_metacell[:, index_per_other_metacell]
-        @views high_log_linear_fraction_per_skeleton_per_other_metacells =
-            high_log_linear_fraction_per_skeleton_per_metacell[:, index_per_other_metacell]
-
-        significant_fold_per_skeleton_per_other_metacell = confident_gene_distance.(
-            min_significant_gene_UMIs,
-            base_metacell_UMIs_per_skeleton,
-            base_metacell_low_log_linear_fraction_per_skeleton,
-            base_metacell_high_log_linear_fraction_per_skeleton,
-            UMIs_per_skeleton_per_other_metacells,
-            low_log_linear_fraction_per_skeleton_per_other_metacells,
-            high_log_linear_fraction_per_skeleton_per_other_metacells,
-        )
-        @assert_matrix(significant_fold_per_skeleton_per_other_metacell, n_skeletons, n_other_metacells, Columns)
-
-        distances_between_base_and_other_metacells =
-            vec(maximum(significant_fold_per_skeleton_per_other_metacell; dims = 1))
-        @assert_vector(distances_between_base_and_other_metacells, n_other_metacells)
-
-        distances_between_metacells[index_per_other_metacell, base_metacell_index] .=
-            distances_between_base_and_other_metacells
-        distances_between_metacells[base_metacell_index, index_per_other_metacell] .=
-            distances_between_base_and_other_metacells
-        return nothing
-    end
-
-    return distances_between_metacells
+    return ConfidenceIntervals(;
+        low_log_linear_fraction_per_skeleton_per_metacell,
+        high_log_linear_fraction_per_skeleton_per_metacell,
+    )
 end
 
 @inline function confident_gene_distance(  # UNTESTED

@@ -56,4 +56,7 @@ include("project_cells.jl")
 include("pipeline.jl")
 @reexport using .Pipeline
 
+include("focus.jl")
+@reexport using .Focus
+
 end # module
