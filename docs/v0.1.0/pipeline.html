@@ -100,6 +100,10 @@
 <a class="tocitem" href="project_cells.html">Project Cells
 </a>
 </li>
+<li>
+<a class="tocitem" href="focus.html">Focus
+</a>
+</li>
 <li class="is-active">
 <a class="tocitem" href="pipeline.html">Pipeline
 </a>
@@ -113,6 +117,12 @@
 <li>
 <a class="tocitem" href="#Preparing">
 <span>Preparing
+</span>
+</a>
+</li>
+<li>
+<a class="tocitem" href="#Focusing">
+<span>Focusing
 </span>
 </a>
 </li>
@@ -141,10 +151,6 @@
 </a>
 </li>
 </ul>
-</li>
-<li>
-<a class="tocitem" href="focus.html">Focus
-</a>
 </li>
 <li>
 <a class="tocitem" href="anndata_format.html">AnnData Format
@@ -424,6 +430,211 @@
 <em>between
 </em>markers
 </strong>::Union{Float32, Float64} (created): The correlation between the log expression of pairs of marker genes across the metacells.
+</p>
+</div>
+</section>
+</details>
+</article>
+<h2 id="Focusing">
+<a class="docs-heading-anchor" href="#Focusing">Focusing
+</a>
+<a id="Focusing-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Focusing" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.focus_metacells!">
+<a class="docstring-binding" href="#Metacells.Pipeline.focus_metacells!">
+<code>Metacells.Pipeline.focus_metacells!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">function focus_metacells!(;
+    full_daf::DafWriter,
+    focus_daf::DafWriter,
+    max_redundant_fold::Real = ```0.5```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Reduce the metacells of 
+<code>full_daf
+</code> to a non-redundant focus set in 
+<code>focus_daf
+</code>, which can then be analyzed and sharpened like any other prepared metacells. This computes the skeleton genes of 
+<code>full_daf
+</code> (
+<a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_skeleton_per_gene!">
+<code>compute_vector_of_is_skeleton_per_gene!
+</code>
+</a>), which needs its gene masks. It then chooses the focus metacells (
+<a href="focus.html#Metacells.Focus.compute_focus_metacells!">
+<code>compute_focus_metacells!
+</code>
+</a>). It copies the rest of the data of 
+<code>full_daf
+</code> into 
+<code>focus_daf
+</code>, restricted to the focus metacells and their cells, except for what 
+<a href="pipeline.html#Metacells.Pipeline.prepare_metacells!">
+<code>prepare_metacells!
+</code>
+</a> computes (
+<a href="focus.html#Metacells.Focus.copy_focus_metacells_data!">
+<code>copy_focus_metacells_data!
+</code>
+</a>). Finally, it prepares the focus metacells (
+<a href="pipeline.html#Metacells.Pipeline.prepare_metacells!">
+<code>prepare_metacells!
+</code>
+</a>).
+</p>
+<p>The 
+<code>full_daf
+</code> is typically a chain of the prepared metacells and the gene masks, with a writable repository on top to hold the skeleton genes. If 
+<code>focus_daf
+</code> rests on the repository of gene masks, the masks are not copied into it.
+</p>
+<p>
+<strong>Full
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_regulator
+</strong>::Bool (required): A mask of genes that regulate the expression level of other genes.
+</p>
+<p>
+<strong>gene @ is_excluded
+</strong>::Bool (required): A mask of genes that are excluded from consideration.
+</p>
+<p>
+<strong>gene @ is_lateral
+</strong>::Bool (required): A mask of genes that are lateral to the biological behaviors of interest.
+</p>
+<p>
+<strong>gene @ is_forbidden
+</strong>::Bool (required): A mask of genes that are forbidden from being used as skeleton genes.
+</p>
+<p>
+<strong>gene @ is_marker
+</strong>::Bool (required): A mask of genes that distinguish between cell states.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ n_cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of cells in each metacell.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>gene, metacell @ linear_fraction
+</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>
+<strong>gene, metacell @ log
+<em>linear
+</em>fraction
+</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
+</p>
+<p>Additional inputs may be used depending on the parameter(s).
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (created): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>Additional outputs may be created depending on the parameter(s).
+</p>
+<p>
+<strong>Focus
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>Additional inputs may be used depending on the parameter(s).
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (created): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (created): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>gene @ is_skeleton
+</strong>::Bool (created): A mask of genes that are used to predict the values of the rest of the genes.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>Additional outputs may be created depending on the parameter(s).
 </p>
 </div>
 </section>
@@ -1992,6 +2203,12 @@ end
 </a>
 </li>
 <li>
+<a href="pipeline.html#Metacells.Pipeline.focus_metacells!">
+<code>Metacells.Pipeline.focus_metacells!
+</code>
+</a>
+</li>
+<li>
 <a href="pipeline.html#Metacells.Pipeline.import_base_metacells!">
 <code>Metacells.Pipeline.import_base_metacells!
 </code>
@@ -2030,9 +2247,9 @@ end
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-prevpage" href="project_cells.html">« Project Cells
+<a class="docs-footer-prevpage" href="focus.html">« Focus
 </a>
-<a class="docs-footer-nextpage" href="focus.html">Focus »
+<a class="docs-footer-nextpage" href="anndata_format.html">AnnData Format »
 </a>
 <div class="flexbox-break">
 </div>

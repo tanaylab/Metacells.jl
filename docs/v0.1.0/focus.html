@@ -100,10 +100,6 @@
 <a class="tocitem" href="project_cells.html">Project Cells
 </a>
 </li>
-<li>
-<a class="tocitem" href="pipeline.html">Pipeline
-</a>
-</li>
 <li class="is-active">
 <a class="tocitem" href="focus.html">Focus
 </a>
@@ -121,6 +117,10 @@
 </a>
 </li>
 </ul>
+</li>
+<li>
+<a class="tocitem" href="pipeline.html">Pipeline
+</a>
 </li>
 <li>
 <a class="tocitem" href="anndata_format.html">AnnData Format
@@ -309,8 +309,10 @@
 <p>This only creates the axes and the skeleton genes mask of the 
 <code>focus_daf
 </code>. To populate the rest of the data, use 
-<code>copy_all!(; source = full_daf, destination = focus_daf, insist = false)
-</code>. This copies everything else, restricted to the focus metacells and cells, and keeps the focus skeleton genes mask.
+<a href="focus.html#Metacells.Focus.copy_focus_metacells_data!">
+<code>copy_focus_metacells_data!
+</code>
+</a>.
 </p>
 <p>
 <strong>Full
@@ -406,6 +408,104 @@
 </section>
 </details>
 </article>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Focus.copy_focus_metacells_data!">
+<a class="docstring-binding" href="#Metacells.Focus.copy_focus_metacells_data!">
+<code>Metacells.Focus.copy_focus_metacells_data!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">copy_focus_metacells_data!(;
+    full_daf::DafReader,
+    focus_daf::DafWriter,
+    excluded_contract::Contract,
+)::Nothing
+</code>
+</pre>
+<p>Copy the data of the 
+<code>full_daf
+</code> into the 
+<code>focus_daf
+</code>, restricted to the focus metacells and cells that 
+<a href="focus.html#Metacells.Focus.compute_focus_metacells!">
+<code>compute_focus_metacells!
+</code>
+</a> chose. Data the 
+<code>focus_daf
+</code> already has is kept. This includes the focus skeleton genes mask, and the gene masks if the 
+<code>focus_daf
+</code> rests on their repository.
+</p>
+<p>The outputs of the 
+<code>excluded_contract
+</code> are not copied. These are typically the outputs of the computations that are redone for the focus metacells, because they depend on which metacells there are (e.g., the marker genes). Both layouts of an excluded matrix are excluded.
+</p>
+<p>
+<strong>Full
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>Additional inputs may be used depending on the parameter(s).
+</p>
+<p>Additional outputs may be created depending on the parameter(s).
+</p>
+<p>
+<strong>Focus
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>Additional inputs may be used depending on the parameter(s).
+</p>
+<p>Additional outputs may be created depending on the parameter(s).
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -427,12 +527,18 @@
 </code>
 </a>
 </li>
+<li>
+<a href="focus.html#Metacells.Focus.copy_focus_metacells_data!">
+<code>Metacells.Focus.copy_focus_metacells_data!
+</code>
+</a>
+</li>
 </ul>
 </article>
 <nav class="docs-footer">
-<a class="docs-footer-prevpage" href="pipeline.html">« Pipeline
+<a class="docs-footer-prevpage" href="project_cells.html">« Project Cells
 </a>
-<a class="docs-footer-nextpage" href="anndata_format.html">AnnData Format »
+<a class="docs-footer-nextpage" href="pipeline.html">Pipeline »
 </a>
 <div class="flexbox-break">
 </div>

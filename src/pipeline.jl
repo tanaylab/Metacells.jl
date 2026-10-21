@@ -10,6 +10,7 @@ case.
 module Pipeline
 
 export analyze_metacells!
+export focus_metacells!
 export import_base_metacells!
 export prepare_metacells!
 export qc_metacells!
@@ -31,6 +32,7 @@ using ..AnalyzeModules
 using ..ComputeBlocks
 using ..ComputeModules
 using ..Contracts
+using ..Focus
 using ..ProjectCells
 using ..SharpenMetacells
 
@@ -295,6 +297,53 @@ $(CONTRACT2)
         base_daf = score_daf,
         overwrite,
     )
+    return nothing
+end
+
+"""
+    function focus_metacells!(;
+        full_daf::DafWriter,
+        focus_daf::DafWriter,
+        max_redundant_fold::Real = $(DEFAULT.max_redundant_fold),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Reduce the metacells of `full_daf` to a non-redundant focus set in `focus_daf`, which can then be analyzed and
+sharpened like any other prepared metacells. This computes the skeleton genes of `full_daf`
+([`compute_vector_of_is_skeleton_per_gene!`](@ref)), which needs its gene masks. It then chooses the focus metacells
+([`compute_focus_metacells!`](@ref)). It copies the rest of the data of `full_daf` into `focus_daf`, restricted to the
+focus metacells and their cells, except for what [`prepare_metacells!`](@ref) computes
+([`copy_focus_metacells_data!`](@ref)). Finally, it prepares the focus metacells ([`prepare_metacells!`](@ref)).
+
+The `full_daf` is typically a chain of the prepared metacells and the gene masks, with a writable repository on top to
+hold the skeleton genes. If `focus_daf` rests on the repository of gene masks, the masks are not copied into it.
+
+# Full
+
+$(CONTRACT1)
+
+# Focus
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation renamed_contract(
+    function_contract(compute_vector_of_is_skeleton_per_gene!) |>
+    function_contract(compute_focus_metacells!, 1) |>
+    function_contract(copy_focus_metacells_data!, 1),
+    "full_daf",
+) renamed_contract(
+    function_contract(compute_focus_metacells!, 2) |> function_contract(copy_focus_metacells_data!, 2),
+    "focus_daf",
+) function focus_metacells!(;  # UNTESTED
+    full_daf::DafWriter,
+    focus_daf::DafWriter,
+    max_redundant_fold::Real = function_default(compute_focus_metacells!, :max_redundant_fold),
+    overwrite::Bool = false,
+)::Nothing
+    compute_vector_of_is_skeleton_per_gene!(full_daf; overwrite)
+    compute_focus_metacells!(; full_daf, focus_daf, max_redundant_fold, overwrite)
+    copy_focus_metacells_data!(; full_daf, focus_daf, excluded_contract = function_contract(prepare_metacells!))
+    prepare_metacells!(focus_daf; overwrite)
     return nothing
 end
 

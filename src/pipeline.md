@@ -16,6 +16,12 @@ Metacells.Pipeline.import_base_metacells!
 Metacells.Pipeline.prepare_metacells!
 ```
 
+## Focusing
+
+```@docs
+Metacells.Pipeline.focus_metacells!
+```
+
 ## Analyzing
 
 ```@docs

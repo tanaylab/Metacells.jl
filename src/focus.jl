@@ -4,6 +4,7 @@ Reduce a large set of metacells to a smaller, non-redundant focus set, for analy
 module Focus
 
 export compute_focus_metacells!
+export copy_focus_metacells_data!
 
 using DataAxesFormats
 using Statistics
@@ -69,8 +70,7 @@ This works in passes, until a pass drops no metacell. Each pass:
     and on a tie, the one with the higher index.
 
 This only creates the axes and the skeleton genes mask of the `focus_daf`. To populate the rest of the data, use
-`copy_all!(; source = full_daf, destination = focus_daf, insist = false)`. This copies everything else, restricted to
-the focus metacells and cells, and keeps the focus skeleton genes mask.
+[`copy_focus_metacells_data!`](@ref).
 
 # Full
 
@@ -284,6 +284,56 @@ $(CONTRACT2)
         add_axis!(focus_daf, "gene", axis_vector(full_daf, "gene"))
     end
     set_vector!(focus_daf, "gene", "is_skeleton", is_skeleton_per_gene; overwrite)
+    return nothing
+end
+
+"""
+    copy_focus_metacells_data!(;
+        full_daf::DafReader,
+        focus_daf::DafWriter,
+        excluded_contract::Contract,
+    )::Nothing
+
+Copy the data of the `full_daf` into the `focus_daf`, restricted to the focus metacells and cells that
+[`compute_focus_metacells!`](@ref) chose. Data the `focus_daf` already has is kept. This includes the focus skeleton
+genes mask, and the gene masks if the `focus_daf` rests on their repository.
+
+The outputs of the `excluded_contract` are not copied. These are typically the outputs of the computations that are
+redone for the focus metacells, because they depend on which metacells there are (e.g., the marker genes). Both layouts
+of an excluded matrix are excluded.
+
+# Full
+
+$(CONTRACT1)
+
+# Focus
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(
+    name = "full_daf",
+    is_relaxed = true,
+    axes = [metacell_axis(RequiredInput), cell_axis(RequiredInput), gene_axis(RequiredInput)],
+) Contract(
+    name = "focus_daf",
+    is_relaxed = true,
+    axes = [metacell_axis(RequiredInput), cell_axis(RequiredInput), gene_axis(RequiredInput)],
+) function copy_focus_metacells_data!(;  # UNTESTED
+    full_daf::DafReader,
+    focus_daf::DafWriter,
+    excluded_contract::Contract,
+)::Nothing
+    view_data = Pair[VIEW_ALL_DATA...]
+    for (key, (expectation, _, _)) in something(excluded_contract.data, [])
+        if expectation in (CreatedOutput, GuaranteedOutput, OptionalOutput)
+            push!(view_data, key => nothing)
+            if key isa Tuple && length(key) == 3
+                rows_axis, columns_axis, name = key
+                push!(view_data, (columns_axis, rows_axis, name) => nothing)
+            end
+        end
+    end
+    copy_all!(; source = viewer(full_daf; data = view_data), destination = focus_daf, insist = false)
     return nothing
 end
 
