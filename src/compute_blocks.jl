@@ -101,8 +101,9 @@ $(CONTRACT)
     @assert 0 < max_fold_confidence < 1
 
     linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
-    log_linear_fraction_per_skeleton_per_metacell =
-        log2.(flipped(linear_fraction_per_metacell_per_skeleton) .+ GENE_FRACTION_REGULARIZATION_FOR_CELLS)
+    log_linear_fraction_per_skeleton_per_metacell = Matrix{Float64}(flipped(linear_fraction_per_metacell_per_skeleton))
+    log_linear_fraction_per_skeleton_per_metacell .=
+        log2.(log_linear_fraction_per_skeleton_per_metacell .+ GENE_FRACTION_REGULARIZATION_FOR_CELLS)
 
     if n_blocks === nothing
         distances_between_metacells = compute_max_skeleton_fold_distance_between_metacells(

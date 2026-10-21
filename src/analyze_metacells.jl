@@ -299,9 +299,9 @@ $(CONTRACT)
     n_metacells = axis_length(daf, "metacell")
     @assert 0 < n_neighbors < n_metacells
     linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
-    linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
-    log_linear_fraction_per_skeleton_per_metacell =
-        log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
+    log_linear_fraction_per_skeleton_per_metacell = Matrix{Float64}(flipped(linear_fraction_per_metacell_per_skeleton))
+    log_linear_fraction_per_skeleton_per_metacell .=
+        log2.(log_linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
     neighbor_index_per_edge, distance_per_edge =
         nearest_neighbors_per_point(log_linear_fraction_per_skeleton_per_metacell, n_neighbors)
     @assert all(distance_per_edge .> 0)

@@ -353,9 +353,9 @@ $(CONTRACT)
     overwrite::Bool = false,
 )::Nothing
     linear_fraction_per_metacell_per_skeleton = plain_array(daf["@ metacell @ gene [ is_skeleton ] :: linear_fraction"])
-    linear_fraction_per_skeleton_per_metacell = flipped(linear_fraction_per_metacell_per_skeleton)
-    log_linear_fraction_per_skeleton_per_metacell =
-        log2.(linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
+    log_linear_fraction_per_skeleton_per_metacell = Matrix{Float64}(flipped(linear_fraction_per_metacell_per_skeleton))
+    log_linear_fraction_per_skeleton_per_metacell .=
+        log2.(log_linear_fraction_per_skeleton_per_metacell .+ gene_fraction_regularization)
     block_index_per_metacell = daf["@ metacell : block : index"].array
 
     n_skeletons, n_metacells = size(log_linear_fraction_per_skeleton_per_metacell)
