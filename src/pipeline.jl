@@ -365,7 +365,8 @@ const SHARPEN_ROUND_PREV_CONTRACT =
 
 Run one round of sharpening. This regroups the cells into new metacells in `sharp_daf`, using what `prev_daf` says about
 the manifold ([`sharpen_metacells!`](@ref)). It then aggregates the new metacells ([`prepare_metacells!`](@ref)) and
-analyzes them ([`analyze_metacells!`](@ref)). Finally, it scores them against `score_daf` ([`qc_metacells!`](@ref)).
+analyzes them ([`analyze_metacells!`](@ref)). That is the last use of the `prev_daf`, so its cached query results are
+released. Finally, it scores the new metacells against `score_daf` ([`qc_metacells!`](@ref)).
 
 The new metacells are named using the `metacells_prefix`, and their blocks using the `blocks_prefix`. The prefixes
 [`sharpening_rounds`](@ref) gives each round are one way to choose them.
@@ -402,6 +403,7 @@ $(CONTRACT3)
     sharpen_metacells!(; sharp_daf, prev_daf, prefix = metacells_prefix, sharpening_round, rng, overwrite)
     prepare_metacells!(sharp_daf; overwrite)
     analyze_metacells!(sharp_daf; prefix = blocks_prefix, prev_daf, module_status, rng, overwrite)
+    empty_cache!(prev_daf; clear = QueryData)
     qc_metacells!(; daf = sharp_daf, score_daf, overwrite)
     return nothing
 end

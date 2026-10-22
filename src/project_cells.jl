@@ -283,7 +283,7 @@ function compute_final_projection_per_query_cell(;
     name_per_block = axis_vector(atlas_daf, "block")
     name_per_metacell = axis_vector(atlas_daf, "metacell")
 
-    module_index_per_atlas_gene_per_block = atlas_daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_atlas_gene_per_block = get_query(atlas_daf, "@ gene @ block :: module ?? 0 : index").array
     is_found_per_module_per_block = plain_array(get_matrix(atlas_daf, "module", "block", "is_found"))
 
     is_in_neighborhood_per_other_block_per_base_block =

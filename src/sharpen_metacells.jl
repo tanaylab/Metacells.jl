@@ -98,6 +98,7 @@ end
 
 struct DispersionScratches
     cluster_cell_indices::Vector{Int}
+    cluster_point_positions::Vector{Int}
     cells_dispersion_per_module::Vector{Float32}
     mean_normalized_per_module::Vector{Float64}
     total_UMIs_per_cluster_cell::Vector{Float32}
@@ -106,6 +107,7 @@ end
 
 function DispersionScratches(; n_points::Integer, n_modules::Integer)  # UNTESTED
     return DispersionScratches(
+        Vector{Int}(undef, n_points),
         Vector{Int}(undef, n_points),
         Vector{Float32}(undef, n_modules),
         Vector{Float64}(undef, n_modules),
@@ -163,6 +165,7 @@ end
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer}
     total_UMIs_per_cell::AbstractVector{<:Integer}
     block_cell_indices::AbstractVector{<:Integer}
+    module_UMIs_per_found_module_per_block_cell::AbstractMatrix{Float32}
     is_found_per_module::BitVector
     gene_indices_per_module::Vector{Vector{Int}}
     normalized_UMIs_quantile::AbstractFloat
@@ -408,7 +411,7 @@ $(CONTRACT2)
     is_in_neighborhood_per_other_block_per_prev_block =
         plain_array(get_matrix(prev_daf, "block", "block", "is_in_neighborhood"))
     is_found_per_module_per_block = plain_array(get_matrix(prev_daf, "module", "block", "is_found"))
-    module_index_per_gene_per_block = prev_daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_gene_per_block = get_query(prev_daf, "@ gene @ block :: module ?? 0 : index").array
 
     metacell_block_index_per_cell = prev_daf["@ cell : metacell ?? 0 : block : index"].array
     is_base_outlier_per_cell = plain_array(get_vector(prev_daf, "cell", "is_base_outlier"))
@@ -1031,6 +1034,8 @@ function compute_local_clusters(;  # UNTESTED
     is_in_block_per_cell_per_thread = [BitVector(undef, n_cells) for _ in 1:maxthreadid()]
     z_score_per_max_module_per_max_block_cell_per_thread =
         [Matrix{Float32}(undef, max_n_block_modules, max_n_block_cells) for _ in 1:maxthreadid()]
+    module_UMIs_per_max_module_per_max_block_cell_per_thread =
+        [Matrix{Float32}(undef, max_n_block_modules, max_n_block_cells) for _ in 1:maxthreadid()]
 
     # Channel pool of per-cell Float32 accumulators for `compute_z_score_per_found_module_per_region_cell!`'s nested
     # parallel-over-found-modules loop. Each inner task takes one for the duration of its module's gene-outer fill,
@@ -1072,10 +1077,17 @@ function compute_local_clusters(;  # UNTESTED
         z_score_per_max_module_per_max_block_cell = z_score_per_max_module_per_max_block_cell_per_thread[threadid()]
         @views z_score_per_found_module_per_block_cell =
             z_score_per_max_module_per_max_block_cell[1:n_block_modules, 1:n_block_cells]
+        # The module UMIs of the block cells, kept by the z-score setup, so the dispersion of each candidate cluster
+        # reads them instead of summing the module genes again.
+        module_UMIs_per_max_module_per_max_block_cell =
+            module_UMIs_per_max_module_per_max_block_cell_per_thread[threadid()]
+        @views module_UMIs_per_found_module_per_block_cell =
+            module_UMIs_per_max_module_per_max_block_cell[1:n_block_modules, 1:n_block_cells]
 
         # The inverted `module_index_per_gene` returned here is reused below by the Phase 1 K-walk dispersion context.
         gene_indices_per_module = setup_z_score_per_found_module_per_region_cell!(;
             z_score_per_found_module_per_region_cell = z_score_per_found_module_per_block_cell,
+            module_UMIs_per_found_module_per_region_cell = module_UMIs_per_found_module_per_block_cell,
             is_found_per_module,
             block_index,
             indices_of_region_cells = block_cell_indices,
@@ -1101,6 +1113,7 @@ function compute_local_clusters(;  # UNTESTED
             sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             block_cell_indices,
+            module_UMIs_per_found_module_per_block_cell,
             is_found_per_module,
             gene_indices_per_module,
             normalized_UMIs_quantile,
@@ -1764,13 +1777,19 @@ function compute_outlier_certificates(;  # UNTESTED
     end
 
     # Reduce the per-thread candidates to the per-cell maximal fold. Only fold-exceeding candidates exist, so every cell
-    # that appears is an outlier, recording the certificate of the module instance that flagged it most strongly.
+    # that appears is an outlier, recording the certificate of the module instance that flagged it most strongly. Equal
+    # folds go to the lowest module instance, so the certificate does not depend on which thread found which candidate.
     max_fold_per_cell = fill(-Inf32, n_cells)
+    total_found_module_index_per_cell = zeros(Int, n_cells)
     for candidates in candidates_per_thread
         for candidate in candidates
             cell_index = candidate.cell_index
-            if candidate.fold > max_fold_per_cell[cell_index]
+            if candidate.fold > max_fold_per_cell[cell_index] || (
+                candidate.fold == max_fold_per_cell[cell_index] &&
+                candidate.total_found_module_index < total_found_module_index_per_cell[cell_index]
+            )
                 max_fold_per_cell[cell_index] = candidate.fold
+                total_found_module_index_per_cell[cell_index] = candidate.total_found_module_index
                 is_outlier_per_cell[cell_index] = true
                 in_metacell_index_per_cell[cell_index] = metacell_index_per_cell[cell_index]
                 by_prev_block_name_per_cell[cell_index] =
@@ -2441,14 +2460,18 @@ function compute_cluster_dispersion!(  # UNTESTED
             n_cluster_cells += 1
             dispersion_scratches.cluster_cell_indices[n_cluster_cells] =
                 dispersion_context.block_cell_indices[point_index]
+            dispersion_scratches.cluster_point_positions[n_cluster_cells] = point_index
         end
     end
 
     @views indices_of_cluster_cells = dispersion_scratches.cluster_cell_indices[1:n_cluster_cells]
+    @views point_positions_of_cluster_cells = dispersion_scratches.cluster_point_positions[1:n_cluster_cells]
     dispersion = maximal_cells_dispersion_of_modules!(;
         cells_dispersion_per_module = dispersion_scratches.cells_dispersion_per_module,
         mean_normalized_per_module = dispersion_scratches.mean_normalized_per_module,
         indices_of_cells = indices_of_cluster_cells,
+        module_UMIs_per_found_module_per_region_cell = dispersion_context.module_UMIs_per_found_module_per_block_cell,
+        region_positions_of_cells = point_positions_of_cluster_cells,
         sparse_UMIs_per_cell_per_gene = dispersion_context.sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell = dispersion_context.total_UMIs_per_cell,
         is_found_per_module = dispersion_context.is_found_per_module,

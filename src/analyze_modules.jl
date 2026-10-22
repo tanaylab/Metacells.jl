@@ -102,7 +102,7 @@ $(CONTRACT)
     n_blocks = axis_length(daf, "block")
 
     n_genes_per_module_per_block = Matrix{UInt32}(undef, n_modules, n_blocks)
-    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_gene_per_block = get_query(daf, "@ gene @ block :: module ?? 0 : index").array
 
     parallel_loop_wo_rng(
         1:n_blocks;
@@ -177,7 +177,7 @@ $(CONTRACT)
 
     block_index_per_metacell = daf["@ metacell : block : index"].array
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
-    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_gene_per_block = get_query(daf, "@ gene @ block :: module ?? 0 : index").array
     is_found_per_module_per_block = plain_array(get_matrix(daf, "module", "block", "is_found"))
     n_modules_per_block = plain_array(get_vector(daf, "block", "n_modules"))
     mean_linear_fraction_in_environment_cells_per_module_per_block =
@@ -342,7 +342,7 @@ $(CONTRACT)
     sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
     total_UMIs_per_cell = plain_array(densify(get_vector(daf, "cell", "total_UMIs")))
 
-    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_gene_per_block = get_query(daf, "@ gene @ block :: module ?? 0 : index").array
 
     is_in_neighborhood_per_other_block_per_base_block =
         plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
@@ -518,7 +518,7 @@ $(CONTRACT)
     sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
     total_UMIs_per_cell = plain_array(densify(get_vector(daf, "cell", "total_UMIs")))
 
-    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_gene_per_block = get_query(daf, "@ gene @ block :: module ?? 0 : index").array
 
     is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
@@ -718,7 +718,7 @@ $(CONTRACT)
 
     block_index_per_metacell = daf["@ metacell : block : index"].array
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
-    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_gene_per_block = get_query(daf, "@ gene @ block :: module ?? 0 : index").array
     is_found_per_module_per_block = plain_array(get_matrix(daf, "module", "block", "is_found"))
     n_modules_per_block = plain_array(get_vector(daf, "block", "n_modules"))
     mean_linear_fraction_in_environment_cells_per_module_per_block =
@@ -892,11 +892,15 @@ end
 # `cells_dispersion_per_module` scratch (zero for non-found modules and for modules that don't pass the effective
 # threshold). If no found module's mean reaches `min_module_UMIs`, the threshold is auto-reduced by integer steps until
 # at least one module qualifies (concretely: `effective_threshold = min(min_module_UMIs, floor(max_mean))`). Returns 0
-# when there are fewer than two cells, no found modules, or every found module has mean = 0.
+# when there are fewer than two cells, no found modules, or every found module has mean = 0. If
+# `module_UMIs_per_found_module_per_region_cell` is given, the module UMIs of the cells are read from it, at the
+# `region_positions_of_cells`, instead of being summed from the `sparse_UMIs_per_cell_per_gene`.
 function maximal_cells_dispersion_of_modules!(;  # UNTESTED
     cells_dispersion_per_module::AbstractVector{<:AbstractFloat},
     mean_normalized_per_module::AbstractVector{<:AbstractFloat},
     indices_of_cells::AbstractVector{<:Integer},
+    module_UMIs_per_found_module_per_region_cell::Maybe{AbstractMatrix{Float32}} = nothing,
+    region_positions_of_cells::Maybe{AbstractVector{<:Integer}} = nothing,
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     is_found_per_module::Union{AbstractVector{Bool}, BitVector},
@@ -929,18 +933,30 @@ function maximal_cells_dispersion_of_modules!(;  # UNTESTED
     module_UMIs_per_cells = reshape(total_UMIs_per_cells, 1, n_cells)
     n_modules = length(is_found_per_module)
     max_mean_normalized_module_UMIs = 0.0
+    found_module_position = 0
     for module_index in 1:n_modules
         if !is_found_per_module[module_index]
             continue
         end
+        found_module_position += 1
 
-        module_UMIs_per_cells .= 0
-        sum_sparse_columns_per_group!(
-            module_UMIs_per_cells,
-            sparse_UMIs_per_cell_per_gene,
-            indices_of_cells,
-            view(gene_indices_per_module, module_index:module_index),
-        )
+        if module_UMIs_per_found_module_per_region_cell === nothing
+            module_UMIs_per_cells .= 0
+            sum_sparse_columns_per_group!(
+                module_UMIs_per_cells,
+                sparse_UMIs_per_cell_per_gene,
+                indices_of_cells,
+                view(gene_indices_per_module, module_index:module_index),
+            )
+        else
+            @assert region_positions_of_cells !== nothing
+            for cell_position in 1:n_cells
+                module_UMIs_per_cells[cell_position] = module_UMIs_per_found_module_per_region_cell[
+                    found_module_position,
+                    region_positions_of_cells[cell_position],
+                ]
+            end
+        end
 
         sum_normalized_module_UMIs = 0.0
         sum_squared_normalized_module_UMIs = 0.0
@@ -1041,7 +1057,7 @@ $(CONTRACT)
 
     block_index_per_metacell = daf["@ metacell : block : index"].array
     metacell_index_per_cell = daf["@ cell : metacell ?? 0 : index"].array
-    module_index_per_gene_per_block = daf["@ gene @ block :: module ?? 0 : index"].array
+    module_index_per_gene_per_block = get_query(daf, "@ gene @ block :: module ?? 0 : index").array
     is_found_per_module_per_block = plain_array(get_matrix(daf, "module", "block", "is_found"))
 
     sparse_UMIs_per_cell_per_gene = plain_array(get_matrix(daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
@@ -1155,9 +1171,11 @@ end
 # fraction - the space cells are clustered in. Fills the caller's `is_found_per_module` buffer from the block, and
 # returns the per-module gene index lists (the inverted `module_index_per_gene`, reused by callers). This is the shared
 # setup around [`compute_z_score_per_found_module_per_region_cell!`](@ref); the caller owns (and sizes) the reused
-# buffers.
+# buffers. If `module_UMIs_per_found_module_per_region_cell` is given, it is filled (in the same layout) with the module
+# UMIs the z-scores are computed from.
 function setup_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
+    module_UMIs_per_found_module_per_region_cell::Maybe{AbstractMatrix{Float32}} = nothing,
     is_found_per_module::BitVector,
     block_index::Integer,
     indices_of_region_cells::AbstractVector{<:Integer},
@@ -1190,8 +1208,9 @@ function setup_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     @views std_linear_fraction_in_environment_cells_per_module =
         std_linear_fraction_in_environment_cells_per_module_per_block[:, block_index]
 
-    compute_z_score_per_found_module_per_region_cell!(;  # NOJET
+    compute_z_score_per_found_module_per_region_cell!(;
         z_score_per_found_module_per_region_cell,
+        module_UMIs_per_found_module_per_region_cell,
         sparse_UMIs_per_cell_per_gene,
         total_UMIs_per_cell,
         is_found_per_module,
@@ -1208,6 +1227,7 @@ end
 
 function compute_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     z_score_per_found_module_per_region_cell::AbstractMatrix{<:AbstractFloat},
+    module_UMIs_per_found_module_per_region_cell::Maybe{AbstractMatrix{Float32}} = nothing,
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     is_found_per_module::BitVector,
@@ -1264,6 +1284,12 @@ function compute_z_score_per_found_module_per_region_cell!(;  # UNTESTED
                 z_score_per_found_module_per_region_cell[found_module_position, region_cell_position] =
                     (delta_fraction + copysign(std_fraction_regularization, delta_fraction)) /
                     (std_linear_fraction + std_fraction_regularization)
+            end
+            if module_UMIs_per_found_module_per_region_cell !== nothing
+                for region_cell_position in 1:n_region_cells
+                    module_UMIs_per_found_module_per_region_cell[found_module_position, region_cell_position] =
+                        accumulator[sorted_position_per_region_position[region_cell_position]]
+                end
             end
         finally
             put!(z_score_accumulator_pool, accumulator)
