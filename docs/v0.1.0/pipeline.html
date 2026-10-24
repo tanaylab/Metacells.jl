@@ -145,6 +145,12 @@
 </a>
 </li>
 <li>
+<a class="tocitem" href="#Projecting">
+<span>Projecting
+</span>
+</a>
+</li>
+<li>
 <a class="tocitem" href="#Index">
 <span>Index
 </span>
@@ -2171,6 +2177,182 @@ end
 </section>
 </details>
 </article>
+<h2 id="Projecting">
+<a class="docs-heading-anchor" href="#Projecting">Projecting
+</a>
+<a id="Projecting-1">
+</a>
+<a class="docs-heading-anchor-permalink" href="#Projecting" title="Permalink">
+</a>
+</h2>
+<article>
+<details class="docstring" open="true">
+<summary id="Metacells.Pipeline.prepare_atlas!">
+<a class="docstring-binding" href="#Metacells.Pipeline.prepare_atlas!">
+<code>Metacells.Pipeline.prepare_atlas!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">prepare_atlas!(
+    daf::DafWriter;
+    std_UMIs_regularization::AbstractFloat = ```2.0```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Prepare analyzed metacells to serve as the atlas that 
+<a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
+<code>compute_cells_projection!
+</code>
+</a> projects cells onto. For each block, this computes the mean z-scores of each metacell&#39;s cells in the block&#39;s modules, and for each metacell, how far its cells are from it in these z-scores.
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>metacell
+</strong> (required): Minimal-sized groups of cells for robust point estimates.
+</p>
+<p>
+<strong>module
+</strong> (required): Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (required): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>block @ n_modules
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of found modules in each block.
+</p>
+<p>
+<strong>block @ total
+<em>neighborhood
+</em>UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of non-excluded gene UMIs in the cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>block @ n
+<em>neighborhood
+</em>cells
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of cells in the metacells in each block&#39;s neighborhood.
+</p>
+<p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (required): The module each gene belongs to in each block.
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (required): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, module @ mean
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The mean of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>block, module @ std
+<em>linear
+</em>fraction
+<em>in
+</em>environment_cells
+</strong>::Union{Float32, Float64} (required): The standard deviation of the linear fraction of each module in the cells of the environment of each block.
+</p>
+<p>
+<strong>block, block @ is
+<em>in
+</em>neighborhood
+</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ mean
+<em>euclidean
+</em>modules
+<em>cells
+</em>distance
+</strong>::Union{Float32, Float64} (created): In each metacell, the mean of the euclidean distances between its cells and the metacell. The distances use the z-scores of the found modules of the metacell&#39;s block, relative to the block&#39;s environment cells.
+</p>
+<p>
+<strong>metacell @ std
+<em>euclidean
+</em>modules
+<em>cells
+</em>distance
+</strong>::Union{Float32, Float64} (created): In each metacell, the standard deviation of the euclidean distances between its cells and the metacell. The distances use the z-scores of the found modules of the metacell&#39;s block, relative to the block&#39;s environment cells.
+</p>
+<p>
+<strong>cell @ metacell
+<em>modules
+</em>z_score
+</strong>::Union{Float32, Float64} (created): The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).
+</p>
+<p>
+<strong>Tensors
+</strong>
+</p>
+<p>
+<strong>block; module, metacell @ mean
+<em>cells
+</em>z_score
+</strong>::Union{Float32, Float64} (created): The mean of the z-scores of the cells of each metacell, for each block&#39;s found modules.
+</p>
+</div>
+</section>
+</details>
+</article>
 <h2 id="Index">
 <a class="docs-heading-anchor" href="#Index">Index
 </a>
@@ -2213,6 +2395,12 @@ end
 <li>
 <a href="pipeline.html#Metacells.Pipeline.import_base_metacells!">
 <code>Metacells.Pipeline.import_base_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="pipeline.html#Metacells.Pipeline.prepare_atlas!">
+<code>Metacells.Pipeline.prepare_atlas!
 </code>
 </a>
 </li>

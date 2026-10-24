@@ -44,6 +44,12 @@ Metacells.Pipeline.SharpeningRound
 Metacells.Pipeline.run!
 ```
 
+## Projecting
+
+```@docs
+Metacells.Pipeline.prepare_atlas!
+```
+
 ## Index
 
 ```@index

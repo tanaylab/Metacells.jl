@@ -12,6 +12,7 @@ module Pipeline
 export analyze_metacells!
 export focus_metacells!
 export import_base_metacells!
+export prepare_atlas!
 export prepare_metacells!
 export qc_metacells!
 export run!
@@ -297,6 +298,35 @@ $(CONTRACT2)
         base_daf = score_daf,
         overwrite,
     )
+    return nothing
+end
+
+"""
+    prepare_atlas!(
+        daf::DafWriter;
+        std_UMIs_regularization::AbstractFloat = $(DEFAULT.std_UMIs_regularization),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Prepare analyzed metacells to serve as the atlas that [`compute_cells_projection!`](@ref) projects cells onto. For each
+block, this computes the mean z-scores of each metacell's cells in the block's modules, and for each metacell, how far
+its cells are from it in these z-scores.
+
+$(CONTRACT)
+"""
+@logged :mcs_ops @computation (
+    function_contract(compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!) |>
+    function_contract(compute_stats_of_euclidean_modules_cells_distance_per_metacell!)
+) function prepare_atlas!(  # UNTESTED
+    daf::DafWriter;
+    std_UMIs_regularization::AbstractFloat = function_default(
+        compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!,
+        :std_UMIs_regularization,
+    ),
+    overwrite::Bool = false,
+)::Nothing
+    compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!(daf; std_UMIs_regularization, overwrite)
+    compute_stats_of_euclidean_modules_cells_distance_per_metacell!(daf; std_UMIs_regularization, overwrite)
     return nothing
 end
 
