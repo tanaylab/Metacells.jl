@@ -218,9 +218,15 @@
 )::Nothing
 </code>
 </pre>
-<p>Compute and set [
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_metacell_per_cell">
+<code>vector_of_projected_metacell_per_cell
+</code>
+</a>, 
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_block_per_cell">
 <code>vector_of_projected_block_per_cell
-</code>] and 
+</code>
+</a> and 
 <a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
 <code>vector_of_projected_modules_z_score_per_cell
 </code>
@@ -255,6 +261,8 @@
 <code>compute_stats_of_euclidean_modules_cells_distance_per_metacell!
 </code>
 </a>). If this is too large, then the query cell isn&#39;t a good match for anything in the atlas.
+</p>
+<p>Excluded query cells are not projected. Their projected metacell and block are empty, and their z-score is infinite.
 </p>
 <p>
 <strong>Query
