@@ -454,6 +454,117 @@
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!">
+<a class="docstring-binding" href="#Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!">
+<code>Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">compute_vector_of_is_deviant_per_cell!(;
+    query_daf::DafWriter,
+    atlas_daf::DafReader,
+    rejected_fraction::AbstractFloat = ```0.01```,
+    overwrite::Bool = ```false```,
+)::Nothing
+</code>
+</pre>
+<p>Compute and set 
+<a href="contracts.html#Metacells.Contracts.vector_of_is_deviant_per_cell">
+<code>vector_of_is_deviant_per_cell
+</code>
+</a>. A query cell is deviant when its projected modules z score is above the cutoff of the atlas (
+<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff">
+<code>compute_projected_modules_z_score_cutoff
+</code>
+</a>). That is, it fits its projected metacell worse than all but 
+<code>rejected_fraction
+</code> of the atlas cells fit their own metacell. Excluded cells are never deviant. If the query has a metacell for each cell, then the cells which belong to a metacell are never deviant either.
+</p>
+<p>
+<strong>Query
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ is_excluded
+</strong>::Bool (required): A mask of cells that are totally excluded from the analysis.
+</p>
+<p>
+<strong>cell @ metacell
+</strong>::AbstractString (optional): The unique metacell each cell belongs to.
+</p>
+<p>
+<strong>cell @ projected
+<em>metacell
+</em>modules
+<em>z
+</em>score
+</strong>::Union{Float32, Float64} (required): The z score of the distance between each query cell and its projected atlas metacell modules.
+</p>
+<p>
+<strong>Outputs
+</strong>
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ is_deviant
+</strong>::Bool (created): A mask of query cells that fit no atlas metacell well.
+</p>
+<p>
+<strong>Atlas
+</strong>
+</p>
+<p>
+<strong>Inputs
+</strong>
+</p>
+<p>
+<strong>Axes
+</strong>
+</p>
+<p>
+<strong>cell
+</strong> (required): Sequenced single cells.
+</p>
+<p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>cell @ metacell
+<em>modules
+</em>z_score
+</strong>::Union{Float32, Float64} (required): The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!">
 <a class="docstring-binding" href="#Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!">
 <code>Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!
@@ -795,6 +906,12 @@
 <li>
 <a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!">
 <code>Metacells.ProjectCells.compute_vector_of_correlation_between_cells_and_projected_metacells!
+</code>
+</a>
+</li>
+<li>
+<a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!">
+<code>Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!
 </code>
 </a>
 </li>

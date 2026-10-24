@@ -88,6 +88,7 @@ export vector_of_excluded_UMIs_per_cell
 export vector_of_global_flow_order_per_type
 export vector_of_is_base_outlier_per_cell
 export vector_of_is_correlated_with_skeleton_per_gene
+export vector_of_is_deviant_per_cell
 export vector_of_is_excluded_per_cell
 export vector_of_is_excluded_per_gene
 export vector_of_is_forbidden_per_gene
@@ -2078,6 +2079,21 @@ function vector_of_metacell_modules_z_score_per_cell(  # untested
         StorageFloat,
         "The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).",
     )
+end
+
+"""
+    vector_of_is_deviant_per_cell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+A mask of query cells that fit no atlas metacell well. Their projected modules z score is above the cutoff of the atlas.
+Excluded cells, and cells which already belong to a metacell, are never deviant.
+
+This vector is populated by [`compute_vector_of_is_deviant_per_cell!`](@ref
+Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!).
+"""
+function vector_of_is_deviant_per_cell(expectation::ContractExpectation)::Pair{VectorKey, DataSpecification}  # untested
+    return ("cell", "is_deviant") => (expectation, Bool, "A mask of query cells that fit no atlas metacell well.")
 end
 
 """

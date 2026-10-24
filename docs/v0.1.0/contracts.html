@@ -3623,6 +3623,36 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </article>
 <article>
 <details class="docstring" open="true">
+<summary id="Metacells.Contracts.vector_of_is_deviant_per_cell">
+<a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_deviant_per_cell">
+<code>Metacells.Contracts.vector_of_is_deviant_per_cell
+</code>
+</a> — 
+<span class="docstring-category">Function
+</span>
+</summary>
+<section>
+<div>
+<pre>
+<code class="language-julia hljs">vector_of_is_deviant_per_cell(
+    expectation::ContractExpectation
+)::Pair{VectorKey, DataSpecification}
+</code>
+</pre>
+<p>A mask of query cells that fit no atlas metacell well. Their projected modules z score is above the cutoff of the atlas. Excluded cells, and cells which already belong to a metacell, are never deviant.
+</p>
+<p>This vector is populated by 
+<a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!">
+<code>compute_vector_of_is_deviant_per_cell!
+</code>
+</a>.
+</p>
+</div>
+</section>
+</details>
+</article>
+<article>
+<details class="docstring" open="true">
 <summary id="Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
 <a class="docstring-binding" href="#Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene">
 <code>Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
@@ -4609,6 +4639,12 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene">
 <code>Metacells.Contracts.vector_of_is_correlated_with_skeleton_per_gene
+</code>
+</a>
+</li>
+<li>
+<a href="contracts.html#Metacells.Contracts.vector_of_is_deviant_per_cell">
+<code>Metacells.Contracts.vector_of_is_deviant_per_cell
 </code>
 </a>
 </li>

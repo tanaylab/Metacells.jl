@@ -4,6 +4,7 @@ Project cells on an atlas with modules.
 module ProjectCells
 
 export compute_cells_projection!
+export compute_vector_of_is_deviant_per_cell!
 export compute_vector_of_correlation_between_cells_and_projected_metacells!
 export compute_matrix_of_correlation_between_neighborhood_cells_and_projected_metacells_per_gene_per_projected_block!
 
@@ -48,11 +49,13 @@ import Metacells.Contracts.projected_block_axis
 import Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
 import Metacells.Contracts.vector_of_block_per_metacell
 import Metacells.Contracts.vector_of_correlation_between_cells_and_projected_metacells_per_gene
+import Metacells.Contracts.vector_of_is_deviant_per_cell
 import Metacells.Contracts.vector_of_is_excluded_per_cell
 import Metacells.Contracts.vector_of_is_excluded_per_gene
 import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_is_marker_per_gene
 import Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_projected_block_per_cell
 import Metacells.Contracts.vector_of_projected_metacell_per_cell
@@ -542,6 +545,67 @@ function compute_final_projection_per_query_cell(;  # UNTESTED
         block_per_metacell[projected_metacell_index_per_query_cell[indices_of_projected_query_cells]]
     set_vector!(query_daf, "cell", "projected_block", projected_block_per_query_cell; overwrite)
 
+    return nothing
+end
+
+const IS_DEVIANT_ATLAS_CONTRACT =
+    renamed_contract(function_contract(compute_projected_modules_z_score_cutoff), "atlas_daf")
+
+"""
+    compute_vector_of_is_deviant_per_cell!(;
+        query_daf::DafWriter,
+        atlas_daf::DafReader,
+        rejected_fraction::AbstractFloat = $(DEFAULT.rejected_fraction),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_is_deviant_per_cell`](@ref). A query cell is deviant when its projected modules z score is
+above the cutoff of the atlas ([`compute_projected_modules_z_score_cutoff`](@ref)). That is, it fits its projected
+metacell worse than all but `rejected_fraction` of the atlas cells fit their own metacell. Excluded cells are never
+deviant. If the query has a metacell for each cell, then the cells which belong to a metacell are never deviant either.
+
+# Query
+
+$(CONTRACT1)
+
+# Atlas
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "query_daf",
+    axes = [cell_axis(RequiredInput)],
+    data = [
+        vector_of_is_excluded_per_cell(RequiredInput),
+        vector_of_metacell_per_cell(OptionalInput),
+        vector_of_projected_modules_z_score_per_cell(RequiredInput),
+        vector_of_is_deviant_per_cell(CreatedOutput),
+    ],
+) IS_DEVIANT_ATLAS_CONTRACT function compute_vector_of_is_deviant_per_cell!(;  # UNTESTED
+    query_daf::DafWriter,
+    atlas_daf::DafReader,
+    rejected_fraction::AbstractFloat = function_default(compute_projected_modules_z_score_cutoff, :rejected_fraction),
+    overwrite::Bool = false,
+)::Nothing
+    z_score_cutoff = compute_projected_modules_z_score_cutoff(atlas_daf; rejected_fraction)
+
+    is_excluded_per_query_cell = plain_array(get_vector(query_daf, "cell", "is_excluded"))
+    z_score_per_query_cell = plain_array(get_vector(query_daf, "cell", "projected_metacell_modules_z_score"))
+    is_deviant_per_query_cell = .!is_excluded_per_query_cell .& (z_score_per_query_cell .> z_score_cutoff)
+
+    metacell_per_query_cell = get_vector(query_daf, "cell", "metacell"; default = nothing)
+    if metacell_per_query_cell !== nothing
+        is_deviant_per_query_cell .&= plain_array(metacell_per_query_cell) .== ""
+    end
+
+    n_included_query_cells = sum(.!is_excluded_per_query_cell)
+    n_deviant_query_cells = sum(is_deviant_per_query_cell)
+    @debug (
+        "Z score cutoff: $(z_score_cutoff) Deviant cells: $(n_deviant_query_cells)" *
+        " $(percent(n_deviant_query_cells, n_included_query_cells)) of the included cells"
+    ) _group = :mcs_results
+
+    set_vector!(query_daf, "cell", "is_deviant", is_deviant_per_query_cell; overwrite)
     return nothing
 end
 
