@@ -1083,7 +1083,7 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <a href="contracts.html#Metacells.Contracts.vector_of_outlier_in_prev_block_per_cell">
 <code>vector_of_outlier_in_prev_block_per_cell
 </code>
-</a> which is the block the cell was clustered in. This is the empty string for any cell that is not an outlier.
+</a> which is the block the cell was clustered in. This is the empty string for any cell that is not an outlier, and for an outlier that no module flagged (only its modules z score).
 </p>
 <p>This vector is populated by 
 <a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
@@ -1117,7 +1117,7 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <a href="contracts.html#Metacells.Contracts.vector_of_outlier_by_prev_block_per_cell">
 <code>vector_of_outlier_by_prev_block_per_cell
 </code>
-</a> of the cell. This is the empty string for any cell that is not an outlier.
+</a> of the cell. This is the empty string for any cell that is not an outlier, and for an outlier that no module flagged (only its modules z score).
 </p>
 <p>This vector is populated by 
 <a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
@@ -1147,7 +1147,7 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The expected UMIs of the outlier module&#39;s genes in each outlier cell. This is the module&#39;s linear fraction in the metacell the cell was ejected from, excluding the cell itself, times the cell&#39;s total UMIs. This is zero for any cell that is not an outlier.
+<p>The expected UMIs of the outlier module&#39;s genes in each outlier cell. This is the module&#39;s linear fraction in the metacell the cell was ejected from, excluding the cell itself, times the cell&#39;s total UMIs. This is zero for any cell that is not an outlier, and for an outlier that no module flagged (only its modules z score).
 </p>
 <p>This vector is populated by 
 <a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
@@ -1177,7 +1177,7 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The actual UMIs of the outlier module&#39;s genes in each outlier cell. This is zero for any cell that is not an outlier.
+<p>The actual UMIs of the outlier module&#39;s genes in each outlier cell. This is zero for any cell that is not an outlier, and for an outlier that no module flagged (only its modules z score).
 </p>
 <p>This vector is populated by 
 <a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">

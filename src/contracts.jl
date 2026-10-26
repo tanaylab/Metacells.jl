@@ -580,7 +580,7 @@ end
 
 The previous round's block whose found module most strongly deviates in each outlier cell, in contrast to the
 [`vector_of_outlier_in_prev_block_per_cell`](@ref) which is the block the cell was clustered in. This is the empty
-string for any cell that is not an outlier.
+string for any cell that is not an outlier, and for an outlier that no module flagged (only its modules z score).
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
@@ -599,7 +599,7 @@ end
 
 The found module that most strongly deviates in each outlier cell. This module belongs to the
 [`vector_of_outlier_by_prev_block_per_cell`](@ref) of the cell. This is the empty string for any cell that is not an
-outlier.
+outlier, and for an outlier that no module flagged (only its modules z score).
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
@@ -615,7 +615,7 @@ end
 
 The expected UMIs of the outlier module's genes in each outlier cell. This is the module's linear fraction in the
 metacell the cell was ejected from, excluding the cell itself, times the cell's total UMIs. This is zero for any cell
-that is not an outlier.
+that is not an outlier, and for an outlier that no module flagged (only its modules z score).
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """
@@ -629,7 +629,8 @@ end
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
-The actual UMIs of the outlier module's genes in each outlier cell. This is zero for any cell that is not an outlier.
+The actual UMIs of the outlier module's genes in each outlier cell. This is zero for any cell that is not an outlier,
+and for an outlier that no module flagged (only its modules z score).
 
 This vector is populated by [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!).
 """

@@ -23,6 +23,7 @@ using ..AnalyzeModules
 using ..Contracts
 using ..Defaults
 
+import ..AnalyzeModules.compute_punctuated_distance_z_score_per_point!
 import ..AnalyzeModules.compute_std_fraction_regularization_per_block
 import ..AnalyzeModules.maximal_cells_dispersion_of_modules!
 import ..AnalyzeModules.setup_z_score_per_found_module_per_region_cell!
@@ -231,6 +232,7 @@ end
         std_UMIs_regularization::AbstractFloat = $(DEFAULT.std_UMIs_regularization),
         min_outlier_fold::AbstractFloat = $(DEFAULT.min_outlier_fold),
         outlier_UMIs_regularization::AbstractFloat = $(DEFAULT.outlier_UMIs_regularization),
+        max_modules_z_score::AbstractFloat = $(DEFAULT.max_modules_z_score),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
@@ -282,11 +284,16 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     regularization so low-count modules do not trigger. A cell whose maximal fold (across all module instances) exceeds
     `min_outlier_fold` is an outlier: it loses its metacell, and we record the certificate (the metacell it was ejected
     from, the previous round's block and module that flagged it, and the expected and actual UMIs) of the module
-    instance that most deviates. Ejecting the outliers can drop a metacell below `min_cells_in_metacell`; we dissolve
-    such a metacell, relocate all its cells to the nearest surviving metacell of its block (by the same module z-score
-    distance used above), and detect the outliers again - so a cell forced into a metacell it does not fit is caught.
-    This repeats until no metacell is dissolved. A block's last metacell is never dissolved, so every outlier's
-    certificate names a metacell that survives.
+    instance that most deviates. A cell is also an outlier if its modules z score exceeds `max_modules_z_score`. This is
+    the distance of the cell from its metacell's center, in the module z-score space of its block, compared with the
+    mean and standard deviation of the distances of the metacell's other cells. It is punctuated too: the center is that
+    of the metacell's other cells. A cell flagged only by its modules z score has no module certificate (the previous
+    round's block and module that flagged it are empty, and its expected and actual UMIs are zero). Ejecting the
+    outliers can drop a metacell below `min_cells_in_metacell`; we dissolve such a metacell, relocate all its cells to
+    the nearest surviving metacell of its block (by the same module z-score distance used above), and detect the
+    outliers again - so a cell forced into a metacell it does not fit is caught. This repeats until no metacell is
+    dissolved. A block's last metacell is never dissolved, so every outlier's certificate names a metacell that
+    survives.
  5. The final clusters are the sharp metacells. We name them using the `prefix`. The prefixes
     [`sharpening_rounds`](@ref Metacells.Pipeline.sharpening_rounds) gives each round are one way to choose it.
 
@@ -371,8 +378,9 @@ $(CONTRACT2)
         compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!,
         :std_UMIs_regularization,
     ),
-    min_outlier_fold::AbstractFloat = 3.0,
+    min_outlier_fold::AbstractFloat = 2.0,
     outlier_UMIs_regularization::AbstractFloat = 2.0,
+    max_modules_z_score::AbstractFloat = 4.0,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
 )::Nothing
@@ -390,6 +398,7 @@ $(CONTRACT2)
     @assert std_UMIs_regularization > 0
     @assert min_outlier_fold > 0
     @assert outlier_UMIs_regularization > 0
+    @assert max_modules_z_score > 0
 
     n_cells = axis_length(prev_daf, "cell")
     n_blocks = axis_length(prev_daf, "block")
@@ -639,6 +648,7 @@ $(CONTRACT2)
         min_cells_in_metacell,
         min_outlier_fold,
         outlier_UMIs_regularization,
+        max_modules_z_score,
         block_index_per_cell,
         is_found_per_module_per_block,
         module_index_per_gene_per_block,
@@ -1622,8 +1632,9 @@ end
 # module's genes to the expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's
 # metacell excluding the cell itself, times the cell's total UMIs - so a strong outlier cannot inflate its own baseline.
 # A cell whose maximal fold (across all module instances) exceeds `min_outlier_fold` is an outlier, with the certificate
-# of the most-deviant module instance. A metacell is never emptied - every outlier names the metacell it was ejected
-# from, so if all the cells of a metacell are outliers, none of them is.
+# of the most-deviant module instance. So is a cell in `is_modules_z_score_outlier_per_cell`, which has no module
+# certificate unless a module also flagged it. A metacell is never emptied - every outlier names the metacell it was
+# ejected from, so if all the cells of a metacell are outliers, none of them is.
 #
 # The loop is parallel over module instances. `sparse_UMIs_per_cell_per_gene` is a CSC matrix whose columns are genes,
 # so each instance walks only the nonzeros of its module's gene columns (the cells that actually express it); cells with
@@ -1634,6 +1645,7 @@ end
 # the per-cell maximum at the end.
 function compute_outlier_certificates(;  # UNTESTED
     cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
+    is_modules_z_score_outlier_per_cell::AbstractVector{Bool},
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
     is_found_per_module_per_block::AbstractMatrix{Bool},
@@ -1802,6 +1814,17 @@ function compute_outlier_certificates(;  # UNTESTED
         end
     end
 
+    # A cell flagged by its modules z score is an outlier too. If no module flagged it, it has no module certificate.
+    is_fold_outlier_per_cell = copy(is_outlier_per_cell)
+    for (sharp_metacell_index, cell_indices) in enumerate(cells_of_sharp_metacells)
+        for cell_index in cell_indices
+            if is_modules_z_score_outlier_per_cell[cell_index]
+                is_outlier_per_cell[cell_index] = true
+                in_metacell_index_per_cell[cell_index] = sharp_metacell_index
+            end
+        end
+    end
+
     # Every outlier names the metacell it was ejected from, so a metacell must keep at least one cell. If all the cells
     # of a metacell are outliers, none of them is.
     for cell_indices in cells_of_sharp_metacells
@@ -1819,9 +1842,16 @@ function compute_outlier_certificates(;  # UNTESTED
 
     n_outlier_cells = sum(is_outlier_per_cell)
     n_grouped_cells = sum(length(cell_indices) for cell_indices in cells_of_sharp_metacells; init = 0)
+    n_fold_only_outlier_cells =
+        sum(is_outlier_per_cell .& is_fold_outlier_per_cell .& .!is_modules_z_score_outlier_per_cell)
+    n_z_score_only_outlier_cells =
+        sum(is_outlier_per_cell .& .!is_fold_outlier_per_cell .& is_modules_z_score_outlier_per_cell)
+    n_both_outlier_cells = sum(is_outlier_per_cell .& is_fold_outlier_per_cell .& is_modules_z_score_outlier_per_cell)
     @debug (
         "Outlier cells: $(n_outlier_cells)" *
-        " ($(percent(n_outlier_cells, n_grouped_cells)) of grouped, $(percent(n_outlier_cells, n_cells)) of all)"
+        " ($(percent(n_outlier_cells, n_grouped_cells)) of grouped, $(percent(n_outlier_cells, n_cells)) of all)" *
+        " By fold only: $(n_fold_only_outlier_cells) By modules z score only: $(n_z_score_only_outlier_cells)" *
+        " By both: $(n_both_outlier_cells)"
     ) _group = :mcs_results
 
     return OutlierCertificates(
@@ -1846,6 +1876,7 @@ function eject_outliers!(;  # UNTESTED
     min_cells_in_metacell::Integer,
     min_outlier_fold::AbstractFloat,
     outlier_UMIs_regularization::AbstractFloat,
+    max_modules_z_score::AbstractFloat,
     block_index_per_cell::AbstractVector{<:Integer},
     is_found_per_module_per_block::AbstractMatrix{Bool},
     module_index_per_gene_per_block::AbstractMatrix{<:Integer},
@@ -1861,9 +1892,35 @@ function eject_outliers!(;  # UNTESTED
     n_modules::Integer,
     n_blocks::Integer,
 )::OutlierCertificates
+    # The cells don't change their block while their metacells are dissolved, so their z-scores are computed once.
+    block_position_per_cell, z_score_per_found_module_per_block_cell_per_block =
+        compute_z_score_per_found_module_per_block_cell_per_block(;
+            block_index_per_cell,
+            is_found_per_module_per_block,
+            module_index_per_gene_per_block,
+            mean_linear_fraction_in_environment_cells_per_module_per_block,
+            std_linear_fraction_in_environment_cells_per_module_per_block,
+            std_fraction_regularization_per_block,
+            sparse_UMIs_per_cell_per_gene,
+            total_UMIs_per_cell,
+            n_cells,
+            n_genes,
+            n_modules,
+            n_blocks,
+        )
+
     while true
+        is_modules_z_score_outlier_per_cell = compute_is_modules_z_score_outlier_per_cell(;
+            cells_of_sharp_metacells,
+            block_index_per_sharp_metacell,
+            block_position_per_cell,
+            z_score_per_found_module_per_block_cell_per_block,
+            max_modules_z_score,
+            n_cells,
+        )
         outlier_certificates = compute_outlier_certificates(;
             cells_of_sharp_metacells,
+            is_modules_z_score_outlier_per_cell,
             sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
             is_found_per_module_per_block,
@@ -1917,6 +1974,121 @@ function eject_outliers!(;  # UNTESTED
             n_blocks,
         )
     end
+end
+
+# The z-scores of the found modules of each block, of the cells of the block, and the position of each cell among its
+# block's cells (0 for cells with no block).
+function compute_z_score_per_found_module_per_block_cell_per_block(;  # UNTESTED
+    block_index_per_cell::AbstractVector{<:Integer},
+    is_found_per_module_per_block::AbstractMatrix{Bool},
+    module_index_per_gene_per_block::AbstractMatrix{<:Integer},
+    mean_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_linear_fraction_in_environment_cells_per_module_per_block::AbstractMatrix{<:AbstractFloat},
+    std_fraction_regularization_per_block::AbstractVector{<:AbstractFloat},
+    sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
+    total_UMIs_per_cell::AbstractVector{<:Integer},
+    n_cells::Integer,
+    n_genes::Integer,
+    n_modules::Integer,
+    n_blocks::Integer,
+)::Tuple{Vector{Int}, Vector{Matrix{Float32}}}
+    block_cell_indices_per_block = [Int[] for _ in 1:n_blocks]
+    block_position_per_cell = zeros(Int, n_cells)
+    for cell_index in 1:n_cells
+        block_index = block_index_per_cell[cell_index]
+        if block_index > 0
+            push!(block_cell_indices_per_block[block_index], cell_index)
+            block_position_per_cell[cell_index] = length(block_cell_indices_per_block[block_index])
+        end
+    end
+    n_block_cells_per_block = length.(block_cell_indices_per_block)
+
+    z_score_per_found_module_per_block_cell_per_block = [
+        Matrix{Float32}(
+            undef,
+            count(view(is_found_per_module_per_block, :, block_index)),
+            n_block_cells_per_block[block_index],
+        ) for block_index in 1:n_blocks
+    ]
+
+    # Channel pool of per-block-cell Float32 accumulators for `setup_z_score_per_found_module_per_region_cell!`'s nested
+    # parallel-over-found-modules loop, as in `relocate_dissolved_metacell_cells!`.
+    z_score_accumulator_pool = Channel{Vector{Float32}}(nthreads())
+    for _ in 1:nthreads()
+        put!(z_score_accumulator_pool, Vector{Float32}(undef, maximum(n_block_cells_per_block; init = 0)))
+    end
+
+    parallel_loop_wo_rng(
+        1:n_blocks;
+        weights = n_block_cells_per_block,
+        name = "z_score_per_found_module_per_block_cell_per_block",
+        progress = DebugProgress(
+            sum(n_block_cells_per_block);
+            group = :mcs_loops,
+            desc = "z_score_per_found_module_per_block_cell_per_block",
+        ),
+    ) do block_index
+        if n_block_cells_per_block[block_index] > 0
+            z_score_per_found_module_per_block_cell = z_score_per_found_module_per_block_cell_per_block[block_index]
+            setup_z_score_per_found_module_per_region_cell!(;
+                z_score_per_found_module_per_region_cell = z_score_per_found_module_per_block_cell,
+                is_found_per_module = falses(n_modules),
+                block_index,
+                indices_of_region_cells = block_cell_indices_per_block[block_index],
+                is_found_per_module_per_block,
+                module_index_per_gene_per_block,
+                mean_linear_fraction_in_environment_cells_per_module_per_block,
+                std_linear_fraction_in_environment_cells_per_module_per_block,
+                std_fraction_regularization_per_block,
+                sparse_UMIs_per_cell_per_gene,
+                total_UMIs_per_cell,
+                z_score_accumulator_pool,
+                n_genes,
+                n_modules,
+            )
+        end
+        return nothing
+    end
+
+    return block_position_per_cell, z_score_per_found_module_per_block_cell_per_block
+end
+
+# The cells whose punctuated modules z score in their sharp metacell (see
+# `compute_punctuated_distance_z_score_per_point!`) is above `max_modules_z_score`, in the found modules of the
+# metacell's block.
+function compute_is_modules_z_score_outlier_per_cell(;  # UNTESTED
+    cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
+    block_index_per_sharp_metacell::AbstractVector{<:Integer},
+    block_position_per_cell::AbstractVector{<:Integer},
+    z_score_per_found_module_per_block_cell_per_block::AbstractVector{<:AbstractMatrix{Float32}},
+    max_modules_z_score::AbstractFloat,
+    n_cells::Integer,
+)::Vector{Bool}
+    is_modules_z_score_outlier_per_cell = zeros(Bool, n_cells)
+    n_cells_per_sharp_metacell = length.(cells_of_sharp_metacells)
+
+    parallel_loop_wo_rng(
+        eachindex(cells_of_sharp_metacells);
+        weights = n_cells_per_sharp_metacell .^ 2,
+        name = "is_modules_z_score_outlier_per_cell",
+    ) do sharp_metacell_index
+        cell_indices = cells_of_sharp_metacells[sharp_metacell_index]
+        z_score_per_found_module_per_block_cell =
+            z_score_per_found_module_per_block_cell_per_block[block_index_per_sharp_metacell[sharp_metacell_index]]
+        modules_z_score_per_metacell_cell = Vector{Float64}(undef, length(cell_indices))
+        compute_punctuated_distance_z_score_per_point!(
+            modules_z_score_per_metacell_cell,
+            z_score_per_found_module_per_block_cell[:, block_position_per_cell[cell_indices]],
+        )
+        for (metacell_cell_position, cell_index) in enumerate(cell_indices)
+            if modules_z_score_per_metacell_cell[metacell_cell_position] > max_modules_z_score
+                is_modules_z_score_outlier_per_cell[cell_index] = true
+            end
+        end
+        return nothing
+    end
+
+    return is_modules_z_score_outlier_per_cell
 end
 
 # The metacells to dissolve: those left with fewer than `min_cells_in_metacell` cells once their outliers are ejected. A

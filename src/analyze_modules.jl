@@ -1473,4 +1473,56 @@ function compute_z_score_per_found_module_per_region_cell!(;  # UNTESTED
     return nothing
 end
 
+# Fill `z_score_per_point` with the punctuated z score of the distance of each point of a group from the group's center,
+# in the space of the dimensions of `value_per_dim_per_point`. Both are exactly punctuated: a point's distance is from
+# the center of the group's other points, and it is compared with the mean and standard deviation of the other points'
+# distances from that same center. A group of fewer than 3 points, or whose other points are all at the same distance,
+# gives a z score of 0.
+#
+# Removing point `i` from a group of `n` points moves the center by `-(xᵢ - c) / (n - 1)`, so point `i`'s distance from
+# it is `n / (n - 1)` times its distance from `c`, and another point `j`'s squared distance from it is
+# `dⱼ² + 2 (xⱼ - c)·(xᵢ - c) / (n - 1) + dᵢ² / (n - 1)²`. The dot products are the Gram matrix of the offsets from `c`,
+# so the whole group takes `O(n² × n_dims)`.
+function compute_punctuated_distance_z_score_per_point!(  # UNTESTED
+    z_score_per_point::AbstractVector{<:AbstractFloat},
+    value_per_dim_per_point::AbstractMatrix{<:AbstractFloat},
+)::Nothing
+    n_points = size(value_per_dim_per_point, 2)
+    @assert length(z_score_per_point) == n_points
+    z_score_per_point .= 0
+    if n_points < 3
+        return nothing
+    end
+
+    offset_per_dim_per_point = Float64.(value_per_dim_per_point)
+    offset_per_dim_per_point .-= mean(offset_per_dim_per_point; dims = 2)  # NOLINT
+    dot_per_point_per_point = transpose(offset_per_dim_per_point) * offset_per_dim_per_point
+    shift_scale = 1.0 / (n_points - 1)
+
+    for point_index in 1:n_points
+        own_squared_distance = dot_per_point_per_point[point_index, point_index]
+        sum_distances = 0.0
+        sum_squared_distances = 0.0
+        @inbounds for other_point_index in 1:n_points
+            if other_point_index != point_index
+                squared_distance =
+                    dot_per_point_per_point[other_point_index, other_point_index] +
+                    2 * shift_scale * dot_per_point_per_point[other_point_index, point_index] +
+                    shift_scale * shift_scale * own_squared_distance
+                distance = sqrt(max(squared_distance, 0.0))
+                sum_distances += distance
+                sum_squared_distances += distance * distance
+            end
+        end
+        mean_distance = sum_distances / (n_points - 1)
+        variance = (sum_squared_distances - sum_distances * mean_distance) / (n_points - 2)
+        if variance > 0
+            own_distance = n_points * shift_scale * sqrt(own_squared_distance)
+            z_score_per_point[point_index] = (own_distance - mean_distance) / sqrt(variance)
+        end
+    end
+
+    return nothing
+end
+
 end  # module
