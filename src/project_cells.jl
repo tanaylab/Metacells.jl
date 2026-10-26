@@ -10,7 +10,6 @@ export compute_matrix_of_correlation_between_neighborhood_cells_and_projected_me
 
 using Base.Threads
 using DataAxesFormats
-using Distances
 using LinearAlgebra
 using LoopVectorization
 using ProgressMeter
@@ -27,7 +26,6 @@ import Base.Threads.maxthreadid
 import Metacells.AnalyzeCells.cell_group_membership_from_block_neighborhoods
 import Metacells.AnalyzeCells.sparse_cell_reference_correlation_per_gene_per_group!
 import Metacells.AnalyzeModules.compute_std_fraction_regularization_per_block
-import Metacells.AnalyzeModules.compute_z_score_per_found_module_per_region_cell!
 
 # Needed because of JET:
 import Metacells.Contracts.block_axis
@@ -79,14 +77,15 @@ Compute and set [`vector_of_projected_metacell_per_cell`](@ref), [`vector_of_pro
 the `query_daf`, we:
 
   - Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral
-    marker genes.
-  - Then, for each cell, consider the expression level of the found modules of the provisional block's neighborhood. We
-    use this to pick a metacell in the neighborhood which has the closest Euclidean distance.
-  - This metacell might belong to a different block. If so, we repeat the process using that block's neighborhood
-    modules.
-  - If the resulting best match metacell is in the same (new) block, we accept it.
-  - Otherwise, we just look for the closest metacell in the original block (using that block's modules) and settle for
-    that.
+    marker genes. It is the cell's first current block.
+  - Score the cell in the found modules of its current block, and find the metacell of the block's neighborhood with
+    the closest Euclidean distance.
+  - If this metacell is in the current block, we accept it.
+  - If it is in a block the cell hasn't visited yet, that block becomes the current block, and we repeat.
+  - Otherwise, it is in a block the cell already visited. We settle for the closest metacell of the current block.
+
+Each cell is projected on its own, reading only its own column of the query's `UMIs`. The cells are read in a single
+pass over the gene × cell layout.
 
 The provisional block is picked using the log (base 2) of the expression of the marker genes, using the
 `gene_fraction_regularization` to handle zero fractions. The metacells are compared using the z-scores of the found
@@ -154,30 +153,94 @@ $(CONTRACT2)
 )::Nothing
     query_gene_index_per_atlas_pertinent_marker, query_gene_index_per_atlas_gene =
         map_query_atlas_genes(; query_daf, atlas_daf)
-
-    sparse_UMIs_per_query_cell_per_query_gene =
-        plain_array(get_matrix(query_daf, "cell", "gene", "UMIs"))::SparseMatrixCSC
-    total_UMIs_per_query_cell = plain_array(get_vector(query_daf, "cell", "total_UMIs"))
-
-    provisional_block_index_per_query_cell = compute_provisional_projection_per_query_cell!(;
+    projection_atlas = load_projection_atlas(;
         query_daf,
         atlas_daf,
-        gene_fraction_regularization,
-        sparse_UMIs_per_query_cell_per_query_gene,
-        total_UMIs_per_query_cell,
         query_gene_index_per_atlas_pertinent_marker,
+        query_gene_index_per_atlas_gene,
+        gene_fraction_regularization,
+        std_UMIs_regularization,
     )
 
-    compute_final_projection_per_query_cell(;
+    is_excluded_per_query_cell = plain_array(get_vector(query_daf, "cell", "is_excluded"))
+    total_UMIs_per_query_cell = plain_array(get_vector(query_daf, "cell", "total_UMIs"))
+    UMIs_per_query_gene_per_query_cell = get_matrix(query_daf, "gene", "cell", "UMIs")
+    @assert issparse(UMIs_per_query_gene_per_query_cell)
+
+    n_query_cells = length(is_excluded_per_query_cell)
+    indices_of_included_query_cells = findall(.!is_excluded_per_query_cell)
+    projected_metacell_index_per_query_cell = zeros(UInt32, n_query_cells)
+    projected_modules_z_score_per_query_cell = fill(Inf32, n_query_cells)
+
+    n_blocks = length(projection_atlas.squared_norm_per_block)
+    max_n_found_modules = maximum(projection_atlas.n_found_modules_per_block)
+    score_per_block_per_thread = [Vector{Float64}(undef, n_blocks) for _ in 1:maxthreadid()]
+    module_UMIs_per_found_module_per_thread = [Vector{Float32}(undef, max_n_found_modules) for _ in 1:maxthreadid()]
+    z_score_per_found_module_per_thread = [Vector{Float32}(undef, max_n_found_modules) for _ in 1:maxthreadid()]
+    visited_block_indices_per_thread = [Int[] for _ in 1:maxthreadid()]
+
+    parallel_foreach_column(
+        UMIs_per_query_gene_per_query_cell;
+        columns = indices_of_included_query_cells,
+        name = "cells_projection",
+        progress = DebugProgress(
+            length(indices_of_included_query_cells);
+            group = :mcs_loops,
+            desc = "cells_projection",
+        ),
+        progress_chunk = 100,
+    ) do _, query_cell_index, UMIs_per_query_gene
+        thread = threadid()
+        query_gene_index_per_stored = SparseArrays.nonzeroinds(UMIs_per_query_gene)
+        UMIs_per_stored = nonzeros(UMIs_per_query_gene)
+        total_UMIs = total_UMIs_per_query_cell[query_cell_index]
+
+        provisional_block_index = provisional_block_index_of_query_cell(
+            projection_atlas;
+            query_gene_index_per_stored,
+            UMIs_per_stored,
+            total_UMIs,
+            gene_fraction_regularization,
+            score_per_block = score_per_block_per_thread[thread],
+        )
+        metacell_index, distance = projected_metacell_of_query_cell(
+            projection_atlas;
+            provisional_block_index,
+            query_gene_index_per_stored,
+            UMIs_per_stored,
+            total_UMIs,
+            module_UMIs_per_found_module = module_UMIs_per_found_module_per_thread[thread],
+            z_score_per_found_module = z_score_per_found_module_per_thread[thread],
+            visited_block_indices = visited_block_indices_per_thread[thread],
+        )
+
+        projected_metacell_index_per_query_cell[query_cell_index] = metacell_index
+        projected_modules_z_score_per_query_cell[query_cell_index] =
+            (distance - projection_atlas.mean_euclidean_modules_cells_distance_per_metacell[metacell_index]) /
+            projection_atlas.std_euclidean_modules_cells_distance_per_metacell[metacell_index]
+        return nothing
+    end
+
+    name_per_metacell = axis_vector(atlas_daf, "metacell")
+    block_per_metacell = plain_array(get_vector(atlas_daf, "metacell", "block"))
+    projected_metacell_per_query_cell = [
+        metacell_index == 0 ? "" : name_per_metacell[metacell_index] for
+        metacell_index in projected_metacell_index_per_query_cell
+    ]
+    projected_block_per_query_cell = [
+        metacell_index == 0 ? "" : block_per_metacell[metacell_index] for
+        metacell_index in projected_metacell_index_per_query_cell
+    ]
+
+    set_vector!(query_daf, "cell", "projected_metacell", projected_metacell_per_query_cell; overwrite)
+    set_vector!(
         query_daf,
-        atlas_daf,
-        query_gene_index_per_atlas_gene,
-        sparse_UMIs_per_query_cell_per_query_gene,
-        total_UMIs_per_query_cell,
-        provisional_block_index_per_query_cell,
-        std_UMIs_regularization,
+        "cell",
+        "projected_metacell_modules_z_score",
+        projected_modules_z_score_per_query_cell;
         overwrite,
     )
+    set_vector!(query_daf, "cell", "projected_block", projected_block_per_query_cell; overwrite)
 
     return nothing
 end
@@ -203,15 +266,45 @@ function map_query_atlas_genes(;  # UNTESTED
     return query_gene_index_per_atlas_pertinent_marker, query_gene_index_per_atlas_gene
 end
 
-function compute_provisional_projection_per_query_cell!(;  # UNTESTED
-    query_daf::DafWriter,
+# What projecting a query cell needs from the atlas, indexed by the query's genes.
+struct ProjectionAtlas
+    # The position of each query gene among the atlas's pertinent markers (0 if it isn't one).
+    pertinent_marker_position_per_query_gene::Vector{Int32}
+    # The `log2(1 + fraction / regularization)` of each pertinent marker in each block.
+    shifted_log_linear_fraction_per_block_per_pertinent_marker::Matrix{Float64}
+    squared_norm_per_block::Vector{Float64}
+    # The position of each query gene among the atlas genes in some module (0 if it is in none).
+    module_gene_position_per_query_gene::Vector{Int32}
+    # The position of each module gene's module among the found modules of each block (0 if it isn't found there).
+    found_module_position_per_module_gene_per_block::Matrix{UInt16}
+    n_found_modules_per_block::Vector{Int}
+    mean_linear_fraction_in_environment_cells_per_found_module_per_block::Matrix{Float32}
+    std_linear_fraction_in_environment_cells_per_found_module_per_block::Matrix{Float32}
+    std_fraction_regularization_per_block::Vector{Float32}
+    # The metacells of each block's neighborhood, and their mean z-scores in the block's found modules.
+    indices_of_candidate_metacells_per_block::Vector{Vector{Int}}
+    mean_cells_z_score_per_found_module_per_candidate_metacell_per_block::Vector{Matrix{Float32}}
+    block_index_per_metacell::Vector{Int}
+    mean_euclidean_modules_cells_distance_per_metacell::Vector{Float32}
+    std_euclidean_modules_cells_distance_per_metacell::Vector{Float32}
+end
+
+function load_projection_atlas(;  # UNTESTED
+    query_daf::DafReader,
     atlas_daf::DafReader,
-    gene_fraction_regularization::AbstractFloat,
-    sparse_UMIs_per_query_cell_per_query_gene::SparseMatrixCSC{<:Integer},
-    total_UMIs_per_query_cell::AbstractVector{<:Integer},
     query_gene_index_per_atlas_pertinent_marker::AbstractVector{<:Integer},
-)::AbstractVector{<:Integer}
-    is_excluded_per_query_cell = plain_array(get_vector(query_daf, "cell", "is_excluded"))
+    query_gene_index_per_atlas_gene::AbstractVector{<:Integer},
+    gene_fraction_regularization::AbstractFloat,
+    std_UMIs_regularization::AbstractFloat,
+)::ProjectionAtlas
+    n_query_genes = axis_length(query_daf, "gene")
+    n_blocks = axis_length(atlas_daf, "block")
+    n_modules = axis_length(atlas_daf, "module")
+    name_per_block = axis_vector(atlas_daf, "block")
+
+    pertinent_marker_position_per_query_gene = zeros(Int32, n_query_genes)
+    pertinent_marker_position_per_query_gene[query_gene_index_per_atlas_pertinent_marker] .=
+        1:length(query_gene_index_per_atlas_pertinent_marker)
 
     # As in `compute_vector_of_block_closest_by_pertinent_markers_per_cell!`: the distances use
     # `log2(1 + fraction / regularization)`, so zero fractions stay zero and each query cell's work is proportional to
@@ -223,329 +316,233 @@ function compute_provisional_projection_per_query_cell!(;  # UNTESTED
         Float64.(Matrix(plain_array(densify(linear_fraction_per_block_per_pertinent_marker)))) ./
         gene_fraction_regularization,
     )
-    squared_norm_per_block = vec(sum(abs2, shifted_log_linear_fraction_per_block_per_pertinent_marker; dims = 2))
-    n_blocks = length(squared_norm_per_block)
-
-    sparse_UMIs_per_pertinent_marker_per_query_cell = SparseMatrixCSC(
-        transpose(sparse_UMIs_per_query_cell_per_query_gene[:, query_gene_index_per_atlas_pertinent_marker]),
-    )
-    pertinent_marker_position_per_stored = rowvals(sparse_UMIs_per_pertinent_marker_per_query_cell)
-    UMIs_per_stored = nonzeros(sparse_UMIs_per_pertinent_marker_per_query_cell)
-
-    score_per_block_per_thread = [Vector{Float64}(undef, n_blocks) for _ in 1:maxthreadid()]
     @check_turbo_matrix(shifted_log_linear_fraction_per_block_per_pertinent_marker)
-    for score_per_block in score_per_block_per_thread
-        @check_turbo_vector(score_per_block)
-    end
-
-    n_query_cells = axis_length(query_daf, "cell")
-    provisional_block_index_per_query_cell = Vector{UInt32}(undef, n_query_cells)
-
-    parallel_loop_wo_rng(
-        1:n_query_cells;
-        name = "provisional_projection_per_cell",
-        progress = DebugProgress(n_query_cells; group = :mcs_loops, desc = "provisional_projection_per_cell"),
-        progress_chunk = 100,
-    ) do query_cell_index
-        if is_excluded_per_query_cell[query_cell_index]
-            provisional_block_index_per_query_cell[query_cell_index] = 0
-        else
-            score_per_block = score_per_block_per_thread[threadid()]
-            score_per_block .= squared_norm_per_block
-            scale = 1.0 / (total_UMIs_per_query_cell[query_cell_index] * gene_fraction_regularization)
-            @inbounds for stored_index in nzrange(sparse_UMIs_per_pertinent_marker_per_query_cell, query_cell_index)
-                twice_shifted_log_linear_fraction = 2 * log2(1 + UMIs_per_stored[stored_index] * scale)
-                pertinent_marker_position = pertinent_marker_position_per_stored[stored_index]
-                @turbo for block_index in 1:n_blocks
-                    score_per_block[block_index] -=
-                        twice_shifted_log_linear_fraction * shifted_log_linear_fraction_per_block_per_pertinent_marker[
-                            block_index,
-                            pertinent_marker_position,
-                        ]
-                end
-            end
-            provisional_block_index_per_query_cell[query_cell_index] = argmin(score_per_block)
-        end
-        return nothing
-    end
-
-    return provisional_block_index_per_query_cell
-end
-
-function compute_final_projection_per_query_cell(;  # UNTESTED
-    query_daf::DafWriter,
-    atlas_daf::DafReader,
-    query_gene_index_per_atlas_gene::AbstractVector{<:Integer},
-    sparse_UMIs_per_query_cell_per_query_gene::SparseMatrixCSC{<:Integer},
-    total_UMIs_per_query_cell::AbstractVector{<:Integer},
-    provisional_block_index_per_query_cell::AbstractVector{<:Integer},
-    std_UMIs_regularization::AbstractFloat,
-    overwrite::Bool,
-)::Nothing
-    n_query_cells = axis_length(query_daf, "cell")
-
-    n_modules = axis_length(atlas_daf, "module")
-    n_blocks = axis_length(atlas_daf, "block")
-    name_per_block = axis_vector(atlas_daf, "block")
-    name_per_metacell = axis_vector(atlas_daf, "metacell")
+    squared_norm_per_block = vec(sum(abs2, shifted_log_linear_fraction_per_block_per_pertinent_marker; dims = 2))
 
     module_index_per_atlas_gene_per_block = get_query(atlas_daf, "@ gene @ block :: module ?? 0 : index").array
     is_found_per_module_per_block = plain_array(get_matrix(atlas_daf, "module", "block", "is_found"))
-
     is_in_neighborhood_per_other_block_per_base_block =
         plain_array(get_matrix(atlas_daf, "block", "block", "is_in_neighborhood"))
-    block_index_per_metacell = atlas_daf["@ metacell : block : index"].array
-
+    block_index_per_metacell = Vector{Int}(atlas_daf["@ metacell : block : index"].array)
     mean_linear_fraction_in_environment_cells_per_module_per_block =
         plain_array(get_matrix(atlas_daf, "module", "block", "mean_linear_fraction_in_environment_cells"))
     std_linear_fraction_in_environment_cells_per_module_per_block =
         plain_array(get_matrix(atlas_daf, "module", "block", "std_linear_fraction_in_environment_cells"))
-    std_fraction_regularization_per_block =
-        compute_std_fraction_regularization_per_block(atlas_daf; std_UMIs_regularization)
 
-    mean_euclidean_modules_cells_distance_per_metacell =
-        plain_array(get_vector(atlas_daf, "metacell", "mean_euclidean_modules_cells_distance"))
-    std_euclidean_modules_cells_distance_per_metacell =
-        plain_array(get_vector(atlas_daf, "metacell", "std_euclidean_modules_cells_distance"))
+    indices_of_module_atlas_genes = findall(vec(any(module_index_per_atlas_gene_per_block .> 0; dims = 2)))
+    n_module_genes = length(indices_of_module_atlas_genes)
+    module_gene_position_per_query_gene = zeros(Int32, n_query_genes)
+    module_gene_position_per_query_gene[query_gene_index_per_atlas_gene[indices_of_module_atlas_genes]] .=
+        1:n_module_genes
 
-    projected_metacell_per_query_cell = Vector{AbstractString}(undef, n_query_cells)
-    projected_metacell_per_query_cell .= ""
-    projected_modules_z_score_per_query_cell = fill(Inf32, n_query_cells)
+    n_found_modules_per_block = vec(sum(is_found_per_module_per_block; dims = 1))
+    max_n_found_modules = maximum(n_found_modules_per_block)
+    found_module_position_per_module_gene_per_block = zeros(UInt16, n_module_genes, n_blocks)
+    mean_linear_fraction_in_environment_cells_per_found_module_per_block = zeros(Float32, max_n_found_modules, n_blocks)
+    std_linear_fraction_in_environment_cells_per_found_module_per_block = zeros(Float32, max_n_found_modules, n_blocks)
+    indices_of_candidate_metacells_per_block = Vector{Vector{Int}}(undef, n_blocks)
+    mean_cells_z_score_per_found_module_per_candidate_metacell_per_block = Vector{Matrix{Float32}}(undef, n_blocks)
 
-    # Excluded cells have no provisional block, so they are never scheduled, and stay unprojected.
-    next_indices_of_undetermined_query_cells_per_block =
-        [findall(provisional_block_index_per_query_cell .== block_index) for block_index in 1:n_blocks]
-    n_included_query_cells = sum(length.(next_indices_of_undetermined_query_cells_per_block))
+    found_module_position_per_module = zeros(UInt16, n_modules)
+    for block_index in 1:n_blocks
+        indices_of_found_modules = findall(view(is_found_per_module_per_block, :, block_index))
+        n_found_modules = length(indices_of_found_modules)
+        @assert n_found_modules > 0
 
-    # Phase 1 keeps, for each cell it defers, the nearest metacell of the cell's own (provisional) block, so the third
-    # phase, which settles for that metacell, is a lookup.
-    nearest_own_metacell_index_per_query_cell = zeros(UInt32, n_query_cells)
-    nearest_own_metacell_distance_per_query_cell = zeros(Float32, n_query_cells)
-
-    spin_lock_per_block = [SpinLock() for _ in 1:n_blocks]
-
-    n_determined_query_cells = Atomic{Int}(0)
-
-    for phase in 1:2
-        phase_name = "final_projection_per_cell.phase_$(phase)"
-        indices_of_undetermined_query_cells_per_block = next_indices_of_undetermined_query_cells_per_block
-        deferred_indices_of_undetermined_query_cells_per_block = [Int32[] for _ in 1:n_blocks]
-        flame_timed(phase_name) do
-            @debug (
-                "Determined: $(n_determined_query_cells[])" *
-                " $(percent(n_determined_query_cells[], n_included_query_cells)) Phase $(phase)..."
-            ) _group = :mcs_details
-
-            n_undetermined_query_cells_per_block = length.(indices_of_undetermined_query_cells_per_block)
-
-            # Channel pool of Float32 accumulators for `compute_z_score_per_found_module_per_region_cell!`'s nested
-            # parallel-over-found-modules loop, as in sharpening, each sized to the largest block of the phase.
-            max_n_undetermined_query_cells = maximum(n_undetermined_query_cells_per_block)
-            z_score_accumulator_pool = Channel{Vector{Float32}}(nthreads())
-            for _ in 1:nthreads()
-                put!(z_score_accumulator_pool, Vector{Float32}(undef, max_n_undetermined_query_cells))
-            end
-
-            # TODO: Many memory allocations inside the parallel loop.
-            parallel_loop_wo_rng(
-                1:n_blocks;
-                name = "final_projection_per_cell.loop",
-                weights = n_undetermined_query_cells_per_block,
-                progress = DebugProgress(
-                    sum(n_undetermined_query_cells_per_block);
-                    group = :mcs_loops,
-                    desc = phase_name,
-                ),
-            ) do block_index
-                block_name = name_per_block[block_index]
-
-                # The cells of a later phase are collected from all the blocks in parallel, so they are unsorted.
-                indices_of_undetermined_query_cells = sort!(indices_of_undetermined_query_cells_per_block[block_index])
-                n_undetermined_query_cells = length(indices_of_undetermined_query_cells)
-                if n_undetermined_query_cells > 0
-                    @views is_in_neighborhood_per_other_block =
-                        is_in_neighborhood_per_other_block_per_base_block[:, block_index]
-                    indices_of_candidate_metacells =
-                        findall(is_in_neighborhood_per_other_block[block_index_per_metacell])
-                    block_index_per_candidate_metacell = block_index_per_metacell[indices_of_candidate_metacells]
-
-                    @views module_index_per_atlas_gene = module_index_per_atlas_gene_per_block[:, block_index]
-                    is_found_per_module = BitVector(view(is_found_per_module_per_block, :, block_index))
-                    indices_of_found_modules = findall(is_found_per_module)
-                    n_found_modules = length(indices_of_found_modules)
-                    @assert n_found_modules > 0
-
-                    mean_cells_z_score_per_module_per_metacell =
-                        plain_array(get_matrix(atlas_daf, "module", "metacell", "$(block_name)_mean_cells_z_score"))
-                    z_score_per_found_module_per_candidate_metacell = mean_cells_z_score_per_module_per_metacell[
-                        indices_of_found_modules,
-                        indices_of_candidate_metacells,
-                    ]
-
-                    @views module_index_per_atlas_gene = module_index_per_atlas_gene_per_block[:, block_index]
-                    query_gene_indices_per_module = [Int[] for _ in 1:n_modules]
-                    for found_module_index in indices_of_found_modules
-                        indices_of_found_module_atlas_genes =
-                            findall(module_index_per_atlas_gene .== found_module_index)
-                        @assert !isempty(indices_of_found_module_atlas_genes)
-                        query_gene_indices_per_module[found_module_index] =
-                            query_gene_index_per_atlas_gene[indices_of_found_module_atlas_genes]
-                    end
-
-                    z_score_per_found_module_per_undetermined_query_cell =
-                        Matrix{Float32}(undef, n_found_modules, n_undetermined_query_cells)
-                    compute_z_score_per_found_module_per_region_cell!(;
-                        z_score_per_found_module_per_region_cell = z_score_per_found_module_per_undetermined_query_cell,
-                        sparse_UMIs_per_cell_per_gene = sparse_UMIs_per_query_cell_per_query_gene,
-                        total_UMIs_per_cell = total_UMIs_per_query_cell,
-                        is_found_per_module,
-                        indices_of_region_cells = indices_of_undetermined_query_cells,
-                        gene_indices_per_module = query_gene_indices_per_module,
-                        z_score_accumulator_pool,
-                        mean_linear_fraction_in_environment_cells_per_module = view(
-                            mean_linear_fraction_in_environment_cells_per_module_per_block,
-                            :,
-                            block_index,
-                        ),
-                        std_linear_fraction_in_environment_cells_per_module = view(
-                            std_linear_fraction_in_environment_cells_per_module_per_block,
-                            :,
-                            block_index,
-                        ),
-                        std_fraction_regularization = std_fraction_regularization_per_block[block_index],
-                    )
-
-                    distances_between_candidate_metacells_and_undetermined_query_cells =
-                        flame_timed("pairwise.Euclidean") do
-                            return pairwise(
-                                Euclidean(),
-                                z_score_per_found_module_per_candidate_metacell,
-                                z_score_per_found_module_per_undetermined_query_cell,
-                            )
-                        end
-
-                    minimal_position_per_undetermined_query_cell =
-                        vec(argmin(distances_between_candidate_metacells_and_undetermined_query_cells; dims = 1))
-                    minimal_distance_per_undetermined_query_cell =
-                        distances_between_candidate_metacells_and_undetermined_query_cells[minimal_position_per_undetermined_query_cell]
-                    position_of_nearest_candidate_metacell_per_undetermined_query_cell =
-                        [position.I[1] for position in minimal_position_per_undetermined_query_cell]
-
-                    nearest_block_index_per_undetermined_query_cell =
-                        block_index_per_candidate_metacell[position_of_nearest_candidate_metacell_per_undetermined_query_cell]
-                    positions_of_stable_undetermined_query_cells =
-                        findall(nearest_block_index_per_undetermined_query_cell .== block_index)
-
-                    # A block is always in its own neighborhood, so its own metacells are among the candidates.
-                    positions_of_own_candidate_metacells = findall(block_index_per_candidate_metacell .== block_index)
-
-                    for (undetermined_query_cell_position, nearest_block_index) in
-                        enumerate(nearest_block_index_per_undetermined_query_cell)
-                        if nearest_block_index != block_index
-                            query_cell_index = indices_of_undetermined_query_cells[undetermined_query_cell_position]
-                            if phase == 1
-                                target_block_index = nearest_block_index
-                                @views distance_per_own_candidate_metacell =
-                                    distances_between_candidate_metacells_and_undetermined_query_cells[
-                                        positions_of_own_candidate_metacells,
-                                        undetermined_query_cell_position,
-                                    ]
-                                own_position = argmin(distance_per_own_candidate_metacell)
-                                nearest_own_metacell_index_per_query_cell[query_cell_index] =
-                                    indices_of_candidate_metacells[positions_of_own_candidate_metacells[own_position]]
-                                nearest_own_metacell_distance_per_query_cell[query_cell_index] =
-                                    distance_per_own_candidate_metacell[own_position]
-                            else
-                                @assert phase == 2
-                                target_block_index = provisional_block_index_per_query_cell[query_cell_index]
-                                @assert block_index != target_block_index
-                            end
-                            try
-                                lock(spin_lock_per_block[target_block_index])
-                                push!(
-                                    deferred_indices_of_undetermined_query_cells_per_block[target_block_index],
-                                    query_cell_index,
-                                )
-                            finally
-                                unlock(spin_lock_per_block[target_block_index])
-                            end
-                        end
-                    end
-
-                    n_stable_query_cells = length(positions_of_stable_undetermined_query_cells)
-                    if n_stable_query_cells > 0
-                        position_of_nearest_candidate_metacell_per_stable_undetermined_query_cell =
-                            position_of_nearest_candidate_metacell_per_undetermined_query_cell[positions_of_stable_undetermined_query_cells]
-                        metacell_index_per_stable_undetermined_query_cell =
-                            indices_of_candidate_metacells[position_of_nearest_candidate_metacell_per_stable_undetermined_query_cell]
-                        metacell_per_stable_undetermined_query_cell =
-                            name_per_metacell[metacell_index_per_stable_undetermined_query_cell]
-
-                        indices_of_stable_query_cells =
-                            indices_of_undetermined_query_cells[positions_of_stable_undetermined_query_cells]
-                        projected_metacell_per_query_cell[indices_of_stable_query_cells] =
-                            metacell_per_stable_undetermined_query_cell
-
-                        projected_modules_z_score_per_query_cell[indices_of_stable_query_cells] .=
-                            (
-                                minimal_distance_per_undetermined_query_cell[positions_of_stable_undetermined_query_cells] .-
-                                mean_euclidean_modules_cells_distance_per_metacell[metacell_index_per_stable_undetermined_query_cell]
-                            ) ./
-                            (std_euclidean_modules_cells_distance_per_metacell[metacell_index_per_stable_undetermined_query_cell])
-                    end
-                    atomic_add!(n_determined_query_cells, n_stable_query_cells)
-                end
-                return nothing
+        found_module_position_per_module .= 0
+        found_module_position_per_module[indices_of_found_modules] .= 1:n_found_modules
+        for (module_gene_position, atlas_gene_index) in enumerate(indices_of_module_atlas_genes)
+            module_index = module_index_per_atlas_gene_per_block[atlas_gene_index, block_index]
+            if module_index > 0
+                found_module_position_per_module_gene_per_block[module_gene_position, block_index] =
+                    found_module_position_per_module[module_index]
             end
         end
-        next_indices_of_undetermined_query_cells_per_block = deferred_indices_of_undetermined_query_cells_per_block
+
+        mean_linear_fraction_in_environment_cells_per_found_module_per_block[1:n_found_modules, block_index] .=
+            view(mean_linear_fraction_in_environment_cells_per_module_per_block, indices_of_found_modules, block_index)
+        std_linear_fraction_in_environment_cells_per_found_module_per_block[1:n_found_modules, block_index] .=
+            view(std_linear_fraction_in_environment_cells_per_module_per_block, indices_of_found_modules, block_index)
+        @assert all(
+            std_linear_fraction_in_environment_cells_per_found_module_per_block[1:n_found_modules, block_index] .> 0,
+        )
+
+        # A block is always in its own neighborhood, so its own metacells are among the candidates.
+        indices_of_candidate_metacells =
+            findall(view(is_in_neighborhood_per_other_block_per_base_block, :, block_index)[block_index_per_metacell])
+        indices_of_candidate_metacells_per_block[block_index] = indices_of_candidate_metacells
+        mean_cells_z_score_per_module_per_metacell = plain_array(
+            get_matrix(atlas_daf, "module", "metacell", "$(name_per_block[block_index])_mean_cells_z_score"),
+        )
+        mean_cells_z_score_per_found_module_per_candidate_metacell_per_block[block_index] = Matrix{Float32}(
+            mean_cells_z_score_per_module_per_metacell[indices_of_found_modules, indices_of_candidate_metacells],
+        )
     end
 
-    # The cells phase 2 sent back to their provisional block settle for the nearest metacell of that block.
-    indices_of_returned_query_cells_per_block = next_indices_of_undetermined_query_cells_per_block
-    flame_timed("final_projection_per_cell.phase_3") do
-        @debug (
-            "Determined: $(n_determined_query_cells[])" *
-            " $(percent(n_determined_query_cells[], n_included_query_cells)) Phase 3..."
-        ) _group = :mcs_details
-        for indices_of_returned_query_cells in indices_of_returned_query_cells_per_block
-            for query_cell_index in indices_of_returned_query_cells
-                metacell_index = nearest_own_metacell_index_per_query_cell[query_cell_index]
-                @assert metacell_index > 0
-                projected_metacell_per_query_cell[query_cell_index] = name_per_metacell[metacell_index]
-                projected_modules_z_score_per_query_cell[query_cell_index] =
-                    (
-                        nearest_own_metacell_distance_per_query_cell[query_cell_index] -
-                        mean_euclidean_modules_cells_distance_per_metacell[metacell_index]
-                    ) / std_euclidean_modules_cells_distance_per_metacell[metacell_index]
-            end
-            atomic_add!(n_determined_query_cells, length(indices_of_returned_query_cells))
-        end
-        return nothing
-    end
-
-    @assert n_determined_query_cells[] == n_included_query_cells
-
-    set_vector!(query_daf, "cell", "projected_metacell", projected_metacell_per_query_cell; overwrite)
-    set_vector!(
-        query_daf,
-        "cell",
-        "projected_metacell_modules_z_score",
-        projected_modules_z_score_per_query_cell;
-        overwrite,
+    return ProjectionAtlas(
+        pertinent_marker_position_per_query_gene,
+        shifted_log_linear_fraction_per_block_per_pertinent_marker,
+        squared_norm_per_block,
+        module_gene_position_per_query_gene,
+        found_module_position_per_module_gene_per_block,
+        n_found_modules_per_block,
+        mean_linear_fraction_in_environment_cells_per_found_module_per_block,
+        std_linear_fraction_in_environment_cells_per_found_module_per_block,
+        compute_std_fraction_regularization_per_block(atlas_daf; std_UMIs_regularization),
+        indices_of_candidate_metacells_per_block,
+        mean_cells_z_score_per_found_module_per_candidate_metacell_per_block,
+        block_index_per_metacell,
+        Vector{Float32}(plain_array(get_vector(atlas_daf, "metacell", "mean_euclidean_modules_cells_distance"))),
+        Vector{Float32}(plain_array(get_vector(atlas_daf, "metacell", "std_euclidean_modules_cells_distance"))),
     )
+end
 
-    projected_metacell_index_per_query_cell =
-        axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell; allow_empty = true)
-    indices_of_projected_query_cells = findall(projected_metacell_index_per_query_cell .> 0)
-    block_per_metacell = plain_array(get_vector(atlas_daf, "metacell", "block"))
-    projected_block_per_query_cell = Vector{AbstractString}(undef, n_query_cells)
-    projected_block_per_query_cell .= ""
-    projected_block_per_query_cell[indices_of_projected_query_cells] =
-        block_per_metacell[projected_metacell_index_per_query_cell[indices_of_projected_query_cells]]
-    set_vector!(query_daf, "cell", "projected_block", projected_block_per_query_cell; overwrite)
+# The block whose pertinent markers are closest to the query cell's.
+function provisional_block_index_of_query_cell(  # UNTESTED
+    projection_atlas::ProjectionAtlas;
+    query_gene_index_per_stored::AbstractVector{<:Integer},
+    UMIs_per_stored::AbstractVector{<:Integer},
+    total_UMIs::Integer,
+    gene_fraction_regularization::AbstractFloat,
+    score_per_block::Vector{Float64},
+)::Int
+    shifted_log_linear_fraction_per_block_per_pertinent_marker =
+        projection_atlas.shifted_log_linear_fraction_per_block_per_pertinent_marker
+    pertinent_marker_position_per_query_gene = projection_atlas.pertinent_marker_position_per_query_gene
+    n_blocks = length(score_per_block)
+
+    score_per_block .= projection_atlas.squared_norm_per_block
+    scale = 1.0 / (total_UMIs * gene_fraction_regularization)
+    @inbounds for stored_index in eachindex(query_gene_index_per_stored)
+        pertinent_marker_position = pertinent_marker_position_per_query_gene[query_gene_index_per_stored[stored_index]]
+        if pertinent_marker_position > 0
+            twice_shifted_log_linear_fraction = 2 * log2(1 + UMIs_per_stored[stored_index] * scale)
+            @turbo for block_index in 1:n_blocks
+                score_per_block[block_index] -=
+                    twice_shifted_log_linear_fraction *
+                    shifted_log_linear_fraction_per_block_per_pertinent_marker[block_index, pertinent_marker_position]
+            end
+        end
+    end
+
+    return argmin(score_per_block)
+end
+
+# The z-scores of the query cell in the found modules of a block. These are the z-scores
+# `compute_z_score_per_found_module_per_region_cell!` computes, for a single cell.
+function compute_z_score_per_found_module_of_query_cell!(  # UNTESTED
+    projection_atlas::ProjectionAtlas;
+    block_index::Integer,
+    query_gene_index_per_stored::AbstractVector{<:Integer},
+    UMIs_per_stored::AbstractVector{<:Integer},
+    total_UMIs::Integer,
+    module_UMIs_per_found_module::AbstractVector{Float32},
+    z_score_per_found_module::AbstractVector{Float32},
+)::Nothing
+    module_gene_position_per_query_gene = projection_atlas.module_gene_position_per_query_gene
+    found_module_position_per_module_gene_per_block = projection_atlas.found_module_position_per_module_gene_per_block
+
+    module_UMIs_per_found_module .= 0.0f0
+    @inbounds for stored_index in eachindex(query_gene_index_per_stored)
+        module_gene_position = module_gene_position_per_query_gene[query_gene_index_per_stored[stored_index]]
+        if module_gene_position > 0
+            found_module_position = found_module_position_per_module_gene_per_block[module_gene_position, block_index]
+            if found_module_position > 0
+                module_UMIs_per_found_module[found_module_position] += UMIs_per_stored[stored_index]
+            end
+        end
+    end
+
+    std_fraction_regularization = projection_atlas.std_fraction_regularization_per_block[block_index]
+    @inbounds for found_module_position in eachindex(z_score_per_found_module)
+        mean_linear_fraction = projection_atlas.mean_linear_fraction_in_environment_cells_per_found_module_per_block[
+            found_module_position,
+            block_index,
+        ]
+        std_linear_fraction = projection_atlas.std_linear_fraction_in_environment_cells_per_found_module_per_block[
+            found_module_position,
+            block_index,
+        ]
+        delta_fraction = module_UMIs_per_found_module[found_module_position] / total_UMIs - mean_linear_fraction
+        z_score_per_found_module[found_module_position] =
+            (delta_fraction + copysign(std_fraction_regularization, delta_fraction)) /
+            (std_linear_fraction + std_fraction_regularization)
+    end
 
     return nothing
+end
+
+# The metacell a query cell is projected on, and its distance from it. Starting at the provisional block, the cell is
+# scored in the current block's found modules, against the metacells of the block's neighborhood. If the nearest is in
+# the current block, the cell settles on it. If it is in a block the cell hasn't visited, the cell moves there.
+# Otherwise, the cell settles on the nearest metacell of the current block.
+function projected_metacell_of_query_cell(  # UNTESTED
+    projection_atlas::ProjectionAtlas;
+    provisional_block_index::Integer,
+    query_gene_index_per_stored::AbstractVector{<:Integer},
+    UMIs_per_stored::AbstractVector{<:Integer},
+    total_UMIs::Integer,
+    module_UMIs_per_found_module::Vector{Float32},
+    z_score_per_found_module::Vector{Float32},
+    visited_block_indices::Vector{Int},
+)::Tuple{Int, Float32}
+    block_index_per_metacell = projection_atlas.block_index_per_metacell
+    block_index = provisional_block_index
+    empty!(visited_block_indices)
+
+    while true
+        push!(visited_block_indices, block_index)
+        n_found_modules = projection_atlas.n_found_modules_per_block[block_index]
+        @views block_z_score_per_found_module = z_score_per_found_module[1:n_found_modules]
+        compute_z_score_per_found_module_of_query_cell!(
+            projection_atlas;
+            block_index,
+            query_gene_index_per_stored,
+            UMIs_per_stored,
+            total_UMIs,
+            module_UMIs_per_found_module = view(module_UMIs_per_found_module, 1:n_found_modules),
+            z_score_per_found_module = block_z_score_per_found_module,
+        )
+
+        indices_of_candidate_metacells = projection_atlas.indices_of_candidate_metacells_per_block[block_index]
+        mean_cells_z_score_per_found_module_per_candidate_metacell =
+            projection_atlas.mean_cells_z_score_per_found_module_per_candidate_metacell_per_block[block_index]
+        nearest_position = 0
+        nearest_squared_distance = Inf32
+        nearest_own_position = 0
+        nearest_own_squared_distance = Inf32
+        @inbounds for candidate_position in eachindex(indices_of_candidate_metacells)
+            squared_distance = 0.0f0
+            for found_module_position in 1:n_found_modules
+                delta =
+                    block_z_score_per_found_module[found_module_position] -
+                    mean_cells_z_score_per_found_module_per_candidate_metacell[
+                        found_module_position,
+                        candidate_position,
+                    ]
+                squared_distance += delta * delta
+            end
+            if squared_distance < nearest_squared_distance
+                nearest_squared_distance = squared_distance
+                nearest_position = candidate_position
+            end
+            if squared_distance < nearest_own_squared_distance &&
+               block_index_per_metacell[indices_of_candidate_metacells[candidate_position]] == block_index
+                nearest_own_squared_distance = squared_distance
+                nearest_own_position = candidate_position
+            end
+        end
+        @assert nearest_own_position > 0
+
+        nearest_block_index = block_index_per_metacell[indices_of_candidate_metacells[nearest_position]]
+        if nearest_block_index == block_index
+            return indices_of_candidate_metacells[nearest_position], sqrt(nearest_squared_distance)
+        elseif !(nearest_block_index in visited_block_indices)
+            block_index = nearest_block_index
+        else
+            return indices_of_candidate_metacells[nearest_own_position], sqrt(nearest_own_squared_distance)
+        end
+    end
 end
 
 const IS_DEVIANT_ATLAS_CONTRACT =

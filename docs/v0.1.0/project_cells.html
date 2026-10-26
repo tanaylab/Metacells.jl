@@ -237,17 +237,21 @@
 </code>, we:
 </p>
 <ul>
-<li>Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral marker genes.
+<li>Pick a provisional block for each cell. This is the block with the minimal Euclidean distance of the non-lateral marker genes. It is the cell&#39;s first current block.
 </li>
-<li>Then, for each cell, consider the expression level of the found modules of the provisional block&#39;s neighborhood. We use this to pick a metacell in the neighborhood which has the closest Euclidean distance.
+<li>Score the cell in the found modules of its current block, and find the metacell of the block&#39;s neighborhood with the closest Euclidean distance.
 </li>
-<li>This metacell might belong to a different block. If so, we repeat the process using that block&#39;s neighborhood modules.
+<li>If this metacell is in the current block, we accept it.
 </li>
-<li>If the resulting best match metacell is in the same (new) block, we accept it.
+<li>If it is in a block the cell hasn&#39;t visited yet, that block becomes the current block, and we repeat.
 </li>
-<li>Otherwise, we just look for the closest metacell in the original block (using that block&#39;s modules) and settle for that.
+<li>Otherwise, it is in a block the cell already visited. We settle for the closest metacell of the current block.
 </li>
 </ul>
+<p>Each cell is projected on its own, reading only its own column of the query&#39;s 
+<code>UMIs
+</code>. The cells are read in a single pass over the gene × cell layout.
+</p>
 <p>The provisional block is picked using the log (base 2) of the expression of the marker genes, using the 
 <code>gene_fraction_regularization
 </code> to handle zero fractions. The metacells are compared using the z-scores of the found modules, computed the same way sharpening computes them, using the same 
