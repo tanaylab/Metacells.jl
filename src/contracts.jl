@@ -124,6 +124,9 @@ export vector_of_outlier_in_metacell_per_cell
 export vector_of_outlier_in_prev_block_per_cell
 export vector_of_projected_block_per_cell
 export vector_of_projected_metacell_per_cell
+export vector_of_projected_modules_z_score_cutoff_level_per_metacell
+export vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell
+export vector_of_projected_modules_z_score_cutoff_per_metacell
 export vector_of_projected_modules_z_score_per_cell
 export vector_of_ribosomal_UMIs_per_cell
 export vector_of_std_euclidean_modules_cells_distance_per_metacell
@@ -2082,12 +2085,74 @@ function vector_of_metacell_modules_z_score_per_cell(  # untested
 end
 
 """
+    vector_of_projected_modules_z_score_cutoff_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The cutoff of the [`vector_of_projected_modules_z_score_per_cell`](@ref) of the query cells projected onto each atlas
+metacell. Query cells from the same distribution as the calibration cells exceed it at the rejected fraction it was
+computed for.
+
+This vector is populated by [`compute_projected_modules_z_score_cutoff_per_metacell!`](@ref
+Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!).
+"""
+function vector_of_projected_modules_z_score_cutoff_per_metacell(  # untested
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "projected_modules_z_score_cutoff") => (
+        expectation,
+        StorageFloat,
+        "The cutoff of the projected modules z score of the query cells projected onto each metacell.",
+    )
+end
+
+"""
+    vector_of_projected_modules_z_score_cutoff_level_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+Which calibration cells the [`vector_of_projected_modules_z_score_cutoff_per_metacell`](@ref) of each metacell was
+computed from: `metacell` (those projected onto it), `block` (onto its block), `neighborhood` (onto its block's
+neighborhood) or `all`.
+
+This vector is populated by [`compute_projected_modules_z_score_cutoff_per_metacell!`](@ref
+Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!).
+"""
+function vector_of_projected_modules_z_score_cutoff_level_per_metacell(  # untested
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "projected_modules_z_score_cutoff_level") => (
+        expectation,
+        AbstractString,
+        "Which calibration cells the cutoff of each metacell was computed from (metacell, block, neighborhood or all).",
+    )
+end
+
+"""
+    vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell(
+        expectation::ContractExpectation
+    )::Pair{VectorKey, DataSpecification}
+
+The number of calibration cells the [`vector_of_projected_modules_z_score_cutoff_per_metacell`](@ref) of each metacell
+was computed from.
+
+This vector is populated by [`compute_projected_modules_z_score_cutoff_per_metacell!`](@ref
+Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!).
+"""
+function vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell(  # untested
+    expectation::ContractExpectation,
+)::Pair{VectorKey, DataSpecification}
+    return ("metacell", "projected_modules_z_score_cutoff_n_cells") =>
+        (expectation, StorageUnsigned, "The number of calibration cells the cutoff of each metacell was computed from.")
+end
+
+"""
     vector_of_is_deviant_per_cell(
         expectation::ContractExpectation
     )::Pair{VectorKey, DataSpecification}
 
-A mask of query cells that fit no atlas metacell well. Their projected modules z score is above the cutoff of the atlas.
-Excluded cells, and cells which already belong to a metacell, are never deviant.
+A mask of query cells that fit no atlas metacell well. Their projected modules z score is above the cutoff of their
+projected metacell. Excluded cells, and cells which already belong to a metacell, are never deviant.
 
 This vector is populated by [`compute_vector_of_is_deviant_per_cell!`](@ref
 Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!).

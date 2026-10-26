@@ -6,6 +6,7 @@ module AnalyzeModules
 export compute_matrix_of_cells_dispersion_per_metacell_per_module!
 export compute_matrix_of_n_genes_per_module_per_block!
 export compute_projected_modules_z_score_cutoff
+export compute_projected_modules_z_score_cutoff_per_metacell!
 export compute_stats_of_euclidean_modules_cells_distance_per_metacell!
 export compute_stats_of_linear_fraction_in_environment_cells_per_module_per_block!
 export compute_stats_of_linear_fraction_in_neighborhood_cells_per_module_per_block!
@@ -48,12 +49,19 @@ import Metacells.Contracts.metacell_axis
 import Metacells.Contracts.module_axis
 import Metacells.Contracts.tensor_of_mean_cells_z_score_per_block_per_module_per_metacell
 import Metacells.Contracts.vector_of_block_per_metacell
+import Metacells.Contracts.vector_of_is_base_outlier_per_cell
+import Metacells.Contracts.vector_of_is_excluded_per_cell
 import Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
 import Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_cells_per_metacell
 import Metacells.Contracts.vector_of_n_modules_per_block
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
+import Metacells.Contracts.vector_of_projected_metacell_per_cell
+import Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_level_per_metacell
+import Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell
+import Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell
+import Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
 import Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
 import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 import Metacells.Contracts.vector_of_total_UMIs_per_cell
@@ -884,6 +892,171 @@ $(CONTRACT)
     finite_z_scores = filter(isfinite, z_score_per_cell)
     @assert !isempty(finite_z_scores)
     return quantile(finite_z_scores, 1 - rejected_fraction)  # NOLINT
+end
+
+"""
+    compute_projected_modules_z_score_cutoff_per_metacell!(;
+        atlas_daf::DafWriter,
+        calibration_daf::DafReader,
+        rejected_fraction::AbstractFloat = $(DEFAULT.rejected_fraction),
+        overwrite::Bool = $(DEFAULT.overwrite),
+    )::Nothing
+
+Compute and set [`vector_of_projected_modules_z_score_cutoff_per_metacell`](@ref),
+[`vector_of_projected_modules_z_score_cutoff_level_per_metacell`](@ref) and
+[`vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell`](@ref) of the `atlas_daf`, from the cells of the
+`calibration_daf` projected onto it (see
+[`compute_cells_projection!`](@ref Metacells.ProjectCells.compute_cells_projection!)). The calibration cells are those
+which are neither excluded nor base outliers. For a data set too large to compute its metacells directly, these are the
+cells of the sample the atlas was computed from. Otherwise, they are the atlas's own cells.
+
+A metacell's cutoff is the quantile at position `q * (n + 1)` (where `q = 1 - rejected_fraction`), interpolated, of the
+projected modules z scores of the `n` calibration cells projected onto it. Query cells from the same distribution as the
+calibration cells exceed it at the `rejected_fraction` on average, whatever `n` is, as long as `q * (n + 1) <= n`.
+
+A metacell with fewer calibration cells than that takes the cutoff of the calibration cells projected onto its block,
+computed the same way. A block with too few takes the cutoff of its neighborhood, and a neighborhood with too few takes
+the cutoff of all the calibration cells. A metacell taking the cutoff of all the calibration cells is a strong signal
+that something is wrong with the data set or the parameters, since its whole neighborhood got too few calibration cells.
+
+# Atlas
+
+$(CONTRACT1)
+
+# Calibration
+
+$(CONTRACT2)
+"""
+@logged :mcs_ops @computation Contract(;
+    name = "atlas_daf",
+    axes = [metacell_axis(RequiredInput), block_axis(RequiredInput)],
+    data = [
+        vector_of_block_per_metacell(RequiredInput),
+        matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
+        vector_of_projected_modules_z_score_cutoff_per_metacell(CreatedOutput),
+        vector_of_projected_modules_z_score_cutoff_level_per_metacell(CreatedOutput),
+        vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell(CreatedOutput),
+    ],
+) Contract(;
+    name = "calibration_daf",
+    axes = [cell_axis(RequiredInput)],
+    data = [
+        vector_of_is_excluded_per_cell(RequiredInput),
+        vector_of_is_base_outlier_per_cell(RequiredInput),
+        vector_of_projected_metacell_per_cell(RequiredInput),
+        vector_of_projected_modules_z_score_per_cell(RequiredInput),
+    ],
+) function compute_projected_modules_z_score_cutoff_per_metacell!(;  # UNTESTED
+    atlas_daf::DafWriter,
+    calibration_daf::DafReader,
+    rejected_fraction::AbstractFloat = function_default(compute_projected_modules_z_score_cutoff, :rejected_fraction),
+    overwrite::Bool = false,
+)::Nothing
+    @assert 0 < rejected_fraction < 1
+    quantile_fraction = 1 - rejected_fraction
+
+    n_metacells = axis_length(atlas_daf, "metacell")
+    n_blocks = axis_length(atlas_daf, "block")
+    block_index_per_metacell = atlas_daf["@ metacell : block : index"].array
+    is_in_neighborhood_per_other_block_per_base_block =
+        plain_array(get_matrix(atlas_daf, "block", "block", "is_in_neighborhood"))
+
+    is_excluded_per_cell = plain_array(get_vector(calibration_daf, "cell", "is_excluded"))
+    is_base_outlier_per_cell = plain_array(get_vector(calibration_daf, "cell", "is_base_outlier"))
+    is_calibration_per_cell = .!is_excluded_per_cell .& .!is_base_outlier_per_cell
+    metacell_index_per_cell = axis_indices(
+        atlas_daf,
+        "metacell",
+        plain_array(get_vector(calibration_daf, "cell", "projected_metacell"));
+        allow_empty = true,
+    )
+    z_score_per_cell = plain_array(get_vector(calibration_daf, "cell", "projected_metacell_modules_z_score"))
+
+    z_scores_per_metacell = [Float32[] for _ in 1:n_metacells]
+    for cell_index in findall(is_calibration_per_cell)
+        metacell_index = metacell_index_per_cell[cell_index]
+        @assert metacell_index > 0
+        push!(z_scores_per_metacell[metacell_index], z_score_per_cell[cell_index])
+    end
+    z_scores_per_block = [
+        reduce(vcat, z_scores_per_metacell[block_index_per_metacell .== block_index]; init = Float32[]) for
+        block_index in 1:n_blocks
+    ]
+
+    all_z_scores = reduce(vcat, z_scores_per_block; init = Float32[])
+    @assert !isempty(all_z_scores)
+    all_cutoff = z_score_cutoff(all_z_scores, quantile_fraction)
+
+    cutoff_per_block = Vector{Float32}(undef, n_blocks)
+    level_per_block = Vector{String}(undef, n_blocks)
+    n_cells_per_block = Vector{UInt32}(undef, n_blocks)
+    for block_index in 1:n_blocks
+        block_z_scores = z_scores_per_block[block_index]
+        if is_enough_for_z_score_cutoff(block_z_scores, quantile_fraction)
+            cutoff_per_block[block_index] = z_score_cutoff(block_z_scores, quantile_fraction)
+            level_per_block[block_index] = "block"
+            n_cells_per_block[block_index] = length(block_z_scores)
+        else
+            neighborhood_z_scores = reduce(
+                vcat,
+                z_scores_per_block[findall(view(is_in_neighborhood_per_other_block_per_base_block, :, block_index))];
+                init = Float32[],
+            )
+            if is_enough_for_z_score_cutoff(neighborhood_z_scores, quantile_fraction)
+                cutoff_per_block[block_index] = z_score_cutoff(neighborhood_z_scores, quantile_fraction)
+                level_per_block[block_index] = "neighborhood"
+                n_cells_per_block[block_index] = length(neighborhood_z_scores)
+            else
+                cutoff_per_block[block_index] = all_cutoff
+                level_per_block[block_index] = "all"
+                n_cells_per_block[block_index] = length(all_z_scores)
+            end
+        end
+    end
+
+    cutoff_per_metacell = Vector{Float32}(undef, n_metacells)
+    level_per_metacell = Vector{String}(undef, n_metacells)
+    n_cells_per_metacell = Vector{UInt32}(undef, n_metacells)
+    for metacell_index in 1:n_metacells
+        metacell_z_scores = z_scores_per_metacell[metacell_index]
+        if is_enough_for_z_score_cutoff(metacell_z_scores, quantile_fraction)
+            cutoff_per_metacell[metacell_index] = z_score_cutoff(metacell_z_scores, quantile_fraction)
+            level_per_metacell[metacell_index] = "metacell"
+            n_cells_per_metacell[metacell_index] = length(metacell_z_scores)
+        else
+            block_index = block_index_per_metacell[metacell_index]
+            cutoff_per_metacell[metacell_index] = cutoff_per_block[block_index]
+            level_per_metacell[metacell_index] = level_per_block[block_index]
+            n_cells_per_metacell[metacell_index] = n_cells_per_block[block_index]
+        end
+    end
+
+    for level in ("metacell", "block", "neighborhood", "all")
+        @debug "Metacells with a $(level) cutoff: $(count(level_per_metacell .== level))" _group = :mcs_results
+    end
+    n_all_level_metacells = count(level_per_metacell .== "all")
+    if n_all_level_metacells > 0
+        @warn (
+            "$(n_all_level_metacells) metacells take the cutoff of all the calibration cells, since their" *
+            " neighborhood got too few of them. Something is likely wrong with the data set or the parameters."
+        )
+    end
+
+    set_vector!(atlas_daf, "metacell", "projected_modules_z_score_cutoff", cutoff_per_metacell; overwrite)
+    set_vector!(atlas_daf, "metacell", "projected_modules_z_score_cutoff_level", level_per_metacell; overwrite)
+    set_vector!(atlas_daf, "metacell", "projected_modules_z_score_cutoff_n_cells", n_cells_per_metacell; overwrite)
+    return nothing
+end
+
+# Whether there are enough z scores for their quantile at position `quantile_fraction * (n + 1)` to be at most `n`.
+function is_enough_for_z_score_cutoff(z_scores::AbstractVector{Float32}, quantile_fraction::AbstractFloat)::Bool  # UNTESTED
+    return quantile_fraction * (length(z_scores) + 1) <= length(z_scores)
+end
+
+# The quantile of the z scores at position `quantile_fraction * (n + 1)`, interpolated. New z scores from the same
+# distribution exceed it at `1 - quantile_fraction` on average.
+function z_score_cutoff(z_scores::AbstractVector{Float32}, quantile_fraction::AbstractFloat)::Float32  # UNTESTED
+    return Float32(quantile(z_scores, quantile_fraction; alpha = 0, beta = 0))  # NOLINT
 end
 
 # Compute and return the maximum (across the block's found modules) cells_dispersion - the ratio between the actual

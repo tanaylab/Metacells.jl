@@ -57,6 +57,7 @@ import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_projected_block_per_cell
 import Metacells.Contracts.vector_of_projected_metacell_per_cell
+import Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell
 import Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
 import Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
 import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
@@ -545,21 +546,17 @@ function projected_metacell_of_query_cell(  # UNTESTED
     end
 end
 
-const IS_DEVIANT_ATLAS_CONTRACT =
-    renamed_contract(function_contract(compute_projected_modules_z_score_cutoff), "atlas_daf")
-
 """
     compute_vector_of_is_deviant_per_cell!(;
         query_daf::DafWriter,
         atlas_daf::DafReader,
-        rejected_fraction::AbstractFloat = $(DEFAULT.rejected_fraction),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
 Compute and set [`vector_of_is_deviant_per_cell`](@ref). A query cell is deviant when its projected modules z score is
-above the cutoff of the atlas ([`compute_projected_modules_z_score_cutoff`](@ref)). That is, it fits its projected
-metacell worse than all but `rejected_fraction` of the atlas cells fit their own metacell. Excluded cells are never
-deviant. If the query has a metacell for each cell, then the cells which belong to a metacell are never deviant either.
+above the cutoff of its projected metacell (see [`compute_projected_modules_z_score_cutoff_per_metacell!`](@ref)).
+Excluded cells are never deviant. If the query has a metacell for each cell, then the cells which belong to a metacell
+are never deviant either.
 
 # Query
 
@@ -575,20 +572,35 @@ $(CONTRACT2)
     data = [
         vector_of_is_excluded_per_cell(RequiredInput),
         vector_of_metacell_per_cell(OptionalInput),
+        vector_of_projected_metacell_per_cell(RequiredInput),
         vector_of_projected_modules_z_score_per_cell(RequiredInput),
         vector_of_is_deviant_per_cell(CreatedOutput),
     ],
-) IS_DEVIANT_ATLAS_CONTRACT function compute_vector_of_is_deviant_per_cell!(;  # UNTESTED
+) Contract(;
+    name = "atlas_daf",
+    axes = [metacell_axis(RequiredInput)],
+    data = [vector_of_projected_modules_z_score_cutoff_per_metacell(RequiredInput)],
+) function compute_vector_of_is_deviant_per_cell!(;  # UNTESTED
     query_daf::DafWriter,
     atlas_daf::DafReader,
-    rejected_fraction::AbstractFloat = function_default(compute_projected_modules_z_score_cutoff, :rejected_fraction),
     overwrite::Bool = false,
 )::Nothing
-    z_score_cutoff = compute_projected_modules_z_score_cutoff(atlas_daf; rejected_fraction)
+    cutoff_per_metacell = plain_array(get_vector(atlas_daf, "metacell", "projected_modules_z_score_cutoff"))
+    projected_metacell_index_per_query_cell = axis_indices(
+        atlas_daf,
+        "metacell",
+        plain_array(get_vector(query_daf, "cell", "projected_metacell"));
+        allow_empty = true,
+    )
 
     is_excluded_per_query_cell = plain_array(get_vector(query_daf, "cell", "is_excluded"))
     z_score_per_query_cell = plain_array(get_vector(query_daf, "cell", "projected_metacell_modules_z_score"))
-    is_deviant_per_query_cell = .!is_excluded_per_query_cell .& (z_score_per_query_cell .> z_score_cutoff)
+    is_deviant_per_query_cell = [
+        !is_excluded_per_query_cell[query_cell_index] &&
+        z_score_per_query_cell[query_cell_index] >
+        cutoff_per_metacell[projected_metacell_index_per_query_cell[query_cell_index]] for
+        query_cell_index in eachindex(is_excluded_per_query_cell)
+    ]
 
     metacell_per_query_cell = get_vector(query_daf, "cell", "metacell"; default = nothing)
     if metacell_per_query_cell !== nothing
@@ -598,7 +610,7 @@ $(CONTRACT2)
     n_included_query_cells = sum(.!is_excluded_per_query_cell)
     n_deviant_query_cells = sum(is_deviant_per_query_cell)
     @debug (
-        "Z score cutoff: $(z_score_cutoff) Deviant cells: $(n_deviant_query_cells)" *
+        "Deviant cells: $(n_deviant_query_cells)" *
         " $(percent(n_deviant_query_cells, n_included_query_cells)) of the included cells"
     ) _group = :mcs_results
 
