@@ -485,11 +485,17 @@
 </code>
 </a>, using the same 
 <code>std_UMIs_regularization
-</code>. The z score of each cell is its distance minus the mean distance of its metacell&#39;s cells, divided by their standard deviation. This is computed the same way 
+</code>. The mean and the standard deviation are of the distances of the metacell&#39;s cells. 
 <a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
 <code>compute_cells_projection!
 </code>
-</a> computes the z score of a query cell relative to its projected metacell.
+</a> uses them to compute the z score of a query cell relative to its projected metacell.
+</p>
+<p>The z score of each cell is punctuated, as in the outlier detection of 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
+</code>
+</a>. It is the cell&#39;s distance from the center of the metacell&#39;s other cells, compared with the mean and standard deviation of the other cells&#39; distances from that same center. It is zero in a metacell of fewer than 3 cells, and infinite for a cell with no metacell.
 </p>
 <p>
 <strong>Inputs
@@ -622,246 +628,6 @@
 <em>modules
 </em>z_score
 </strong>::Union{Float32, Float64} (created): The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff">
-<a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff">
-<code>Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">compute_projected_modules_z_score_cutoff(
-    daf::DafReader;
-    rejected_fraction::AbstractFloat = ```0.01```,
-)::AbstractFloat
-</code>
-</pre>
-<p>Compute a cutoff for the 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
-<code>vector_of_projected_modules_z_score_per_cell
-</code>
-</a> of query cells projected onto this (atlas) 
-<code>daf
-</code>. This is the z score which only 
-<code>rejected_fraction
-</code> of the atlas cells exceed, using their 
-<a href="contracts.html#Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell">
-<code>vector_of_metacell_modules_z_score_per_cell
-</code>
-</a>. That is, a query cell above the cutoff fits its projected metacell worse than all but 
-<code>rejected_fraction
-</code> of the atlas cells fit their own metacell. Atlas cells which do not belong to any metacell are ignored.
-</p>
-<p>This makes no assumption about the distribution of the z scores, which is not normal. It also makes no assumption about the query cells. It only describes how well the atlas cells fit their own metacells.
-</p>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>cell
-</strong> (required): Sequenced single cells.
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>cell @ metacell
-<em>modules
-</em>z_score
-</strong>::Union{Float32, Float64} (required): The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!">
-<a class="docstring-binding" href="#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!">
-<code>Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">compute_projected_modules_z_score_cutoff_per_metacell!(;
-    atlas_daf::DafWriter,
-    calibration_daf::DafReader,
-    rejected_fraction::AbstractFloat = ```0.01```,
-    overwrite::Bool = ```false```,
-)::Nothing
-</code>
-</pre>
-<p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell">
-<code>vector_of_projected_modules_z_score_cutoff_per_metacell
-</code>
-</a>, 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_level_per_metacell">
-<code>vector_of_projected_modules_z_score_cutoff_level_per_metacell
-</code>
-</a> and 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell">
-<code>vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell
-</code>
-</a> of the 
-<code>atlas_daf
-</code>, from the cells of the 
-<code>calibration_daf
-</code> projected onto it (see 
-<a href="project_cells.html#Metacells.ProjectCells.compute_cells_projection!">
-<code>compute_cells_projection!
-</code>
-</a>). The calibration cells are those which are neither excluded nor base outliers. For a data set too large to compute its metacells directly, these are the cells of the sample the atlas was computed from. Otherwise, they are the atlas&#39;s own cells.
-</p>
-<p>A metacell&#39;s cutoff is the quantile at position 
-<code>q * (n + 1)
-</code> (where 
-<code>q = 1 - rejected_fraction
-</code>), interpolated, of the projected modules z scores of the 
-<code>n
-</code> calibration cells projected onto it. Query cells from the same distribution as the calibration cells exceed it at the 
-<code>rejected_fraction
-</code> on average, whatever 
-<code>n
-</code> is, as long as 
-<code>q * (n + 1) &lt;= n
-</code>.
-</p>
-<p>A metacell with fewer calibration cells than that takes the cutoff of the calibration cells projected onto its block, computed the same way. A block with too few takes the cutoff of its neighborhood, and a neighborhood with too few takes the cutoff of all the calibration cells. A metacell taking the cutoff of all the calibration cells is a strong signal that something is wrong with the data set or the parameters, since its whole neighborhood got too few calibration cells.
-</p>
-<p>
-<strong>Atlas
-</strong>
-</p>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
-</p>
-<p>
-<strong>block
-</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>metacell @ block
-</strong>::AbstractString (required): The unique block each metacell belongs to.
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
-<strong>block, block @ is
-<em>in
-</em>neighborhood
-</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
-</p>
-<p>
-<strong>Outputs
-</strong>
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>metacell @ projected
-<em>modules
-</em>z
-<em>score
-</em>cutoff
-</strong>::Union{Float32, Float64} (created): The cutoff of the projected modules z score of the query cells projected onto each metacell.
-</p>
-<p>
-<strong>metacell @ projected
-<em>modules
-</em>z
-<em>score
-</em>cutoff_level
-</strong>::AbstractString (created): Which calibration cells the cutoff of each metacell was computed from (metacell, block, neighborhood or all).
-</p>
-<p>
-<strong>metacell @ projected
-<em>modules
-</em>z
-<em>score
-</em>cutoff
-<em>n
-</em>cells
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (created): The number of calibration cells the cutoff of each metacell was computed from.
-</p>
-<p>
-<strong>Calibration
-</strong>
-</p>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>cell
-</strong> (required): Sequenced single cells.
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>cell @ is_excluded
-</strong>::Bool (required): A mask of cells that are totally excluded from the analysis.
-</p>
-<p>
-<strong>cell @ is
-<em>base
-</em>outlier
-</strong>::Bool (required): A mask of cells that were outliers at the original input.
-</p>
-<p>
-<strong>cell @ projected_metacell
-</strong>::AbstractString (required): The projected atlas metacell for each cell.
-</p>
-<p>
-<strong>cell @ projected
-<em>metacell
-</em>modules
-<em>z
-</em>score
-</strong>::Union{Float32, Float64} (required): The z score of the distance between each query cell and its projected atlas metacell modules.
 </p>
 </div>
 </section>
@@ -1269,18 +1035,6 @@
 <li>
 <a href="analyze_modules.html#Metacells.AnalyzeModules.compute_matrix_of_n_genes_per_module_per_block!">
 <code>Metacells.AnalyzeModules.compute_matrix_of_n_genes_per_module_per_block!
-</code>
-</a>
-</li>
-<li>
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff">
-<code>Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff
-</code>
-</a>
-</li>
-<li>
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!">
-<code>Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!
 </code>
 </a>
 </li>

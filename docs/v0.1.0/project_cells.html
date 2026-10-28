@@ -476,6 +476,11 @@
 <code class="language-julia hljs">compute_vector_of_is_deviant_per_cell!(;
     query_daf::DafWriter,
     atlas_daf::DafReader,
+    min_outlier_fold::AbstractFloat = ```2.0```,
+    min_foreign_outlier_fold::AbstractFloat = ```3.0```,
+    outlier_UMIs_regularization::AbstractFloat = ```2.0```,
+    outlier_min_significant_UMIs::Integer = ```40```,
+    max_modules_z_score::AbstractFloat = ```4.0```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -484,11 +489,43 @@
 <a href="contracts.html#Metacells.Contracts.vector_of_is_deviant_per_cell">
 <code>vector_of_is_deviant_per_cell
 </code>
-</a>. A query cell is deviant when its projected modules z score is above the cutoff of its projected metacell (see 
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!">
-<code>compute_projected_modules_z_score_cutoff_per_metacell!
+</a>. A query cell is deviant if it would be an outlier of its projected metacell. This uses the same rules 
+<a href="sharpen_metacells.html#Metacells.SharpenMetacells.sharpen_metacells!">
+<code>sharpen_metacells!
 </code>
-</a>). Excluded cells are never deviant. If the query has a metacell for each cell, then the cells which belong to a metacell are never deviant either.
+</a> uses to detect outliers, with the same parameters:
+</p>
+<ul>
+<li>For every found module instance in the atlas (across all blocks), we compare the actual UMIs of the module&#39;s genes in the cell to the expected UMIs. The expectation is the module&#39;s linear fraction in the projected metacell, times the cell&#39;s total UMIs. The fold is 
+<code>abs(log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization)))
+</code>. A fold counts only if the actual plus the expected UMIs are at least 
+<code>outlier_min_significant_UMIs
+</code>. A counted fold makes the cell deviant if it exceeds 
+<code>min_outlier_fold
+</code> for a module instance of the block of the projected metacell, or 
+<code>min_foreign_outlier_fold
+</code> for a module instance of any other block.
+</li>
+<li>The cell is also deviant if its 
+<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
+<code>vector_of_projected_modules_z_score_per_cell
+</code>
+</a> exceeds 
+<code>max_modules_z_score
+</code>.
+</li>
+</ul>
+<p>In a self-projection, where the 
+<code>query_daf
+</code> and the 
+<code>atlas_daf
+</code> are the same, a cell may be projected onto the metacell it belongs to. Such a cell is tested punctuated, exactly as sharpening tests it. Its expected UMIs exclude the cell&#39;s own UMIs from the metacell&#39;s UMIs. Its z score is its 
+<a href="contracts.html#Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell">
+<code>vector_of_metacell_modules_z_score_per_cell
+</code>
+</a> instead of its projected one. A cell of a single-cell metacell projected onto it is only tested by its z score.
+</p>
+<p>Excluded cells are never deviant.
 </p>
 <p>
 <strong>Query
@@ -507,6 +544,10 @@
 </strong> (required): Sequenced single cells.
 </p>
 <p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
 <strong>Vectors
 </strong>
 </p>
@@ -519,6 +560,10 @@
 </strong>::AbstractString (optional): The unique metacell each cell belongs to.
 </p>
 <p>
+<strong>cell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each cell.
+</p>
+<p>
 <strong>cell @ projected_metacell
 </strong>::AbstractString (required): The projected atlas metacell for each cell.
 </p>
@@ -529,6 +574,20 @@
 <em>z
 </em>score
 </strong>::Union{Float32, Float64} (required): The z score of the distance between each query cell and its projected atlas metacell modules.
+</p>
+<p>
+<strong>cell @ metacell
+<em>modules
+</em>z_score
+</strong>::Union{Float32, Float64} (optional): The z score of the distance between each cell and its own metacell modules (infinite if it has no metacell).
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, cell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The number of UMIs collected for each gene for each cell.
 </p>
 <p>
 <strong>Outputs
@@ -559,16 +618,44 @@
 </strong> (required): Minimal-sized groups of cells for robust point estimates.
 </p>
 <p>
+<strong>block
+</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
+</p>
+<p>
+<strong>gene
+</strong> (required): Sequenced genes.
+</p>
+<p>
+<strong>module
+</strong> (required): Groups of non-lateral genes that together predict the rest of the genes at a specific region of the manifold.
+</p>
+<p>
 <strong>Vectors
 </strong>
 </p>
 <p>
-<strong>metacell @ projected
-<em>modules
-</em>z
-<em>score
-</em>cutoff
-</strong>::Union{Float32, Float64} (required): The cutoff of the projected modules z score of the query cells projected onto each metacell.
+<strong>metacell @ block
+</strong>::AbstractString (required): The unique block each metacell belongs to.
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
+<strong>Matrices
+</strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
+</p>
+<p>
+<strong>block, module @ is_found
+</strong>::Bool (required): A mask of the modules that were found for each block.
+</p>
+<p>
+<strong>block, gene @ module
+</strong>::AbstractString (required): The module each gene belongs to in each block.
 </p>
 </div>
 </section>

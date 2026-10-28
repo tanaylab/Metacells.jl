@@ -21,11 +21,14 @@ using ..AnalyzeCells
 using ..AnalyzeModules
 using ..Contracts
 using ..Defaults
+using ..SharpenMetacells
 
 import Base.Threads.maxthreadid
 import Metacells.AnalyzeCells.cell_group_membership_from_block_neighborhoods
 import Metacells.AnalyzeCells.sparse_cell_reference_correlation_per_gene_per_group!
 import Metacells.AnalyzeModules.compute_std_fraction_regularization_per_block
+import Metacells.SharpenMetacells.collect_total_found_modules
+import Metacells.SharpenMetacells.outlier_fold
 
 # Needed because of JET:
 import Metacells.Contracts.block_axis
@@ -53,11 +56,11 @@ import Metacells.Contracts.vector_of_is_excluded_per_gene
 import Metacells.Contracts.vector_of_is_lateral_per_gene
 import Metacells.Contracts.vector_of_is_marker_per_gene
 import Metacells.Contracts.vector_of_mean_euclidean_modules_cells_distance_per_metacell
+import Metacells.Contracts.vector_of_metacell_modules_z_score_per_cell
 import Metacells.Contracts.vector_of_metacell_per_cell
 import Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 import Metacells.Contracts.vector_of_projected_block_per_cell
 import Metacells.Contracts.vector_of_projected_metacell_per_cell
-import Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell
 import Metacells.Contracts.vector_of_projected_modules_z_score_per_cell
 import Metacells.Contracts.vector_of_std_euclidean_modules_cells_distance_per_metacell
 import Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
@@ -552,13 +555,34 @@ end
     compute_vector_of_is_deviant_per_cell!(;
         query_daf::DafWriter,
         atlas_daf::DafReader,
+        min_outlier_fold::AbstractFloat = $(DEFAULT.min_outlier_fold),
+        min_foreign_outlier_fold::AbstractFloat = $(DEFAULT.min_foreign_outlier_fold),
+        outlier_UMIs_regularization::AbstractFloat = $(DEFAULT.outlier_UMIs_regularization),
+        outlier_min_significant_UMIs::Integer = $(DEFAULT.outlier_min_significant_UMIs),
+        max_modules_z_score::AbstractFloat = $(DEFAULT.max_modules_z_score),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
-Compute and set [`vector_of_is_deviant_per_cell`](@ref). A query cell is deviant when its projected modules z score is
-above the cutoff of its projected metacell (see [`compute_projected_modules_z_score_cutoff_per_metacell!`](@ref)).
-Excluded cells are never deviant. If the query has a metacell for each cell, then the cells which belong to a metacell
-are never deviant either.
+Compute and set [`vector_of_is_deviant_per_cell`](@ref). A query cell is deviant if it would be an outlier of its
+projected metacell. This uses the same rules [`sharpen_metacells!`](@ref Metacells.SharpenMetacells.sharpen_metacells!)
+uses to detect outliers, with the same parameters:
+
+  - For every found module instance in the atlas (across all blocks), we compare the actual UMIs of the module's genes
+    in the cell to the expected UMIs. The expectation is the module's linear fraction in the projected metacell, times
+    the cell's total UMIs. The fold is
+    `abs(log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization)))`. A fold counts only
+    if the actual plus the expected UMIs are at least `outlier_min_significant_UMIs`. A counted fold makes the cell
+    deviant if it exceeds `min_outlier_fold` for a module instance of the block of the projected metacell, or
+    `min_foreign_outlier_fold` for a module instance of any other block.
+  - The cell is also deviant if its [`vector_of_projected_modules_z_score_per_cell`](@ref) exceeds
+    `max_modules_z_score`.
+
+In a self-projection, where the `query_daf` and the `atlas_daf` are the same, a cell may be projected onto the
+metacell it belongs to. Such a cell is tested punctuated, exactly as sharpening tests it. Its expected UMIs exclude the
+cell's own UMIs from the metacell's UMIs. Its z score is its [`vector_of_metacell_modules_z_score_per_cell`](@ref)
+instead of its projected one. A cell of a single-cell metacell projected onto it is only tested by its z score.
+
+Excluded cells are never deviant.
 
 # Query
 
@@ -570,54 +594,267 @@ $(CONTRACT2)
 """
 @logged :mcs_ops @computation Contract(;
     name = "query_daf",
-    axes = [cell_axis(RequiredInput)],
+    axes = [cell_axis(RequiredInput), gene_axis(RequiredInput)],
     data = [
         vector_of_is_excluded_per_cell(RequiredInput),
         vector_of_metacell_per_cell(OptionalInput),
+        matrix_of_UMIs_per_gene_per_cell(RequiredInput),
+        vector_of_total_UMIs_per_cell(RequiredInput),
         vector_of_projected_metacell_per_cell(RequiredInput),
         vector_of_projected_modules_z_score_per_cell(RequiredInput),
+        vector_of_metacell_modules_z_score_per_cell(OptionalInput),
         vector_of_is_deviant_per_cell(CreatedOutput),
     ],
 ) Contract(;
     name = "atlas_daf",
-    axes = [metacell_axis(RequiredInput)],
-    data = [vector_of_projected_modules_z_score_cutoff_per_metacell(RequiredInput)],
+    axes = [
+        metacell_axis(RequiredInput),
+        block_axis(RequiredInput),
+        gene_axis(RequiredInput),
+        module_axis(RequiredInput),
+    ],
+    data = [
+        vector_of_block_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_is_found_per_module_per_block(RequiredInput),
+        matrix_of_module_per_gene_per_block(RequiredInput),
+    ],
 ) function compute_vector_of_is_deviant_per_cell!(;  # UNTESTED
     query_daf::DafWriter,
     atlas_daf::DafReader,
+    min_outlier_fold::AbstractFloat = function_default(sharpen_metacells!, :min_outlier_fold),
+    min_foreign_outlier_fold::AbstractFloat = function_default(sharpen_metacells!, :min_foreign_outlier_fold),
+    outlier_UMIs_regularization::AbstractFloat = function_default(sharpen_metacells!, :outlier_UMIs_regularization),
+    outlier_min_significant_UMIs::Integer = function_default(sharpen_metacells!, :outlier_min_significant_UMIs),
+    max_modules_z_score::AbstractFloat = function_default(sharpen_metacells!, :max_modules_z_score),
     overwrite::Bool = false,
 )::Nothing
-    cutoff_per_metacell = plain_array(get_vector(atlas_daf, "metacell", "projected_modules_z_score_cutoff"))
-    projected_metacell_index_per_query_cell = axis_indices(
-        atlas_daf,
-        "metacell",
-        plain_array(get_vector(query_daf, "cell", "projected_metacell"));
-        allow_empty = true,
-    )
+    @assert min_outlier_fold > 0
+    @assert min_foreign_outlier_fold > 0
+    @assert outlier_UMIs_regularization > 0
+    @assert outlier_min_significant_UMIs >= 0
+    @assert max_modules_z_score > 0
+
+    projected_metacell_per_query_cell = plain_array(get_vector(query_daf, "cell", "projected_metacell"))
+    projected_metacell_index_per_query_cell =
+        axis_indices(atlas_daf, "metacell", projected_metacell_per_query_cell; allow_empty = true)
 
     is_excluded_per_query_cell = plain_array(get_vector(query_daf, "cell", "is_excluded"))
+    is_candidate_per_query_cell = .!is_excluded_per_query_cell
+    @assert all(projected_metacell_index_per_query_cell[is_candidate_per_query_cell] .> 0)
+
     z_score_per_query_cell = plain_array(get_vector(query_daf, "cell", "projected_metacell_modules_z_score"))
-    is_deviant_per_query_cell = [
-        !is_excluded_per_query_cell[query_cell_index] &&
-        z_score_per_query_cell[query_cell_index] >
-        cutoff_per_metacell[projected_metacell_index_per_query_cell[query_cell_index]] for
-        query_cell_index in eachindex(is_excluded_per_query_cell)
-    ]
+
+    query_base_daf = query_daf
+    if query_base_daf isa DataAxesFormats.Contracts.ContractDaf
+        query_base_daf = query_base_daf.daf
+    end
+    atlas_base_daf = atlas_daf
+    if atlas_base_daf isa DataAxesFormats.Contracts.ContractDaf
+        atlas_base_daf = atlas_base_daf.daf
+    end
 
     metacell_per_query_cell = get_vector(query_daf, "cell", "metacell"; default = nothing)
-    if metacell_per_query_cell !== nothing
-        is_deviant_per_query_cell .&= plain_array(metacell_per_query_cell) .== ""
+    if metacell_per_query_cell === nothing
+        is_grouped_per_query_cell = zeros(Bool, length(is_candidate_per_query_cell))
+    else
+        is_grouped_per_query_cell = plain_array(metacell_per_query_cell) .!= ""
     end
+
+    if query_base_daf === atlas_base_daf
+        @assert metacell_per_query_cell !== nothing
+        is_own_per_query_cell =
+            is_candidate_per_query_cell .& is_grouped_per_query_cell .&
+            (plain_array(metacell_per_query_cell) .== projected_metacell_per_query_cell)
+        metacell_z_score_per_query_cell = plain_array(get_vector(query_daf, "cell", "metacell_modules_z_score"))
+        z_score_per_query_cell = ifelse.(is_own_per_query_cell, metacell_z_score_per_query_cell, z_score_per_query_cell)
+    else
+        is_own_per_query_cell = zeros(Bool, length(is_candidate_per_query_cell))
+    end
+
+    is_z_score_deviant_per_query_cell = is_candidate_per_query_cell .& (z_score_per_query_cell .> max_modules_z_score)
+
+    is_fold_deviant_per_query_cell = compute_is_fold_deviant_per_query_cell(;
+        query_daf,
+        atlas_daf,
+        is_candidate_per_query_cell,
+        is_own_per_query_cell,
+        projected_metacell_index_per_query_cell,
+        min_outlier_fold,
+        min_foreign_outlier_fold,
+        outlier_UMIs_regularization,
+        outlier_min_significant_UMIs,
+    )
+
+    is_deviant_per_query_cell = is_z_score_deviant_per_query_cell .| is_fold_deviant_per_query_cell
 
     n_included_query_cells = sum(.!is_excluded_per_query_cell)
     n_deviant_query_cells = sum(is_deviant_per_query_cell)
+    n_fold_only_deviant_query_cells = sum(is_fold_deviant_per_query_cell .& .!is_z_score_deviant_per_query_cell)
+    n_z_score_only_deviant_query_cells = sum(is_z_score_deviant_per_query_cell .& .!is_fold_deviant_per_query_cell)
+    n_both_deviant_query_cells = sum(is_fold_deviant_per_query_cell .& is_z_score_deviant_per_query_cell)
+    n_grouped_query_cells = sum(is_candidate_per_query_cell .& is_grouped_per_query_cell)
+    n_grouped_deviant_query_cells = sum(is_deviant_per_query_cell .& is_grouped_per_query_cell)
+    n_own_query_cells = sum(is_own_per_query_cell)
+    n_own_deviant_query_cells = sum(is_deviant_per_query_cell .& is_own_per_query_cell)
     @debug (
         "Deviant cells: $(n_deviant_query_cells)" *
-        " $(percent(n_deviant_query_cells, n_included_query_cells)) of the included cells"
+        " $(percent(n_deviant_query_cells, n_included_query_cells)) of the included cells" *
+        " By fold only: $(n_fold_only_deviant_query_cells)" *
+        " By modules z score only: $(n_z_score_only_deviant_query_cells)" *
+        " By both: $(n_both_deviant_query_cells)" *
+        " Grouped: $(n_grouped_deviant_query_cells)" *
+        " $(percent(n_grouped_deviant_query_cells, n_grouped_query_cells)) of the grouped cells" *
+        " Projected onto their own metacell: $(n_own_deviant_query_cells)" *
+        " $(percent(n_own_deviant_query_cells, n_own_query_cells)) of these cells"
     ) _group = :mcs_results
 
     set_vector!(query_daf, "cell", "is_deviant", is_deviant_per_query_cell; overwrite)
     return nothing
+end
+
+# Whether each candidate query cell has a module instance whose fold flags it as an outlier of its projected metacell,
+# as in `compute_outlier_certificates`. The expectation is punctuated only for the cells in `is_own_per_query_cell`,
+# which belong to their projected metacell. The loop is parallel over the projected metacells, so each metacell's module
+# UMIs are summed once. A cell with no UMIs of a module is tested like any other, with zero actual UMIs.
+function compute_is_fold_deviant_per_query_cell(;  # UNTESTED
+    query_daf::DafReader,
+    atlas_daf::DafReader,
+    is_candidate_per_query_cell::AbstractVector{Bool},
+    is_own_per_query_cell::AbstractVector{Bool},
+    projected_metacell_index_per_query_cell::AbstractVector{<:Integer},
+    min_outlier_fold::AbstractFloat,
+    min_foreign_outlier_fold::AbstractFloat,
+    outlier_UMIs_regularization::AbstractFloat,
+    outlier_min_significant_UMIs::Integer,
+)::Vector{Bool}
+    n_query_cells = length(is_candidate_per_query_cell)
+    n_query_genes = axis_length(query_daf, "gene")
+    n_metacells = axis_length(atlas_daf, "metacell")
+
+    total_found_modules = collect_total_found_modules(;
+        is_found_per_module_per_block = plain_array(get_matrix(atlas_daf, "module", "block", "is_found")),
+        module_index_per_gene_per_block = get_query(atlas_daf, "@ gene @ block :: module ?? 0 : index").array,
+        name_per_block = axis_vector(atlas_daf, "block"),
+        name_per_module = axis_vector(atlas_daf, "module"),
+    )
+    n_total_found_modules = length(total_found_modules.gene_indices_per_total_found_module)
+
+    # The module genes must exist in the query, as in `map_query_atlas_genes`.
+    query_gene_index_per_atlas_gene =
+        axis_indices(query_daf, "gene", axis_vector(atlas_daf, "gene"); allow_missing = true)
+    total_found_module_indices_per_query_gene = [Int[] for _ in 1:n_query_genes]
+    for (total_found_module_index, atlas_gene_indices) in
+        enumerate(total_found_modules.gene_indices_per_total_found_module)
+        for atlas_gene_index in atlas_gene_indices
+            query_gene_index = query_gene_index_per_atlas_gene[atlas_gene_index]
+            @assert query_gene_index > 0
+            push!(total_found_module_indices_per_query_gene[query_gene_index], total_found_module_index)
+        end
+    end
+
+    block_index_per_metacell = atlas_daf["@ metacell : block : index"].array
+    UMIs_per_atlas_gene_per_metacell = plain_array(get_matrix(atlas_daf, "gene", "metacell", "UMIs"))
+    total_UMIs_per_metacell = plain_array(get_vector(atlas_daf, "metacell", "total_UMIs"))
+
+    UMIs_per_query_gene_per_query_cell = plain_array(get_matrix(query_daf, "gene", "cell", "UMIs"))::SparseMatrixCSC
+    row_index_per_stored = rowvals(UMIs_per_query_gene_per_query_cell)
+    UMIs_per_stored = nonzeros(UMIs_per_query_gene_per_query_cell)
+    total_UMIs_per_query_cell = plain_array(get_vector(query_daf, "cell", "total_UMIs"))
+
+    query_cell_indices_per_metacell = [Int[] for _ in 1:n_metacells]
+    for query_cell_index in findall(is_candidate_per_query_cell)
+        push!(
+            query_cell_indices_per_metacell[projected_metacell_index_per_query_cell[query_cell_index]],
+            query_cell_index,
+        )
+    end
+    n_query_cells_per_metacell = length.(query_cell_indices_per_metacell)
+
+    metacell_module_UMIs_per_total_found_module_per_thread =
+        [Vector{Float64}(undef, n_total_found_modules) for _ in 1:maxthreadid()]
+    actual_UMIs_per_total_found_module_per_thread =
+        [Vector{Float32}(undef, n_total_found_modules) for _ in 1:maxthreadid()]
+
+    is_fold_deviant_per_query_cell = zeros(Bool, n_query_cells)
+
+    parallel_loop_wo_rng(
+        1:n_metacells;
+        name = "is_fold_deviant_per_query_cell",
+        weights = n_query_cells_per_metacell,
+        progress = DebugProgress(
+            sum(n_query_cells_per_metacell);
+            group = :mcs_loops,
+            desc = "is_fold_deviant_per_cell",
+        ),
+    ) do metacell_index
+        query_cell_indices = query_cell_indices_per_metacell[metacell_index]
+        if isempty(query_cell_indices)
+            return nothing
+        end
+
+        metacell_module_UMIs_per_total_found_module = metacell_module_UMIs_per_total_found_module_per_thread[threadid()]
+        actual_UMIs_per_total_found_module = actual_UMIs_per_total_found_module_per_thread[threadid()]
+
+        @inbounds for (total_found_module_index, atlas_gene_indices) in
+                      enumerate(total_found_modules.gene_indices_per_total_found_module)
+            metacell_module_UMIs = 0.0
+            for atlas_gene_index in atlas_gene_indices
+                metacell_module_UMIs += UMIs_per_atlas_gene_per_metacell[atlas_gene_index, metacell_index]
+            end
+            metacell_module_UMIs_per_total_found_module[total_found_module_index] = metacell_module_UMIs
+        end
+        metacell_total_UMIs = Float64(total_UMIs_per_metacell[metacell_index])
+        metacell_block_index = block_index_per_metacell[metacell_index]
+
+        @inbounds for query_cell_index in query_cell_indices
+            actual_UMIs_per_total_found_module .= 0.0f0
+            for stored_index in nzrange(UMIs_per_query_gene_per_query_cell, query_cell_index)
+                UMIs = UMIs_per_stored[stored_index]
+                for total_found_module_index in
+                    total_found_module_indices_per_query_gene[row_index_per_stored[stored_index]]
+                    actual_UMIs_per_total_found_module[total_found_module_index] += UMIs
+                end
+            end
+
+            cell_total_UMIs = total_UMIs_per_query_cell[query_cell_index]
+            is_own = is_own_per_query_cell[query_cell_index]
+            if is_own
+                baseline_total_UMIs = metacell_total_UMIs - cell_total_UMIs
+            else
+                baseline_total_UMIs = metacell_total_UMIs
+            end
+            if baseline_total_UMIs > 0
+                scale = cell_total_UMIs / baseline_total_UMIs
+                for total_found_module_index in 1:n_total_found_modules
+                    actual_UMIs = actual_UMIs_per_total_found_module[total_found_module_index]
+                    baseline_module_UMIs = metacell_module_UMIs_per_total_found_module[total_found_module_index]
+                    if is_own
+                        baseline_module_UMIs -= actual_UMIs
+                    end
+                    fold = outlier_fold(;
+                        actual_UMIs,
+                        expected_UMIs = baseline_module_UMIs * scale,
+                        is_native = total_found_modules.block_index_per_total_found_module[total_found_module_index] ==
+                                    metacell_block_index,
+                        min_outlier_fold,
+                        min_foreign_outlier_fold,
+                        outlier_UMIs_regularization,
+                        outlier_min_significant_UMIs,
+                    )
+                    if fold > 0
+                        is_fold_deviant_per_query_cell[query_cell_index] = true
+                        break
+                    end
+                end
+            end
+        end
+
+        return nothing
+    end
+
+    return is_fold_deviant_per_query_cell
 end
 
 """

@@ -1799,13 +1799,16 @@ function compute_outlier_certificates(;  # UNTESTED
             punctuated_module_UMIs = module_total_UMIs_per_metacell[metacell_index] - actual_UMIs
             module_linear_fraction = punctuated_module_UMIs / punctuated_total_UMIs
             expected_UMIs = module_linear_fraction * cell_total_UMIs
-            fold = abs(log2((actual_UMIs + regularization) / (expected_UMIs + regularization)))
-            min_fold = if block_index_per_sharp_metacell[metacell_index] == module_block_index
-                min_outlier_fold
-            else
-                min_foreign_outlier_fold
-            end
-            if fold > min_fold && actual_UMIs + expected_UMIs >= outlier_min_significant_UMIs
+            fold = outlier_fold(;
+                actual_UMIs,
+                expected_UMIs,
+                is_native = block_index_per_sharp_metacell[metacell_index] == module_block_index,
+                min_outlier_fold,
+                min_foreign_outlier_fold,
+                outlier_UMIs_regularization,
+                outlier_min_significant_UMIs,
+            )
+            if fold > 0
                 push!(
                     candidates,
                     OutlierCandidate(
@@ -1828,11 +1831,7 @@ function compute_outlier_certificates(;  # UNTESTED
             metacell_total_UMIs = metacell_total_UMIs_per_metacell[metacell_index]
             sorted_cell_indices = sorted_cell_indices_per_metacell[metacell_index]
             sorted_total_UMIs = sorted_total_UMIs_per_metacell[metacell_index]
-            min_fold = if block_index_per_sharp_metacell[metacell_index] == module_block_index
-                min_outlier_fold
-            else
-                min_foreign_outlier_fold
-            end
+            is_native = block_index_per_sharp_metacell[metacell_index] == module_block_index
             min_cell_total_UMIs =
                 min_zero_cell_expected_UMIs * metacell_total_UMIs / (module_UMIs + min_zero_cell_expected_UMIs)
             first_position = searchsortedfirst(sorted_total_UMIs, floor(min_cell_total_UMIs))
@@ -1844,8 +1843,16 @@ function compute_outlier_certificates(;  # UNTESTED
                     @assert punctuated_total_UMIs > 0
                     module_linear_fraction = module_UMIs / punctuated_total_UMIs
                     expected_UMIs = module_linear_fraction * cell_total_UMIs
-                    fold = log2((expected_UMIs + regularization) / regularization)
-                    if fold > min_fold && expected_UMIs >= outlier_min_significant_UMIs
+                    fold = outlier_fold(;
+                        actual_UMIs = 0.0,
+                        expected_UMIs,
+                        is_native,
+                        min_outlier_fold,
+                        min_foreign_outlier_fold,
+                        outlier_UMIs_regularization,
+                        outlier_min_significant_UMIs,
+                    )
+                    if fold > 0
                         push!(
                             candidates,
                             OutlierCandidate(
@@ -1947,6 +1954,36 @@ function compute_outlier_certificates(;  # UNTESTED
         expected_UMIs_per_cell,
         actual_UMIs_per_cell,
     )
+end
+
+# The fold of a cell's actual UMIs of a module instance relative to its expected UMIs, if it flags the cell as an
+# outlier, or zero otherwise. The fold is absolute. It counts only if the actual plus the expected UMIs are at least
+# `outlier_min_significant_UMIs`. A counted fold flags the cell if it exceeds `min_outlier_fold` for a native module
+# instance (of the block of the cell's metacell), or `min_foreign_outlier_fold` for a foreign one.
+@inline function outlier_fold(;  # UNTESTED
+    actual_UMIs::Real,
+    expected_UMIs::Real,
+    is_native::Bool,
+    min_outlier_fold::AbstractFloat,
+    min_foreign_outlier_fold::AbstractFloat,
+    outlier_UMIs_regularization::AbstractFloat,
+    outlier_min_significant_UMIs::Integer,
+)::Float64
+    if actual_UMIs + expected_UMIs < outlier_min_significant_UMIs
+        return 0.0
+    end
+
+    fold = abs(log2((actual_UMIs + outlier_UMIs_regularization) / (expected_UMIs + outlier_UMIs_regularization)))
+    min_fold = if is_native
+        min_outlier_fold
+    else
+        min_foreign_outlier_fold
+    end
+    if fold > min_fold
+        return fold
+    else
+        return 0.0
+    end
 end
 
 # Eject the outlier cells from the sharp metacells. Ejecting the outliers can drop a metacell below

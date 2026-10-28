@@ -3473,11 +3473,9 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>The z score of the distance between each cell and its own metacell modules. This is computed the same way as the 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
-<code>vector_of_projected_modules_z_score_per_cell
-</code>
-</a>, so its distribution describes how well cells fit the metacells they belong to. Cells which do not belong to any metacell have an infinite z score.
+<p>The punctuated z score of the distance between each cell and its own metacell modules. This is the z score sharpening compares with its 
+<code>max_modules_z_score
+</code> to detect outliers. The center is that of the metacell&#39;s other cells, and the cell&#39;s distance from it is compared with the distances of the other cells. Cells which do not belong to any metacell have an infinite z score.
 </p>
 <p>This vector is populated by 
 <a href="analyze_modules.html#Metacells.AnalyzeModules.compute_stats_of_euclidean_modules_cells_distance_per_metacell!">
@@ -3623,116 +3621,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell">
-<a class="docstring-binding" href="#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell">
-<code>Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">vector_of_projected_modules_z_score_cutoff_per_metacell(
-    expectation::ContractExpectation
-)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>The cutoff of the 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_per_cell">
-<code>vector_of_projected_modules_z_score_per_cell
-</code>
-</a> of the query cells projected onto each atlas metacell. Query cells from the same distribution as the calibration cells exceed it at the rejected fraction it was computed for.
-</p>
-<p>This vector is populated by 
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!">
-<code>compute_projected_modules_z_score_cutoff_per_metacell!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_level_per_metacell">
-<a class="docstring-binding" href="#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_level_per_metacell">
-<code>Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_level_per_metacell
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">vector_of_projected_modules_z_score_cutoff_level_per_metacell(
-    expectation::ContractExpectation
-)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>Which calibration cells the 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell">
-<code>vector_of_projected_modules_z_score_cutoff_per_metacell
-</code>
-</a> of each metacell was computed from: 
-<code>metacell
-</code> (those projected onto it), 
-<code>block
-</code> (onto its block), 
-<code>neighborhood
-</code> (onto its block&#39;s neighborhood) or 
-<code>all
-</code>.
-</p>
-<p>This vector is populated by 
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!">
-<code>compute_projected_modules_z_score_cutoff_per_metacell!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell">
-<a class="docstring-binding" href="#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell">
-<code>Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell(
-    expectation::ContractExpectation
-)::Pair{VectorKey, DataSpecification}
-</code>
-</pre>
-<p>The number of calibration cells the 
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell">
-<code>vector_of_projected_modules_z_score_cutoff_per_metacell
-</code>
-</a> of each metacell was computed from.
-</p>
-<p>This vector is populated by 
-<a href="analyze_modules.html#Metacells.AnalyzeModules.compute_projected_modules_z_score_cutoff_per_metacell!">
-<code>compute_projected_modules_z_score_cutoff_per_metacell!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
 <summary id="Metacells.Contracts.vector_of_is_deviant_per_cell">
 <a class="docstring-binding" href="#Metacells.Contracts.vector_of_is_deviant_per_cell">
 <code>Metacells.Contracts.vector_of_is_deviant_per_cell
@@ -3749,7 +3637,7 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 )::Pair{VectorKey, DataSpecification}
 </code>
 </pre>
-<p>A mask of query cells that fit no atlas metacell well. Their projected modules z score is above the cutoff of their projected metacell. Excluded cells, and cells which already belong to a metacell, are never deviant.
+<p>A mask of query cells that fit no atlas metacell well. They would be outliers of their projected metacell, by the same rules sharpening uses to detect outliers. In a self-projection, a cell projected onto the metacell it belongs to is tested punctuated, as sharpening tests it. Excluded cells are never deviant.
 </p>
 <p>This vector is populated by 
 <a href="project_cells.html#Metacells.ProjectCells.compute_vector_of_is_deviant_per_cell!">
@@ -4971,24 +4859,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.vector_of_projected_metacell_per_cell">
 <code>Metacells.Contracts.vector_of_projected_metacell_per_cell
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_level_per_metacell">
-<code>Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_level_per_metacell
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell">
-<code>Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_n_cells_per_metacell
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell">
-<code>Metacells.Contracts.vector_of_projected_modules_z_score_cutoff_per_metacell
 </code>
 </a>
 </li>
