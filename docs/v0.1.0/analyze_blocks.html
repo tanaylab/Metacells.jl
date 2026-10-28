@@ -2306,6 +2306,14 @@
 </code>
 </a>) gives the root mean square distance between the blocks.
 </p>
+<p>The distance uses the log (base 2) of the fractions, using the 
+<code>gene_fraction_regularization
+</code> to handle zero fractions. Unlike other fold factors, this does not require each gene to be based on at least 
+<code>MIN_SIGNIFICANT_GENE_UMIS
+</code>. Counting such a gene as zero would make metacells with fewer UMIs seem closer to all other metacells. Instead, the high 
+<code>gene_fraction_regularization
+</code> reduces the effect of these genes.
+</p>
 <p>
 <strong>Inputs
 </strong>

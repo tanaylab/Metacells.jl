@@ -793,13 +793,15 @@
 <code>n_neighbors
 </code> nearest other metacells.
 </p>
-<div class="admonition is-info" id="Note-ecf5441cfe130967">
+<div class="admonition is-info" id="Note-6c0ea628c0f9ecc6">
 <header class="admonition-header">Note
-<a class="admonition-anchor" href="#Note-ecf5441cfe130967" title="Permalink">
+<a class="admonition-anchor" href="#Note-6c0ea628c0f9ecc6" title="Permalink">
 </a>
 </header>
 <div class="admonition-body">
-<p>We use a higher regularization here even though these are fractions for metacells to avoid over-sensitivity for differences in weakly-expressed genes between the metacells.
+<p>We use a higher regularization here even though these are fractions for metacells to avoid over-sensitivity for differences in weakly-expressed genes between the metacells. Unlike other fold factors, this does not require each gene to be based on at least 
+<code>MIN_SIGNIFICANT_GENE_UMIS
+</code>. Counting such a gene as zero would make metacells with fewer UMIs seem closer to all other metacells. Instead, the high regularization reduces the effect of these genes.
 </p>
 </div>
 </div>

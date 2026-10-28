@@ -279,7 +279,9 @@ its `n_neighbors` nearest other metacells.
 !!! note
 
     We use a higher regularization here even though these are fractions for metacells to avoid over-sensitivity for
-    differences in weakly-expressed genes between the metacells.
+    differences in weakly-expressed genes between the metacells. Unlike other fold factors, this does not require each
+    gene to be based on at least `MIN_SIGNIFICANT_GENE_UMIS`. Counting such a gene as zero would make metacells with
+    fewer UMIs seem closer to all other metacells. Instead, the high regularization reduces the effect of these genes.
 
 $(CONTRACT)
 """

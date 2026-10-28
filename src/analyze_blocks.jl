@@ -337,6 +337,11 @@ own metacells are included. Reducing this over each block's metacells (see
 [`compute_matrix_of_rms_euclidean_skeleton_fold_distance_between_blocks!`](@ref)) gives the root mean square distance
 between the blocks.
 
+The distance uses the log (base 2) of the fractions, using the `gene_fraction_regularization` to handle zero fractions.
+Unlike other fold factors, this does not require each gene to be based on at least `MIN_SIGNIFICANT_GENE_UMIS`.
+Counting such a gene as zero would make metacells with fewer UMIs seem closer to all other metacells. Instead, the high
+`gene_fraction_regularization` reduces the effect of these genes.
+
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(;
