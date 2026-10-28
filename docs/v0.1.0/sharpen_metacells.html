@@ -228,7 +228,9 @@
     gene_fraction_regularization::AbstractFloat = ```0.0001```,
     std_UMIs_regularization::AbstractFloat = ```2.0```,
     min_outlier_fold::AbstractFloat = ```2.0```,
+    min_foreign_outlier_fold::AbstractFloat = ```3.0```,
     outlier_UMIs_regularization::AbstractFloat = ```2.0```,
+    outlier_min_significant_UMIs::Integer = ```40```,
     max_modules_z_score::AbstractFloat = ```4.0```,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = ```false```,
@@ -288,9 +290,13 @@
 </li>
 <li>We detect the outlier cells and eject them from their metacell. For each cell in each metacell, and for every found module instance in the previous round&#39;s repository (across all blocks, not just the modules of the cell&#39;s own region), we compare the actual UMIs of the module&#39;s genes in the cell to the expected UMIs. The expectation is punctuated - the module&#39;s linear fraction in the cell&#39;s metacell excluding the cell itself, times the cell&#39;s total UMIs - so a strong outlier cannot inflate its own baseline. The comparison is a fold factor 
 <code>log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization))
-</code>, using a strong UMIs regularization so low-count modules do not trigger. A cell whose maximal fold (across all module instances) exceeds 
+</code>, using a strong UMIs regularization so low-count modules do not trigger. The fold is absolute, so a cell with too few UMIs of a module is an outlier as well as a cell with too many. A fold counts only if the actual plus the expected UMIs are at least 
+<code>outlier_min_significant_UMIs
+</code>. A counted fold flags the cell if it exceeds 
 <code>min_outlier_fold
-</code> is an outlier: it loses its metacell, and we record the certificate (the metacell it was ejected from, the previous round&#39;s block and module that flagged it, and the expected and actual UMIs) of the module instance that most deviates. A cell is also an outlier if its modules z score exceeds 
+</code> for a module instance of the block of the cell&#39;s metacell, or 
+<code>min_foreign_outlier_fold
+</code> for a module instance of any other block. A flagged cell is an outlier: it loses its metacell, and we record the certificate (the metacell it was ejected from, the previous round&#39;s block and module that flagged it, and the expected and actual UMIs) of the flagging module instance that most deviates. A cell is also an outlier if its modules z score exceeds 
 <code>max_modules_z_score
 </code>. This is the distance of the cell from its metacell&#39;s center, in the module z-score space of its block, compared with the mean and standard deviation of the distances of the metacell&#39;s other cells. It is punctuated too: the center is that of the metacell&#39;s other cells. A cell flagged only by its modules z score has no module certificate (the previous round&#39;s block and module that flagged it are empty, and its expected and actual UMIs are zero). Ejecting the outliers can drop a metacell below 
 <code>min_cells_in_metacell

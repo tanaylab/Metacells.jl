@@ -231,7 +231,9 @@ end
         gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         std_UMIs_regularization::AbstractFloat = $(DEFAULT.std_UMIs_regularization),
         min_outlier_fold::AbstractFloat = $(DEFAULT.min_outlier_fold),
+        min_foreign_outlier_fold::AbstractFloat = $(DEFAULT.min_foreign_outlier_fold),
         outlier_UMIs_regularization::AbstractFloat = $(DEFAULT.outlier_UMIs_regularization),
+        outlier_min_significant_UMIs::Integer = $(DEFAULT.outlier_min_significant_UMIs),
         max_modules_z_score::AbstractFloat = $(DEFAULT.max_modules_z_score),
         rng::AbstractRNG = default_rng(),
         overwrite::Bool = $(DEFAULT.overwrite),
@@ -281,9 +283,12 @@ manifold, compute a `sharp_daf` metacells repository, which hopefully more faith
     punctuated - the module's linear fraction in the cell's metacell excluding the cell itself, times the cell's total
     UMIs - so a strong outlier cannot inflate its own baseline. The comparison is a fold factor
     `log2((actual + outlier_UMIs_regularization) / (expected + outlier_UMIs_regularization))`, using a strong UMIs
-    regularization so low-count modules do not trigger. A cell whose maximal fold (across all module instances) exceeds
-    `min_outlier_fold` is an outlier: it loses its metacell, and we record the certificate (the metacell it was ejected
-    from, the previous round's block and module that flagged it, and the expected and actual UMIs) of the module
+    regularization so low-count modules do not trigger. The fold is absolute, so a cell with too few UMIs of a module is
+    an outlier as well as a cell with too many. A fold counts only if the actual plus the expected UMIs are at least
+    `outlier_min_significant_UMIs`. A counted fold flags the cell if it exceeds `min_outlier_fold` for a module instance
+    of the block of the cell's metacell, or `min_foreign_outlier_fold` for a module instance of any other block. A
+    flagged cell is an outlier: it loses its metacell, and we record the certificate (the metacell it was ejected from,
+    the previous round's block and module that flagged it, and the expected and actual UMIs) of the flagging module
     instance that most deviates. A cell is also an outlier if its modules z score exceeds `max_modules_z_score`. This is
     the distance of the cell from its metacell's center, in the module z-score space of its block, compared with the
     mean and standard deviation of the distances of the metacell's other cells. It is punctuated too: the center is that
@@ -379,7 +384,9 @@ $(CONTRACT2)
         :std_UMIs_regularization,
     ),
     min_outlier_fold::AbstractFloat = 2.0,
+    min_foreign_outlier_fold::AbstractFloat = 3.0,
     outlier_UMIs_regularization::AbstractFloat = 2.0,
+    outlier_min_significant_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
     max_modules_z_score::AbstractFloat = 4.0,
     rng::AbstractRNG = default_rng(),
     overwrite::Bool = false,
@@ -397,7 +404,9 @@ $(CONTRACT2)
     @assert improvement_half_life === nothing || improvement_half_life > 0
     @assert std_UMIs_regularization > 0
     @assert min_outlier_fold > 0
+    @assert min_foreign_outlier_fold > 0
     @assert outlier_UMIs_regularization > 0
+    @assert outlier_min_significant_UMIs >= 0
     @assert max_modules_z_score > 0
 
     n_cells = axis_length(prev_daf, "cell")
@@ -647,7 +656,9 @@ $(CONTRACT2)
         block_index_per_sharp_metacell,
         min_cells_in_metacell,
         min_outlier_fold,
+        min_foreign_outlier_fold,
         outlier_UMIs_regularization,
+        outlier_min_significant_UMIs,
         max_modules_z_score,
         block_index_per_cell,
         is_found_per_module_per_block,
@@ -1555,9 +1566,10 @@ function combine_local_clusters(;  # UNTESTED
 end
 
 # The flattened enumeration of every found module instance across all blocks in a repository, indexed by
-# `total_found_module_index`. The parallel vectors hold each instance's block and module names and the gene indices of
-# the module in that block.
+# `total_found_module_index`. The parallel vectors hold each instance's block index, its block and module names, and the
+# gene indices of the module in that block.
 struct TotalFoundModules
+    block_index_per_total_found_module::Vector{Int}
     block_name_per_total_found_module::Vector{String}
     module_name_per_total_found_module::Vector{String}
     gene_indices_per_total_found_module::Vector{Vector{Int}}
@@ -1574,6 +1586,7 @@ function collect_total_found_modules(;  # UNTESTED
     n_blocks = size(is_found_per_module_per_block, 2)
     n_genes = size(module_index_per_gene_per_block, 1)
 
+    block_index_per_total_found_module = Int[]
     block_name_per_total_found_module = String[]
     module_name_per_total_found_module = String[]
     gene_indices_per_total_found_module = Vector{Vector{Int}}()
@@ -1589,6 +1602,7 @@ function collect_total_found_modules(;  # UNTESTED
         end
         for module_index in 1:n_modules
             if is_found_per_module[module_index]
+                push!(block_index_per_total_found_module, block_index)
                 push!(block_name_per_total_found_module, name_per_block[block_index])
                 push!(module_name_per_total_found_module, name_per_module[module_index])
                 push!(gene_indices_per_total_found_module, gene_indices_per_module[module_index])
@@ -1597,6 +1611,7 @@ function collect_total_found_modules(;  # UNTESTED
     end
 
     return TotalFoundModules(
+        block_index_per_total_found_module,
         block_name_per_total_found_module,
         module_name_per_total_found_module,
         gene_indices_per_total_found_module,
@@ -1616,8 +1631,9 @@ struct OutlierCertificates
     actual_UMIs_per_cell::Vector{Float32}
 end
 
-# A single outlier fold factor found for a cell against one found module instance. Collected per thread during the
-# parallel sweep over module instances, then reduced to the per-cell maximal fold in `compute_outlier_certificates`.
+# A single (absolute) outlier fold factor found for a cell against one found module instance. Collected per thread
+# during the parallel sweep over module instances, then reduced to the per-cell maximal fold in
+# `compute_outlier_certificates`.
 struct OutlierCandidate
     cell_index::Int
     total_found_module_index::Int
@@ -1626,25 +1642,31 @@ struct OutlierCandidate
     actual_UMIs::Float32
 end
 
-# Detect the outlier cells: cells whose expression of some prev found module wildly exceeds what their metacell
+# Detect the outlier cells: cells whose expression of some prev found module wildly differs from what their metacell
 # predicts. For every found module instance in the previous round's repository (across all blocks, not just the modules
-# of a cell's own region), and for each grouped cell that expresses the module, compare the cell's actual UMIs of the
-# module's genes to the expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's
-# metacell excluding the cell itself, times the cell's total UMIs - so a strong outlier cannot inflate its own baseline.
-# A cell whose maximal fold (across all module instances) exceeds `min_outlier_fold` is an outlier, with the certificate
-# of the most-deviant module instance. So is a cell in `is_modules_z_score_outlier_per_cell`, which has no module
-# certificate unless a module also flagged it. A metacell is never emptied - every outlier names the metacell it was
-# ejected from, so if all the cells of a metacell are outliers, none of them is.
+# of a cell's own region), and for each grouped cell, compare the cell's actual UMIs of the module's genes to the
+# expected UMIs. The expectation is punctuated - the module's linear fraction in the cell's metacell excluding the cell
+# itself, times the cell's total UMIs - so a strong outlier cannot inflate its own baseline. The fold is absolute, so a
+# cell with too few UMIs of a module is an outlier as well as a cell with too many. A fold counts only if the actual
+# plus the expected UMIs are at least `outlier_min_significant_UMIs`. A counted fold flags the cell if it exceeds
+# `min_outlier_fold` for a module instance of the metacell's block, or `min_foreign_outlier_fold` for a module instance
+# of any other block. A flagged cell is an outlier, with the certificate of the flagging module instance that most
+# deviates. So is a cell in `is_modules_z_score_outlier_per_cell`, which has no module certificate unless a module also
+# flagged it. A metacell is never emptied - every outlier names the metacell it was ejected from, so if all the cells of
+# a metacell are outliers, none of them is.
 #
 # The loop is parallel over module instances. `sparse_UMIs_per_cell_per_gene` is a CSC matrix whose columns are genes,
-# so each instance walks only the nonzeros of its module's gene columns (the cells that actually express it); cells with
-# no UMIs of the module cannot be deviant for it (their fold is non-positive), so they are never visited. Per thread we
-# reuse a dense `actual_per_cell` accumulator and a `is_touched_per_cell` mask, tracking the touched cells (and
-# metacells) in preallocated index vectors so both the per-instance reduction and the reset are O(touched), not
-# O(n_cells). Each instance emits only its fold-exceeding candidates (rare) to a per-thread buffer, reduced serially to
-# the per-cell maximum at the end.
+# so each instance walks the nonzeros of its module's gene columns (the cells that actually express it). A cell with no
+# UMIs of the module can only be an outlier if its metacell has some UMIs of the module, and its expected UMIs grow with
+# its total UMIs. So for each metacell that has UMIs of the module, a binary search over its cells (sorted by their
+# total UMIs) finds the ones to test, using the smaller of the two fold thresholds. Per thread we reuse a dense
+# `actual_per_cell` accumulator and a `is_touched_per_cell` mask, tracking the touched cells (and metacells) in
+# preallocated index vectors so both the per-instance reduction and the reset are O(touched), not O(n_cells). Each
+# instance emits only its fold-exceeding candidates (rare) to a per-thread buffer, reduced serially to the per-cell
+# maximum at the end.
 function compute_outlier_certificates(;  # UNTESTED
     cells_of_sharp_metacells::AbstractVector{<:AbstractVector{<:Integer}},
+    block_index_per_sharp_metacell::AbstractVector{<:Integer},
     is_modules_z_score_outlier_per_cell::AbstractVector{Bool},
     sparse_UMIs_per_cell_per_gene::SparseMatrixCSC{<:Integer},
     total_UMIs_per_cell::AbstractVector{<:Integer},
@@ -1653,7 +1675,9 @@ function compute_outlier_certificates(;  # UNTESTED
     name_per_block::AbstractVector{<:AbstractString},
     name_per_module::AbstractVector{<:AbstractString},
     min_outlier_fold::AbstractFloat,
+    min_foreign_outlier_fold::AbstractFloat,
     outlier_UMIs_regularization::AbstractFloat,
+    outlier_min_significant_UMIs::Integer,
     n_cells::Integer,
 )::OutlierCertificates
     n_sharp_metacells = length(cells_of_sharp_metacells)
@@ -1671,12 +1695,19 @@ function compute_outlier_certificates(;  # UNTESTED
     # it can never be an outlier.
     metacell_index_per_cell = zeros(Int32, n_cells)
     metacell_total_UMIs_per_metacell = zeros(Float64, n_sharp_metacells)
+    # Each grouped metacell's cells and their total UMIs, in ascending order of the total UMIs. The expected UMIs of a
+    # cell with no UMIs of a module grow with its total UMIs, so a binary search finds the ones that may be outliers.
+    sorted_cell_indices_per_metacell = [Int[] for _ in 1:n_sharp_metacells]
+    sorted_total_UMIs_per_metacell = [Int[] for _ in 1:n_sharp_metacells]
     for (sharp_metacell_index, cell_indices) in enumerate(cells_of_sharp_metacells)
         if length(cell_indices) > 1
             for cell_index in cell_indices
                 metacell_index_per_cell[cell_index] = sharp_metacell_index
                 metacell_total_UMIs_per_metacell[sharp_metacell_index] += total_UMIs_per_cell[cell_index]
             end
+            sorted_cell_indices = sort(cell_indices; by = cell_index -> total_UMIs_per_cell[cell_index])
+            sorted_cell_indices_per_metacell[sharp_metacell_index] = sorted_cell_indices
+            sorted_total_UMIs_per_metacell[sharp_metacell_index] = total_UMIs_per_cell[sorted_cell_indices]
         end
     end
 
@@ -1706,6 +1737,12 @@ function compute_outlier_certificates(;  # UNTESTED
 
     regularization = Float64(outlier_UMIs_regularization)
 
+    # A cell with no UMIs of a module must have at least this many expected UMIs to pass both the fold and the
+    # significance tests.
+    min_zero_cell_expected_UMIs = Float64(
+        max(outlier_min_significant_UMIs, regularization * (2^min(min_outlier_fold, min_foreign_outlier_fold) - 1)),
+    )
+
     parallel_loop_wo_rng(
         1:n_total_found_modules;
         name = "compute_outlier_certificates",
@@ -1720,6 +1757,7 @@ function compute_outlier_certificates(;  # UNTESTED
         candidates = candidates_per_thread[threadid()]
 
         gene_indices_in_module = prev_total_modules.gene_indices_per_total_found_module[total_found_module_index]
+        module_block_index = prev_total_modules.block_index_per_total_found_module[total_found_module_index]
 
         # Gather the module's UMIs into `actual_per_cell` for every grouped cell that expresses it, walking only the
         # nonzeros of the module's gene columns and recording each cell once in `touched_cells`.
@@ -1750,7 +1788,7 @@ function compute_outlier_certificates(;  # UNTESTED
             module_total_UMIs_per_metacell[metacell_index] += actual_per_cell[cell_index]
         end
 
-        # Punctuated fold per touched cell; emit the fold-exceeding ones as candidates.
+        # Punctuated fold (in either direction) per touched cell; emit the fold-exceeding ones as candidates.
         @inbounds for touched_index in 1:n_touched_cells
             cell_index = touched_cells[touched_index]
             metacell_index = metacell_index_per_cell[cell_index]
@@ -1761,8 +1799,13 @@ function compute_outlier_certificates(;  # UNTESTED
             punctuated_module_UMIs = module_total_UMIs_per_metacell[metacell_index] - actual_UMIs
             module_linear_fraction = punctuated_module_UMIs / punctuated_total_UMIs
             expected_UMIs = module_linear_fraction * cell_total_UMIs
-            fold = log2((actual_UMIs + regularization) / (expected_UMIs + regularization))
-            if fold > min_outlier_fold
+            fold = abs(log2((actual_UMIs + regularization) / (expected_UMIs + regularization)))
+            min_fold = if block_index_per_sharp_metacell[metacell_index] == module_block_index
+                min_outlier_fold
+            else
+                min_foreign_outlier_fold
+            end
+            if fold > min_fold && actual_UMIs + expected_UMIs >= outlier_min_significant_UMIs
                 push!(
                     candidates,
                     OutlierCandidate(
@@ -1773,6 +1816,48 @@ function compute_outlier_certificates(;  # UNTESTED
                         Float32(actual_UMIs),
                     ),
                 )
+            end
+        end
+
+        # Punctuated fold per untouched cell of each touched metacell. Only the cells whose total UMIs are at least
+        # the cutoff for `min_zero_cell_expected_UMIs` are visited. The cutoff is rounded down, and each visited cell
+        # is tested exactly.
+        @inbounds for touched_index in 1:n_touched_metacells
+            metacell_index = touched_metacells[touched_index]
+            module_UMIs = module_total_UMIs_per_metacell[metacell_index]
+            metacell_total_UMIs = metacell_total_UMIs_per_metacell[metacell_index]
+            sorted_cell_indices = sorted_cell_indices_per_metacell[metacell_index]
+            sorted_total_UMIs = sorted_total_UMIs_per_metacell[metacell_index]
+            min_fold = if block_index_per_sharp_metacell[metacell_index] == module_block_index
+                min_outlier_fold
+            else
+                min_foreign_outlier_fold
+            end
+            min_cell_total_UMIs =
+                min_zero_cell_expected_UMIs * metacell_total_UMIs / (module_UMIs + min_zero_cell_expected_UMIs)
+            first_position = searchsortedfirst(sorted_total_UMIs, floor(min_cell_total_UMIs))
+            for position in first_position:length(sorted_cell_indices)  # NOJET
+                cell_index = sorted_cell_indices[position]
+                if !is_touched_per_cell[cell_index]
+                    cell_total_UMIs = sorted_total_UMIs[position]
+                    punctuated_total_UMIs = metacell_total_UMIs - cell_total_UMIs
+                    @assert punctuated_total_UMIs > 0
+                    module_linear_fraction = module_UMIs / punctuated_total_UMIs
+                    expected_UMIs = module_linear_fraction * cell_total_UMIs
+                    fold = log2((expected_UMIs + regularization) / regularization)
+                    if fold > min_fold && expected_UMIs >= outlier_min_significant_UMIs
+                        push!(
+                            candidates,
+                            OutlierCandidate(
+                                cell_index,
+                                total_found_module_index,
+                                Float32(fold),
+                                Float32(expected_UMIs),
+                                0.0f0,
+                            ),
+                        )
+                    end
+                end
             end
         end
 
@@ -1875,7 +1960,9 @@ function eject_outliers!(;  # UNTESTED
     block_index_per_sharp_metacell::Vector{Int},
     min_cells_in_metacell::Integer,
     min_outlier_fold::AbstractFloat,
+    min_foreign_outlier_fold::AbstractFloat,
     outlier_UMIs_regularization::AbstractFloat,
+    outlier_min_significant_UMIs::Integer,
     max_modules_z_score::AbstractFloat,
     block_index_per_cell::AbstractVector{<:Integer},
     is_found_per_module_per_block::AbstractMatrix{Bool},
@@ -1920,6 +2007,7 @@ function eject_outliers!(;  # UNTESTED
         )
         outlier_certificates = compute_outlier_certificates(;
             cells_of_sharp_metacells,
+            block_index_per_sharp_metacell,
             is_modules_z_score_outlier_per_cell,
             sparse_UMIs_per_cell_per_gene,
             total_UMIs_per_cell,
@@ -1928,7 +2016,9 @@ function eject_outliers!(;  # UNTESTED
             name_per_block,
             name_per_module,
             min_outlier_fold,
+            min_foreign_outlier_fold,
             outlier_UMIs_regularization,
+            outlier_min_significant_UMIs,
             n_cells,
         )
         is_outlier_per_cell = outlier_certificates.is_outlier_per_cell
