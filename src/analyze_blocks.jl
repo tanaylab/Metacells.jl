@@ -466,7 +466,13 @@ end
         overwrite::Bool = false
     )::Nothing
 
-Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref).
+Compute and set [`vector_of_block_closest_by_pertinent_markers_per_cell`](@ref). This is the block with the minimal
+Euclidean distance between the log of the fractions of the pertinent (non-lateral) marker genes in the cell and in the
+block, adding the `gene_fraction_regularization`.
+
+Unlike other fold factors, this does not require each gene to be based on at least `MIN_SIGNIFICANT_GENE_UMIS`. A single
+cell has few UMIs of each gene, so such a floor would ignore most of them. Instead, the high
+`gene_fraction_regularization` reduces the effect of genes with few UMIs.
 """
 @logged :mcs_ops @computation Contract(;
     axes = [gene_axis(RequiredInput), cell_axis(RequiredInput), block_axis(RequiredInput)],
@@ -1044,6 +1050,8 @@ end
         min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
         min_marker_gene_range_fold::Real = 1.0,
         min_marker_quantile::Real = 0.1,
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = false,
     )::Nothing
 
@@ -1058,6 +1066,8 @@ We only consider genes which are markers in the overall population. We then call
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         vector_of_is_marker_per_gene(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_neighborhood_marker_per_gene_per_block(CreatedOutput),
@@ -1067,6 +1077,8 @@ We only consider genes which are markers in the overall population. We then call
     min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
     min_marker_gene_range_fold::Real = 1.0,
     min_marker_quantile::Real = 0.1,
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     overwrite::Bool = false,
 )::Nothing
     n_genes = axis_length(daf, "gene")
@@ -1104,6 +1116,8 @@ We only consider genes which are markers in the overall population. We then call
                 "gene" => "@ gene [ is_marker ]",
             ],
             input_data = [
+                ("metacell", "total_UMIs") => "=",
+                ("metacell", "gene", "UMIs") => "=",
                 ("metacell", "gene", "linear_fraction") => "=",
                 ("metacell", "gene", "log_linear_fraction") => "=",
                 ("gene", "full_index") => "index",
@@ -1116,6 +1130,8 @@ We only consider genes which are markers in the overall population. We then call
                 min_marker_gene_max_fraction,
                 min_marker_gene_range_fold,
                 min_marker_quantile,
+                min_significant_gene_UMIs,
+                gene_fraction_regularization,
             )
             full_index_per_gene = plain_array(get_vector(adapted, "gene", "full_index"))
             is_neighborhood_marker_per_gene = plain_array(get_vector(adapted, "gene", "is_marker"))
@@ -1144,6 +1160,8 @@ end
         min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
         min_marker_gene_range_fold::Real = 1.0,
         min_marker_quantile::Real = 0.1,
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = false,
     )::Nothing
 
@@ -1157,6 +1175,8 @@ We only consider genes which are markers in the overall population. We then call
     data = [
         matrix_of_is_in_environment_per_metacell_per_block(RequiredInput),
         vector_of_is_marker_per_gene(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_environment_marker_per_gene_per_block(CreatedOutput),
@@ -1166,6 +1186,8 @@ We only consider genes which are markers in the overall population. We then call
     min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
     min_marker_gene_range_fold::Real = 1.0,
     min_marker_quantile::Real = 0.1,
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     overwrite::Bool = false,
 )::Nothing
     n_genes = axis_length(daf, "gene")
@@ -1195,6 +1217,8 @@ We only consider genes which are markers in the overall population. We then call
                 "gene" => "@ gene [ is_marker ]",
             ],
             input_data = [
+                ("metacell", "total_UMIs") => "=",
+                ("metacell", "gene", "UMIs") => "=",
                 ("metacell", "gene", "linear_fraction") => "=",
                 ("metacell", "gene", "log_linear_fraction") => "=",
                 ("gene", "full_index") => "index",
@@ -1207,6 +1231,8 @@ We only consider genes which are markers in the overall population. We then call
                 min_marker_gene_max_fraction,
                 min_marker_gene_range_fold,
                 min_marker_quantile,
+                min_significant_gene_UMIs,
+                gene_fraction_regularization,
             )
             full_index_per_gene = plain_array(get_vector(adapted, "gene", "full_index"))
             is_environment_marker_per_gene = plain_array(get_vector(adapted, "gene", "is_marker"))
@@ -1233,6 +1259,8 @@ end
         daf::DafWriter;
         min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
         min_distinct_gene_mean_fold::Real = 2,
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = false,
     )::Nothing
 
@@ -1242,7 +1270,9 @@ if:
   - It has a maximal expression level of at least `min_distinct_gene_max_fraction`.
   - When comparing its fold factor compared to its median expression level in the population, then the mean fold factor
     in the neighborhood is at least `min_distinct_gene_mean_fold`. This is not the absolute fold, that is, we only look
-    for genes which are stronger than the population as a whole, not weaker.
+    for genes which are stronger than the population as a whole, not weaker. As usual, we only consider the fold factor
+    of a metacell if it is based on at least `min_significant_gene_UMIs`, counting the metacell UMIs of the gene plus
+    the median expression normalized to the metacell size. Otherwise it counts as zero in the mean.
 
 $(CONTRACT)
 """
@@ -1251,6 +1281,8 @@ $(CONTRACT)
     data = [
         matrix_of_is_in_neighborhood_per_block_per_block(RequiredInput),
         vector_of_block_per_metacell(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_neighborhood_distinct_per_gene_per_block(CreatedOutput),
@@ -1259,15 +1291,19 @@ $(CONTRACT)
     daf::DafWriter;
     min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
     min_distinct_gene_mean_fold::Real = 2,
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     overwrite::Bool = false,
 )::Nothing
+    @assert min_significant_gene_UMIs >= 0
+    @assert gene_fraction_regularization > 0
+
     n_genes = axis_length(daf, "gene")
     n_blocks = axis_length(daf, "block")
 
     linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "linear_fraction"))
-    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
-    median_log_linear_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- Median"].array
-    @assert_vector(median_log_linear_fraction_per_gene, n_genes)
+    fold_per_gene_per_metacell =
+        significant_fold_per_gene_per_metacell_from_median(daf; min_significant_gene_UMIs, gene_fraction_regularization)
 
     is_in_neighborhood_per_other_block_per_base_block =
         plain_array(get_matrix(daf, "block", "block", "is_in_neighborhood"))
@@ -1302,12 +1338,9 @@ $(CONTRACT)
 
         linear_fraction_per_gene_per_neighborhood_metacell =
             linear_fraction_per_gene_per_metacell[:, is_in_neighborhood_per_metacell]
-        log_linear_fraction_per_gene_per_neighborhood_metacell =
-            log_linear_fraction_per_gene_per_metacell[:, is_in_neighborhood_per_metacell]
         max_linear_fraction_per_gene = vec(maximum(linear_fraction_per_gene_per_neighborhood_metacell; dims = 2))
 
-        fold_per_gene_per_neighborhood_metacell =
-            log_linear_fraction_per_gene_per_neighborhood_metacell .- median_log_linear_fraction_per_gene
+        fold_per_gene_per_neighborhood_metacell = fold_per_gene_per_metacell[:, is_in_neighborhood_per_metacell]
         mean_fold_per_gene = vec(mean(fold_per_gene_per_neighborhood_metacell; dims = 2))  # NOLINT
 
         is_neighborhood_distinct_per_gene .=
@@ -1337,6 +1370,8 @@ end
         daf::DafWriter;
         min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
         min_distinct_gene_mean_fold::Real = 2,
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = false,
     )::Nothing
 
@@ -1346,7 +1381,9 @@ if:
   - It has a maximal expression level of at least `min_distinct_gene_max_fraction`.
   - When comparing its fold factor compared to its median expression level in the population, then the mean fold factor
     in the environment is at least `min_distinct_gene_mean_fold`. This is not the absolute fold, that is, we only look
-    for genes which are stronger than the population as a whole, not weaker.
+    for genes which are stronger than the population as a whole, not weaker. As usual, we only consider the fold factor
+    of a metacell if it is based on at least `min_significant_gene_UMIs`, counting the metacell UMIs of the gene plus
+    the median expression normalized to the metacell size. Otherwise it counts as zero in the mean.
 
 $(CONTRACT)
 """
@@ -1354,6 +1391,8 @@ $(CONTRACT)
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput), block_axis(RequiredInput)],
     data = [
         matrix_of_is_in_environment_per_metacell_per_block(RequiredInput),
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_is_environment_distinct_per_gene_per_block(CreatedOutput),
@@ -1362,15 +1401,19 @@ $(CONTRACT)
     daf::DafWriter;
     min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
     min_distinct_gene_mean_fold::Real = 2,
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     overwrite::Bool = false,
 )::Nothing
+    @assert min_significant_gene_UMIs >= 0
+    @assert gene_fraction_regularization > 0
+
     n_genes = axis_length(daf, "gene")
     n_blocks = axis_length(daf, "block")
 
     linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "linear_fraction"))
-    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
-    median_log_linear_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- Median"].array
-    @assert_vector(median_log_linear_fraction_per_gene, n_genes)
+    fold_per_gene_per_metacell =
+        significant_fold_per_gene_per_metacell_from_median(daf; min_significant_gene_UMIs, gene_fraction_regularization)
 
     is_in_environment_per_metacell_per_block = plain_array(get_matrix(daf, "metacell", "block", "is_in_environment"))
     n_metacells_in_environment_per_block = vec(sum(is_in_environment_per_metacell_per_block; dims = 1))
@@ -1393,12 +1436,9 @@ $(CONTRACT)
 
         linear_fraction_per_gene_per_environment_metacell =
             linear_fraction_per_gene_per_metacell[:, indices_of_environment_metacells]
-        log_linear_fraction_per_gene_per_environment_metacell =
-            log_linear_fraction_per_gene_per_metacell[:, indices_of_environment_metacells]
         max_linear_fraction_per_gene = vec(maximum(linear_fraction_per_gene_per_environment_metacell; dims = 2))
 
-        fold_per_gene_per_environment_metacell =
-            log_linear_fraction_per_gene_per_environment_metacell .- median_log_linear_fraction_per_gene
+        fold_per_gene_per_environment_metacell = fold_per_gene_per_metacell[:, indices_of_environment_metacells]
         mean_fold_per_gene = vec(mean(fold_per_gene_per_environment_metacell; dims = 2))  # NOLINT
 
         is_environment_distinct_per_gene .=
@@ -1421,6 +1461,29 @@ $(CONTRACT)
         :mcs_results
 
     return nothing
+end
+
+# The fold of each gene in each metacell compared to its median expression across all the metacells. The fold is zero if
+# it is based on less than `min_significant_gene_UMIs`, counting the metacell UMIs of the gene plus the median
+# expression normalized to the metacell size.
+function significant_fold_per_gene_per_metacell_from_median(  # UNTESTED
+    daf::DafReader;
+    min_significant_gene_UMIs::Integer,
+    gene_fraction_regularization::AbstractFloat,
+)::Matrix{<:AbstractFloat}
+    n_genes = axis_length(daf, "gene")
+
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
+    UMIs_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "UMIs"))
+    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
+    median_log_linear_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- Median"].array
+    @assert_vector(median_log_linear_fraction_per_gene, n_genes)
+    median_fraction_per_gene = 2 .^ median_log_linear_fraction_per_gene .- gene_fraction_regularization
+
+    return (log_linear_fraction_per_gene_per_metacell .- median_log_linear_fraction_per_gene) .* (
+        UMIs_per_gene_per_metacell .+ median_fraction_per_gene .* transpose(total_UMIs_per_metacell) .>=
+        min_significant_gene_UMIs
+    )
 end
 
 """

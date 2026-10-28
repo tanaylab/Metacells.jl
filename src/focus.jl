@@ -46,6 +46,8 @@ import Metacells.Contracts.vector_of_total_UMIs_per_metacell
         min_marker_gene_max_fraction::AbstractFloat = $(DEFAULT.min_marker_gene_max_fraction),
         min_marker_gene_range_fold::Real = $(DEFAULT.min_marker_gene_range_fold),
         min_marker_quantile::Real = $(DEFAULT.min_marker_quantile),
+        marker_min_significant_gene_UMIs::Integer = $(DEFAULT.marker_min_significant_gene_UMIs),
+        marker_gene_fraction_regularization::AbstractFloat = $(DEFAULT.marker_gene_fraction_regularization),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
@@ -57,11 +59,15 @@ to the skeleton genes that are still markers of the focus metacells.
 This works in passes, until a pass drops no metacell. Each pass:
 
   - Keeps only the skeleton genes that are still markers of the remaining metacells, using the
-    `min_marker_gene_max_fraction`, `min_marker_gene_range_fold` and `min_marker_quantile` (see
+    `min_marker_gene_max_fraction`, `min_marker_gene_range_fold`, `min_marker_quantile`,
+    `marker_min_significant_gene_UMIs` and `marker_gene_fraction_regularization` (see
     [`compute_vector_of_is_marker_per_gene!`](@ref)).
   - Finds the `n_neighbors` nearest neighbors of each remaining metacell, using the Euclidean distance between the log
     of the fractions of the skeleton genes, adding the `gene_fraction_regularization` (see
-    [`compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!`](@ref)).
+    [`compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!`](@ref)). Unlike other fold
+    factors, this does not require each gene to be based on at least `max_fold_min_significant_gene_UMIs`. Testing all
+    the pairs would be too expensive for a large number of metacells. Instead, the high `gene_fraction_regularization`
+    reduces the effect of genes with few UMIs. This only chooses the pairs to test. The test itself does use the floor.
   - Computes the maximal confident fold of the skeleton genes between each metacell and each of its neighbors, using
     the `max_fold_gene_fraction_regularization`, `max_fold_min_significant_gene_UMIs`, `max_fold_confidence` and
     `max_fold_min_confidence_UMIs` (see [`compute_metacells_blocks!`](@ref)).
@@ -127,11 +133,21 @@ $(CONTRACT2)
         :min_marker_gene_range_fold,
     ),
     min_marker_quantile::Real = function_default(compute_vector_of_is_marker_per_gene!, :min_marker_quantile),
+    marker_min_significant_gene_UMIs::Integer = function_default(
+        compute_vector_of_is_marker_per_gene!,
+        :min_significant_gene_UMIs,
+    ),
+    marker_gene_fraction_regularization::AbstractFloat = function_default(
+        compute_vector_of_is_marker_per_gene!,
+        :gene_fraction_regularization,
+    ),
     overwrite::Bool = false,
 )::Nothing
     @assert max_redundant_fold >= 0
     @assert 0 < n_neighbors
     @assert 0 <= min_marker_quantile < 1
+    @assert marker_min_significant_gene_UMIs >= 0
+    @assert marker_gene_fraction_regularization > 0
 
     is_skeleton_per_gene = Vector{Bool}(get_vector(full_daf, "gene", "is_skeleton").array)
     indices_of_skeletons = findall(is_skeleton_per_gene)
@@ -172,9 +188,24 @@ $(CONTRACT2)
             else
                 log_minimal_fraction = quantile(log_linear_fraction_per_focus_metacell, min_marker_quantile)
             end
+            minimal_fraction = 2^log_minimal_fraction - marker_gene_fraction_regularization
+
+            # An insignificant fold counts as zero.
+            range_fold = 0.0f0
+            for metacell_index in indices_of_focus_metacells
+                if UMIs_per_skeleton_per_metacell[skeleton_position, metacell_index] +
+                   minimal_fraction * total_UMIs_per_metacell[metacell_index] >= marker_min_significant_gene_UMIs
+                    range_fold = max(
+                        range_fold,
+                        log_linear_fraction_per_skeleton_per_metacell[skeleton_position, metacell_index] -
+                        log_minimal_fraction,
+                    )
+                end
+            end
+
             is_focus_per_skeleton[skeleton_position] =
                 maximum(linear_fraction_per_focus_metacell) >= min_marker_gene_max_fraction &&
-                maximum(log_linear_fraction_per_focus_metacell) - log_minimal_fraction >= min_marker_gene_range_fold
+                range_fold >= min_marker_gene_range_fold
         end
         focus_skeleton_positions = findall(is_focus_per_skeleton)
         @assert !isempty(focus_skeleton_positions)

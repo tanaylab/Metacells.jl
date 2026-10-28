@@ -236,6 +236,8 @@
     min_marker_gene_max_fraction::AbstractFloat = ```0.0001```,
     min_marker_gene_range_fold::Real = ```2```,
     min_marker_quantile::Real = ```0```,
+    marker_min_significant_gene_UMIs::Integer = ```40```,
+    marker_gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -269,8 +271,12 @@
 <code>min_marker_gene_max_fraction
 </code>, 
 <code>min_marker_gene_range_fold
-</code> and 
+</code>, 
 <code>min_marker_quantile
+</code>, 
+<code>marker_min_significant_gene_UMIs
+</code> and 
+<code>marker_gene_fraction_regularization
 </code> (see 
 <a href="analyze_genes.html#Metacells.AnalyzeGenes.compute_vector_of_is_marker_per_gene!">
 <code>compute_vector_of_is_marker_per_gene!
@@ -285,7 +291,11 @@
 <a href="analyze_metacells.html#Metacells.AnalyzeMetacells.compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!">
 <code>compute_matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell!
 </code>
-</a>).
+</a>). Unlike other fold factors, this does not require each gene to be based on at least 
+<code>max_fold_min_significant_gene_UMIs
+</code>. Testing all the pairs would be too expensive for a large number of metacells. Instead, the high 
+<code>gene_fraction_regularization
+</code> reduces the effect of genes with few UMIs. This only chooses the pairs to test. The test itself does use the floor.
 </li>
 <li>Computes the maximal confident fold of the skeleton genes between each metacell and each of its neighbors, using the 
 <code>max_fold_gene_fraction_regularization

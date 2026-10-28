@@ -31,6 +31,7 @@ import Random.default_rng
 # Needed because of JET:
 import Metacells.Contracts.base_block_axis
 import Metacells.Contracts.gene_axis
+import Metacells.Contracts.matrix_of_UMIs_per_gene_per_metacell
 import Metacells.Contracts.matrix_of_correlation_between_base_neighborhood_cells_and_punctuated_metacells_per_gene_per_base_block
 import Metacells.Contracts.matrix_of_correlation_between_markers_per_gene_per_gene
 import Metacells.Contracts.matrix_of_linear_fraction_per_gene_per_metacell
@@ -49,6 +50,7 @@ import Metacells.Contracts.vector_of_is_transcription_factor_per_gene
 import Metacells.Contracts.vector_of_marker_rank_per_gene
 import Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_degraded_base_blocks_per_gene
 import Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhood_cells_at_improved_base_blocks_per_gene
+import Metacells.Contracts.vector_of_total_UMIs_per_metacell
 
 """
     function compute_vector_of_is_marker_per_gene!(
@@ -56,6 +58,8 @@ import Metacells.Contracts.vector_of_mean_no_module_fraction_in_base_neighborhoo
         min_marker_gene_max_fraction::AbstractFloat = $(DEFAULT.min_marker_gene_max_fraction),
         min_marker_gene_range_fold::Real = $(DEFAULT.min_marker_gene_range_fold),
         min_marker_quantile::Real = $(DEFAULT.min_marker_quantile),
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
@@ -64,13 +68,17 @@ Compute and set `vector_of_is_marker_per_gene`. Such genes:
   - Have a maximal gene expression level of at least `min_marker_gene_max_fraction`, and
   - Have a range of expression of at least `min_marker_gene_range_fold` between the maximal and minimal
     (log base 2) of the expression level. For the minimal expression, we take the `min_marker_quantile`
-    of the expression levels in the population.
+    of the expression levels in the population. As usual, we only consider the fold factor of a metacell if it is
+    based on at least `min_significant_gene_UMIs`, counting the metacell UMIs of the gene plus the minimal expression
+    normalized to the metacell size.
 
 $(CONTRACT)
 """
 @logged :mcs_ops @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
         matrix_of_linear_fraction_per_gene_per_metacell(RequiredInput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         vector_of_is_marker_per_gene(CreatedOutput),
@@ -80,11 +88,15 @@ $(CONTRACT)
     min_marker_gene_max_fraction::AbstractFloat = 1e-4,
     min_marker_gene_range_fold::Real = 2,
     min_marker_quantile::Real = 0,
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     overwrite::Bool = false,
 )::Nothing
     @assert min_marker_gene_range_fold >= 0
     @assert 0 <= min_marker_gene_max_fraction <= 1
     @assert 0 <= min_marker_quantile < 1
+    @assert min_significant_gene_UMIs >= 0
+    @assert gene_fraction_regularization > 0
 
     maximal_fraction_per_gene = daf["@ metacell @ gene :: linear_fraction >- Max"].array
     if min_marker_quantile == 0
@@ -93,8 +105,22 @@ $(CONTRACT)
         log_minimal_fraction_per_gene =
             daf["@ metacell @ gene :: log_linear_fraction >- Quantile p $(min_marker_quantile)"].array
     end
-    log_maximal_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- Max"].array
-    range_fold_per_gene = log_maximal_fraction_per_gene .- log_minimal_fraction_per_gene
+    minimal_fraction_per_gene = 2 .^ log_minimal_fraction_per_gene .- gene_fraction_regularization
+
+    total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
+    UMIs_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "UMIs"))
+    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
+
+    # An insignificant fold counts as zero.
+    range_fold_per_gene = vec(
+        maximum(
+            (log_linear_fraction_per_gene_per_metacell .- log_minimal_fraction_per_gene) .* (
+                UMIs_per_gene_per_metacell .+ minimal_fraction_per_gene .* transpose(total_UMIs_per_metacell) .>=
+                min_significant_gene_UMIs
+            );
+            dims = 2,
+        ),
+    )
 
     is_marker_per_gene =
         (maximal_fraction_per_gene .>= min_marker_gene_max_fraction) .&
@@ -330,6 +356,8 @@ end
 """
     function compute_vector_of_marker_rank_per_gene!(
         daf::DafWriter;
+        min_significant_gene_UMIs::Integer = $(DEFAULT.min_significant_gene_UMIs),
+        gene_fraction_regularization::AbstractFloat = $(DEFAULT.gene_fraction_regularization),
         overwrite::Bool = $(DEFAULT.overwrite),
     )::Nothing
 
@@ -338,7 +366,9 @@ Compute and set [`vector_of_marker_rank_per_gene`](@ref). To compute this:
  1. Non-marker genes are given a rank of `typemax(UInt32)` regardless of their expression level in the metacells (see
     [`vector_of_is_marker_per_gene`](@ref)).
  2. Compute the median of the (log base 2) of the gene expression level for each marker gene across all the metacells.
- 3. Compute the per-marker-per-metacell fold factor (absolute difference of the log expression from the median).
+ 3. Compute the per-marker-per-metacell fold factor (absolute difference of the log expression from the median). As
+    usual, we only consider the fold factor if it is based on at least `min_significant_gene_UMIs`, counting the
+    metacell UMIs of the gene plus the median expression normalized to the metacell size. Otherwise it is zero.
  4. Invoke [`rank_variables`](@ref) to rank the marker genes from most to least significant.
 
 Non-marker genes are given a rank of `typemax(UInt32)` regardless of their expression level in the metacells.
@@ -348,14 +378,21 @@ $(CONTRACT)
 @logged :mcs_ops @computation Contract(
     axes = [gene_axis(RequiredInput), metacell_axis(RequiredInput)],
     data = [
+        vector_of_total_UMIs_per_metacell(RequiredInput),
+        matrix_of_UMIs_per_gene_per_metacell(RequiredInput),
         matrix_of_log_linear_fraction_per_gene_per_metacell(RequiredInput),
         vector_of_is_marker_per_gene(RequiredInput),
         vector_of_marker_rank_per_gene(CreatedOutput),
     ],
 ) function compute_vector_of_marker_rank_per_gene!(  # UNTESTED
     daf::DafWriter;
+    min_significant_gene_UMIs::Integer = MIN_SIGNIFICANT_GENE_UMIS,
+    gene_fraction_regularization::AbstractFloat = GENE_FRACTION_REGULARIZATION_FOR_METACELLS,
     overwrite::Bool = false,
 )::Nothing
+    @assert min_significant_gene_UMIs >= 0
+    @assert gene_fraction_regularization > 0
+
     n_metacells = axis_length(daf, "metacell")
     n_genes = axis_length(daf, "gene")
 
@@ -366,23 +403,39 @@ $(CONTRACT)
         plain_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction"]))
     @assert_matrix(log_fraction_per_metacell_per_marker, n_metacells, n_markers, Columns)
 
+    UMIs_per_metacell_per_marker = Matrix{Float32}(plain_array(densify(daf["@ metacell @ gene [ is_marker ] :: UMIs"])))
+    @assert_matrix(UMIs_per_metacell_per_marker, n_metacells, n_markers, Columns)
+
+    total_UMIs_per_metacell = Vector{Float32}(get_vector(daf, "metacell", "total_UMIs").array)
+
     median_log_fraction_per_marker =
         plain_array(densify(daf["@ metacell @ gene [ is_marker ] :: log_linear_fraction >- Median"]))
     @assert_vector(median_log_fraction_per_marker, n_markers)
+    median_fraction_per_marker = Float32.(2 .^ median_log_fraction_per_marker .- gene_fraction_regularization)
 
+    min_significant_gene_UMIs = Float32(min_significant_gene_UMIs)
     abs_fold_per_metacell_per_marker = Matrix{Float32}(undef, size(log_fraction_per_metacell_per_marker))
     @check_turbo_matrix(abs_fold_per_metacell_per_marker)
     @check_turbo_matrix(log_fraction_per_metacell_per_marker)
+    @check_turbo_matrix(UMIs_per_metacell_per_marker)
+    @check_turbo_vector(total_UMIs_per_metacell)
     @check_turbo_vector(median_log_fraction_per_marker)
+    @check_turbo_vector(median_fraction_per_marker)
     parallel_loop_wo_rng(
         1:n_markers;
         name = "abs_fold_per_metacell_per_marker",
         progress = DebugProgress(n_markers; group = :mcs_loops, desc = "abs_fold_per_metacell_per_marker"),
     ) do marker_index
         @turbo for metacell_index in 1:n_metacells
-            abs_fold_per_metacell_per_marker[metacell_index, marker_index] = abs(
-                log_fraction_per_metacell_per_marker[metacell_index, marker_index] -
-                median_log_fraction_per_marker[marker_index],
+            abs_fold_per_metacell_per_marker[metacell_index, marker_index] = ifelse(
+                UMIs_per_metacell_per_marker[metacell_index, marker_index] +
+                median_fraction_per_marker[marker_index] * total_UMIs_per_metacell[metacell_index] >=
+                min_significant_gene_UMIs,
+                abs(
+                    log_fraction_per_metacell_per_marker[metacell_index, marker_index] -
+                    median_log_fraction_per_marker[marker_index],
+                ),
+                0.0f0,
             )
         end
         return nothing

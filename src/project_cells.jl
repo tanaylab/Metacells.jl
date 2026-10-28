@@ -89,13 +89,15 @@ Each cell is projected on its own, reading only its own column of the query's `U
 pass over the gene × cell layout.
 
 The provisional block is picked using the log (base 2) of the expression of the marker genes, using the
-`gene_fraction_regularization` to handle zero fractions. The metacells are compared using the z-scores of the found
-modules, computed the same way sharpening computes them, using the same `std_UMIs_regularization` (see
-[`compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!`](@ref)). Each metacell is represented by the
-mean z-scores of its cells. We also compute the z-score of the final distance between the cell and its projected
-metacell, relative to the mean and standard deviation of the distances of the metacell's own cells (see
-[`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref)). If this is too large, then the query cell
-isn't a good match for anything in the atlas.
+`gene_fraction_regularization` to handle zero fractions. Unlike other fold factors, this does not require each gene to
+be based on at least `MIN_SIGNIFICANT_GENE_UMIS`. A single cell has few UMIs of each gene, so such a floor would ignore
+most of them. Instead, the high `gene_fraction_regularization` reduces the effect of genes with few UMIs. The metacells
+are compared using the z-scores of the found modules, computed the same way sharpening computes them, using the same
+`std_UMIs_regularization` (see [`compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!`](@ref)). Each
+metacell is represented by the mean z-scores of its cells. We also compute the z-score of the final distance between the
+cell and its projected metacell, relative to the mean and standard deviation of the distances of the metacell's own
+cells (see [`compute_stats_of_euclidean_modules_cells_distance_per_metacell!`](@ref)). If this is too large, then the
+query cell isn't a good match for anything in the atlas.
 
 Excluded query cells are not projected. Their projected metacell and block are empty, and their z-score is infinite.
 

@@ -1462,6 +1462,8 @@
     min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
     min_marker_gene_range_fold::Real = 1.0,
     min_marker_quantile::Real = 0.1,
+    min_significant_gene_UMIs::Integer = ```40```,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = false,
 )::Nothing
 </code>
@@ -1500,6 +1502,8 @@
     min_marker_gene_max_fraction::AbstractFloat = 2 ^ -13.5,
     min_marker_gene_range_fold::Real = 1.0,
     min_marker_quantile::Real = 0.1,
+    min_significant_gene_UMIs::Integer = ```40```,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = false,
 )::Nothing
 </code>
@@ -1537,6 +1541,8 @@
     daf::DafWriter;
     min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
     min_distinct_gene_mean_fold::Real = 2,
+    min_significant_gene_UMIs::Integer = ```40```,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = false,
 )::Nothing
 </code>
@@ -1554,7 +1560,9 @@
 </li>
 <li>When comparing its fold factor compared to its median expression level in the population, then the mean fold factor in the neighborhood is at least 
 <code>min_distinct_gene_mean_fold
-</code>. This is not the absolute fold, that is, we only look for genes which are stronger than the population as a whole, not weaker.
+</code>. This is not the absolute fold, that is, we only look for genes which are stronger than the population as a whole, not weaker. As usual, we only consider the fold factor of a metacell if it is based on at least 
+<code>min_significant_gene_UMIs
+</code>, counting the metacell UMIs of the gene plus the median expression normalized to the metacell size. Otherwise it counts as zero in the mean.
 </li>
 </ul>
 <p>
@@ -1586,6 +1594,10 @@
 </strong>::AbstractString (required): The unique block each metacell belongs to.
 </p>
 <p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -1594,6 +1606,10 @@
 <em>in
 </em>neighborhood
 </strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
 </p>
 <p>
 <strong>gene, metacell @ linear_fraction
@@ -1640,6 +1656,8 @@
     daf::DafWriter;
     min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
     min_distinct_gene_mean_fold::Real = 2,
+    min_significant_gene_UMIs::Integer = ```40```,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = false,
 )::Nothing
 </code>
@@ -1657,7 +1675,9 @@
 </li>
 <li>When comparing its fold factor compared to its median expression level in the population, then the mean fold factor in the environment is at least 
 <code>min_distinct_gene_mean_fold
-</code>. This is not the absolute fold, that is, we only look for genes which are stronger than the population as a whole, not weaker.
+</code>. This is not the absolute fold, that is, we only look for genes which are stronger than the population as a whole, not weaker. As usual, we only consider the fold factor of a metacell if it is based on at least 
+<code>min_significant_gene_UMIs
+</code>, counting the metacell UMIs of the gene plus the median expression normalized to the metacell size. Otherwise it counts as zero in the mean.
 </li>
 </ul>
 <p>
@@ -1681,6 +1701,14 @@
 </strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
 </p>
 <p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
 <strong>Matrices
 </strong>
 </p>
@@ -1689,6 +1717,10 @@
 <em>in
 </em>environment
 </strong>::Bool (required): For each block, whether each metacell is in its environment.
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
 </p>
 <p>
 <strong>gene, metacell @ linear_fraction
@@ -2443,7 +2475,15 @@
 <a href="contracts.html#Metacells.Contracts.vector_of_block_closest_by_pertinent_markers_per_cell">
 <code>vector_of_block_closest_by_pertinent_markers_per_cell
 </code>
-</a>.
+</a>. This is the block with the minimal Euclidean distance between the log of the fractions of the pertinent (non-lateral) marker genes in the cell and in the block, adding the 
+<code>gene_fraction_regularization
+</code>.
+</p>
+<p>Unlike other fold factors, this does not require each gene to be based on at least 
+<code>MIN_SIGNIFICANT_GENE_UMIS
+</code>. A single cell has few UMIs of each gene, so such a floor would ignore most of them. Instead, the high 
+<code>gene_fraction_regularization
+</code> reduces the effect of genes with few UMIs.
 </p>
 </div>
 </section>

@@ -254,7 +254,11 @@
 </p>
 <p>The provisional block is picked using the log (base 2) of the expression of the marker genes, using the 
 <code>gene_fraction_regularization
-</code> to handle zero fractions. The metacells are compared using the z-scores of the found modules, computed the same way sharpening computes them, using the same 
+</code> to handle zero fractions. Unlike other fold factors, this does not require each gene to be based on at least 
+<code>MIN_SIGNIFICANT_GENE_UMIS
+</code>. A single cell has few UMIs of each gene, so such a floor would ignore most of them. Instead, the high 
+<code>gene_fraction_regularization
+</code> reduces the effect of genes with few UMIs. The metacells are compared using the z-scores of the found modules, computed the same way sharpening computes them, using the same 
 <code>std_UMIs_regularization
 </code> (see 
 <a href="analyze_modules.html#Metacells.AnalyzeModules.compute_tensor_of_mean_cells_z_score_per_block_per_module_per_metacell!">

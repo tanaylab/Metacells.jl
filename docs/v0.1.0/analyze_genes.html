@@ -370,6 +370,8 @@
     min_marker_gene_max_fraction::AbstractFloat = ```0.0001```,
     min_marker_gene_range_fold::Real = ```2```,
     min_marker_quantile::Real = ```0```,
+    min_significant_gene_UMIs::Integer = ```40```,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -387,7 +389,9 @@
 <code>min_marker_gene_range_fold
 </code> between the maximal and minimal (log base 2) of the expression level. For the minimal expression, we take the 
 <code>min_marker_quantile
-</code> of the expression levels in the population.
+</code> of the expression levels in the population. As usual, we only consider the fold factor of a metacell if it is based on at least 
+<code>min_significant_gene_UMIs
+</code>, counting the metacell UMIs of the gene plus the minimal expression normalized to the metacell size.
 </li>
 </ul>
 <p>
@@ -407,8 +411,20 @@
 </strong> (required): Minimal-sized groups of cells for robust point estimates.
 </p>
 <p>
+<strong>Vectors
+</strong>
+</p>
+<p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
 <strong>Matrices
 </strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
 </p>
 <p>
 <strong>gene, metacell @ linear_fraction
@@ -451,6 +467,8 @@
 <pre>
 <code class="language-julia hljs">function compute_vector_of_marker_rank_per_gene!(
     daf::DafWriter;
+    min_significant_gene_UMIs::Integer = ```40```,
+    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
     overwrite::Bool = ```false```,
 )::Nothing
 </code>
@@ -472,7 +490,9 @@
 </li>
 <li>Compute the median of the (log base 2) of the gene expression level for each marker gene across all the metacells.
 </li>
-<li>Compute the per-marker-per-metacell fold factor (absolute difference of the log expression from the median).
+<li>Compute the per-marker-per-metacell fold factor (absolute difference of the log expression from the median). As usual, we only consider the fold factor if it is based on at least 
+<code>min_significant_gene_UMIs
+</code>, counting the metacell UMIs of the gene plus the median expression normalized to the metacell size. Otherwise it is zero.
 </li>
 <li>Invoke 
 <a href="analyze_genes.html#Metacells.AnalyzeGenes.rank_variables">
@@ -506,12 +526,20 @@
 </strong>
 </p>
 <p>
+<strong>metacell @ total_UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
+</p>
+<p>
 <strong>gene @ is_marker
 </strong>::Bool (required): A mask of genes that distinguish between cell states.
 </p>
 <p>
 <strong>Matrices
 </strong>
+</p>
+<p>
+<strong>gene, metacell @ UMIs
+</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
 </p>
 <p>
 <strong>gene, metacell @ log
