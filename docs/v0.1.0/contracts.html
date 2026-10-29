@@ -2317,45 +2317,11 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 )::Pair{MatrixKey, DataSpecification}
 </code>
 </pre>
-<p>A mask of genes that distinguish between cell states in each block&#39;s neighborhood. Such genes do not necessarily distinguish the neighborhood from the rest of the population - see 
-<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
-<code>matrix_of_is_neighborhood_distinct_per_gene_per_block
-</code>
-</a>.
+<p>A mask of genes that distinguish between cell states in each block&#39;s neighborhood. Such genes do not necessarily distinguish the neighborhood from the rest of the population.
 </p>
 <p>This matrix is populated by 
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_marker_per_gene_per_block!">
 <code>compute_matrix_of_is_neighborhood_marker_per_gene_per_block!
-</code>
-</a>.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
-<summary id="Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
-<a class="docstring-binding" href="#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">matrix_of_is_neighborhood_distinct_per_gene_per_block(
-    expectation::ContractExpectation
-)::Pair{MatrixKey, DataSpecification}
-</code>
-</pre>
-<p>A mask of genes that distinguish between cell states of each block&#39;s neighborhood and the rest of the manifold.
-</p>
-<p>This matrix is populated by 
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
-<code>compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
 </code>
 </a>.
 </p>
@@ -4403,12 +4369,6 @@ is_gmara_lateral_per_gene .&amp; .!get_vector(daf, &quot;gene&quot;, &quot;is_la
 <li>
 <a href="contracts.html#Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block">
 <code>Metacells.Contracts.matrix_of_is_in_neighborhood_per_block_per_block
-</code>
-</a>
-</li>
-<li>
-<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
-<code>Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
 </code>
 </a>
 </li>

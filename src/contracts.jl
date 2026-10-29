@@ -48,7 +48,6 @@ export matrix_of_is_environment_specific_per_gene_per_metacell
 export matrix_of_is_found_per_module_per_block
 export matrix_of_is_in_environment_per_metacell_per_block
 export matrix_of_is_in_neighborhood_per_block_per_block
-export matrix_of_is_neighborhood_distinct_per_gene_per_block
 export matrix_of_is_neighborhood_marker_per_gene_per_block
 export matrix_of_knn_euclidean_skeleton_fold_distance_per_metacell_per_metacell
 export matrix_of_linear_fraction_per_gene_per_block
@@ -1315,8 +1314,7 @@ end
     )::Pair{MatrixKey, DataSpecification}
 
 A mask of genes that distinguish between cell states in each block's neighborhood. Such genes do not necessarily
-distinguish the neighborhood from the rest of the population - see
-[`matrix_of_is_neighborhood_distinct_per_gene_per_block`](@ref).
+distinguish the neighborhood from the rest of the population.
 
 This matrix is populated by [`compute_matrix_of_is_neighborhood_marker_per_gene_per_block!`](@ref
 Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_marker_per_gene_per_block!).
@@ -1326,27 +1324,6 @@ function matrix_of_is_neighborhood_marker_per_gene_per_block(
 )::Pair{MatrixKey, DataSpecification}  # untested
     return ("gene", "block", "is_neighborhood_marker") =>
         (expectation, Bool, "A mask of genes that distinguish between cell states in each block's neighborhood.")
-end
-
-"""
-    matrix_of_is_neighborhood_distinct_per_gene_per_block(
-        expectation::ContractExpectation
-    )::Pair{MatrixKey, DataSpecification}
-
-A mask of genes that distinguish between cell states of each block's neighborhood and the rest of the manifold.
-
-This matrix is populated by [`compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!`](@ref
-Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!).
-"""
-function matrix_of_is_neighborhood_distinct_per_gene_per_block(
-    expectation::ContractExpectation,
-)::Pair{MatrixKey, DataSpecification}  # untested
-    return ("block", "gene", "is_neighborhood_distinct") => (
-        expectation,
-        Bool,
-        "A mask of genes that distinguish between cell states of each block's neighborhood and the rest of the" *
-        " manifold.",
-    )
 end
 
 ### Neighborhoods Correlations

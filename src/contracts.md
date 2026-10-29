@@ -144,7 +144,6 @@ Metacells.Contracts.vector_of_n_neighborhood_metacells_per_block
 Metacells.Contracts.vector_of_n_neighborhood_cells_per_block
 Metacells.Contracts.vector_of_total_neighborhood_UMIs_per_block
 Metacells.Contracts.matrix_of_is_neighborhood_marker_per_gene_per_block
-Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block
 ```
 
 ### Neighborhoods Correlations

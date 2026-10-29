@@ -13,6 +13,7 @@ export fetch_gmara_vector_of_is_regulator_per_gene!
 export fetch_gmara_vector_of_is_transcription_factor_per_gene!
 export rank_variables
 
+using Base.Threads
 using DataAxesFormats
 using DataFrames
 using LinearAlgebra
@@ -26,6 +27,7 @@ using ..Contracts
 using ..Defaults
 using ..Gmara
 
+import Base.Threads.maxthreadid
 import Random.default_rng
 
 # Needed because of JET:
@@ -99,28 +101,40 @@ $(CONTRACT)
     @assert gene_fraction_regularization > 0
 
     maximal_fraction_per_gene = daf["@ metacell @ gene :: linear_fraction >- Max"].array
-    if min_marker_quantile == 0
-        log_minimal_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- Min"].array
-    else
-        log_minimal_fraction_per_gene =
-            daf["@ metacell @ gene :: log_linear_fraction >- Quantile p $(min_marker_quantile)"].array
-    end
+    minimal_reduction = min_marker_quantile == 0 ? "Min" : "Quantile p $(min_marker_quantile)"
+    log_minimal_fraction_per_gene = daf["@ metacell @ gene :: log_linear_fraction >- $(minimal_reduction)"].array
     minimal_fraction_per_gene = 2 .^ log_minimal_fraction_per_gene .- gene_fraction_regularization
 
+    n_genes = axis_length(daf, "gene")
+    n_metacells = axis_length(daf, "metacell")
     total_UMIs_per_metacell = plain_array(get_vector(daf, "metacell", "total_UMIs"))
-    UMIs_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "UMIs"))
-    log_linear_fraction_per_gene_per_metacell = plain_array(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
+    log_linear_fraction_reader_per_thread =
+        new_column_reader_per_thread(get_matrix(daf, "gene", "metacell", "log_linear_fraction"))
+    UMIs_per_gene_per_thread = [Vector{Float32}(undef, n_genes) for _ in 1:maxthreadid()]
+    max_range_fold_per_gene_per_thread = [fill(-Inf, n_genes) for _ in 1:maxthreadid()]
 
-    # An insignificant fold counts as zero.
-    range_fold_per_gene = vec(
-        maximum(
-            (log_linear_fraction_per_gene_per_metacell .- log_minimal_fraction_per_gene) .* (
-                UMIs_per_gene_per_metacell .+ minimal_fraction_per_gene .* transpose(total_UMIs_per_metacell) .>=
+    parallel_foreach_column(
+        get_matrix(daf, "gene", "metacell", "UMIs");
+        name = "is_marker_per_gene",
+        progress = DebugProgress(n_metacells; group = :mcs_loops, desc = "is_marker_per_gene"),
+    ) do _, metacell_index, UMIs_per_gene_column
+        UMIs_per_gene = UMIs_per_gene_per_thread[threadid()]
+        UMIs_per_gene .= UMIs_per_gene_column
+        log_linear_fraction_per_gene = read_column(log_linear_fraction_reader_per_thread[threadid()], metacell_index)
+        max_range_fold_per_gene = max_range_fold_per_gene_per_thread[threadid()]
+        total_UMIs = total_UMIs_per_metacell[metacell_index]
+        @inbounds for gene_index in 1:n_genes
+            # An insignificant fold counts as zero.
+            is_significant =
+                UMIs_per_gene[gene_index] + minimal_fraction_per_gene[gene_index] * total_UMIs >=
                 min_significant_gene_UMIs
-            );
-            dims = 2,
-        ),
-    )
+            range_fold =
+                (log_linear_fraction_per_gene[gene_index] - log_minimal_fraction_per_gene[gene_index]) * is_significant
+            max_range_fold_per_gene[gene_index] = max(max_range_fold_per_gene[gene_index], range_fold)
+        end
+        return nothing
+    end
+    range_fold_per_gene = reduce((left, right) -> max.(left, right), max_range_fold_per_gene_per_thread)
 
     is_marker_per_gene =
         (maximal_fraction_per_gene .>= min_marker_gene_max_fraction) .&

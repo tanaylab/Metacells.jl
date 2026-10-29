@@ -1526,121 +1526,6 @@
 </article>
 <article>
 <details class="docstring" open="true">
-<summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
-<a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
-</code>
-</a> — 
-<span class="docstring-category">Function
-</span>
-</summary>
-<section>
-<div>
-<pre>
-<code class="language-julia hljs">compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!(
-    daf::DafWriter;
-    min_distinct_gene_max_fraction::AbstractFloat = 2 ^ -14.5,
-    min_distinct_gene_mean_fold::Real = 2,
-    min_significant_gene_UMIs::Integer = ```40```,
-    gene_fraction_regularization::AbstractFloat = ```1.0e-5```,
-    overwrite::Bool = false,
-)::Nothing
-</code>
-</pre>
-<p>Compute and set 
-<a href="contracts.html#Metacells.Contracts.matrix_of_is_neighborhood_distinct_per_gene_per_block">
-<code>matrix_of_is_neighborhood_distinct_per_gene_per_block
-</code>
-</a>. A gene is distinct in the neighborhood if:
-</p>
-<ul>
-<li>It has a maximal expression level of at least 
-<code>min_distinct_gene_max_fraction
-</code>.
-</li>
-<li>When comparing its fold factor compared to its median expression level in the population, then the mean fold factor in the neighborhood is at least 
-<code>min_distinct_gene_mean_fold
-</code>. This is not the absolute fold, that is, we only look for genes which are stronger than the population as a whole, not weaker. As usual, we only consider the fold factor of a metacell if it is based on at least 
-<code>min_significant_gene_UMIs
-</code>, counting the metacell UMIs of the gene plus the median expression normalized to the metacell size. Otherwise it counts as zero in the mean.
-</li>
-</ul>
-<p>
-<strong>Inputs
-</strong>
-</p>
-<p>
-<strong>Axes
-</strong>
-</p>
-<p>
-<strong>gene
-</strong> (required): Sequenced genes.
-</p>
-<p>
-<strong>metacell
-</strong> (required): Minimal-sized groups of cells for robust point estimates.
-</p>
-<p>
-<strong>block
-</strong> (required): Distinct groups of metacells with &quot;very close&quot; cell state.
-</p>
-<p>
-<strong>Vectors
-</strong>
-</p>
-<p>
-<strong>metacell @ block
-</strong>::AbstractString (required): The unique block each metacell belongs to.
-</p>
-<p>
-<strong>metacell @ total_UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of all the non-excluded genes in each metacell.
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
-<strong>block, block @ is
-<em>in
-</em>neighborhood
-</strong>::Bool (required): For each (column) block, whether each (row) block is in its immediate neighborhood.
-</p>
-<p>
-<strong>gene, metacell @ UMIs
-</strong>::Union{UInt16, UInt32, UInt64, UInt8} (required): The total number of UMIs of each gene in the cells of each metacell.
-</p>
-<p>
-<strong>gene, metacell @ linear_fraction
-</strong>::Union{Float32, Float64} (required): The linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
-</p>
-<p>
-<strong>gene, metacell @ log
-<em>linear
-</em>fraction
-</strong>::Union{Float32, Float64} (required): The log base 2 of the linear fraction of the UMIs of each non-excluded gene in each metacell, out of the total UMIs.
-</p>
-<p>
-<strong>Outputs
-</strong>
-</p>
-<p>
-<strong>Matrices
-</strong>
-</p>
-<p>
-<strong>block, gene @ is
-<em>neighborhood
-</em>distinct
-</strong>::Bool (created): A mask of genes that distinguish between cell states of each block&#39;s neighborhood and the rest of the manifold.
-</p>
-</div>
-</section>
-</details>
-</article>
-<article>
-<details class="docstring" open="true">
 <summary id="Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!">
 <a class="docstring-binding" href="#Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_is_environment_distinct_per_gene_per_block!
@@ -4041,12 +3926,6 @@
 <li>
 <a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_in_neighborhood_per_block_per_block!">
 <code>Metacells.AnalyzeBlocks.compute_matrix_of_is_in_neighborhood_per_block_per_block!
-</code>
-</a>
-</li>
-<li>
-<a href="analyze_blocks.html#Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!">
-<code>Metacells.AnalyzeBlocks.compute_matrix_of_is_neighborhood_distinct_per_gene_per_block!
 </code>
 </a>
 </li>
